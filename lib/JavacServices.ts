@@ -6,11 +6,13 @@ import Net = require('net');
 import * as Maven from './Maven';
 import {MavenDependency} from './JavaConfig';
 import * as V from 'vscode';
+import {getJavaBinPath} from './JavaPath';
 
 export function provideJavac(classpath: string[], mavenDependencies: MavenDependency[] = []): Promise<JavacServices> {
     return new Promise((resolve, reject) => {
         PortFinder.basePort = 55220;
-
+        
+        var javaPath = getJavaBinPath('java');
         var dependencies = mavenDependencies.concat([
             {
                 "groupId": "com.fivetran",
@@ -27,7 +29,7 @@ export function provideJavac(classpath: string[], mavenDependencies: MavenDepend
                     var mvnClasspath = mvnResults.classpath;
                     var combinedClasspath = mvnClasspath.concat(classpath);
 
-                    resolve(new JavacServices('.', 'java', combinedClasspath, port, 'inherit'));
+                    resolve(new JavacServices('.', javaPath, combinedClasspath, port, 'inherit'));
                 }
             });
         });
@@ -174,10 +176,17 @@ export class JavacServices {
                 stdio: string) {
 
         var args = ['-cp', classPath.join(':')];
+        var cwd = V.workspace.rootPath;
+        
+        if (cwd == null) {
+            console.error('Can\'t invoke javac without a working directory');
+            
+            return
+        }
 
         //args.push('-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005');
         args.push('-DservicePort=' + port);
-        args.push('-DprojectDirectory=' + projectDirectoryPath);
+        args.push('-DprojectDirectory=' + cwd);
         args.push('com.fivetran.javac.Main');
 
         console.log(javaExecutablePath + ' ' + args.join(' '));
@@ -197,7 +206,12 @@ export class JavacServices {
                 resolve(socket);
             }).listen(port, () => {
                 // Start the child java process
-                child_process.spawn(javaExecutablePath, args, { 'stdio': stdio });
+                child_process.execFile(javaExecutablePath, args, { stdio, cwd }, (err, stdout, stderr) => {
+                    if (err)
+                        console.error(err.message);
+                    else
+                        console.info('javac server has terminated')
+                });
             });
         });
     }

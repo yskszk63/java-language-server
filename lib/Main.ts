@@ -22,7 +22,7 @@ function startBuildOnSaveWatcher(subscriptions: V.Disposable[]) {
     J.provideJavac([], []).then(newJavac => {
         javac = newJavac;
         
-        javac.echo('javac has started').then(response => {
+        javac.echo('javac server has started').then(response => {
             console.log(response);
         }).catch(err => console.error(err));
         
