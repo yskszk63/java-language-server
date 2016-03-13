@@ -11,14 +11,21 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:extension.sayHello"
+        "onLanguage:java"
 	],
 	"main": "./out/src/extension",
 	"contributes": {
-		"commands": [{
-			"command": "extension.sayHello",
-			"title": "Hello World"
-		}]
+        "languages": [
+            {
+                "id": "java",
+                "extensions": [
+                    ".java"
+                ],
+                "aliases": [
+                    "Java"
+                ]
+            }
+        ]
 	},
 	"scripts": {
 		"vscode:prepublish": "node ./node_modules/vscode/bin/compile",
