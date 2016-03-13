@@ -5,10 +5,12 @@ import PortFinder = require('portfinder');
 import Net = require('net');
 import * as Maven from './Maven';
 import {MavenDependency} from './JavaConfig';
-import * as V from 'vscode';
+// Don't import members, just types, otherwise the tests will break
+import {DiagnosticSeverity,CompletionItemKind} from 'vscode';
 import {getJavaBinPath} from './JavaPath';
 
-export function provideJavac(classpath: string[], mavenDependencies: MavenDependency[] = []): Promise<JavacServices> {
+export function provideJavac(projectDirectoryPath: string, 
+                             mavenDependencies: MavenDependency[] = []): Promise<JavacServices> {
     return new Promise((resolve, reject) => {
         PortFinder.basePort = 55220;
         
@@ -27,9 +29,8 @@ export function provideJavac(classpath: string[], mavenDependencies: MavenDepend
                     reject(err);
                 else {
                     var mvnClasspath = mvnResults.classpath;
-                    var combinedClasspath = mvnClasspath.concat(classpath);
 
-                    resolve(new JavacServices('.', javaPath, combinedClasspath, port, 'inherit'));
+                    resolve(new JavacServices(projectDirectoryPath, javaPath, mvnClasspath, port, 'inherit'));
                 }
             });
         });
@@ -105,7 +106,7 @@ export interface LintMessage {
     /**
      * The severity, default is [error](#DiagnosticSeverity.Error).
      */
-    severity: V.DiagnosticSeverity;
+    severity: DiagnosticSeverity;
 }
 
 /** The suggestion */
@@ -121,7 +122,7 @@ export interface AutocompleteSuggestion {
      * The kind of this completion item. Based on the kind
      * an icon is chosen by the editor.
      */
-    kind: V.CompletionItemKind;
+    kind: CompletionItemKind;
 
     /**
      * A human-readable string with additional information
@@ -176,17 +177,10 @@ export class JavacServices {
                 stdio: string) {
 
         var args = ['-cp', classPath.join(':')];
-        var cwd = V.workspace.rootPath;
-        
-        if (cwd == null) {
-            console.error('Can\'t invoke javac without a working directory');
-            
-            return
-        }
 
         //args.push('-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005');
         args.push('-DservicePort=' + port);
-        args.push('-DprojectDirectory=' + cwd);
+        args.push('-DprojectDirectory=' + projectDirectoryPath);
         args.push('com.fivetran.javac.Main');
 
         console.log(javaExecutablePath + ' ' + args.join(' '));
@@ -205,8 +199,10 @@ export class JavacServices {
 
                 resolve(socket);
             }).listen(port, () => {
+                var options = { stdio, cwd: projectDirectoryPath };
+                
                 // Start the child java process
-                child_process.execFile(javaExecutablePath, args, { stdio, cwd }, (err, stdout, stderr) => {
+                child_process.execFile(javaExecutablePath, args, options, (err, stdout, stderr) => {
                     if (err)
                         console.error(err.message);
                     else

@@ -19,7 +19,7 @@ export function activate(ctx: V.ExtensionContext) {
 }
 
 function startBuildOnSaveWatcher(subscriptions: V.Disposable[]) {
-    J.provideJavac([], []).then(newJavac => {
+    J.provideJavac(V.workspace.rootPath, []).then(newJavac => {
         javac = newJavac;
         
         javac.echo('javac server has started').then(response => {
