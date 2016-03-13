@@ -73,7 +73,7 @@ public class AutocompleteTest extends Fixtures {
         request.row = row;
         request.column = column;
 
-        return new Services().autocomplete(request).suggestions.stream().map(s -> s.text).collect(toSet());
+        return new Services().autocomplete(request).suggestions.stream().map(s -> s.insertText).collect(toSet());
     }
 
     private String path(String file) {

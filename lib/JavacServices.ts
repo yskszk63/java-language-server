@@ -5,6 +5,7 @@ import PortFinder = require('portfinder');
 import Net = require('net');
 import * as Maven from './Maven';
 import {MavenDependency} from './JavaConfig';
+import * as V from 'vscode';
 
 export function provideJavac(classpath: string[], mavenDependencies: MavenDependency[] = []): Promise<JavacServices> {
     return new Promise((resolve, reject) => {
@@ -45,42 +46,112 @@ export interface RequestLint extends JavacOptions {
 }
 
 export interface RequestAutocomplete extends JavacOptions {
-    row: number;
-    column: number;
+    position: Position;
 }
 
 export interface ResponseLint {
     messages: LintMessage[];
 }
 
+export interface Range {
+    /**
+     * The start position. It is before or equal to [end](#Range.end).
+     * @readonly
+     */
+    start: Position;
+
+    /**
+     * The end position. It is after or equal to [start](#Range.start).
+     * @readonly
+     */
+    end: Position;
+}
+
 export interface Position {
-    row: number;
-    column: number;
+    /**
+     * The zero-based line value.
+     * @readonly
+     */
+    line: number;
+
+    /**
+     * The zero-based character value.
+     * @readonly
+     */
+    character: number;
 }
 
 export interface LintMessage {
-    type: string;
+    uri: string;
+    
+    /**
+     * The range to which this diagnostic applies.
+     */
+    range: Range;
+
+    /**
+     * The human-readable message.
+     */
     message: string;
-    range: {
-        start: Position;
-        end: Position;
-    }
+
+    /**
+     * A human-readable string describing the source of this
+     * diagnostic, e.g. 'typescript' or 'super lint'.
+     */
+    source: string;
+
+    /**
+     * The severity, default is [error](#DiagnosticSeverity.Error).
+     */
+    severity: V.DiagnosticSeverity;
 }
 
 /** The suggestion */
 export interface AutocompleteSuggestion {
-    //Either text or snippet is required
+    /**
+     * The label of this completion item. By default
+     * this is also the text that is inserted when selecting
+     * this completion.
+     */
+    label: string;
 
-    text: string;
-    snippet: string;
-    type: string;
+    /**
+     * The kind of this completion item. Based on the kind
+     * an icon is chosen by the editor.
+     */
+    kind: V.CompletionItemKind;
 
-    replacementPrefix?: string;
+    /**
+     * A human-readable string with additional information
+     * about this item, like type or symbol information.
+     */
+    detail: string;
 
-    rightLabel?: string;
-    rightLabelHTML?: string;
-    leftLabel?: string;
-    description?: string;
+    /**
+     * A human-readable string that represents a doc-comment.
+     */
+    documentation: string;
+
+    /**
+     * A string that should be used when comparing this item
+     * with other items. When `falsy` the [label](#CompletionItem.label)
+     * is used.
+     */
+    sortText: string;
+
+    /**
+     * A string that should be used when filtering a set of
+     * completion items. When `falsy` the [label](#CompletionItem.label)
+     * is used.
+     */
+    filterText: string;
+
+    /**
+     * A string that should be inserted in a document when selecting
+     * this completion. When `falsy` the [label](#CompletionItem.label)
+     * is used.
+     */
+    insertText: string;
 }
 
 export interface ResponseAutocomplete {

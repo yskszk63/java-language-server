@@ -64,8 +64,8 @@ public class RequestResponseTest extends Fixtures {
 
         ResponseLint responseLint = new ResponseLint();
         String message = "cannot find symbol\n  symbol:   variable foo\n  location: class UndefinedSymbol";
-        Range range = new Range(new Point(2, 15), new Point(2, 18));
-        responseLint.messages.add(new LintMessage(LintMessage.Type.Error, message, lint.path, range));
+        Range range = new Range(new Position(2, 15), new Position(2, 18));
+        responseLint.messages.add(new LintMessage(lint.path, range, message, LintMessage.Type.Error));
 
         Response expected = new Response(request.requestId);
         expected.lint = Optional.of(responseLint);
@@ -88,8 +88,8 @@ public class RequestResponseTest extends Fixtures {
 
         ResponseLint responseLint = new ResponseLint();
         String message = "cannot find symbol\n  symbol:   variable foo\n  location: class SingleLineUndefinedSymbol";
-        Range range = new Range(new Point(0, 71), new Point(0, 74));
-        responseLint.messages.add(new LintMessage(LintMessage.Type.Error, message, lint.path, range));
+        Range range = new Range(new Position(0, 71), new Position(0, 74));
+        responseLint.messages.add(new LintMessage(lint.path, range, message, LintMessage.Type.Error));
 
         Response expected = new Response(request.requestId);
         expected.lint = Optional.of(responseLint);

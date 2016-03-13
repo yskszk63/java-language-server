@@ -55,7 +55,7 @@ public class AutocompleteVisitor extends BridgeExpressionScanner {
             if (type == null)
                 LOG.warning("No type for " + Joiner.on("/").join(pathToExpression));
             else if (isClassReference(expression)) {
-                suggestions.add(new AutocompleteSuggestion("class", "class", AutocompleteSuggestion.Type.Constant));
+                suggestions.add(new AutocompleteSuggestion("class", "class", AutocompleteSuggestion.Type.Property));
 
                 type.accept(new CollectStatics(), null);
             }
@@ -83,7 +83,7 @@ public class AutocompleteVisitor extends BridgeExpressionScanner {
             if (type == null)
                 LOG.warning("No type for " + Joiner.on("/").join(pathToExpression));
             else if (isClassReference(expression)) {
-                suggestions.add(new AutocompleteSuggestion("new", "new", AutocompleteSuggestion.Type.Constant));
+                suggestions.add(new AutocompleteSuggestion("new", "new", AutocompleteSuggestion.Type.Method));
 
                 type.accept(new CollectStatics(), null);
             }
@@ -123,7 +123,7 @@ public class AutocompleteVisitor extends BridgeExpressionScanner {
             case ANNOTATION_TYPE:
             case INTERFACE:
             case TYPE_PARAMETER:
-                suggestions.add(new AutocompleteSuggestion(name, name, AutocompleteSuggestion.Type.Type));
+                suggestions.add(new AutocompleteSuggestion(name, name, AutocompleteSuggestion.Type.Interface));
 
                 break;
             case ENUM_CONSTANT:
@@ -162,42 +162,27 @@ public class AutocompleteVisitor extends BridgeExpressionScanner {
 
     private void addEnumConstant(Element e) {
         String name = e.getSimpleName().toString();
-        AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name, name, AutocompleteSuggestion.Type.Constant);
+        AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name, name, AutocompleteSuggestion.Type.Enum);
 
-        suggestion.rightLabel = Optional.of(e.getEnclosingElement().getSimpleName().toString());
+        suggestion.detail = Optional.of(e.getEnclosingElement().getSimpleName().toString());
 
         suggestions.add(suggestion);
     }
 
     private void addMethod(Symbol.MethodSymbol e) {
         String name = e.getSimpleName().toString();
-        String snippet = name + "(";
-        List<Symbol.VarSymbol> parameters = e.getParameters();
+        AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name, name, AutocompleteSuggestion.Type.Method);
 
-        for (int i = 0; i < parameters.size(); i++) {
-            Symbol.VarSymbol p = parameters.get(i);
-
-            snippet += "{" + (i+1) + ":" + p.getSimpleName() + "}";
-
-            if (i < parameters.size() - 1)
-                snippet += ", ";
-        }
-
-        snippet += ")";
-
-        AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name, snippet, AutocompleteSuggestion.Type.Method);
-
-        suggestion.rightLabel = Optional.of(e.getEnclosingElement().getSimpleName().toString());
+        suggestion.detail = Optional.of(e.getEnclosingElement().getSimpleName().toString());
 
         suggestions.add(suggestion);
     }
 
     private void addField(Element e) {
         String name = e.getSimpleName().toString();
-        String snippet = name;
-        AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name, snippet, AutocompleteSuggestion.Type.Property);
+        AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name, name, AutocompleteSuggestion.Type.Property);
 
-        suggestion.rightLabel = Optional.of(e.getEnclosingElement().getSimpleName().toString());
+        suggestion.detail = Optional.of(e.getEnclosingElement().getSimpleName().toString());
 
         suggestions.add(suggestion);
     }

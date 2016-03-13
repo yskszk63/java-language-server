@@ -66,13 +66,10 @@ public class Services {
         ResponseLint response = new ResponseLint();
 
         for (Diagnostic<? extends JavaFileObject> error : errors.getDiagnostics()) {
-            Point start = lines.point(error.getStartPosition());
-            Point end = lines.point(error.getEndPosition());
+            Position start = lines.point(error.getStartPosition());
+            Position end = lines.point(error.getEndPosition());
             Range range = new Range(start, end);
-            LintMessage message = new LintMessage(LintMessage.Type.Error,
-                                                  error.getMessage(null),
-                                                  error.getSource().toUri().getPath(),
-                                                  range);
+            LintMessage message = new LintMessage(error.getSource().toUri().getPath(), range, error.getMessage(null), LintMessage.Type.Error);
 
             response.messages.add(message);
         }

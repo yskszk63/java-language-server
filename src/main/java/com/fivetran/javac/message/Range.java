@@ -1,9 +1,17 @@
 package com.fivetran.javac.message;
 
 public class Range {
-    public final Point start, end;
+    /**
+     * The start position. It is before or equal to [end](#Range.end).
+     */
+    public final Position start;
 
-    public Range(Point start, Point end) {
+    /**
+     * The end position. It is after or equal to [start](#Range.start).
+     */
+    public final Position end;
+
+    public Range(Position start, Position end) {
         this.start = start;
         this.end = end;
     }

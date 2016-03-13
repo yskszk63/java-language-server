@@ -55,21 +55,9 @@ function runBuilds(document: V.TextDocument,
 }
 
 function asDiagnostic(m: J.LintMessage): V.Diagnostic {
-    let range = new V.Range(m.range.start.row, m.range.start.column, m.range.end.row, m.range.end.column);
-    let severity = asSeverity(m.type);
+    let range = new V.Range(m.range.start.line, m.range.start.character, m.range.end.line, m.range.end.character);
     
-    return new V.Diagnostic(range, m.message, severity);
-}
-
-function asSeverity(type: string): V.DiagnosticSeverity {
-    switch (type) {
-        case 'Error':
-            return V.DiagnosticSeverity.Error;
-        case 'Warning':
-            return V.DiagnosticSeverity.Warning;
-        default:
-            return V.DiagnosticSeverity.Information;
-    }
+    return new V.Diagnostic(range, m.message, m.severity);
 }
 
 // this method is called when your extension is deactivated
