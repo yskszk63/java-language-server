@@ -7,14 +7,14 @@ import * as Maven from './Maven';
 import {MavenDependency} from './JavaConfig';
 // Don't import members, just types, otherwise the tests will break
 import {DiagnosticSeverity,CompletionItemKind} from 'vscode';
-import {getJavaBinPath} from './JavaPath';
+import {findJavaExecutable} from './Finder';
 
 export function provideJavac(projectDirectoryPath: string, 
                              mavenDependencies: MavenDependency[] = []): Promise<JavacServices> {
     return new Promise((resolve, reject) => {
         PortFinder.basePort = 55220;
         
-        var javaPath = getJavaBinPath('java');
+        var javaPath = findJavaExecutable('java');
         var dependencies = mavenDependencies.concat([
             {
                 "groupId": "com.fivetran",

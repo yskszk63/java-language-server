@@ -5,10 +5,12 @@ import fs = require('fs');
 import path = require('path');
 import os = require('os');
 
+import {JavaConfig} from './JavaConfig';
+
 let binPathCache: { [bin: string]: string; } = {};
 let runtimePathCache: string = null;
 
-export function getJavaBinPath(binname: string) {
+export function findJavaExecutable(binname: string) {
 	binname = correctBinname(binname);
 	if (binPathCache[binname]) return binPathCache[binname];
 
@@ -46,4 +48,34 @@ function correctBinname(binname: string) {
 		return binname + '.exe';
 	else
 		return binname;
+}
+
+let javaConfigCache: {[file: string]: JavaConfig} = {};
+
+export function findJavaConfig(workspaceRoot: string, javaSource: string): JavaConfig {
+    workspaceRoot = path.normalize(workspaceRoot);
+    javaSource = path.resolve(workspaceRoot, javaSource);
+    
+    if (!javaConfigCache.hasOwnProperty(javaSource))
+        javaConfigCache[javaSource] = doFindJavaConfig(workspaceRoot, javaSource);
+    
+    return javaConfigCache[javaSource];
+}
+
+function doFindJavaConfig(workspaceRoot: string, javaSource: string): JavaConfig {
+    var pointer = path.dirname(javaSource);
+    
+    while (true) {
+        let candidate = path.resolve(pointer, 'javaconfig.json');
+        
+        if (fs.existsSync(candidate)) {
+            let text = fs.readFileSync(candidate, 'utf8');
+            
+            return JSON.parse(text);
+        }
+        else if (pointer === workspaceRoot || pointer === path.dirname(pointer))
+            return null;
+        else 
+            pointer = path.dirname(pointer);
+    }
 }

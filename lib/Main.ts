@@ -3,6 +3,8 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as V from 'vscode';
 import * as J from './JavacServices';
+import * as F from './Finder';
+import {JavaConfig} from './JavaConfig';
 
 const JAVA_MODE: V.DocumentFilter = { language: 'java', scheme: 'file' };
 
@@ -30,17 +32,19 @@ function startBuildOnSaveWatcher(subscriptions: V.Disposable[]) {
             if (document.languageId !== 'java') 
                 return;
                 
-            let javaConfig = V.workspace.getConfiguration('java');
+            let vsCodeJavaConfig = V.workspace.getConfiguration('java');
+            let javaConfig = F.findJavaConfig(V.workspace.rootPath, document.fileName);
             let textEditor = V.window.activeTextEditor;
             
-            runBuilds(document, javaConfig);
+            runBuilds(document, vsCodeJavaConfig, javaConfig);
         }, null, subscriptions);
     })
 }
 
 function runBuilds(document: V.TextDocument, 
-                   javaConfig: V.WorkspaceConfiguration) {
-    console.log('Check ' + document.fileName);
+                   vsCodeJavaConfig: V.WorkspaceConfiguration,
+                   javaConfig: JavaConfig) {
+    console.log('Check ' + document.fileName + ' using ' + JSON.stringify(javaConfig));
     
     javac.lint({
         path: document.fileName
