@@ -53,12 +53,18 @@ export interface ResponseLint {
     messages: LintMessage[];
 }
 
+export interface Position {
+    row: number;
+    column: number;
+}
+
 export interface LintMessage {
     type: string;
     message: string;
-    line: number;
-    from: number;
-    to: number;
+    range: {
+        start: Position;
+        end: Position;
+    }
 }
 
 /** The suggestion */
@@ -150,7 +156,12 @@ export class JavacServices {
             this.socket.then(socket => socket.write(JSON.stringify(request)));
 
             // Set callback handler
-            this.requestCallbacks[requestId] = response => resolve(response[type]);
+            this.requestCallbacks[requestId] = response => {
+                if (response.error != null)
+                    reject(response.error.message);
+                else
+                    resolve(response[type]);
+            }
         });
     }
 
@@ -175,4 +186,7 @@ interface Request {
 interface Response {
     requestId: number;
     [requestType: string]: any;
+    error?: {
+        message: string;
+    }
 }

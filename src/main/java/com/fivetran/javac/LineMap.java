@@ -50,11 +50,11 @@ public class LineMap {
             Long startOffset = startOfLineOffset.get(row);
             Long endOffset = startOfLineOffset.get(row + 1);
 
-            if (endOffset > offset)
+            if (endOffset >= offset)
                 return new Point(row, offset - startOffset);
         }
 
-        throw new IllegalArgumentException("Offset " + offset + " is after the end of the file " + startOfLineOffset.get(startOfLineOffset.size()));
+        throw new IllegalArgumentException("Offset " + offset + " is after the end of the file " + startOfLineOffset.get(startOfLineOffset.size() - 1));
     }
 
     public static LineMap fromPath(Path path) throws IOException {
