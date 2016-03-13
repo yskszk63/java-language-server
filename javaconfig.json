@@ -1,4 +1,4 @@
 {
-    "sourcePath": "src",
+    "sourcePath": ["src/main/java", "src/test/java"],
     "outputDirectory": "target"
 }

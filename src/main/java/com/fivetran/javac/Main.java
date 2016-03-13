@@ -117,41 +117,20 @@ public class Main {
      * When the request stream is closed, wait for 5s for all outstanding responses to compute, then return.
      */
     public void run() throws IOException {
-        while (in.hasNextValue()) {
-            final Request request = in.nextValue();
+        try {
+            while (in.hasNextValue()) {
+                final Request request = in.nextValue();
 
-            pool.submit(() -> {
-                Response response = new Response(request.requestId);
+                pool.submit(() -> handleRequest(request));
+            }
+        } catch (Exception e) {
+            LOG.log(Level.SEVERE, "Error reading request", e);
 
-                try {
-                    // Put request id in logging context
-                    LoggingFormat.request.set(request.requestId);
+            Response response = new Response();
 
-                    LOG.info("request " + prettyPrint(request));
+            response.error = Optional.of(new ResponseError(e.getMessage()));
 
-                    if (request.echo.isPresent())
-                        response.echo = Optional.of(services.echo(request.echo.get()));
-                    else if (request.lint.isPresent())
-                        response.lint = Optional.of(services.lint(request.lint.get()));
-                    else if (request.autocomplete.isPresent())
-                        response.autocomplete = Optional.of(services.autocomplete(request.autocomplete.get()));
-                    // Continue the pattern for additional request / response types
-                    else
-                        LOG.severe("Unrecognized message " + request);
-                } catch (Exception e) {
-                    response.error = Optional.of(new ResponseError(e.getClass().getSimpleName() + ": " + e.getMessage()));
-
-                    LOG.log(Level.SEVERE, e.getMessage(), e);
-                } finally {
-                    try {
-                        LOG.info("response " + prettyPrint(response));
-
-                        out.next(response);
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                }
-            });
+            out.next(response);
         }
 
         pool.shutdown();
@@ -160,6 +139,39 @@ public class Main {
             pool.awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             LOG.log(Level.SEVERE, e.getMessage(), e);
+        }
+    }
+
+    private void handleRequest(Request request) {
+        Response response = new Response(request.requestId);
+
+        try {
+            // Put request id in logging context
+            LoggingFormat.request.set(request.requestId);
+
+            LOG.info("request " + prettyPrint(request));
+
+            if (request.echo.isPresent())
+                response.echo = Optional.of(services.echo(request.echo.get()));
+            else if (request.lint.isPresent())
+                response.lint = Optional.of(services.lint(request.lint.get()));
+            else if (request.autocomplete.isPresent())
+                response.autocomplete = Optional.of(services.autocomplete(request.autocomplete.get()));
+            // Continue the pattern for additional request / response types
+            else
+                LOG.severe("Unrecognized message " + request);
+        } catch (Exception e) {
+            response.error = Optional.of(new ResponseError(e.getClass().getSimpleName() + ": " + e.getMessage()));
+
+            LOG.log(Level.SEVERE, e.getMessage(), e);
+        }
+
+        try {
+            LOG.info("response " + prettyPrint(response));
+
+            out.next(response);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 

@@ -21,7 +21,7 @@ export function activate(ctx: V.ExtensionContext) {
 }
 
 function startBuildOnSaveWatcher(subscriptions: V.Disposable[]) {
-    J.provideJavac(V.workspace.rootPath, []).then(newJavac => {
+    J.provideJavac(V.workspace.rootPath, [], onErrorWithoutRequestId).then(newJavac => {
         javac = newJavac;
         
         javac.echo('javac server has started').then(response => {
@@ -41,11 +41,13 @@ function startBuildOnSaveWatcher(subscriptions: V.Disposable[]) {
     })
 }
 
+function onErrorWithoutRequestId(message: string) {
+    V.window.showErrorMessage(message);
+}
+
 function runBuilds(document: V.TextDocument, 
                    vsCodeJavaConfig: V.WorkspaceConfiguration,
                    javaConfig: JavaConfig) {
-    console.log('Check ' + document.fileName + ' using ' + JSON.stringify(javaConfig));
-    
     javac.lint({
         path: document.fileName,
         config: javaConfig
@@ -55,7 +57,7 @@ function runBuilds(document: V.TextDocument,
         
         diagnosticCollection.set(uri, diagnostics);
     }).catch(error => {
-        console.error(error);
+        V.window.showErrorMessage(error);
     });
 }
 

@@ -12,8 +12,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
 public class RequestResponseTest extends Fixtures {
@@ -120,5 +119,14 @@ public class RequestResponseTest extends Fixtures {
         List<Response> responses = responses(request.toString());
 
         assertThat(responses.toString(), containsString("NoSuchFileException: /NoSuchFile.java"));
+    }
+
+    @Test
+    public void badlyFormattedRequest() throws IOException {
+        String request = "{\"requestId\":1,\"lint\":[\"oops!\"]}";
+
+        List<Response> responses = responses(request.toString());
+
+        assertThat(responses, not(empty()));
     }
 }

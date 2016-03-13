@@ -11,7 +11,8 @@ import {findJavaExecutable} from './Finder';
 import {JavaConfig} from './JavaConfig';
 
 export function provideJavac(projectDirectoryPath: string, 
-                             mavenDependencies: MavenDependency[] = []): Promise<JavacServices> {
+                             mavenDependencies: MavenDependency[] = [],
+                             onErrorWithoutRequestId: (message: string) => void): Promise<JavacServices> {
     return new Promise((resolve, reject) => {
         PortFinder.basePort = 55220;
         
@@ -31,7 +32,7 @@ export function provideJavac(projectDirectoryPath: string,
                 else {
                     var mvnClasspath = mvnResults.classpath;
 
-                    resolve(new JavacServices(projectDirectoryPath, javaPath, mvnClasspath, port, 'inherit'));
+                    resolve(new JavacServices(projectDirectoryPath, javaPath, mvnClasspath, port, onErrorWithoutRequestId));
                 }
             });
         });
@@ -173,7 +174,7 @@ export class JavacServices {
                 javaExecutablePath: string,
                 classPath: string[],
                 port: number,
-                stdio: string) {
+                private onErrorWithoutRequestId: (message: string) => void) {
 
         var args = ['-cp', classPath.join(':')];
 
@@ -193,20 +194,16 @@ export class JavacServices {
                 socket
                     .pipe(split())
                     .on('data', response => {
-                        this.handleResponse(response);
+                        if (response.length > 0)
+                            this.handleResponse(response);
                     });
 
                 resolve(socket);
             }).listen(port, () => {
-                var options = { stdio, cwd: projectDirectoryPath };
+                var options = { stdio: 'inherit', cwd: projectDirectoryPath };
                 
                 // Start the child java process
-                child_process.execFile(javaExecutablePath, args, options, (err, stdout, stderr) => {
-                    if (err)
-                        console.error(err.message);
-                    else
-                        console.info('javac server has terminated')
-                });
+                child_process.spawn(javaExecutablePath, args, options);
             });
         });
     }
@@ -227,11 +224,11 @@ export class JavacServices {
         var requestId = this.requestCounter++;
 
         return new Promise((resolve, reject) => {
-            var request: Request = { requestId: requestId };
+            let request: Request = { requestId: requestId };
 
             // Set payload, using request type as key for easy deserialization
             request[type] = payload;
-
+            
             // Send request to child process
             this.socket.then(socket => socket.write(JSON.stringify(request)));
 
@@ -247,14 +244,21 @@ export class JavacServices {
 
     private handleResponse(message: string) {
         var response: Response = JSON.parse(message);
-        var todo = this.requestCallbacks[response.requestId];
+        
+        if (response.requestId == null) {
+            if (response.error)
+                this.onErrorWithoutRequestId(response.error.message);
+        }
+        else {
+            var todo = this.requestCallbacks[response.requestId];
 
-        this.requestCallbacks[response.requestId] = null;
+            this.requestCallbacks[response.requestId] = null;
 
-        if (!todo)
-            console.error('No callback registered for request id ' + response.requestId);
-        else
-            todo(response);
+            if (!todo)
+                console.error('No callback registered for request id ' + response.requestId);
+            else 
+                todo(response);
+        }
     }
 }
 

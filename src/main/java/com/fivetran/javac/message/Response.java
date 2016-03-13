@@ -1,20 +1,26 @@
 package com.fivetran.javac.message;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fivetran.javac.Main;
 
 import java.util.Optional;
+import java.util.OptionalInt;
 
 public class Response {
-    public final int requestId;
+    public final OptionalInt requestId;
     public Optional<ResponseLint> lint = Optional.empty();
     public Optional<JsonNode> echo = Optional.empty();
     public Optional<ResponseError> error = Optional.empty();
     public Optional<ResponseAutocomplete> autocomplete = Optional.empty();
 
     public Response(int requestId) {
-        this.requestId = requestId;
+        this.requestId = OptionalInt.of(requestId);
+    }
+
+    public Response() {
+        this.requestId = OptionalInt.empty();
     }
 
     @Override
