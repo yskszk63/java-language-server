@@ -13,7 +13,7 @@
 	"activationEvents": [
         "onLanguage:java"
 	],
-	"main": "./out/src/extension",
+	"main": "./out/lib/extension",
 	"contributes": {
         "languages": [
             {
