@@ -3,6 +3,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
+
 const JAVA_MODE: vscode.DocumentFilter = { language: 'java', scheme: 'file' };
 
 let diagnosticCollection: vscode.DiagnosticCollection;

@@ -13,7 +13,7 @@
 	"activationEvents": [
         "onLanguage:java"
 	],
-	"main": "./out/lib/extension",
+	"main": "./out/lib/Main",
 	"contributes": {
         "languages": [
             {
@@ -30,10 +30,18 @@
 	"scripts": {
 		"vscode:prepublish": "node ./node_modules/vscode/bin/compile",
 		"compile": "node ./node_modules/vscode/bin/compile -watch -p ./",
-		"postinstall": "node ./node_modules/vscode/bin/install"
+		"postinstall": "node ./node_modules/vscode/bin/install",
+        "test": "mocha out/test"
 	},
 	"devDependencies": {
 		"typescript": "^1.8.5",
-		"vscode": "^0.11.0"
+		"vscode": "^0.11.0",
+        "async": "^1.5.2",
+        "mkdirp": "^0.5.1",
+        "portfinder": "^0.4.0",
+        "request": "^2.69.0",
+        "split": "^1.0.0",
+        "xml2js": "^0.4.16",
+        "mocha": "^2.4.5"
 	}
 }

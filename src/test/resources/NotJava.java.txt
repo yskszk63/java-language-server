@@ -1,0 +1,5 @@
+public class NotJava {
+    public String test() {
+        return "Not .java";
+    }
+}
