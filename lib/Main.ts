@@ -47,7 +47,8 @@ function runBuilds(document: V.TextDocument,
     console.log('Check ' + document.fileName + ' using ' + JSON.stringify(javaConfig));
     
     javac.lint({
-        path: document.fileName
+        path: document.fileName,
+        config: javaConfig
     }).then(lint => {
         let uri = V.Uri.file(document.fileName);
         let diagnostics = lint.messages.map(asDiagnostic);

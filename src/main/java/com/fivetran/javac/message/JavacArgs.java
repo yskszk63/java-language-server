@@ -16,7 +16,5 @@ public class JavacArgs {
      */
     public String path;
 
-    public List<String> sourcePath = Collections.emptyList(), classPath = Collections.emptyList();
-
-    public Optional<String> outputDirectory = Optional.empty();
+    public JavaConfig config = new JavaConfig();
 }

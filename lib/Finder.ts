@@ -52,6 +52,13 @@ function correctBinname(binname: string) {
 
 let javaConfigCache: {[file: string]: JavaConfig} = {};
 
+const DEFAULT_JAVA_CONFIG: JavaConfig = {
+    sourcePath: ["src"],
+    outputDirectory: "target",
+    classPath: [],
+    dependencies: []    
+}
+
 export function findJavaConfig(workspaceRoot: string, javaSource: string): JavaConfig {
     workspaceRoot = path.normalize(workspaceRoot);
     javaSource = path.resolve(workspaceRoot, javaSource);
@@ -74,7 +81,7 @@ function doFindJavaConfig(workspaceRoot: string, javaSource: string): JavaConfig
             return JSON.parse(text);
         }
         else if (pointer === workspaceRoot || pointer === path.dirname(pointer))
-            return null;
+            return DEFAULT_JAVA_CONFIG;
         else 
             pointer = path.dirname(pointer);
     }

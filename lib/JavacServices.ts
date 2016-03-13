@@ -8,6 +8,7 @@ import {MavenDependency} from './JavaConfig';
 // Don't import members, just types, otherwise the tests will break
 import {DiagnosticSeverity,CompletionItemKind} from 'vscode';
 import {findJavaExecutable} from './Finder';
+import {JavaConfig} from './JavaConfig';
 
 export function provideJavac(projectDirectoryPath: string, 
                              mavenDependencies: MavenDependency[] = []): Promise<JavacServices> {
@@ -40,9 +41,7 @@ export function provideJavac(projectDirectoryPath: string,
 interface JavacOptions {
     path: string;
     text?: string;
-    classPath?: string[];
-    sourcePath?: string[];
-    outputDirectory?: string;
+    config?: JavaConfig;
 }
 
 export interface RequestLint extends JavacOptions {

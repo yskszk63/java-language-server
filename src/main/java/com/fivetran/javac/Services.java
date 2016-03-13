@@ -30,9 +30,10 @@ public class Services {
                                          .addFile(file)
                                          .reportErrors(errors)
                                          .afterAnalyze(autocompleter)
-                                         .classPath(request.classPath)
-                                         .sourcePath(request.sourcePath)
-                                         .outputDirectory(request.outputDirectory.orElse("target"))
+                                         .classPath(request.config.classPath)
+                                         .sourcePath(request.config.sourcePath)
+                                         .outputDirectory(request.config.outputDirectory.orElse("target"))
+                                         // TODO maven dependencies
                                          .stopIfError(CompileStates.CompileState.GENERATE)
                                          .build();
 
@@ -57,9 +58,10 @@ public class Services {
         JavacTask task = JavacTaskBuilder.create()
                                          .addFile(file)
                                          .reportErrors(errors)
-                                         .classPath(request.classPath)
-                                         .sourcePath(request.sourcePath)
-                                         .outputDirectory(request.outputDirectory.orElse("target"))
+                                         .classPath(request.config.classPath)
+                                         .sourcePath(request.config.sourcePath)
+                                         .outputDirectory(request.config.outputDirectory.orElse("target"))
+                                         // TODO maven dependencies
                                          .build();
 
         task.call();
@@ -67,7 +69,7 @@ public class Services {
         ResponseLint response = new ResponseLint();
 
         for (Diagnostic<? extends JavaFileObject> error : errors.getDiagnostics()) {
-            if (error.getStartPosition() == Diagnostic.NOPOS) 
+            if (error.getStartPosition() == Diagnostic.NOPOS)
                 LOG.warning("Error " + error.getMessage(null) + " has no location");
             else {
                 Position start = lines.point(error.getStartPosition());
