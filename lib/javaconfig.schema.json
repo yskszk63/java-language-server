@@ -1,0 +1,20 @@
+{
+    "type": "object",
+    "properties": {
+        "sourcePath": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "classPath": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "outputDirectory": {
+            "type": "string"
+        }
+    }
+}

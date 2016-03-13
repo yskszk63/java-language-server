@@ -25,7 +25,11 @@
                     "Java"
                 ]
             }
-        ]
+        ],
+        "jsonValidation": [{ 
+            "fileMatch": "javaconfig.json",
+            "url": "./lib/javaconfig.schema.json"
+        }]
 	},
 	"scripts": {
 		"vscode:prepublish": "node ./node_modules/vscode/bin/compile",
