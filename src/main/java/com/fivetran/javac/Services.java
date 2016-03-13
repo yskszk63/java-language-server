@@ -12,6 +12,7 @@ import javax.tools.JavaFileObject;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Optional;
 import java.util.logging.Logger;
 
 public class Services {
@@ -66,12 +67,19 @@ public class Services {
         ResponseLint response = new ResponseLint();
 
         for (Diagnostic<? extends JavaFileObject> error : errors.getDiagnostics()) {
-            Position start = lines.point(error.getStartPosition());
-            Position end = lines.point(error.getEndPosition());
-            Range range = new Range(start, end);
-            LintMessage message = new LintMessage(error.getSource().toUri().getPath(), range, error.getMessage(null), LintMessage.Type.Error);
+            if (error.getStartPosition() == Diagnostic.NOPOS) 
+                LOG.warning("Error " + error.getMessage(null) + " has no location");
+            else {
+                Position start = lines.point(error.getStartPosition());
+                Position end = lines.point(error.getEndPosition());
+                Range range = new Range(start, end);
+                LintMessage message = new LintMessage(error.getSource().toUri().getPath(),
+                                                      range,
+                                                      error.getMessage(null),
+                                                      LintMessage.Type.Error);
 
-            response.messages.add(message);
+                response.messages.add(message);
+            }
         }
 
         return response;
