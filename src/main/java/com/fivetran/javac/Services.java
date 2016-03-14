@@ -14,6 +14,8 @@ import java.io.Reader;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Logger;
 
 public class Services {
@@ -71,12 +73,12 @@ public class Services {
         for (Diagnostic<? extends JavaFileObject> error : errors.getDiagnostics()) {
             Range range = position(error);
             String lintPath = error.getSource().toUri().getPath();
-            LintMessage message = new LintMessage(lintPath,
-                                                  range,
+            LintMessage message = new LintMessage(range,
                                                   error.getMessage(null),
                                                   LintMessage.Type.Error);
+            List<LintMessage> ms = response.messages.computeIfAbsent(lintPath, newPath -> new ArrayList<>());
 
-            response.messages.add(message);
+            ms.add(message);
         }
 
         return response;

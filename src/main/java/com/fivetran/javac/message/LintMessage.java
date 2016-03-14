@@ -8,8 +8,6 @@ import java.util.Optional;
 
 public class LintMessage {
 
-    private final String uri;
-
     /**
      * The range to which this diagnostic applies.
      */
@@ -31,8 +29,7 @@ public class LintMessage {
      */
     public final Type severity;
 
-    public LintMessage(String uri, Range range, String message, Type severity) {
-        this.uri = uri;
+    public LintMessage(Range range, String message, Type severity) {
         this.range = range;
         this.message = message;
         this.severity = severity;

@@ -53,7 +53,9 @@ export interface RequestAutocomplete extends JavacOptions {
 }
 
 export interface ResponseLint {
-    messages: LintMessage[];
+    messages: {
+        [uri: string]: LintMessage[];
+    }
 }
 
 export interface Range {

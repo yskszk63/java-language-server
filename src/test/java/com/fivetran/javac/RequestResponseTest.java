@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -64,7 +65,8 @@ public class RequestResponseTest extends Fixtures {
         ResponseLint responseLint = new ResponseLint();
         String message = "cannot find symbol\n  symbol:   variable foo\n  location: class UndefinedSymbol";
         Range range = new Range(new Position(2, 15), new Position(2, 18));
-        responseLint.messages.add(new LintMessage(lint.path, range, message, LintMessage.Type.Error));
+        responseLint.messages.put(file.toString(),
+                                  Collections.singletonList(new LintMessage(range, message, LintMessage.Type.Error)));
 
         Response expected = new Response(request.requestId);
         expected.lint = Optional.of(responseLint);
@@ -88,7 +90,8 @@ public class RequestResponseTest extends Fixtures {
         ResponseLint responseLint = new ResponseLint();
         String message = "cannot find symbol\n  symbol:   variable foo\n  location: class SingleLineUndefinedSymbol";
         Range range = new Range(new Position(0, 71), new Position(0, 74));
-        responseLint.messages.add(new LintMessage(lint.path, range, message, LintMessage.Type.Error));
+        responseLint.messages.put(file.toString(),
+                                  Collections.singletonList(new LintMessage(range, message, LintMessage.Type.Error)));
 
         Response expected = new Response(request.requestId);
         expected.lint = Optional.of(responseLint);

@@ -52,10 +52,11 @@ function runBuilds(document: V.TextDocument,
         path: document.fileName,
         config: javaConfig
     }).then(lint => {
-        let uri = V.Uri.file(document.fileName);
-        let diagnostics = lint.messages.map(asDiagnostic);
-        
-        diagnosticCollection.set(uri, diagnostics);
+        for (let uri of Object.keys(lint.messages)) {
+            let diagnostics = lint.messages[uri].map(asDiagnostic);
+            
+            diagnosticCollection.set(V.Uri.file(uri), diagnostics);
+        }
     }).catch(error => {
         V.window.showErrorMessage(error);
     });

@@ -1,8 +1,10 @@
 package com.fivetran.javac.message;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ResponseLint {
-    public List<LintMessage> messages = new ArrayList<>();
+    public Map<String, List<LintMessage>> messages = new HashMap<>();
 }
