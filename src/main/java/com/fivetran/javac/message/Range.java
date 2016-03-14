@@ -1,6 +1,7 @@
 package com.fivetran.javac.message;
 
 public class Range {
+    public static final Range NONE = new Range(Position.NONE, Position.NONE);
     /**
      * The start position. It is before or equal to [end](#Range.end).
      */

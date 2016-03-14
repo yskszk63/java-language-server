@@ -3,14 +3,10 @@ package com.fivetran.javac.message;
 import java.util.Objects;
 
 public class Position {
+    public static final Position NONE = new Position(-1, -1);
     public final long line, character;
 
     public Position(long line, long character) {
-        if (line < 0)
-            throw new IllegalArgumentException("Line " + line + " is < 0");
-        if (character < 0)
-            throw new IllegalArgumentException("Character " + character + " is < 0");
-            
         this.line = line;
         this.character = character;
     }

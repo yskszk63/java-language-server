@@ -118,7 +118,7 @@ public class RequestResponseTest extends Fixtures {
 
         List<Response> responses = responses(request.toString());
 
-        assertThat(responses.toString(), containsString("NoSuchFileException: /NoSuchFile.java"));
+        assertThat(responses.toString(), containsString("No such file or directory"));
     }
 
     @Test

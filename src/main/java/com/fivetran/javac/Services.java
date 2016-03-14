@@ -10,9 +10,10 @@ import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
 import java.io.IOException;
+import java.io.Reader;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Optional;
 import java.util.logging.Logger;
 
 public class Services {
@@ -54,7 +55,6 @@ public class Services {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         Path path = Paths.get(request.path);
         JavaFileObject file = JavacTaskBuilder.STANDARD_FILE_MANAGER.getRegularFile(path.toFile());
-        LineMap lines = LineMap.fromPath(path);
         JavacTask task = JavacTaskBuilder.create()
                                          .addFile(file)
                                          .reportErrors(errors)
@@ -69,21 +69,55 @@ public class Services {
         ResponseLint response = new ResponseLint();
 
         for (Diagnostic<? extends JavaFileObject> error : errors.getDiagnostics()) {
-            if (error.getStartPosition() == Diagnostic.NOPOS)
-                LOG.warning("Error " + error.getMessage(null) + " has no location");
-            else {
-                Position start = lines.point(error.getStartPosition());
-                Position end = lines.point(error.getEndPosition());
-                Range range = new Range(start, end);
-                LintMessage message = new LintMessage(error.getSource().toUri().getPath(),
-                                                      range,
-                                                      error.getMessage(null),
-                                                      LintMessage.Type.Error);
+            Range range = position(error);
+            String lintPath = error.getSource().toUri().getPath();
+            LintMessage message = new LintMessage(lintPath,
+                                                  range,
+                                                  error.getMessage(null),
+                                                  LintMessage.Type.Error);
 
-                response.messages.add(message);
-            }
+            response.messages.add(message);
         }
 
         return response;
     }
+
+    private Range position(Diagnostic<? extends JavaFileObject> error) {
+        if (error.getStartPosition() == Diagnostic.NOPOS)
+            return Range.NONE;
+
+        Position start = new Position(error.getLineNumber() - 1, error.getColumnNumber() - 1);
+        Position end = endPosition(error);
+
+        return new Range(start, end);
+    }
+
+    private Position endPosition(Diagnostic<? extends JavaFileObject> error) {
+        try {
+            Reader reader = error.getSource().openReader(true);
+            long startOffset = error.getStartPosition();
+            long endOffset = error.getEndPosition();
+
+            reader.skip(startOffset);
+
+            long line = error.getLineNumber() - 1;
+            long column = error.getColumnNumber() - 1;
+
+            for (long i = startOffset; i < endOffset; i++) {
+                int next = reader.read();
+
+                if (next == '\n') {
+                    line++;
+                    column = 0;
+                }
+                else
+                    column++;
+            }
+
+            return new Position(line, column);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
 }

@@ -2,6 +2,7 @@ package com.fivetran.javac;
 
 import com.fivetran.javac.message.Position;
 
+import javax.tools.JavaFileObject;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
