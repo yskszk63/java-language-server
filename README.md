@@ -1,13 +1,74 @@
-# README
-## This is the README for your extension "vscode-javac" 
-You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
+# VS Code support for Java using the javac API
 
-* Split the editor (`Cmd+\` on OSX or `Ctrl+\` on Windows and Linux)
-* Toggle preview (`Shift+CMD+V` on OSX or `Shift+Ctrl+V` on Windows and Linux)
-* Press `Ctrl+Space` (Windows, Linux) or `Cmd+Space` (OSX) to see a list of Markdown snippets
+Provides Java support using the javac API.
 
-### For more information
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+## Features
 
-** Enjoy!**
+* Compile-on-save
+
+## javaconfig.json
+
+The presence of a `javaconfig.json` file indicates that this directory is the root of a Java source tree.
+
+### Examples
+
+### Compile without a build tool
+
+Set the source and class path:
+
+    {
+        "sourcePath": ["src"],
+        "classPath": ["lib/MyJar.jar"],
+        "outputDirectory": "out"
+    }
+
+### Compile using maven
+
+`javaconfig.json`
+
+Set the source path, and get the class path from a file:
+
+    {
+        "sourcePath": ["src/main/java"],
+        "classPathFile": "classpath.txt",
+        "outputDirectory": "target"
+    }
+
+`pom.xml`
+
+Configure maven to output `classpath.txt`
+
+    <project ...>
+        ...
+        <build>
+            ...
+            <plugins>
+                ...
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>2.9</version>
+                    <executions>
+                        <execution>
+                            <id>build-classpath</id>
+                            <phase>generate-sources</phase>
+                            <goals>
+                                <goal>build-classpath</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <outputFile>classpath.txt</outputFile>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </build>
+    </project>
+
+`gitignore.txt`
+
+Ignore `classpath.txt`, since it will be different on every host
+
+    classpath.txt
+    ...
+    
