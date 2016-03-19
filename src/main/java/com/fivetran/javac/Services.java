@@ -9,12 +9,15 @@ import com.sun.tools.javac.comp.CompileStates;
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -33,7 +36,7 @@ public class Services {
                                          .addFile(file)
                                          .reportErrors(errors)
                                          .afterAnalyze(autocompleter)
-                                         .classPath(request.config.classPath)
+                                         .classPath(classPath(request.config))
                                          .sourcePath(request.config.sourcePath)
                                          .outputDirectory(request.config.outputDirectory.orElse("target"))
                                          // TODO maven dependencies
@@ -60,7 +63,7 @@ public class Services {
         JavacTask task = JavacTaskBuilder.create()
                                          .addFile(file)
                                          .reportErrors(errors)
-                                         .classPath(request.config.classPath)
+                                         .classPath(classPath(request.config))
                                          .sourcePath(request.config.sourcePath)
                                          .outputDirectory(request.config.outputDirectory.orElse("target"))
                                          // TODO maven dependencies
@@ -82,6 +85,24 @@ public class Services {
         }
 
         return response;
+    }
+
+    private List<String> classPath(JavaConfig config) {
+        List<String> acc = new ArrayList<>();
+
+        acc.addAll(config.classPath);
+
+        if (config.classPathFile.isPresent()) {
+            try (BufferedReader reader = Files.newBufferedReader(Paths.get(config.classPathFile.get()))) {
+                reader.lines()
+                      .flatMap(line -> Arrays.stream(line.split(":")))
+                      .forEach(acc::add);
+            } catch (IOException e) {
+                throw new ReturnError("Error reading classPathFile " + config.classPathFile, e);
+            }
+        }
+
+        return acc;
     }
 
     private Range position(Diagnostic<? extends JavaFileObject> error) {

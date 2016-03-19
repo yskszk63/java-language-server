@@ -5,8 +5,9 @@ export interface MavenDependency {
 }
 
 export interface JavaConfig {
-    sourcePath: string[];
-    classPath: string[];
-    dependencies: MavenDependency[];
-    outputDirectory: string;
+    sourcePath?: string[];
+    classPath?: string[];
+    classPathFile?: string;
+    dependencies?: MavenDependency[];
+    outputDirectory?: string;
 }

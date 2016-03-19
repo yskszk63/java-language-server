@@ -157,9 +157,11 @@ public class Main {
                 response.lint = Optional.of(services.lint(request.lint.get()));
             else if (request.autocomplete.isPresent())
                 response.autocomplete = Optional.of(services.autocomplete(request.autocomplete.get()));
-            // Continue the pattern for additional request / response types
+                // Continue the pattern for additional request / response types
             else
                 LOG.severe("Unrecognized message " + request);
+        } catch (ReturnError error) {
+            response.error = Optional.of(new ResponseError(error.message));
         } catch (Exception e) {
             response.error = Optional.of(new ResponseError(e.getClass().getSimpleName() + ": " + e.getMessage()));
 
