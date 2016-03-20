@@ -2,17 +2,21 @@ package com.fivetran.javac;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.sun.source.tree.ClassTree;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.api.MultiTaskListener;
+import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.Todo;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.parser.FuzzyParserFactory;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.TreeScanner;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
+import com.sun.tools.javac.util.Name;
 import com.sun.tools.javac.util.Options;
 
 import javax.tools.*;
@@ -37,11 +41,8 @@ public class JavacHolder {
 
     private final IncrementalLog log = new IncrementalLog(context);
     public final JavacFileManager fileManager = new JavacFileManager(context, true, null);
-
-    {
-        FuzzyParserFactory.instance(context);
-    }
-
+    private final Check check = Check.instance(context);
+    private final FuzzyParserFactory parserFactory = FuzzyParserFactory.instance(context);
     private final Options options = Options.instance(context);
     private final JavaCompiler compiler = JavaCompiler.instance(context);
     private final Todo todo = Todo.instance(context);
@@ -100,7 +101,20 @@ public class JavacHolder {
     public JCTree.JCCompilationUnit parse(JavaFileObject source) {
         clear(source);
 
-        return compiler.parse(source);
+        JCTree.JCCompilationUnit result = compiler.parse(source);
+
+        // Search for class definitions in this file
+        // Remove them from downstream caches so that we can re-compile this class
+        result.accept(new TreeScanner() {
+            @Override
+            public void visitClassDef(JCTree.JCClassDecl that) {
+                super.visitClassDef(that);
+
+                clear(that.name);
+            }
+        });
+
+        return result;
     }
 
     public void check(JCTree.JCCompilationUnit source) {
@@ -110,8 +124,18 @@ public class JavacHolder {
             compiler.generate(compiler.desugar(compiler.flow(compiler.attribute(todo.remove()))));
     }
 
+    /**
+     * Remove source file from caches in the parse stage
+     */
     private void clear(JavaFileObject source) {
         log.clear(source);
+    }
+
+    /**
+     * Remove class definitions from caches in the compile stage
+     */
+    private void clear(Name name) {
+        check.compiled.remove(name);
     }
 
 }
