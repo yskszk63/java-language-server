@@ -3,18 +3,11 @@ package com.fivetran.javac;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fivetran.javac.autocomplete.AutocompleteVisitor;
 import com.fivetran.javac.message.*;
-import com.sun.source.util.JavacTask;
-import com.sun.tools.javac.api.JavacTool;
-import com.sun.tools.javac.file.JavacFileManager;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
-import javax.tools.ToolProvider;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.Reader;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -25,8 +18,6 @@ import java.util.logging.Logger;
 
 public class Services {
     private static final Logger LOG = Logger.getLogger("");
-    private static final JavacTool SYSTEM_JAVA_COMPILER = (JavacTool) ToolProvider.getSystemJavaCompiler();
-    private static final JavacFileManager STANDARD_FILE_MANAGER = SYSTEM_JAVA_COMPILER.getStandardFileManager(null, null, null);
 
     public ResponseAutocomplete autocomplete(RequestAutocomplete request) throws IOException {
         Path path = Paths.get(request.path);
@@ -57,10 +48,10 @@ public class Services {
     public ResponseLint lint(RequestLint request) throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         Path path = Paths.get(request.path);
-        JavaFileObject file = STANDARD_FILE_MANAGER.getRegularFile(path.toFile());
         JavacHolder compiler = new JavacHolder(classPath(request.config),
                                                request.config.sourcePath,
                                                request.config.outputDirectory.orElse("target"));
+        JavaFileObject file = compiler.fileManager.getRegularFile(path.toFile());
         compiler.onError(errors);
 
         compiler.check(compiler.parse(file));

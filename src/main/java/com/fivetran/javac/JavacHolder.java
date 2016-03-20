@@ -2,7 +2,6 @@ package com.fivetran.javac;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
-import com.sun.source.util.JavacTask;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.api.JavacTool;
@@ -17,6 +16,7 @@ import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
 
 import javax.tools.*;
+import java.io.File;
 import java.io.PrintWriter;
 import java.util.*;
 import java.util.logging.Logger;
@@ -26,8 +26,6 @@ public class JavacHolder {
     private final List<String> classPath, sourcePath;
     private final String outputDirectory;
     private final Context context = new Context();
-    private final JavacTool systemJavaCompiler = (JavacTool) ToolProvider.getSystemJavaCompiler();
-    private final JavacFileManager fileManager = systemJavaCompiler.getStandardFileManager(null, null, null);
     private DiagnosticListener<JavaFileObject> errorsDelegate = diagnostic -> {};
     private final DiagnosticListener<JavaFileObject> errors = diagnostic -> {
         errorsDelegate.report(diagnostic);
@@ -35,14 +33,16 @@ public class JavacHolder {
 
     {
         context.put(DiagnosticListener.class, errors);
-        context.put(Log.outKey, new PrintWriter(System.err, true));
-        context.put(JavaFileManager.class, fileManager);
+    }
 
+    public final JavacFileManager fileManager = new JavacFileManager(context, true, null);
+
+    {
         FuzzyParserFactory.instance(context);
     }
 
     private final Options options = Options.instance(context);
-    private final Log log = Log.instance(context);
+//    private final IncrementalLog log = new IncrementalLog(context);
     private final JavaCompiler compiler = JavaCompiler.instance(context);
     private final Todo todo = Todo.instance(context);
     private final Map<TaskEvent.Kind, List<BridgeExpressionScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
@@ -98,6 +98,8 @@ public class JavacHolder {
     }
 
     public JCTree.JCCompilationUnit parse(JavaFileObject source) {
+        clear(source);
+
         return compiler.parse(source);
     }
 
@@ -107,4 +109,9 @@ public class JavacHolder {
         while (!todo.isEmpty())
             compiler.generate(compiler.desugar(compiler.flow(compiler.attribute(todo.remove()))));
     }
+
+    private void clear(JavaFileObject source) {
+//        log.clear(source);
+    }
+
 }
