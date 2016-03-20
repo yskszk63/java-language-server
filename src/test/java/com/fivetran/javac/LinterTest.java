@@ -22,17 +22,20 @@ public class LinterTest extends Fixtures {
 
     @Test
     public void compile() throws IOException {
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/HelloWorld.java");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
                                                Collections.singletonList("src/test/resources"),
                                                "out");
-        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
+        compiler.onError(errors);
+        compiler.check(compiler.parse(file));
 
-        assertThat(errors, empty());
+        assertThat(errors.getDiagnostics(), empty());
     }
 
     @Test
     public void inspectTree() throws IOException {
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         CollectMethods scanner = new CollectMethods();
         GetResourceFileObject file = new GetResourceFileObject("/HelloWorld.java");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
@@ -41,13 +44,15 @@ public class LinterTest extends Fixtures {
 
         compiler.afterAnalyze(scanner);
 
-        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
+        compiler.onError(errors);
+        compiler.check(compiler.parse(file));
 
         assertThat(scanner.methodNames, hasItem("main"));
     }
 
     @Test
     public void missingMethodBody() throws IOException {
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         CollectMethods scanner = new CollectMethods();
         GetResourceFileObject file = new GetResourceFileObject("/MissingMethodBody.java");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
@@ -56,14 +61,16 @@ public class LinterTest extends Fixtures {
 
         compiler.afterAnalyze(scanner);
 
-        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
+        compiler.onError(errors);
+        compiler.check(compiler.parse(file));
 
         assertThat(scanner.methodNames, hasItem("test"));
-        assertThat(errors, not(empty()));
+        assertThat(errors.getDiagnostics(), not(empty()));
     }
 
     @Test
     public void incompleteAssignment() throws IOException {
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         CollectMethods parsed = new CollectMethods();
         CollectMethods compiled = new CollectMethods();
         GetResourceFileObject file = new GetResourceFileObject("/IncompleteAssignment.java");
@@ -74,15 +81,17 @@ public class LinterTest extends Fixtures {
         compiler.afterAnalyze(compiled);
         compiler.afterParse(parsed);
 
-        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
+        compiler.onError(errors);
+        compiler.check(compiler.parse(file));
 
         assertThat(parsed.methodNames, hasItem("test")); // Error recovery should have worked
         assertThat(compiled.methodNames, hasItem("test")); // Type error recovery should have worked
-        assertThat(errors, not(empty()));
+        assertThat(errors.getDiagnostics(), not(empty()));
     }
 
     @Test
     public void undefinedSymbol() throws IOException {
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         CollectMethods scanner = new CollectMethods();
         GetResourceFileObject file = new GetResourceFileObject("/UndefinedSymbol.java");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
@@ -91,21 +100,23 @@ public class LinterTest extends Fixtures {
 
         compiler.afterAnalyze(scanner);
 
-        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
+        compiler.onError(errors);
+        compiler.check(compiler.parse(file));
 
         assertThat(scanner.methodNames, hasItem("test")); // Type error, so parse tree is present
 
-        Diagnostic<? extends JavaFileObject> d = errors.get(0);
+        Diagnostic<? extends JavaFileObject> d = errors.getDiagnostics().get(0);
 
         // Error position should span entire 'foo' symbol
         assertThat(d.getLineNumber(), greaterThan(0L));
         assertThat(d.getStartPosition(), greaterThan(0L));
         assertThat(d.getEndPosition(), greaterThan(d.getStartPosition() + 1));
-        assertThat(errors, not(empty()));
+        assertThat(errors.getDiagnostics(), not(empty()));
     }
 
     @Test
     public void getType() {
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         MethodTypes scanner = new MethodTypes();
         GetResourceFileObject file = new GetResourceFileObject("/FooString.java");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
@@ -114,9 +125,10 @@ public class LinterTest extends Fixtures {
 
         compiler.afterAnalyze(scanner);
 
-        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
+        compiler.onError(errors);
+        compiler.check(compiler.parse(file));
 
-        assertThat(errors, empty());
+        assertThat(errors.getDiagnostics(), empty());
         assertThat(scanner.methodTypes, hasKey("test"));
 
         Type.MethodType type = scanner.methodTypes.get("test");
@@ -128,13 +140,15 @@ public class LinterTest extends Fixtures {
 
     @Test
     public void notJava() {
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/NotJava.java.txt");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
                                                Collections.singletonList("src/test/resources"),
                                                "out");
-        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
+        compiler.onError(errors);
+        compiler.check(compiler.parse(file));
 
-        assertThat(errors, not(empty()));
+        assertThat(errors.getDiagnostics(), not(empty()));
     }
 
     public static class MethodTypes extends BridgeExpressionScanner {

@@ -22,6 +22,7 @@ import static org.junit.Assert.assertThat;
 public class ParserTest extends Fixtures {
     @Test
     public void missingSemicolon() throws IOException, URISyntaxException {
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/MissingSemicolon.java");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
                                                Collections.singletonList("src/test/resources"),
@@ -35,6 +36,7 @@ public class ParserTest extends Fixtures {
             }
         });
 
+        compiler.onError(errors);
         compiler.parse(file);
 
         assertThat(methods, hasItem("methodWithMissingSemicolon"));

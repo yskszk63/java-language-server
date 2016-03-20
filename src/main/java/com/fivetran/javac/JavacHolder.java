@@ -26,9 +26,12 @@ public class JavacHolder {
     private final List<String> classPath, sourcePath;
     private final String outputDirectory;
     private final Context context = new Context();
-    private final DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
     private final JavacTool systemJavaCompiler = (JavacTool) ToolProvider.getSystemJavaCompiler();
     private final JavacFileManager fileManager = systemJavaCompiler.getStandardFileManager(null, null, null);
+    private DiagnosticListener<JavaFileObject> errorsDelegate = diagnostic -> {};
+    private final DiagnosticListener<JavaFileObject> errors = diagnostic -> {
+        errorsDelegate.report(diagnostic);
+    };
 
     {
         context.put(DiagnosticListener.class, errors);
@@ -82,10 +85,6 @@ public class JavacHolder {
         });
     }
 
-    public JCTree.JCCompilationUnit parse(JavaFileObject source) {
-        return compiler.parse(source);
-    }
-
     public void afterParse(BridgeExpressionScanner... scan) {
         afterTask.put(TaskEvent.Kind.PARSE, ImmutableList.copyOf(scan));
     }
@@ -94,12 +93,18 @@ public class JavacHolder {
         afterTask.put(TaskEvent.Kind.ANALYZE, ImmutableList.copyOf(scan));
     }
 
-    public List<Diagnostic<? extends JavaFileObject>> check(JCTree.JCCompilationUnit source) {
+    public void onError(DiagnosticListener<JavaFileObject> callback) {
+        errorsDelegate = callback;
+    }
+
+    public JCTree.JCCompilationUnit parse(JavaFileObject source) {
+        return compiler.parse(source);
+    }
+
+    public void check(JCTree.JCCompilationUnit source) {
         compiler.processAnnotations(compiler.enterTrees(com.sun.tools.javac.util.List.of(source)));
 
         while (!todo.isEmpty())
             compiler.generate(compiler.desugar(compiler.flow(compiler.attribute(todo.remove()))));
-
-        return errors.getDiagnostics();
     }
 }
