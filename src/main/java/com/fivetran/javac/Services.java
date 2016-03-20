@@ -4,11 +4,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fivetran.javac.autocomplete.AutocompleteVisitor;
 import com.fivetran.javac.message.*;
 import com.sun.source.util.JavacTask;
-import com.sun.tools.javac.comp.CompileStates;
+import com.sun.tools.javac.api.JavacTool;
+import com.sun.tools.javac.file.JavacFileManager;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
+import javax.tools.ToolProvider;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.Reader;
@@ -23,6 +25,8 @@ import java.util.logging.Logger;
 
 public class Services {
     private static final Logger LOG = Logger.getLogger("");
+    private static final JavacTool SYSTEM_JAVA_COMPILER = (JavacTool) ToolProvider.getSystemJavaCompiler();
+    private static final JavacFileManager STANDARD_FILE_MANAGER = SYSTEM_JAVA_COMPILER.getStandardFileManager(null, null, null);
 
     public ResponseAutocomplete autocomplete(RequestAutocomplete request) throws IOException {
         Path path = Paths.get(request.path);
@@ -31,19 +35,13 @@ public class Services {
         LineMap lines = LineMap.fromString(request.text);
         long cursor = lines.offset(request.row, request.column);
         AutocompleteVisitor autocompleter = new AutocompleteVisitor(cursor);
-        JavacTask task = JavacTaskBuilder.create()
-                                         .fuzzyParser()
-                                         .addFile(file)
-                                         .reportErrors(errors)
-                                         .afterAnalyze(autocompleter)
-                                         .classPath(classPath(request.config))
-                                         .sourcePath(request.config.sourcePath)
-                                         .outputDirectory(request.config.outputDirectory.orElse("target"))
-                                         // TODO maven dependencies
-                                         .stopIfError(CompileStates.CompileState.GENERATE)
-                                         .build();
+        JavacHolder compiler = new JavacHolder(classPath(request.config),
+                                               request.config.sourcePath,
+                                               request.config.outputDirectory.orElse("target"));
 
-        task.call();
+        compiler.afterAnalyze(autocompleter);
+        compiler.onError(errors);
+        compiler.check(compiler.parse(file));
 
         for (Diagnostic<? extends JavaFileObject> error : errors.getDiagnostics()) {
             LOG.warning(error.toString());
@@ -59,17 +57,13 @@ public class Services {
     public ResponseLint lint(RequestLint request) throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         Path path = Paths.get(request.path);
-        JavaFileObject file = JavacTaskBuilder.STANDARD_FILE_MANAGER.getRegularFile(path.toFile());
-        JavacTask task = JavacTaskBuilder.create()
-                                         .addFile(file)
-                                         .reportErrors(errors)
-                                         .classPath(classPath(request.config))
-                                         .sourcePath(request.config.sourcePath)
-                                         .outputDirectory(request.config.outputDirectory.orElse("target"))
-                                         // TODO maven dependencies
-                                         .build();
+        JavaFileObject file = STANDARD_FILE_MANAGER.getRegularFile(path.toFile());
+        JavacHolder compiler = new JavacHolder(classPath(request.config),
+                                               request.config.sourcePath,
+                                               request.config.outputDirectory.orElse("target"));
+        compiler.onError(errors);
 
-        task.call();
+        compiler.check(compiler.parse(file));
 
         ResponseLint response = new ResponseLint();
 

@@ -112,7 +112,7 @@ public class RequestResponseTest extends Fixtures {
 
         List<Response> responses = responses(request.toString());
 
-        assertThat(responses.toString(), containsString("Compilation unit is not of SOURCE kind"));
+        assertThat(responses.toString(), containsString("class NotJava is public, should be declared in a file named NotJava.java"));
     }
 
     @Test
