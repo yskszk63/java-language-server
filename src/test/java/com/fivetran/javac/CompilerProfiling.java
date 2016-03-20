@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.logging.Logger;
 
 import static org.junit.Assert.assertNotNull;
@@ -38,16 +39,11 @@ public class CompilerProfiling extends Fixtures {
 
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetCompilationUnit compilationUnit = new GetCompilationUnit();
-        JavacTask task = JavacTaskBuilder.create()
-                                         .addFile(file)
-                                         .afterParse(compilationUnit)
-                                         .reportErrors(errors)
-                                         .stopIfError(CompileStates.CompileState.ENTER)
-                                         .stopIfNoError(CompileStates.CompileState.ENTER)
-                                         .build();
-
+        JavacHolder compiler = new JavacHolder(Collections.emptyList(), Collections.emptyList(), "out");
+        compiler.afterParse(compilationUnit);
+        compiler.onError(errors);
         try {
-            task.call();
+            compiler.parse(file);
         } catch (RuntimeException e) {
             if (e.getCause() instanceof AbortCompilation)
                 LOG.info("Aborted further stages");
