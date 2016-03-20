@@ -5,6 +5,7 @@ import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.comp.CompileStates;
 import org.junit.Test;
 
+import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
 import java.io.IOException;
@@ -12,6 +13,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.hamcrest.Matchers.hasItem;
@@ -20,26 +22,20 @@ import static org.junit.Assert.assertThat;
 public class ParserTest extends Fixtures {
     @Test
     public void missingSemicolon() throws IOException, URISyntaxException {
-        String test = "/MissingSemicolon.java";
-
+        GetResourceFileObject file = new GetResourceFileObject("/MissingSemicolon.java");
+        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
+                                               Collections.singletonList("src/test/resources"),
+                                               "out");
         List<String> methods = new ArrayList<>();
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        Path path = Paths.get(ParserTest.class.getResource(test).toURI().getPath());
-        JavaFileObject file = JavacTaskBuilder.STANDARD_FILE_MANAGER.getRegularFile(path.toFile());
-        JavacTask task = JavacTaskBuilder.create()
-                                         .fuzzyParser()
-                                         .addFile(file)
-                                         .reportErrors(errors)
-                                         .afterParse(new BridgeExpressionScanner() {
-                                             @Override
-                                             protected void visitMethod(MethodTree node) {
-                                                 methods.add(node.getName().toString());
-                                             }
-                                         })
-                                         .stopIfNoError(CompileStates.CompileState.PARSE)
-                                         .build();
 
-        task.call();
+        compiler.afterParse(new BridgeExpressionScanner() {
+            @Override
+            protected void visitMethod(MethodTree node) {
+                methods.add(node.getName().toString());
+            }
+        });
+
+        compiler.parse(file);
 
         assertThat(methods, hasItem("methodWithMissingSemicolon"));
         assertThat(methods, hasItem("methodAfterMissingSemicolon"));

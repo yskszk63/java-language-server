@@ -4,7 +4,9 @@ import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
 import com.sun.tools.javac.api.JavacTrees;
+import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.model.JavacTypes;
+import com.sun.tools.javac.util.Context;
 
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
@@ -14,10 +16,7 @@ import javax.lang.model.util.Types;
  */
 public class BridgeExpressionScanner implements TreeVisitor<Void, Void> {
 
-    /**
-     * Compilation task we are currently doing
-     */
-    public JavacTask task;
+    public Context context;
 
     private TreePath path;
 
@@ -88,9 +87,9 @@ public class BridgeExpressionScanner implements TreeVisitor<Void, Void> {
     protected void visitCompilationUnit(CompilationUnitTree node) {
         path = new TreePath(node);
         compilationUnit = node;
-        trees = JavacTrees.instance(task);
-        types = (JavacTypes) task.getTypes();
-        elements = task.getElements();
+        trees = JavacTrees.instance(context);
+        types = JavacTypes.instance(context);
+        elements = JavacElements.instance(context);
 
         scan(node.getPackageAnnotations());
 

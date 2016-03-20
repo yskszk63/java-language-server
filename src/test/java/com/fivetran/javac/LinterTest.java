@@ -3,6 +3,7 @@ package com.fivetran.javac;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.Trees;
+import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Type;
 import org.junit.Test;
 
@@ -10,10 +11,7 @@ import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
 
 import static org.hamcrest.Matchers.*;
@@ -24,26 +22,26 @@ public class LinterTest extends Fixtures {
 
     @Test
     public void compile() throws IOException {
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
+        GetResourceFileObject file = new GetResourceFileObject("/HelloWorld.java");
+        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
+                                               Collections.singletonList("src/test/resources"),
+                                               "out");
+        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
 
-        JavacTaskBuilder.create()
-                        .addFile(new GetResourceFileObject("/HelloWorld.java"))
-                        .reportErrors(errors)
-                        .build()
-                        .call();
+        assertThat(errors, empty());
     }
 
     @Test
     public void inspectTree() throws IOException {
         CollectMethods scanner = new CollectMethods();
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        JavacTask task = JavacTaskBuilder.create()
-                                         .addFile(new GetResourceFileObject("/HelloWorld.java"))
-                                         .reportErrors(errors)
-                                         .afterAnalyze(scanner)
-                                         .build();
+        GetResourceFileObject file = new GetResourceFileObject("/HelloWorld.java");
+        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
+                                               Collections.singletonList("src/test/resources"),
+                                               "out");
 
-        task.call();
+        compiler.afterAnalyze(scanner);
+
+        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
 
         assertThat(scanner.methodNames, hasItem("main"));
     }
@@ -51,73 +49,74 @@ public class LinterTest extends Fixtures {
     @Test
     public void missingMethodBody() throws IOException {
         CollectMethods scanner = new CollectMethods();
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        JavacTask task = JavacTaskBuilder.create()
-                                         .addFile(new GetResourceFileObject("/MissingMethodBody.java"))
-                                         .reportErrors(errors)
-                                         .afterAnalyze(scanner)
-                                         .build();
+        GetResourceFileObject file = new GetResourceFileObject("/MissingMethodBody.java");
+        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
+                                               Collections.singletonList("src/test/resources"),
+                                               "out");
 
-        task.call();
+        compiler.afterAnalyze(scanner);
+
+        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
 
         assertThat(scanner.methodNames, hasItem("test"));
-        assertThat(errors.getDiagnostics(), not(empty()));
+        assertThat(errors, not(empty()));
     }
 
     @Test
     public void incompleteAssignment() throws IOException {
         CollectMethods parsed = new CollectMethods();
         CollectMethods compiled = new CollectMethods();
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        JavacTask task = JavacTaskBuilder.create()
-                                         .addFile(new GetResourceFileObject("/IncompleteAssignment.java"))
-                                         .reportErrors(errors)
-                                         .afterParse(parsed)
-                                         .afterAnalyze(compiled)
-                                         .build();
+        GetResourceFileObject file = new GetResourceFileObject("/IncompleteAssignment.java");
+        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
+                                               Collections.singletonList("src/test/resources"),
+                                               "out");
 
-        task.call();
+        compiler.afterAnalyze(compiled);
+        compiler.afterParse(parsed);
+
+        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
 
         assertThat(parsed.methodNames, hasItem("test")); // Error recovery should have worked
         assertThat(compiled.methodNames, hasItem("test")); // Type error recovery should have worked
-        assertThat(errors.getDiagnostics(), not(empty()));
+        assertThat(errors, not(empty()));
     }
 
     @Test
     public void undefinedSymbol() throws IOException {
         CollectMethods scanner = new CollectMethods();
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        JavacTask task = JavacTaskBuilder.create()
-                                         .addFile(new GetResourceFileObject("/UndefinedSymbol.java"))
-                                         .afterAnalyze(scanner)
-                                         .reportErrors(errors)
-                                         .build();
+        GetResourceFileObject file = new GetResourceFileObject("/UndefinedSymbol.java");
+        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
+                                               Collections.singletonList("src/test/resources"),
+                                               "out");
 
-        task.call();
+        compiler.afterAnalyze(scanner);
+
+        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
 
         assertThat(scanner.methodNames, hasItem("test")); // Type error, so parse tree is present
-        assertThat(errors.getDiagnostics(), not(empty()));
 
-        Diagnostic<? extends JavaFileObject> d = errors.getDiagnostics().get(0);
+        Diagnostic<? extends JavaFileObject> d = errors.get(0);
 
         // Error position should span entire 'foo' symbol
         assertThat(d.getLineNumber(), greaterThan(0L));
         assertThat(d.getStartPosition(), greaterThan(0L));
         assertThat(d.getEndPosition(), greaterThan(d.getStartPosition() + 1));
+        assertThat(errors, not(empty()));
     }
 
     @Test
     public void getType() {
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         MethodTypes scanner = new MethodTypes();
-        JavacTask task = JavacTaskBuilder.create()
-                                         .addFile(new GetResourceFileObject("/FooString.java"))
-                                         .afterAnalyze(scanner)
-                                         .reportErrors(errors)
-                                         .build();
+        GetResourceFileObject file = new GetResourceFileObject("/FooString.java");
+        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
+                                               Collections.singletonList("src/test/resources"),
+                                               "out");
 
-        task.call();
+        compiler.afterAnalyze(scanner);
 
+        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
+
+        assertThat(errors, empty());
         assertThat(scanner.methodTypes, hasKey("test"));
 
         Type.MethodType type = scanner.methodTypes.get("test");
@@ -129,15 +128,13 @@ public class LinterTest extends Fixtures {
 
     @Test
     public void notJava() {
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        JavacTask task = JavacTaskBuilder.create()
-                                         .addFile(new GetResourceFileObject("/NotJava.java.txt"))
-                                         .reportErrors(errors)
-                                         .build();
+        GetResourceFileObject file = new GetResourceFileObject("/NotJava.java.txt");
+        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
+                                               Collections.singletonList("src/test/resources"),
+                                               "out");
+        List<Diagnostic<? extends JavaFileObject>> errors = compiler.check(compiler.parse(file));
 
-        task.call();
-
-        assertThat(errors.getDiagnostics(), not(empty()));
+        assertThat(errors, not(empty()));
     }
 
     public static class MethodTypes extends BridgeExpressionScanner {
@@ -147,7 +144,7 @@ public class LinterTest extends Fixtures {
         protected void visitMethod(MethodTree node) {
             super.visitMethod(node);
 
-            Trees trees = Trees.instance(super.task);
+            JavacTrees trees = JavacTrees.instance(super.context);
             Type.MethodType typeMirror = (Type.MethodType) trees.getTypeMirror(path());
 
             methodTypes.put(node.getName().toString(), typeMirror);

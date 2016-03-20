@@ -193,7 +193,7 @@ public class JavacTaskBuilder {
                 switch (e.getKind()) {
                     case PARSE:
                         for (BridgeExpressionScanner visitor : afterParse) {
-                            visitor.task = task;
+                            visitor.context = context;
 
                             e.getCompilationUnit().accept(visitor, null);
                         }
@@ -201,7 +201,7 @@ public class JavacTaskBuilder {
                         break;
                     case ENTER:
                         for (BridgeExpressionScanner visitor : afterEnter) {
-                            visitor.task = task;
+                            visitor.context = context;
 
                             e.getCompilationUnit().accept(visitor, null);
                         }
@@ -209,7 +209,7 @@ public class JavacTaskBuilder {
                         break;
                     case ANALYZE:
                         for (BridgeExpressionScanner visitor : afterAnalyze) {
-                            visitor.task = task;
+                            visitor.context = context;
 
                             e.getCompilationUnit().accept(visitor, null);
                         }

@@ -1,6 +1,7 @@
 package com.fivetran.javac;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
@@ -17,7 +18,7 @@ import com.sun.tools.javac.util.Options;
 
 import javax.tools.*;
 import java.io.PrintWriter;
-import java.util.List;
+import java.util.*;
 import java.util.logging.Logger;
 
 public class JavacHolder {
@@ -41,7 +42,7 @@ public class JavacHolder {
     private final Log log = Log.instance(context);
     private final JavaCompiler compiler = JavaCompiler.instance(context);
     private final Todo todo = Todo.instance(context);
-    private final MultiTaskListener listeners = MultiTaskListener.instance(context);
+    private final Map<TaskEvent.Kind, List<BridgeExpressionScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
 
     public JavacHolder(List<String> classPath, List<String> sourcePath, String outputDirectory) {
         this.classPath = classPath;
@@ -52,21 +53,45 @@ public class JavacHolder {
         options.put("-sourcepath", Joiner.on(":").join(sourcePath));
         options.put("-d", outputDirectory);
 
-        listeners.add(new TaskListener() {
+        MultiTaskListener.instance(context).add(new TaskListener() {
             @Override
             public void started(TaskEvent e) {
                 LOG.info("started " + e);
+
+                List<BridgeExpressionScanner> todo = beforeTask.getOrDefault(e.getKind(), Collections.emptyList());
+
+                for (BridgeExpressionScanner visitor : todo) {
+                    visitor.context = context;
+
+                    e.getCompilationUnit().accept(visitor, null);
+                }
             }
 
             @Override
             public void finished(TaskEvent e) {
                 LOG.info("finished " + e);
+
+                List<BridgeExpressionScanner> todo = afterTask.getOrDefault(e.getKind(), Collections.emptyList());
+
+                for (BridgeExpressionScanner visitor : todo) {
+                    visitor.context = context;
+
+                    e.getCompilationUnit().accept(visitor, null);
+                }
             }
         });
     }
 
     public JCTree.JCCompilationUnit parse(JavaFileObject source) {
         return compiler.parse(source);
+    }
+
+    public void afterParse(BridgeExpressionScanner... scan) {
+        afterTask.put(TaskEvent.Kind.PARSE, ImmutableList.copyOf(scan));
+    }
+
+    public void afterAnalyze(BridgeExpressionScanner... scan) {
+        afterTask.put(TaskEvent.Kind.ANALYZE, ImmutableList.copyOf(scan));
     }
 
     public List<Diagnostic<? extends JavaFileObject>> check(JCTree.JCCompilationUnit source) {
