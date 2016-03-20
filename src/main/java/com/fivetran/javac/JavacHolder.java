@@ -35,6 +35,7 @@ public class JavacHolder {
         context.put(DiagnosticListener.class, errors);
     }
 
+    private final IncrementalLog log = new IncrementalLog(context);
     public final JavacFileManager fileManager = new JavacFileManager(context, true, null);
 
     {
@@ -42,7 +43,6 @@ public class JavacHolder {
     }
 
     private final Options options = Options.instance(context);
-//    private final IncrementalLog log = new IncrementalLog(context);
     private final JavaCompiler compiler = JavaCompiler.instance(context);
     private final Todo todo = Todo.instance(context);
     private final Map<TaskEvent.Kind, List<BridgeExpressionScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
@@ -111,7 +111,7 @@ public class JavacHolder {
     }
 
     private void clear(JavaFileObject source) {
-//        log.clear(source);
+        log.clear(source);
     }
 
 }
