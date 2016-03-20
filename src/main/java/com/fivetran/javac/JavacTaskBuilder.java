@@ -28,7 +28,7 @@ public class JavacTaskBuilder {
     public static final JavacTool SYSTEM_JAVA_COMPILER = (JavacTool) ToolProvider.getSystemJavaCompiler();
     public static final JavacFileManager STANDARD_FILE_MANAGER = SYSTEM_JAVA_COMPILER.getStandardFileManager(null, null, null);
 
-    private final Context context = new Context();
+    private final Context context;
     private boolean fuzzyParser = false;
     /** Files we're going to compile */
     private final List<JavaFileObject> files = new ArrayList<>();
@@ -47,14 +47,19 @@ public class JavacTaskBuilder {
     /** When to stop if no error */
     private CompileStates.CompileState shouldStopPolicyIfNoError = CompileStates.CompileState.GENERATE;
 
-    private JavacTaskBuilder() {
+    private JavacTaskBuilder(Context context) {
+        this.context = context;
     }
 
     /**
      * Build a JavacTask using the system java compiler and the standard file manager
      */
     public static JavacTaskBuilder create() {
-        return new JavacTaskBuilder();
+        return createWithContext(new Context());
+    }
+
+    public static JavacTaskBuilder createWithContext(Context context) {
+        return new JavacTaskBuilder(context);
     }
 
     public JavacTaskBuilder fuzzyParser() {
