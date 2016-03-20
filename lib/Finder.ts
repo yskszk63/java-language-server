@@ -55,8 +55,7 @@ let javaConfigCache: {[file: string]: JavaConfig} = {};
 const DEFAULT_JAVA_CONFIG: JavaConfig = {
     sourcePath: ["src"],
     outputDirectory: "target",
-    classPath: [],
-    dependencies: []    
+    classPath: [] 
 }
 
 export function findJavaConfig(workspaceRoot: string, javaSource: string): JavaConfig {
