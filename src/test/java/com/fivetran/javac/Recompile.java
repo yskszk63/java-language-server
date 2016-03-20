@@ -3,7 +3,6 @@ package com.fivetran.javac;
 import com.sun.source.tree.ClassTree;
 import org.junit.Test;
 
-import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
 import java.util.ArrayList;
@@ -32,14 +31,14 @@ public class Recompile extends Fixtures {
             }
         });
         compiler.onError(errors);
-        compiler.check(compiler.parse(file));
+        compiler.compile(compiler.parse(file));
 
         assertThat(errors.getDiagnostics(), empty());
         assertThat(visits, contains("CompileTwice"));
 
         // Compile again
         compiler.onError(errors);
-        compiler.check(compiler.parse(file));
+        compiler.compile(compiler.parse(file));
 
         assertThat(errors.getDiagnostics(), empty());
         assertThat(visits, contains("CompileTwice", "CompileTwice"));

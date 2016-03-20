@@ -1,8 +1,6 @@
 package com.fivetran.javac;
 
 import com.sun.source.tree.MethodTree;
-import com.sun.source.util.JavacTask;
-import com.sun.source.util.Trees;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Type;
 import org.junit.Test;
@@ -28,7 +26,7 @@ public class LinterTest extends Fixtures {
                                                Collections.singletonList("src/test/resources"),
                                                "out");
         compiler.onError(errors);
-        compiler.check(compiler.parse(file));
+        compiler.compile(compiler.parse(file));
 
         assertThat(errors.getDiagnostics(), empty());
     }
@@ -45,7 +43,7 @@ public class LinterTest extends Fixtures {
         compiler.afterAnalyze(scanner);
 
         compiler.onError(errors);
-        compiler.check(compiler.parse(file));
+        compiler.compile(compiler.parse(file));
 
         assertThat(scanner.methodNames, hasItem("main"));
     }
@@ -62,7 +60,7 @@ public class LinterTest extends Fixtures {
         compiler.afterAnalyze(scanner);
 
         compiler.onError(errors);
-        compiler.check(compiler.parse(file));
+        compiler.compile(compiler.parse(file));
 
         assertThat(scanner.methodNames, hasItem("test"));
         assertThat(errors.getDiagnostics(), not(empty()));
@@ -82,7 +80,7 @@ public class LinterTest extends Fixtures {
         compiler.afterParse(parsed);
 
         compiler.onError(errors);
-        compiler.check(compiler.parse(file));
+        compiler.compile(compiler.parse(file));
 
         assertThat(parsed.methodNames, hasItem("test")); // Error recovery should have worked
         assertThat(compiled.methodNames, hasItem("test")); // Type error recovery should have worked
@@ -101,7 +99,7 @@ public class LinterTest extends Fixtures {
         compiler.afterAnalyze(scanner);
 
         compiler.onError(errors);
-        compiler.check(compiler.parse(file));
+        compiler.compile(compiler.parse(file));
 
         assertThat(scanner.methodNames, hasItem("test")); // Type error, so parse tree is present
 
@@ -126,7 +124,7 @@ public class LinterTest extends Fixtures {
         compiler.afterAnalyze(scanner);
 
         compiler.onError(errors);
-        compiler.check(compiler.parse(file));
+        compiler.compile(compiler.parse(file));
 
         assertThat(errors.getDiagnostics(), empty());
         assertThat(scanner.methodTypes, hasKey("test"));
@@ -146,7 +144,7 @@ public class LinterTest extends Fixtures {
                                                Collections.singletonList("src/test/resources"),
                                                "out");
         compiler.onError(errors);
-        compiler.check(compiler.parse(file));
+        compiler.compile(compiler.parse(file));
 
         assertThat(errors.getDiagnostics(), not(empty()));
     }

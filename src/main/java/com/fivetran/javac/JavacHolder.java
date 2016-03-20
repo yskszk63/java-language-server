@@ -117,7 +117,7 @@ public class JavacHolder {
         return result;
     }
 
-    public void check(JCTree.JCCompilationUnit source) {
+    public void compile(JCTree.JCCompilationUnit source) {
         compiler.processAnnotations(compiler.enterTrees(com.sun.tools.javac.util.List.of(source)));
 
         while (!todo.isEmpty())

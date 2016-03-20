@@ -32,7 +32,7 @@ public class Services {
 
         compiler.afterAnalyze(autocompleter);
         compiler.onError(errors);
-        compiler.check(compiler.parse(file));
+        compiler.compile(compiler.parse(file));
 
         for (Diagnostic<? extends JavaFileObject> error : errors.getDiagnostics()) {
             LOG.warning(error.toString());
@@ -54,7 +54,7 @@ public class Services {
         JavaFileObject file = compiler.fileManager.getRegularFile(path.toFile());
         compiler.onError(errors);
 
-        compiler.check(compiler.parse(file));
+        compiler.compile(compiler.parse(file));
 
         ResponseLint response = new ResponseLint();
 
