@@ -1,4 +1,4 @@
-package com.fivetran.javac.autocomplete;
+package com.fivetran.javac.message;
 
 import com.fivetran.javac.BridgeExpressionScanner;
 import com.fivetran.javac.BridgeTypeVisitor;

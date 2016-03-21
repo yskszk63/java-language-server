@@ -52,7 +52,7 @@ public class LineMap {
             Long endOffset = startOfLineOffset.get(row + 1);
 
             if (endOffset >= offset)
-                return new Position(row, offset - startOffset);
+                return new Position(row, (int) (offset - startOffset));
         }
 
         throw new IllegalArgumentException("Offset " + offset + " is after the end of the file " + startOfLineOffset.get(startOfLineOffset.size() - 1));

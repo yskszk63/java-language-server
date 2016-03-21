@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
-import com.fivetran.javac.logging.LoggingFormat;
 import com.fivetran.javac.message.Request;
 import com.fivetran.javac.message.Response;
 import com.fivetran.javac.message.ResponseChannel;

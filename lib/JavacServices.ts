@@ -26,6 +26,7 @@ export function provideJavac(projectDirectoryPath: string,
         ]);
 
         PortFinder.getPort((err, port) => {
+            // TODO package everything as a fat jar and get rid of this
             Maven.dependencies({dependencies}, (err, mvnResults) => {
                 if (err)
                     reject(err);

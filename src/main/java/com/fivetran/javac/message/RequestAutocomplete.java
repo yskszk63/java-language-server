@@ -5,5 +5,5 @@ public class RequestAutocomplete extends JavacArgs {
     /**
      * Autocomplete symbols here
      */
-    public int row, column;
+    public Position position = new Position();
 }

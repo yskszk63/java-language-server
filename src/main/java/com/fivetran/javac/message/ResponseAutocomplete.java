@@ -1,7 +1,5 @@
 package com.fivetran.javac.message;
 
-import com.fivetran.javac.autocomplete.AutocompleteSuggestion;
-
 import java.util.Set;
 
 public class ResponseAutocomplete {

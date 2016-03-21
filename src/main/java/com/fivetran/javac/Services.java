@@ -1,7 +1,7 @@
 package com.fivetran.javac;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fivetran.javac.autocomplete.AutocompleteVisitor;
+import com.fivetran.javac.message.AutocompleteVisitor;
 import com.fivetran.javac.message.*;
 
 import javax.tools.Diagnostic;
@@ -24,7 +24,7 @@ public class Services {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         StringFileObject file = new StringFileObject(request.text, path);
         LineMap lines = LineMap.fromString(request.text);
-        long cursor = lines.offset(request.row, request.column);
+        long cursor = lines.offset(request.position.line, request.position.character);
         AutocompleteVisitor autocompleter = new AutocompleteVisitor(cursor);
         JavacHolder compiler = new JavacHolder(classPath(request.config),
                                                request.config.sourcePath,
@@ -94,7 +94,7 @@ public class Services {
         if (error.getStartPosition() == Diagnostic.NOPOS)
             return Range.NONE;
 
-        Position start = new Position(error.getLineNumber() - 1, error.getColumnNumber() - 1);
+        Position start = new Position((int) error.getLineNumber() - 1, (int) error.getColumnNumber() - 1);
         Position end = endPosition(error);
 
         return new Range(start, end);
@@ -108,8 +108,8 @@ public class Services {
 
             reader.skip(startOffset);
 
-            long line = error.getLineNumber() - 1;
-            long column = error.getColumnNumber() - 1;
+            int line = (int) error.getLineNumber() - 1;
+            int column = (int) error.getColumnNumber() - 1;
 
             for (long i = startOffset; i < endOffset; i++) {
                 int next = reader.read();

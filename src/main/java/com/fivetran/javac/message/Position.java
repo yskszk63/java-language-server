@@ -4,9 +4,13 @@ import java.util.Objects;
 
 public class Position {
     public static final Position NONE = new Position(-1, -1);
-    public final long line, character;
+    public int line, character;
 
-    public Position(long line, long character) {
+    public Position() {
+        this(-1, -1);
+    }
+
+    public Position(int line, int character) {
         this.line = line;
         this.character = character;
     }

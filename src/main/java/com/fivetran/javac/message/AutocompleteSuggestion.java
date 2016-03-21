@@ -1,4 +1,4 @@
-package com.fivetran.javac.autocomplete;
+package com.fivetran.javac.message;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.core.JsonProcessingException;

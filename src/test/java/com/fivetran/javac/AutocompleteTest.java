@@ -1,5 +1,6 @@
 package com.fivetran.javac;
 
+import com.fivetran.javac.message.Position;
 import com.fivetran.javac.message.RequestAutocomplete;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -70,8 +71,7 @@ public class AutocompleteTest extends Fixtures {
 
         request.path = path(file);
         request.text = new String(Files.readAllBytes(Paths.get(path(file))));
-        request.row = row;
-        request.column = column;
+        request.position = new Position(row, column);
 
         return new Services().autocomplete(request).suggestions.stream().map(s -> s.insertText).collect(toSet());
     }

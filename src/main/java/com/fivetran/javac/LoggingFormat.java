@@ -1,4 +1,4 @@
-package com.fivetran.javac.logging;
+package com.fivetran.javac;
 
 import java.io.IOException;
 import java.io.PrintWriter;
