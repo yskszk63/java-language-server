@@ -51,6 +51,7 @@ function correctBinname(binname: string) {
 }
 
 let javaConfigCache: {[file: string]: JavaConfig} = {};
+let locationCache: {[file: string]: string} = {};
 
 const DEFAULT_JAVA_CONFIG: JavaConfig = {
     sourcePath: ["src"],
@@ -58,29 +59,56 @@ const DEFAULT_JAVA_CONFIG: JavaConfig = {
     classPath: [] 
 }
 
+/**
+ * Get the latest saved version of javaconfig.json 
+ * in the nearest parent directory of [fileName]
+ */
 export function findJavaConfig(workspaceRoot: string, javaSource: string): JavaConfig {
     workspaceRoot = path.normalize(workspaceRoot);
     javaSource = path.resolve(workspaceRoot, javaSource);
     
-    if (!javaConfigCache.hasOwnProperty(javaSource))
-        javaConfigCache[javaSource] = doFindJavaConfig(workspaceRoot, javaSource);
+    let location = findLocation(workspaceRoot, javaSource);
     
-    return javaConfigCache[javaSource];
+    return loadConfig(location);
 }
 
-function doFindJavaConfig(workspaceRoot: string, javaSource: string): JavaConfig {
+export function invalidateCaches() {
+    javaConfigCache = {};
+    locationCache = {};
+}
+
+function loadConfig(javaConfig: string) {
+    if (javaConfig == null)
+        return DEFAULT_JAVA_CONFIG;
+        
+    if (!javaConfigCache.hasOwnProperty(javaConfig)) {
+        let text = fs.readFileSync(javaConfig, 'utf8');
+        let json = JSON.parse(text);
+        
+        javaConfigCache[javaConfig] = json;
+    }
+    
+    return javaConfigCache[javaConfig];
+}
+
+function findLocation(workspaceRoot: string, javaSource: string) {
+    if (!locationCache.hasOwnProperty(javaSource))
+        locationCache[javaSource] = doFindLocation(workspaceRoot, javaSource);
+        
+    return locationCache[javaSource];
+}
+
+function doFindLocation(workspaceRoot: string, javaSource: string): string {
     var pointer = path.dirname(javaSource);
     
     while (true) {
         let candidate = path.resolve(pointer, 'javaconfig.json');
         
-        if (fs.existsSync(candidate)) {
-            let text = fs.readFileSync(candidate, 'utf8');
+        if (fs.existsSync(candidate))
+            return candidate;
             
-            return JSON.parse(text);
-        }
         else if (pointer === workspaceRoot || pointer === path.dirname(pointer))
-            return DEFAULT_JAVA_CONFIG;
+            return null;
         else 
             pointer = path.dirname(pointer);
     }

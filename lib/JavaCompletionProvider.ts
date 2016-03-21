@@ -1,5 +1,6 @@
 import V = require('vscode');
 import {JavacServices, ResponseAutocomplete, AutocompleteSuggestion} from './JavacServices';
+import {findJavaConfig} from './Finder';
 
 export class JavaCompletionProvider implements V.CompletionItemProvider {
     constructor(private provideJavac: Promise<JavacServices>) { }
@@ -9,7 +10,8 @@ export class JavaCompletionProvider implements V.CompletionItemProvider {
                            token: V.CancellationToken): Promise<V.CompletionItem[]> {
         let text = document.getText();
         let path = document.uri.fsPath;
-        let response = this.provideJavac.then(javac => javac.autocomplete({path, text, position}));
+        let config = findJavaConfig(V.workspace.rootPath, document.fileName)
+        let response = this.provideJavac.then(javac => javac.autocomplete({path, text, position, config}));
         
         return response.then(asCompletionItems);
     }

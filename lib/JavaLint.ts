@@ -1,6 +1,7 @@
 
 import * as V from 'vscode';
 
+import {findJavaConfig} from './Finder';
 import {JavacServices, LintMessage} from './JavacServices';
 import {JavaConfig} from './JavaConfig';
 
@@ -24,7 +25,8 @@ export class JavaLint {
                       vsCodeJavaConfig: V.WorkspaceConfiguration) {
         this.provideJavac.then(javac => {
             javac.lint({
-                path: document.fileName
+                path: document.fileName,
+                config: findJavaConfig(V.workspace.rootPath, document.fileName)
             }).then(lint => {
                 this.diagnosticCollection.clear();
                 

@@ -3,10 +3,11 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as V from 'vscode';
 import * as J from './JavacServices';
+import * as P from 'path';
+import * as F from './Finder';
 import {JavaConfig} from './JavaConfig';
 import {JavaCompletionProvider} from './JavaCompletionProvider';
 import {JavaLint} from './JavaLint';
-import {onSaveConfig} from './ProvideJavaConfig';
 
 const JAVA_MODE: V.DocumentFilter = { language: 'java', scheme: 'file' };
 
@@ -22,7 +23,10 @@ export function activate(ctx: V.ExtensionContext) {
 	ctx.subscriptions.push(diagnosticCollection);
     ctx.subscriptions.push(V.languages.registerCompletionItemProvider(JAVA_MODE, autocomplete))
     ctx.subscriptions.push(V.workspace.onDidSaveTextDocument(document => lint.onSave(document)));
-    ctx.subscriptions.push(V.workspace.onDidSaveTextDocument(onSaveConfig));
+    ctx.subscriptions.push(V.workspace.onDidSaveTextDocument(document => {
+        if (P.basename(document.fileName) == 'javaconfig.json')
+            F.invalidateCaches();
+    }));
 }
 
 function onErrorWithoutRequestId(message: string) {

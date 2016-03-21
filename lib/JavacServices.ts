@@ -7,9 +7,8 @@ import * as Maven from './Maven';
 import {MavenDependency} from './JavaConfig';
 // Don't import members, just types, otherwise the tests will break
 import {DiagnosticSeverity,CompletionItemKind} from 'vscode';
-import {findJavaExecutable} from './Finder';
+import {findJavaExecutable, findJavaConfig} from './Finder';
 import {JavaConfig} from './JavaConfig';
-import {getConfig} from './ProvideJavaConfig';
 
 export function provideJavac(projectDirectoryPath: string, 
                              mavenDependencies: MavenDependency[] = [],
@@ -217,14 +216,10 @@ export class JavacServices {
     }
 
     lint(request: RequestLint): Promise<ResponseLint> {
-        request.config = getConfig(request.path);
-        
         return this.doRequest('lint', request);
     }
 
     autocomplete(request: RequestAutocomplete): Promise<ResponseAutocomplete> {
-        request.config = getConfig(request.path);
-        
         return this.doRequest('autocomplete', request);
     }
 
