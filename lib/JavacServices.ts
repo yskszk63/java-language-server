@@ -3,7 +3,6 @@ import split = require('split');
 import path = require('path');
 import PortFinder = require('portfinder');
 import Net = require('net');
-import * as Maven from './Maven';
 import {MavenDependency} from './JavaConfig';
 // Don't import members, just types, otherwise the tests will break
 import {DiagnosticSeverity,CompletionItemKind} from 'vscode';
@@ -11,31 +10,17 @@ import {findJavaExecutable, findJavaConfig} from './Finder';
 import {JavaConfig} from './JavaConfig';
 
 export function provideJavac(projectDirectoryPath: string, 
-                             mavenDependencies: MavenDependency[] = [],
+                             extensionDirectoryPath: string,
                              onErrorWithoutRequestId: (message: string) => void): Promise<JavacServices> {
     return new Promise((resolve, reject) => {
         PortFinder.basePort = 55220;
         
         var javaPath = findJavaExecutable('java');
-        var dependencies = mavenDependencies.concat([
-            {
-                "groupId": "com.fivetran",
-                "artifactId": "javac-services",
-                "version": "0.1-SNAPSHOT"
-            }
-        ]);
 
         PortFinder.getPort((err, port) => {
-            // TODO package everything as a fat jar and get rid of this
-            Maven.dependencies({dependencies}, (err, mvnResults) => {
-                if (err)
-                    reject(err);
-                else {
-                    var mvnClasspath = mvnResults.classpath;
-
-                    resolve(new JavacServices(projectDirectoryPath, javaPath, mvnClasspath, port, onErrorWithoutRequestId));
-                }
-            });
+            let classpath = [path.resolve(extensionDirectoryPath, "out/fat-jar.jar")];
+            
+            resolve(new JavacServices(projectDirectoryPath, javaPath, classpath, port, onErrorWithoutRequestId));
         });
     });
 }

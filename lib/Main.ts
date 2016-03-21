@@ -15,14 +15,15 @@ const JAVA_MODE: V.DocumentFilter = { language: 'java', scheme: 'file' };
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export function activate(ctx: V.ExtensionContext) {
-    let provideJavac: Promise<J.JavacServices> = J.provideJavac(V.workspace.rootPath, [], onErrorWithoutRequestId);
+    let provideJavac: Promise<J.JavacServices> = J.provideJavac(V.workspace.rootPath, ctx.extensionPath, onErrorWithoutRequestId);
     let diagnosticCollection: V.DiagnosticCollection = V.languages.createDiagnosticCollection('java');
     let autocomplete = new Autocomplete(provideJavac);
     let lint = new Lint(provideJavac, diagnosticCollection);
     
 	ctx.subscriptions.push(diagnosticCollection);
-    ctx.subscriptions.push(V.languages.registerCompletionItemProvider(JAVA_MODE, autocomplete))
-    ctx.subscriptions.push(V.workspace.onDidSaveTextDocument(document => lint.onSave(document)));
+    ctx.subscriptions.push(V.languages.registerCompletionItemProvider(JAVA_MODE, autocomplete));
+    ctx.subscriptions.push(V.workspace.onDidOpenTextDocument(document => lint.onSaveOrOpen(document)));
+    ctx.subscriptions.push(V.workspace.onDidSaveTextDocument(document => lint.onSaveOrOpen(document)));
     ctx.subscriptions.push(V.workspace.onDidSaveTextDocument(document => {
         if (P.basename(document.fileName) == 'javaconfig.json')
             F.invalidateCaches();

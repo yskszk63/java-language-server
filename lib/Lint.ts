@@ -11,7 +11,7 @@ export class Lint {
                 private diagnosticCollection: V.DiagnosticCollection) {
     }
     
-    public onSave(document: V.TextDocument) {
+    public onSaveOrOpen(document: V.TextDocument) {
         if (document.languageId !== 'java') 
             return;
             
