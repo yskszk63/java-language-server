@@ -72,6 +72,9 @@ export function findJavaConfig(workspaceRoot: string, javaSource: string): JavaC
     return loadConfig(location);
 }
 
+/**
+ * Forget all the cached javaconfig.json locations and contents
+ */
 export function invalidateCaches() {
     javaConfigCache = {};
     locationCache = {};
