@@ -3,12 +3,12 @@ public class AutocompleteMember {
         this.
     }
 
-    private static String fieldStatic;
-    private String field;
-    private static String methodStatic() {
+    public static String fieldStatic;
+    public String field;
+    public static String methodStatic() {
         return "foo";
     }
-    private String method() {
+    public String method() {
         return "foo";
     }
 }

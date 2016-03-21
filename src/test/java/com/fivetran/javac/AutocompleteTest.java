@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.Set;
 import java.util.logging.Logger;
 
@@ -55,6 +56,17 @@ public class AutocompleteTest extends Fixtures {
     }
 
     @Test
+    public void other() throws IOException {
+        String file = "/AutocompleteOther.java";
+
+        // Static method
+        Set<String> suggestions = autocomplete(file, 2, 33);
+
+        assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "class")));
+        assertThat(suggestions, hasItems("field", "method", "getClass"));
+    }
+
+    @Test
     @Ignore
     public void reference() throws IOException {
         String file = "/AutocompleteReference.java";
@@ -72,6 +84,7 @@ public class AutocompleteTest extends Fixtures {
         request.path = path(file);
         request.text = new String(Files.readAllBytes(Paths.get(path(file))));
         request.position = new Position(row, column);
+        request.config.sourcePath = Collections.singletonList("src/test/resources");
 
         return new Services().autocomplete(request).suggestions.stream().map(s -> s.insertText).collect(toSet());
     }
