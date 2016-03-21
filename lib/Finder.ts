@@ -1,9 +1,9 @@
 
 'use strict';
 
-import fs = require('fs');
-import path = require('path');
-import os = require('os');
+import FS = require('fs');
+import Path = require('path');
+import OS = require('os');
 
 import {JavaConfig} from './JavaConfig';
 
@@ -16,10 +16,10 @@ export function findJavaExecutable(binname: string) {
 
 	// First search each JAVA_HOME bin folder
 	if (process.env['JAVA_HOME']) {
-		let workspaces = process.env['JAVA_HOME'].split(path.delimiter);
+		let workspaces = process.env['JAVA_HOME'].split(Path.delimiter);
 		for (let i = 0; i < workspaces.length; i++) {
-			let binpath = path.join(workspaces[i], 'bin', binname);
-			if (fs.existsSync(binpath)) {
+			let binpath = Path.join(workspaces[i], 'bin', binname);
+			if (FS.existsSync(binpath)) {
 				binPathCache[binname] = binpath;
 				return binpath;
 			}
@@ -28,10 +28,10 @@ export function findJavaExecutable(binname: string) {
 
 	// Then search PATH parts
 	if (process.env['PATH']) {
-		let pathparts = process.env['PATH'].split(path.delimiter);
+		let pathparts = process.env['PATH'].split(Path.delimiter);
 		for (let i = 0; i < pathparts.length; i++) {
-			let binpath = path.join(pathparts[i], binname);
-			if (fs.existsSync(binpath)) {
+			let binpath = Path.join(pathparts[i], binname);
+			if (FS.existsSync(binpath)) {
 				binPathCache[binname] = binpath;
 				return binpath;
 			}
@@ -64,8 +64,8 @@ const DEFAULT_JAVA_CONFIG: JavaConfig = {
  * in the nearest parent directory of [fileName]
  */
 export function findJavaConfig(workspaceRoot: string, javaSource: string): JavaConfig {
-    workspaceRoot = path.normalize(workspaceRoot);
-    javaSource = path.resolve(workspaceRoot, javaSource);
+    workspaceRoot = Path.normalize(workspaceRoot);
+    javaSource = Path.resolve(workspaceRoot, javaSource);
     
     let location = findLocation(workspaceRoot, javaSource);
     
@@ -85,7 +85,7 @@ function loadConfig(javaConfig: string) {
         return DEFAULT_JAVA_CONFIG;
         
     if (!javaConfigCache.hasOwnProperty(javaConfig)) {
-        let text = fs.readFileSync(javaConfig, 'utf8');
+        let text = FS.readFileSync(javaConfig, 'utf8');
         let json = JSON.parse(text);
         
         javaConfigCache[javaConfig] = json;
@@ -102,17 +102,17 @@ function findLocation(workspaceRoot: string, javaSource: string) {
 }
 
 function doFindLocation(workspaceRoot: string, javaSource: string): string {
-    var pointer = path.dirname(javaSource);
+    var pointer = Path.dirname(javaSource);
     
     while (true) {
-        let candidate = path.resolve(pointer, 'javaconfig.json');
+        let candidate = Path.resolve(pointer, 'javaconfig.json');
         
-        if (fs.existsSync(candidate))
+        if (FS.existsSync(candidate))
             return candidate;
             
-        else if (pointer === workspaceRoot || pointer === path.dirname(pointer))
+        else if (pointer === workspaceRoot || pointer === Path.dirname(pointer))
             return null;
         else 
-            pointer = path.dirname(pointer);
+            pointer = Path.dirname(pointer);
     }
 }
