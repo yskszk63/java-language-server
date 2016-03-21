@@ -8,23 +8,10 @@ import {JavaConfig} from './JavaConfig';
 export class JavaLint {
     
     constructor(private provideJavac: Promise<JavacServices>, 
-                private subscriptions: V.Disposable[],
                 private diagnosticCollection: V.DiagnosticCollection) {
-        V.workspace.onDidSaveTextDocument(document => {
-            if (document.languageId !== 'java') 
-                return;
-                
-            let vsCodeJavaConfig = V.workspace.getConfiguration('java');
-            let javaConfig = F.findJavaConfig(V.workspace.rootPath, document.fileName);
-            let textEditor = V.window.activeTextEditor;
-            
-            this.runBuilds(document, vsCodeJavaConfig, javaConfig);
-        }, null, subscriptions);
-        
     }
     
-    private startBuildOnSaveWatcher() {
-        V.workspace.onDidSaveTextDocument(document => {
+    public onSave(document: V.TextDocument) {
             if (document.languageId !== 'java') 
                 return;
                 
@@ -33,7 +20,6 @@ export class JavaLint {
             let textEditor = V.window.activeTextEditor;
             
             this.runBuilds(document, vsCodeJavaConfig, javaConfig);
-        }, null, this.subscriptions);
     }
     
     private runBuilds(document: V.TextDocument, 

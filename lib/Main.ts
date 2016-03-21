@@ -9,16 +9,18 @@ import {JavaLint} from './JavaLint';
 
 const JAVA_MODE: V.DocumentFilter = { language: 'java', scheme: 'file' };
 
-let provideJavac: Promise<J.JavacServices> = J.provideJavac(V.workspace.rootPath, [], onErrorWithoutRequestId);
-let diagnosticCollection: V.DiagnosticCollection = V.languages.createDiagnosticCollection('java');
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export function activate(ctx: V.ExtensionContext) {
-	ctx.subscriptions.push(diagnosticCollection);
-    ctx.subscriptions.push(V.languages.registerCompletionItemProvider(JAVA_MODE, new JavaCompletionProvider(provideJavac)))
+    let provideJavac: Promise<J.JavacServices> = J.provideJavac(V.workspace.rootPath, [], onErrorWithoutRequestId);
+    let diagnosticCollection: V.DiagnosticCollection = V.languages.createDiagnosticCollection('java');
+    let autocomplete = new JavaCompletionProvider(provideJavac);
+    let lint = new JavaLint(provideJavac, diagnosticCollection);
     
-	new JavaLint(provideJavac, ctx.subscriptions, diagnosticCollection);
+	ctx.subscriptions.push(diagnosticCollection);
+    ctx.subscriptions.push(V.languages.registerCompletionItemProvider(JAVA_MODE, autocomplete))
+    ctx.subscriptions.push(V.workspace.onDidSaveTextDocument(document => lint.onSave(document)));
 }
 
 function onErrorWithoutRequestId(message: string) {
