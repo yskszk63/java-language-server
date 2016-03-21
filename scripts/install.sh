@@ -5,7 +5,6 @@ tsc
 
 # Build fat jar
 mvn package 
-cp ./target/fat-jar.jar out/fat-jar.jar
 
 # Ensure .vscode/extensions/vscode-javac exists
 mkdir -p ~/.vscode/extensions/vscode-javac
