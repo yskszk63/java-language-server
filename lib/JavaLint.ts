@@ -1,6 +1,5 @@
 
 import * as V from 'vscode';
-import * as F from './Finder';
 
 import {JavacServices, LintMessage} from './JavacServices';
 import {JavaConfig} from './JavaConfig';
@@ -12,23 +11,20 @@ export class JavaLint {
     }
     
     public onSave(document: V.TextDocument) {
-            if (document.languageId !== 'java') 
-                return;
-                
-            let vsCodeJavaConfig = V.workspace.getConfiguration('java');
-            let javaConfig = F.findJavaConfig(V.workspace.rootPath, document.fileName);
-            let textEditor = V.window.activeTextEditor;
+        if (document.languageId !== 'java') 
+            return;
             
-            this.runBuilds(document, vsCodeJavaConfig, javaConfig);
+        let vsCodeJavaConfig = V.workspace.getConfiguration('java');
+        let textEditor = V.window.activeTextEditor;
+        
+        this.runBuilds(document, vsCodeJavaConfig);
     }
     
     private runBuilds(document: V.TextDocument, 
-                   vsCodeJavaConfig: V.WorkspaceConfiguration,
-                   javaConfig: JavaConfig) {
+                      vsCodeJavaConfig: V.WorkspaceConfiguration) {
         this.provideJavac.then(javac => {
             javac.lint({
-                path: document.fileName,
-                config: javaConfig
+                path: document.fileName
             }).then(lint => {
                 this.diagnosticCollection.clear();
                 

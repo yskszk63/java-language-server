@@ -6,6 +6,7 @@ import * as J from './JavacServices';
 import {JavaConfig} from './JavaConfig';
 import {JavaCompletionProvider} from './JavaCompletionProvider';
 import {JavaLint} from './JavaLint';
+import {onSaveConfig} from './ProvideJavaConfig';
 
 const JAVA_MODE: V.DocumentFilter = { language: 'java', scheme: 'file' };
 
@@ -21,6 +22,7 @@ export function activate(ctx: V.ExtensionContext) {
 	ctx.subscriptions.push(diagnosticCollection);
     ctx.subscriptions.push(V.languages.registerCompletionItemProvider(JAVA_MODE, autocomplete))
     ctx.subscriptions.push(V.workspace.onDidSaveTextDocument(document => lint.onSave(document)));
+    ctx.subscriptions.push(V.workspace.onDidSaveTextDocument(onSaveConfig));
 }
 
 function onErrorWithoutRequestId(message: string) {
