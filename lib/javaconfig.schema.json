@@ -5,19 +5,23 @@
             "type": "array",
             "items": {
                 "type": "string"
-            }
+            },
+            "description": "Java compiler sourcepath"
         },
         "classPath": {
             "type": "array",
             "items": {
                 "type": "string"
-            }
+            },
+            "description": "Java compiler classpath"
         },
         "classPathFile": {
-            "type": "string"
+            "type": "string",
+            "description": "File containing the classpath"
         },
         "outputDirectory": {
-            "type": "string"
+            "type": "string",
+            "description": "Where to place generated .class files"
         }
     }
 }
