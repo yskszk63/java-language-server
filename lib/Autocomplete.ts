@@ -2,7 +2,7 @@ import V = require('vscode');
 import {JavacServices, ResponseAutocomplete, AutocompleteSuggestion} from './JavacServices';
 import {findJavaConfig} from './Finder';
 
-export class JavaCompletionProvider implements V.CompletionItemProvider {
+export class Autocomplete implements V.CompletionItemProvider {
     constructor(private provideJavac: Promise<JavacServices>) { }
     
     provideCompletionItems(document: V.TextDocument, 

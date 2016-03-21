@@ -6,8 +6,8 @@ import * as J from './JavacServices';
 import * as P from 'path';
 import * as F from './Finder';
 import {JavaConfig} from './JavaConfig';
-import {JavaCompletionProvider} from './JavaCompletionProvider';
-import {JavaLint} from './JavaLint';
+import {Autocomplete} from './Autocomplete';
+import {Lint} from './Lint';
 
 const JAVA_MODE: V.DocumentFilter = { language: 'java', scheme: 'file' };
 
@@ -17,8 +17,8 @@ const JAVA_MODE: V.DocumentFilter = { language: 'java', scheme: 'file' };
 export function activate(ctx: V.ExtensionContext) {
     let provideJavac: Promise<J.JavacServices> = J.provideJavac(V.workspace.rootPath, [], onErrorWithoutRequestId);
     let diagnosticCollection: V.DiagnosticCollection = V.languages.createDiagnosticCollection('java');
-    let autocomplete = new JavaCompletionProvider(provideJavac);
-    let lint = new JavaLint(provideJavac, diagnosticCollection);
+    let autocomplete = new Autocomplete(provideJavac);
+    let lint = new Lint(provideJavac, diagnosticCollection);
     
 	ctx.subscriptions.push(diagnosticCollection);
     ctx.subscriptions.push(V.languages.registerCompletionItemProvider(JAVA_MODE, autocomplete))

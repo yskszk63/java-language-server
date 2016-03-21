@@ -5,7 +5,7 @@ import {findJavaConfig} from './Finder';
 import {JavacServices, LintMessage} from './JavacServices';
 import {JavaConfig} from './JavaConfig';
 
-export class JavaLint {
+export class Lint {
     
     constructor(private provideJavac: Promise<JavacServices>, 
                 private diagnosticCollection: V.DiagnosticCollection) {
