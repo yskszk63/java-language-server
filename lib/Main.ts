@@ -8,6 +8,7 @@ import * as F from './Finder';
 import {JavaConfig} from './JavaConfig';
 import {Autocomplete} from './Autocomplete';
 import {Lint} from './Lint';
+import {GoToDefinition} from './GoToDefinition';
 
 const JAVA_MODE: V.DocumentFilter = { language: 'java', scheme: 'file' };
 
@@ -19,6 +20,7 @@ export function activate(ctx: V.ExtensionContext) {
     let diagnosticCollection: V.DiagnosticCollection = V.languages.createDiagnosticCollection('java');
     let autocomplete = new Autocomplete(provideJavac);
     let lint = new Lint(provideJavac, diagnosticCollection);
+    let goTo = new GoToDefinition(provideJavac);
     
 	ctx.subscriptions.push(diagnosticCollection);
     ctx.subscriptions.push(V.languages.registerCompletionItemProvider(JAVA_MODE, autocomplete));
@@ -28,6 +30,7 @@ export function activate(ctx: V.ExtensionContext) {
         if (P.basename(document.fileName) == 'javaconfig.json')
             F.invalidateCaches();
     }));
+    V.languages.registerDefinitionProvider('java', goTo);
 }
 
 function onErrorWithoutRequestId(message: string) {

@@ -149,6 +149,19 @@ export interface ResponseAutocomplete {
     suggestions: AutocompleteSuggestion[];
 }
 
+export interface RequestGoTo extends JavacOptions {
+    position: Position;
+}
+
+export interface ResponseGoto {
+    definitions: GotoLocation[];
+}
+
+export interface GotoLocation {
+    uri: string;
+    range: Range;
+}
+
 export class JavacServices {
     private socket: Promise<Net.Socket>;
 
@@ -206,6 +219,10 @@ export class JavacServices {
 
     autocomplete(request: RequestAutocomplete): Promise<ResponseAutocomplete> {
         return this.doRequest('autocomplete', request);
+    }
+    
+    goto(request: RequestGoto): Promise<ResponseGoto> {
+        return this.doRequest('goto', request);
     }
 
     private doRequest(type: string, payload: any): Promise<any> {

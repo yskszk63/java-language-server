@@ -31,9 +31,6 @@ public class Position {
 
     @Override
     public String toString() {
-        return "Position{" +
-               "line=" + line +
-               ", character=" + character +
-               '}';
+        return line + "." + character;
     }
 }

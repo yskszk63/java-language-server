@@ -1,19 +1,24 @@
 package com.fivetran.javac;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fivetran.javac.message.AutocompleteVisitor;
 import com.fivetran.javac.message.*;
+import com.sun.source.util.Trees;
+import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.main.JavaCompiler;
+import com.sun.tools.javac.util.Name;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
 import java.io.*;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.logging.Logger;
 
 public class Services {
@@ -25,7 +30,7 @@ public class Services {
         StringFileObject file = new StringFileObject(request.text, path);
         LineMap lines = LineMap.fromString(request.text);
         long cursor = lines.offset(request.position.line, request.position.character);
-        AutocompleteVisitor autocompleter = new AutocompleteVisitor(cursor);
+        AutocompleteVisitor autocompleter = new AutocompleteVisitor(file, cursor);
         JavacHolder compiler = new JavacHolder(classPath(request.config),
                                                request.config.sourcePath,
                                                request.config.outputDirectory.orElse("target"));
@@ -40,6 +45,45 @@ public class Services {
 
         return new ResponseAutocomplete(autocompleter.suggestions);
     }
+    
+    public ResponseGoto doGoto(RequestGoto request) throws IOException {
+        Path path = Paths.get(request.path);
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
+        JavacHolder compiler = new JavacHolder(classPath(request.config),
+                                               request.config.sourcePath,
+                                               request.config.outputDirectory.orElse("target"));
+        StringFileObject file = new StringFileObject(request.text, path);
+        LineMap lines = LineMap.fromString(request.text);
+        long cursor = lines.offset(request.position.line, request.position.character);
+        GotoDefinitionVisitor visitor = new GotoDefinitionVisitor(file, cursor);
+
+        compiler.afterAnalyze(visitor);
+        compiler.onError(errors);
+        compiler.compile(compiler.parse(file));
+
+        ResponseGoto response = new ResponseGoto();
+
+        for (Symbol s : visitor.definitions) {
+            Optional<JavacHolder.SymbolLocation> maybeLocate = compiler.locate(s);
+
+            if (maybeLocate.isPresent()) {
+                JavacHolder.SymbolLocation locate = maybeLocate.get();
+                URI uri = locate.file.toUri();
+                Path symbolPath = Paths.get(uri);
+                // If this is the currently open file, use text
+                // Otherwise use file on disk
+                LineMap symbolLineMap = path.equals(symbolPath) ? lines : LineMap.fromPath(symbolPath);
+                Position start = symbolLineMap.point(locate.startPosition);
+                Position end = symbolLineMap.point(locate.endPosition);
+                Range range = new Range(start, end);
+                Location location = new Location(symbolPath.toString(), range);
+
+                response.definitions.add(location);
+            }
+        }
+
+        return response;
+    }
 
     public JsonNode echo(JsonNode echo) {
         return echo;
@@ -52,8 +96,8 @@ public class Services {
                                                request.config.sourcePath,
                                                request.config.outputDirectory.orElse("target"));
         JavaFileObject file = compiler.fileManager.getRegularFile(path.toFile());
-        compiler.onError(errors);
 
+        compiler.onError(errors);
         compiler.compile(compiler.parse(file));
 
         ResponseLint response = new ResponseLint();

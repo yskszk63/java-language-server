@@ -2,11 +2,14 @@ package com.fivetran.javac;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
-import com.sun.source.tree.ClassTree;
+import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.util.DocSourcePositions;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
-import com.sun.tools.javac.api.JavacTool;
+import com.sun.source.util.TreePath;
+import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.api.MultiTaskListener;
+import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.Todo;
 import com.sun.tools.javac.file.JavacFileManager;
@@ -15,13 +18,11 @@ import com.sun.tools.javac.parser.FuzzyParserFactory;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeScanner;
 import com.sun.tools.javac.util.Context;
-import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Name;
 import com.sun.tools.javac.util.Options;
 
+import javax.lang.model.element.TypeElement;
 import javax.tools.*;
-import java.io.File;
-import java.io.PrintWriter;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -46,6 +47,7 @@ public class JavacHolder {
     private final Options options = Options.instance(context);
     private final JavaCompiler compiler = JavaCompiler.instance(context);
     private final Todo todo = Todo.instance(context);
+    private final JavacTrees trees = JavacTrees.instance(context);
     private final Map<TaskEvent.Kind, List<BridgeExpressionScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
 
     public JavacHolder(List<String> classPath, List<String> sourcePath, String outputDirectory) {
@@ -138,4 +140,53 @@ public class JavacHolder {
         check.compiled.remove(name);
     }
 
+    public static class SymbolLocation {
+        public final JavaFileObject file;
+        public final long startPosition, endPosition;
+
+        public SymbolLocation(JavaFileObject file, long startPosition, long endPosition) {
+            this.file = file;
+            this.startPosition = startPosition;
+            this.endPosition = endPosition;
+        }
+    }
+    public Optional<SymbolLocation> locate(Symbol symbol) {
+        JavaFileObject file = symbol.enclClass().classfile;
+
+        if (!file.toUri().getScheme().equals("file"))
+            return Optional.empty();
+        else if (symbol instanceof Symbol.VarSymbol) {
+            int startPosition = ((Symbol.VarSymbol) symbol).pos;
+            int endPosition = startPosition + symbol.name.length();
+
+            return Optional.of(new SymbolLocation(file, startPosition, endPosition));
+        }
+        else if (symbol instanceof Symbol.ClassSymbol) {
+            Symbol.ClassSymbol type = (Symbol.ClassSymbol) symbol;
+            JCTree.JCClassDecl tree = trees.getTree(type);
+            CompilationUnitTree unit = compilationUnit(symbol);
+            DocSourcePositions pos = trees.getSourcePositions();
+            long startPosition = pos.getStartPosition(unit, tree);
+            long endPosition = pos.getEndPosition(unit, tree);
+
+            return Optional.of(new SymbolLocation(file, startPosition, endPosition));
+        }
+        else if (symbol instanceof Symbol.MethodSymbol) {
+            Symbol.MethodSymbol method = (Symbol.MethodSymbol) symbol;
+            JCTree.JCMethodDecl tree = trees.getTree(method);
+            long startPosition = tree.pos;
+            long endPosition = startPosition + symbol.name.length();
+
+            return Optional.of(new SymbolLocation(file, startPosition, endPosition));
+        }
+        else {
+            LOG.severe("Don't know what to do with " + symbol);
+
+            return Optional.empty();
+        }
+    }
+
+    private CompilationUnitTree compilationUnit(Symbol symbol) {
+        return trees.getPath(symbol).getCompilationUnit();
+    }
 }

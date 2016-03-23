@@ -11,31 +11,19 @@ import com.sun.tools.javac.tree.JCTree;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
+import javax.tools.JavaFileObject;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
 
-public class AutocompleteVisitor extends BridgeExpressionScanner {
+public class AutocompleteVisitor extends VisitCursor {
     private static final Logger LOG = Logger.getLogger("");
-    private final long cursor;
     public final Set<AutocompleteSuggestion> suggestions = new LinkedHashSet<>();
 
-    public AutocompleteVisitor(long cursor) {
-        this.cursor = cursor;
-    }
-
-    @Override
-    public void scan(Tree node) {
-        if (containsCursor(node))
-            super.scan(node);
-    }
-
-    private boolean containsCursor(Tree node) {
-        long start = trees().getSourcePositions().getStartPosition(compilationUnit(), node);
-        long end = trees().getSourcePositions().getEndPosition(compilationUnit(), node);
-        return start <= cursor && cursor <= end;
+    public AutocompleteVisitor(JavaFileObject file, long cursor) {
+        super(file, cursor);
     }
 
     /**
