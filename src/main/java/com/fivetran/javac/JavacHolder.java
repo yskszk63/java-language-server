@@ -30,7 +30,7 @@ public class JavacHolder {
     private static final Logger LOG = Logger.getLogger("");
     private final List<String> classPath, sourcePath;
     private final String outputDirectory;
-    private final Context context = new Context();
+    public final Context context = new Context();
     private DiagnosticListener<JavaFileObject> errorsDelegate = diagnostic -> {};
     private final DiagnosticListener<JavaFileObject> errors = diagnostic -> {
         errorsDelegate.report(diagnostic);
@@ -49,6 +49,7 @@ public class JavacHolder {
     private final Todo todo = Todo.instance(context);
     private final JavacTrees trees = JavacTrees.instance(context);
     private final Map<TaskEvent.Kind, List<BridgeExpressionScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
+    private final Map<TaskEvent.Kind, List<TreeScanner>> beforeTaskScan = new HashMap<>(), afterTaskScan = new HashMap<>();
 
     public JavacHolder(List<String> classPath, List<String> sourcePath, String outputDirectory) {
         this.classPath = classPath;
@@ -84,6 +85,14 @@ public class JavacHolder {
 
                     e.getCompilationUnit().accept(visitor, null);
                 }
+
+                List<TreeScanner> todoScan = afterTaskScan.getOrDefault(e.getKind(), Collections.emptyList());
+
+                for (TreeScanner visitor : todoScan) {
+                    JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
+
+                    unit.accept(visitor);
+                }
             }
         });
     }
@@ -94,6 +103,10 @@ public class JavacHolder {
 
     public void afterAnalyze(BridgeExpressionScanner... scan) {
         afterTask.put(TaskEvent.Kind.ANALYZE, ImmutableList.copyOf(scan));
+    }
+
+    public void afterAnalyze(TreeScanner... scan) {
+        afterTaskScan.put(TaskEvent.Kind.ANALYZE, ImmutableList.copyOf(scan));
     }
 
     public void onError(DiagnosticListener<JavaFileObject> callback) {

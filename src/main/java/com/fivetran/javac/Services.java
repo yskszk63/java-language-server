@@ -55,7 +55,7 @@ public class Services {
         StringFileObject file = new StringFileObject(request.text, path);
         LineMap lines = LineMap.fromString(request.text);
         long cursor = lines.offset(request.position.line, request.position.character);
-        GotoDefinitionVisitor visitor = new GotoDefinitionVisitor(file, cursor);
+        GotoDefinitionVisitor visitor = new GotoDefinitionVisitor(file, cursor, compiler.context);
 
         compiler.afterAnalyze(visitor);
         compiler.onError(errors);
