@@ -1,8 +1,11 @@
 package com.fivetran.javac;
 
+import com.fivetran.javac.message.BaseScanner;
 import com.sun.source.tree.MethodTree;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.util.Context;
 import org.junit.Test;
 
 import javax.tools.Diagnostic;
@@ -34,11 +37,11 @@ public class LinterTest extends Fixtures {
     @Test
     public void inspectTree() throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        CollectMethods scanner = new CollectMethods();
         GetResourceFileObject file = new GetResourceFileObject("/HelloWorld.java");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
                                                Collections.singletonList("src/test/resources"),
                                                "out");
+        CollectMethods scanner = new CollectMethods(compiler.context);
 
         compiler.afterAnalyze(scanner);
 
@@ -51,11 +54,11 @@ public class LinterTest extends Fixtures {
     @Test
     public void missingMethodBody() throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        CollectMethods scanner = new CollectMethods();
         GetResourceFileObject file = new GetResourceFileObject("/MissingMethodBody.java");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
                                                Collections.singletonList("src/test/resources"),
                                                "out");
+        CollectMethods scanner = new CollectMethods(compiler.context);
 
         compiler.afterAnalyze(scanner);
 
@@ -69,12 +72,12 @@ public class LinterTest extends Fixtures {
     @Test
     public void incompleteAssignment() throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        CollectMethods parsed = new CollectMethods();
-        CollectMethods compiled = new CollectMethods();
         GetResourceFileObject file = new GetResourceFileObject("/IncompleteAssignment.java");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
                                                Collections.singletonList("src/test/resources"),
                                                "out");
+        CollectMethods parsed = new CollectMethods(compiler.context);
+        CollectMethods compiled = new CollectMethods(compiler.context);
 
         compiler.afterAnalyze(compiled);
         compiler.afterParse(parsed);
@@ -90,11 +93,11 @@ public class LinterTest extends Fixtures {
     @Test
     public void undefinedSymbol() throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        CollectMethods scanner = new CollectMethods();
         GetResourceFileObject file = new GetResourceFileObject("/UndefinedSymbol.java");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
                                                Collections.singletonList("src/test/resources"),
                                                "out");
+        CollectMethods scanner = new CollectMethods(compiler.context);
 
         compiler.afterAnalyze(scanner);
 
@@ -115,11 +118,11 @@ public class LinterTest extends Fixtures {
     @Test
     public void getType() {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        MethodTypes scanner = new MethodTypes();
         GetResourceFileObject file = new GetResourceFileObject("/FooString.java");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
                                                Collections.singletonList("src/test/resources"),
                                                "out");
+        MethodTypes scanner = new MethodTypes(compiler.context);
 
         compiler.afterAnalyze(scanner);
 
@@ -149,28 +152,36 @@ public class LinterTest extends Fixtures {
         assertThat(errors.getDiagnostics(), not(empty()));
     }
 
-    public static class MethodTypes extends BridgeExpressionScanner {
+    public static class MethodTypes extends BaseScanner {
         public final Map<String, Type.MethodType> methodTypes = new HashMap<>();
 
+        public MethodTypes(Context context) {
+            super(context);
+        }
+
         @Override
-        protected void visitMethod(MethodTree node) {
-            super.visitMethod(node);
+        public void visitMethodDef(JCTree.JCMethodDecl node) {
+            super.visitMethodDef(node);
 
             JavacTrees trees = JavacTrees.instance(super.context);
-            Type.MethodType typeMirror = (Type.MethodType) trees.getTypeMirror(path());
+            Type.MethodType typeMirror = (Type.MethodType) trees.getTypeMirror(path);
 
             methodTypes.put(node.getName().toString(), typeMirror);
         }
     }
 
-    public static class CollectMethods extends BridgeExpressionScanner {
+    public static class CollectMethods extends BaseScanner {
         public final Set<String> methodNames = new HashSet<>();
 
-        @Override
-        protected void visitMethod(MethodTree node) {
-            super.visitMethod(node);
+        public CollectMethods(Context context) {
+            super(context);
+        }
 
-            methodNames.add(node.getName().toString());
+        @Override
+        public void visitMethodDef(JCTree.JCMethodDecl tree) {
+            super.visitMethodDef(tree);
+
+            methodNames.add(tree.getName().toString());
         }
     }
 }

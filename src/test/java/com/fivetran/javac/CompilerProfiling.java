@@ -1,8 +1,9 @@
 package com.fivetran.javac;
 
+import com.fivetran.javac.message.BaseScanner;
 import com.sun.source.tree.CompilationUnitTree;
-import com.sun.source.util.JavacTask;
-import com.sun.tools.javac.comp.CompileStates;
+import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.util.Context;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -38,8 +39,8 @@ public class CompilerProfiling extends Fixtures {
         long start = System.nanoTime();
 
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        GetCompilationUnit compilationUnit = new GetCompilationUnit();
         JavacHolder compiler = new JavacHolder(Collections.emptyList(), Collections.emptyList(), "out");
+        GetCompilationUnit compilationUnit = new GetCompilationUnit(compiler.context);
         compiler.afterParse(compilationUnit);
         compiler.onError(errors);
         try {
@@ -64,12 +65,16 @@ public class CompilerProfiling extends Fixtures {
         return new StringFileObject(content, path);
     }
 
-    private static class GetCompilationUnit extends BridgeExpressionScanner {
+    private static class GetCompilationUnit extends BaseScanner {
         private CompilationUnitTree result;
 
+        private GetCompilationUnit(Context context) {
+            super(context);
+        }
+
         @Override
-        protected void visitCompilationUnit(CompilationUnitTree node) {
-            this.result = node;
+        public void visitTopLevel(JCTree.JCCompilationUnit tree) {
+            this.result = tree;
 
             throw new AbortCompilation();
         }

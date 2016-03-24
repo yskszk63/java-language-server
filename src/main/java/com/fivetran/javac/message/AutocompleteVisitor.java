@@ -1,6 +1,5 @@
 package com.fivetran.javac.message;
 
-import com.fivetran.javac.BridgeExpressionScanner;
 import com.fivetran.javac.BridgeTypeVisitor;
 import com.google.common.base.Joiner;
 import com.sun.source.tree.*;
@@ -15,7 +14,6 @@ import com.sun.tools.javac.util.Context;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
-import javax.lang.model.util.Elements;
 import javax.tools.JavaFileObject;
 import java.util.LinkedHashSet;
 import java.util.List;

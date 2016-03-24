@@ -1,6 +1,9 @@
 package com.fivetran.javac;
 
+import com.fivetran.javac.message.BaseScanner;
 import com.sun.source.tree.ClassTree;
+import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.util.Context;
 import org.junit.Test;
 
 import javax.tools.DiagnosticCollector;
@@ -25,14 +28,7 @@ public class Recompile extends Fixtures {
                                                Collections.singletonList("src/test/resources"),
                                                "out");
         List<String> visits = new ArrayList<>();
-        compiler.afterAnalyze(new BridgeExpressionScanner() {
-            @Override
-            protected void visitClass(ClassTree node) {
-                super.visitClass(node);
-
-                visits.add(node.getSimpleName().toString());
-            }
-        });
+        compiler.afterAnalyze(new GetClass(compiler.context, visits));
         compiler.onError(errors);
         compiler.compile(compiler.parse(file));
 
@@ -67,14 +63,7 @@ public class Recompile extends Fixtures {
         // Parse again
         List<String> parsedClassNames = new ArrayList<>();
 
-        compiler.afterParse(new BridgeExpressionScanner() {
-            @Override
-            protected void visitClass(ClassTree node) {
-                super.visitClass(node);
-
-                parsedClassNames.add(node.getSimpleName().toString());
-            }
-        });
+        compiler.afterParse(new GetClass(compiler.context, parsedClassNames));
         compiler.onError(goodErrors);
         compiler.parse(good);
 
@@ -102,18 +91,28 @@ public class Recompile extends Fixtures {
         // Parse again
         List<String> parsedClassNames = new ArrayList<>();
 
-        compiler.afterAnalyze(new BridgeExpressionScanner() {
-            @Override
-            protected void visitClass(ClassTree node) {
-                super.visitClass(node);
-
-                parsedClassNames.add(node.getSimpleName().toString());
-            }
-        });
+        compiler.afterAnalyze(new GetClass(compiler.context, parsedClassNames));
         compiler.onError(goodErrors);
         compiler.compile(compiler.parse(good));
 
         assertThat(goodErrors.getDiagnostics(), empty());
         assertThat(parsedClassNames, contains("FixTypeError"));
+    }
+
+    private static class GetClass extends BaseScanner {
+        private final List<String> visits;
+
+        public GetClass(Context context, List<String> visits) {
+            super(context);
+
+            this.visits = visits;
+        }
+
+        @Override
+        public void visitClassDef(JCTree.JCClassDecl tree) {
+            super.visitClassDef(tree);
+
+            visits.add(tree.getSimpleName().toString());
+        }
     }
 }

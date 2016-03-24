@@ -48,8 +48,7 @@ public class JavacHolder {
     private final JavaCompiler compiler = JavaCompiler.instance(context);
     private final Todo todo = Todo.instance(context);
     private final JavacTrees trees = JavacTrees.instance(context);
-    private final Map<TaskEvent.Kind, List<BridgeExpressionScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
-    private final Map<TaskEvent.Kind, List<TreeScanner>> beforeTaskScan = new HashMap<>(), afterTaskScan = new HashMap<>();
+    private final Map<TaskEvent.Kind, List<TreeScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
 
     public JavacHolder(List<String> classPath, List<String> sourcePath, String outputDirectory) {
         this.classPath = classPath;
@@ -65,12 +64,12 @@ public class JavacHolder {
             public void started(TaskEvent e) {
                 LOG.info("started " + e);
 
-                List<BridgeExpressionScanner> todo = beforeTask.getOrDefault(e.getKind(), Collections.emptyList());
+                List<TreeScanner> todo = beforeTask.getOrDefault(e.getKind(), Collections.emptyList());
 
-                for (BridgeExpressionScanner visitor : todo) {
-                    visitor.context = context;
+                for (TreeScanner visitor : todo) {
+                    JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
 
-                    e.getCompilationUnit().accept(visitor, null);
+                    unit.accept(visitor);
                 }
             }
 
@@ -78,17 +77,9 @@ public class JavacHolder {
             public void finished(TaskEvent e) {
                 LOG.info("finished " + e);
 
-                List<BridgeExpressionScanner> todo = afterTask.getOrDefault(e.getKind(), Collections.emptyList());
+                List<TreeScanner> todo = afterTask.getOrDefault(e.getKind(), Collections.emptyList());
 
-                for (BridgeExpressionScanner visitor : todo) {
-                    visitor.context = context;
-
-                    e.getCompilationUnit().accept(visitor, null);
-                }
-
-                List<TreeScanner> todoScan = afterTaskScan.getOrDefault(e.getKind(), Collections.emptyList());
-
-                for (TreeScanner visitor : todoScan) {
+                for (TreeScanner visitor : todo) {
                     JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
 
                     unit.accept(visitor);
@@ -97,16 +88,12 @@ public class JavacHolder {
         });
     }
 
-    public void afterParse(BridgeExpressionScanner... scan) {
+    public void afterParse(TreeScanner... scan) {
         afterTask.put(TaskEvent.Kind.PARSE, ImmutableList.copyOf(scan));
     }
 
-    public void afterAnalyze(BridgeExpressionScanner... scan) {
-        afterTask.put(TaskEvent.Kind.ANALYZE, ImmutableList.copyOf(scan));
-    }
-
     public void afterAnalyze(TreeScanner... scan) {
-        afterTaskScan.put(TaskEvent.Kind.ANALYZE, ImmutableList.copyOf(scan));
+        afterTask.put(TaskEvent.Kind.ANALYZE, ImmutableList.copyOf(scan));
     }
 
     public void onError(DiagnosticListener<JavaFileObject> callback) {

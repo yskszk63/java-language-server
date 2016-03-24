@@ -9,12 +9,11 @@ import javax.tools.JavaFileObject;
 public class CursorScanner extends BaseScanner {
     protected final JavaFileObject file;
     protected final long cursor;
-    protected final Context context;
 
     public CursorScanner(JavaFileObject file, long cursor, Context context) {
+        super(context);
         this.file = file;
         this.cursor = cursor;
-        this.context = context;
     }
 
     @Override

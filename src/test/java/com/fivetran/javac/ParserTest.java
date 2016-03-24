@@ -3,6 +3,8 @@ package com.fivetran.javac;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.comp.CompileStates;
+import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.TreeScanner;
 import org.junit.Test;
 
 import javax.tools.Diagnostic;
@@ -29,9 +31,9 @@ public class ParserTest extends Fixtures {
                                                "out");
         List<String> methods = new ArrayList<>();
 
-        compiler.afterParse(new BridgeExpressionScanner() {
+        compiler.afterParse(new TreeScanner() {
             @Override
-            protected void visitMethod(MethodTree node) {
+            public void visitMethodDef(JCTree.JCMethodDecl node) {
                 methods.add(node.getName().toString());
             }
         });

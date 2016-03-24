@@ -1,14 +1,19 @@
 package com.fivetran.javac.message;
 
-import com.sun.source.tree.Tree;
 import com.sun.source.util.TreePath;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeScanner;
+import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.List;
 
 public class BaseScanner extends TreeScanner {
+    protected final Context context;
     protected JCTree.JCCompilationUnit compilationUnit;
     protected TreePath path;
+
+    public BaseScanner(Context context) {
+        this.context = context;
+    }
 
     @Override
     public void visitTopLevel(JCTree.JCCompilationUnit tree) {
