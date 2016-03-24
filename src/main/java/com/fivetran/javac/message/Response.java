@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fivetran.javac.Main;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 
@@ -14,6 +15,7 @@ public class Response {
     public Optional<JsonNode> echo = Optional.empty();
     public Optional<ResponseError> error = Optional.empty();
     public Optional<ResponseAutocomplete> autocomplete = Optional.empty();
+    public Optional<ResponseGoto> responseGoto = Optional.empty();
 
     public Response(int requestId) {
         this.requestId = OptionalInt.of(requestId);

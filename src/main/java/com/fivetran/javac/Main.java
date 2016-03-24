@@ -156,6 +156,8 @@ public class Main {
                 response.lint = Optional.of(services.lint(request.lint.get()));
             else if (request.autocomplete.isPresent())
                 response.autocomplete = Optional.of(services.autocomplete(request.autocomplete.get()));
+            else if (request.requestGoto.isPresent())
+                response.responseGoto = Optional.of(services.doGoto(request.requestGoto.get()));
                 // Continue the pattern for additional request / response types
             else
                 LOG.severe("Unrecognized message " + request);

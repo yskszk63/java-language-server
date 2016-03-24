@@ -1,9 +1,11 @@
 package com.fivetran.javac.message;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fivetran.javac.Main;
 
+import java.util.Objects;
 import java.util.Optional;
 
 public class Request {
@@ -17,6 +19,9 @@ public class Request {
     public Optional<RequestLint> lint = Optional.empty();
 
     public Optional<RequestAutocomplete> autocomplete = Optional.empty();
+
+    @JsonProperty("goto")
+    public Optional<RequestGoto> requestGoto = Optional.empty();
 
     @Override
     public boolean equals(Object o) {
