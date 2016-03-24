@@ -7,7 +7,9 @@ import com.sun.source.util.TreePath;
 import com.sun.tools.javac.api.JavacScope;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.model.JavacElements;
+import com.sun.tools.javac.model.JavacTypes;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 
@@ -40,12 +42,10 @@ public class AutocompleteVisitor extends CursorScanner {
         if (containsCursor(expression))
             super.visitSelect(node);
         else {
-            JavacTrees trees = JavacTrees.instance(context);
-            TreePath pathToExpression = new TreePath(path, expression);
-            TypeMirror type = trees.getTypeMirror(pathToExpression);
+            TypeMirror type = expression.type;
 
             if (type == null)
-                LOG.warning("No type for " + Joiner.on("/").join(pathToExpression));
+                LOG.warning("No type for " + expression);
             else if (isClassReference(expression)) {
                 suggestions.add(new AutocompleteSuggestion("class", "class", AutocompleteSuggestion.Type.Property));
 
@@ -69,12 +69,10 @@ public class AutocompleteVisitor extends CursorScanner {
         if (containsCursor(expression))
             super.visitReference(node);
         else {
-            JavacTrees trees = JavacTrees.instance(context);
-            TreePath pathToExpression = new TreePath(path, expression);
-            TypeMirror type = trees.getTypeMirror(pathToExpression);
+            TypeMirror type = expression.type;
 
             if (type == null)
-                LOG.warning("No type for " + Joiner.on("/").join(pathToExpression));
+                LOG.warning("No type for " + expression);
             else if (isClassReference(expression)) {
                 suggestions.add(new AutocompleteSuggestion("new", "new", AutocompleteSuggestion.Type.Method));
 

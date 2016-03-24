@@ -4,7 +4,6 @@ import javax.lang.model.type.*;
 import javax.lang.model.util.AbstractTypeVisitor8;
 import java.util.List;
 
-// TODO delete and use scanner
 public class BridgeTypeVisitor extends AbstractTypeVisitor8<Void, Void> {
 
     public void scan(List<? extends TypeMirror> types) {
