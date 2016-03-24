@@ -5,12 +5,17 @@ import com.fivetran.javac.BridgeTypeVisitor;
 import com.google.common.base.Joiner;
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePath;
+import com.sun.tools.javac.api.JavacScope;
+import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.util.Context;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
+import javax.lang.model.util.Elements;
 import javax.tools.JavaFileObject;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -18,27 +23,28 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
 
-public class AutocompleteVisitor extends VisitCursor {
+public class AutocompleteVisitor extends CursorScanner {
     private static final Logger LOG = Logger.getLogger("");
     public final Set<AutocompleteSuggestion> suggestions = new LinkedHashSet<>();
 
-    public AutocompleteVisitor(JavaFileObject file, long cursor) {
-        super(file, cursor);
+    public AutocompleteVisitor(JavaFileObject file, long cursor, Context context) {
+        super(file, cursor, context);
     }
 
     /**
      * [expression].[identifier]
      */
     @Override
-    protected void visitMemberSelect(MemberSelectTree node) {
+    public void visitSelect(JCTree.JCFieldAccess node) {
         // If expression contains cursor, no autocomplete
-        ExpressionTree expression = node.getExpression();
+        JCTree.JCExpression expression = node.getExpression();
 
         if (containsCursor(expression))
-            super.visitMemberSelect(node);
+            super.visitSelect(node);
         else {
-            TreePath pathToExpression = new TreePath(path(), expression);
-            TypeMirror type = trees().getTypeMirror(pathToExpression);
+            JavacTrees trees = JavacTrees.instance(context);
+            TreePath pathToExpression = new TreePath(path, expression);
+            TypeMirror type = trees.getTypeMirror(pathToExpression);
 
             if (type == null)
                 LOG.warning("No type for " + Joiner.on("/").join(pathToExpression));
@@ -58,15 +64,16 @@ public class AutocompleteVisitor extends VisitCursor {
     }
 
     @Override
-    protected void visitMemberReference(MemberReferenceTree node) {
+    public void visitReference(JCTree.JCMemberReference node) {
         // If expression contains cursor, no autocomplete
-        ExpressionTree expression = node.getQualifierExpression();
+        JCTree.JCExpression expression = node.getQualifierExpression();
 
         if (containsCursor(expression))
-            super.visitMemberReference(node);
+            super.visitReference(node);
         else {
-            TreePath pathToExpression = new TreePath(path(), expression);
-            TypeMirror type = trees().getTypeMirror(pathToExpression);
+            JavacTrees trees = JavacTrees.instance(context);
+            TreePath pathToExpression = new TreePath(path, expression);
+            TypeMirror type = trees.getTypeMirror(pathToExpression);
 
             if (type == null)
                 LOG.warning("No type for " + Joiner.on("/").join(pathToExpression));
@@ -81,22 +88,19 @@ public class AutocompleteVisitor extends VisitCursor {
     }
 
     @Override
-    protected void visitIdentifier(IdentifierTree node) {
-        super.visitIdentifier(node);
+    public void visitIdent(JCTree.JCIdent node) {
+        super.visitIdent(node);
 
-        if (containsCursor(node)) {
-            TreePath path = path();
-            Scope scope = trees().getScope(path);
+        JavacScope scope = JavacTrees.instance(context).getScope(path);
 
-            while (scope != null) {
-                LOG.info(Joiner.on(", ").join(scope.getLocalElements()));
+        while (scope != null) {
+            LOG.info(Joiner.on(", ").join(scope.getLocalElements()));
 
-                for (Element e : scope.getLocalElements())
-                    addElement(e);
-                // TODO add to suggestions
+            for (Element e : scope.getLocalElements())
+                addElement(e);
+            // TODO add to suggestions
 
-                scope = scope.getEnclosingScope();
-            }
+            scope = scope.getEnclosingScope();
         }
     }
 
@@ -180,7 +184,7 @@ public class AutocompleteVisitor extends VisitCursor {
         @Override
         public void visitDeclared(DeclaredType t) {
             TypeElement typeElement = (TypeElement) t.asElement();
-            List<? extends Element> members = elements().getAllMembers(typeElement);
+            List<? extends Element> members = JavacElements.instance(context).getAllMembers(typeElement);
 
             for (Element e : members) {
                 switch (e.getKind()) {
@@ -222,7 +226,7 @@ public class AutocompleteVisitor extends VisitCursor {
         @Override
         public void visitDeclared(DeclaredType t) {
             TypeElement typeElement = (TypeElement) t.asElement();
-            List<? extends Element> members = elements().getAllMembers(typeElement);
+            List<? extends Element> members = JavacElements.instance(context).getAllMembers(typeElement);
 
             for (Element e : members) {
                 switch (e.getKind()) {

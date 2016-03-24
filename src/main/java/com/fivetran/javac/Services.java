@@ -30,10 +30,10 @@ public class Services {
         StringFileObject file = new StringFileObject(request.text, path);
         LineMap lines = LineMap.fromString(request.text);
         long cursor = lines.offset(request.position.line, request.position.character);
-        AutocompleteVisitor autocompleter = new AutocompleteVisitor(file, cursor);
         JavacHolder compiler = new JavacHolder(classPath(request.config),
                                                request.config.sourcePath,
                                                request.config.outputDirectory.orElse("target"));
+        AutocompleteVisitor autocompleter = new AutocompleteVisitor(file, cursor, compiler.context);
 
         compiler.afterAnalyze(autocompleter);
         compiler.onError(errors);

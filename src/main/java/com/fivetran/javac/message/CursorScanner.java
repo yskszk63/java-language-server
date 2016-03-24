@@ -2,28 +2,19 @@ package com.fivetran.javac.message;
 
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.TreeScanner;
 import com.sun.tools.javac.util.Context;
 
 import javax.tools.JavaFileObject;
 
-public class CursorScanner extends TreeScanner {
+public class CursorScanner extends BaseScanner {
     protected final JavaFileObject file;
     protected final long cursor;
     protected final Context context;
-    protected JCTree.JCCompilationUnit compilationUnit;
 
     public CursorScanner(JavaFileObject file, long cursor, Context context) {
         this.file = file;
         this.cursor = cursor;
         this.context = context;
-    }
-
-    @Override
-    public void visitTopLevel(JCTree.JCCompilationUnit tree) {
-        this.compilationUnit = tree;
-
-        super.visitTopLevel(tree);
     }
 
     @Override

@@ -45,7 +45,9 @@ public class GotoDefinitionVisitor extends CursorScanner {
         // Given a member reference [expr]::[name]
         // expr is taken care of by visitIdentifier
         // Check cursor is in name
-        if (containsCursor(tree) && !containsCursor(tree.selected))
+        if (containsCursor(tree.getExpression()))
+            super.visitSelect(tree);
+        else
             definitions.add(tree.sym);
     }
 
@@ -56,7 +58,9 @@ public class GotoDefinitionVisitor extends CursorScanner {
         // Given a member reference [expr]::[name]
         // expr is taken care of by visitIdentifier
         // Check cursor is in name
-        if (containsCursor(tree) && !containsCursor(tree.expr))
+        if (containsCursor(tree.getQualifierExpression()))
+            super.visitReference(tree);
+        else
             definitions.add(tree.sym);
     }
 }
