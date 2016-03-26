@@ -2,7 +2,7 @@ import * as V from 'vscode';
 import * as J from './JavacServices';
 import * as F from './Finder';
 
-export class GoToDefinition implements V.DefinitionProvider {
+export class GotoDefinition implements V.DefinitionProvider {
     constructor (private provideJavac: Promise<J.JavacServices>) { }
     
     provideDefinition(document: V.TextDocument, position: V.Position, token: V.CancellationToken): Promise<V.Location[]> {
@@ -15,11 +15,11 @@ export class GoToDefinition implements V.DefinitionProvider {
     } 
 }
 
-function asDefinition(response: J.ResponseGoTo): V.Location[] {
+function asDefinition(response: J.ResponseGoto): V.Location[] {
     return response.definitions.map(asLocation);
 }
 
-function asLocation(d: J.GoToLocation): V.Location {
+function asLocation(d: J.GotoLocation): V.Location {
     let start = asPosition(d.range.start);
     let end = asPosition(d.range.end);
     let range = new V.Range(start, end);

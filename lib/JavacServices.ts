@@ -149,7 +149,7 @@ export interface ResponseAutocomplete {
     suggestions: AutocompleteSuggestion[];
 }
 
-export interface RequestGoTo extends JavacOptions {
+export interface RequestGoto extends JavacOptions {
     position: Position;
 }
 
@@ -175,7 +175,7 @@ export class JavacServices {
                 javaExecutablePath: string,
                 classPath: string[],
                 port: number,
-                private onErrorWithoutRequestId: (message: string) => void) {
+                private onError: (message: string) => void) {
 
         var args = ['-cp', classPath.join(':')];
 
@@ -250,11 +250,10 @@ export class JavacServices {
     private handleResponse(message: string) {
         var response: Response = JSON.parse(message);
         
-        if (response.requestId == null) {
-            if (response.error)
-                this.onErrorWithoutRequestId(response.error.message);
-        }
-        else {
+        if (response.error)
+            this.onError(response.error.message);
+        
+        if (response.requestId != null) {
             var todo = this.requestCallbacks[response.requestId];
 
             this.requestCallbacks[response.requestId] = null;
