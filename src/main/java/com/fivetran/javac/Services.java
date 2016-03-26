@@ -73,7 +73,7 @@ public class Services {
                 Position start = symbolLineMap.point(locate.startPosition);
                 Position end = symbolLineMap.point(locate.endPosition);
                 Range range = new Range(start, end);
-                Location location = new Location(symbolPath.toString(), range);
+                Location location = new Location(uri, range);
 
                 response.definitions.add(location);
             }

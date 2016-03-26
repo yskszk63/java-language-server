@@ -1,6 +1,7 @@
 package com.fivetran.javac.message;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fivetran.javac.Main;
@@ -15,6 +16,7 @@ public class Response {
     public Optional<JsonNode> echo = Optional.empty();
     public Optional<ResponseError> error = Optional.empty();
     public Optional<ResponseAutocomplete> autocomplete = Optional.empty();
+    @JsonProperty("goto")
     public Optional<ResponseGoto> responseGoto = Optional.empty();
 
     public Response(int requestId) {

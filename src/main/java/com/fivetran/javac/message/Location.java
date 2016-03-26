@@ -4,20 +4,21 @@ import com.fivetran.javac.LineMap;
 import com.sun.tools.javac.code.Symbol;
 
 import javax.tools.JavaFileObject;
+import java.net.URI;
 import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Optional;
 
 public class Location {
-    public final String uri;
+    public final URI uri;
     public final Range range;
 
-    public Location(String uri, Range range) {
+    public Location(URI uri, Range range) {
         this.uri = uri;
         this.range = range;
     }
 
-    public Location(String uri, int fromLine, int fromCharacter, int toLine, int toCharacter) {
+    public Location(URI uri, int fromLine, int fromCharacter, int toLine, int toCharacter) {
         this(uri, new Range(new Position(fromLine, fromCharacter), new Position(toLine, toCharacter)));
     }
 
