@@ -86,7 +86,9 @@ function loadConfig(javaConfig: string) {
         
     if (!javaConfigCache.hasOwnProperty(javaConfig)) {
         let text = FS.readFileSync(javaConfig, 'utf8');
-        let json = JSON.parse(text);
+        let json = JSON.parse(text) as JavaConfig;
+        
+        json.rootPath = Path.dirname(javaConfig);
         
         javaConfigCache[javaConfig] = json;
     }

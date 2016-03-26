@@ -26,8 +26,20 @@ export function provideJavac(projectDirectoryPath: string,
 }
 
 interface JavacOptions {
+    /**
+     * Path to java file
+     */
     path: string;
+    
+    /**
+     * Java source.
+     * If not specified, file at [path] will be read.
+     */
     text?: string;
+    
+    /**
+     * Contents of nearest parent javaconfig.json
+     */
     config?: JavaConfig;
 }
 
@@ -181,7 +193,6 @@ export class JavacServices {
 
         //args.push('-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005');
         args.push('-DservicePort=' + port);
-        args.push('-DprojectDirectory=' + projectDirectoryPath);
         args.push('com.fivetran.javac.Main');
 
         console.log(javaExecutablePath + ' ' + args.join(' '));

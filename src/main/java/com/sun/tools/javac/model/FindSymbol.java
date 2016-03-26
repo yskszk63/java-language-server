@@ -11,22 +11,32 @@ import com.sun.tools.javac.util.Pair;
 import javax.tools.JavaFileObject;
 import java.io.IOException;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 public class FindSymbol {
-    public static Optional<SymbolLocation> locate(Context context, Symbol symbol) throws IOException {
-        JavacElements elements = JavacElements.instance(context);
-        JavacSourcePosition p = elements.getSourcePosition(symbol);
+    private static final Logger LOG = Logger.getLogger("");
 
-        if (symbol instanceof Symbol.ClassSymbol) {
-            CharSequence content = p.sourcefile.getCharContent(false);
-            Name name = symbol.getSimpleName();
-            int offset = indexOf(content, name, p.getOffset());
+    public static Optional<SymbolLocation> locate(Context context, Symbol symbol)  {
+        try {
+            JavacElements elements = JavacElements.instance(context);
+            JavacSourcePosition p = elements.getSourcePosition(symbol);
 
-            return Optional.of(new SymbolLocation(p.getFile(), offset, offset + name.length()));
+            if (symbol instanceof Symbol.ClassSymbol) {
+                CharSequence content = p.sourcefile.getCharContent(false);
+                Name name = symbol.getSimpleName();
+                int offset = indexOf(content, name, p.getOffset());
+
+                return Optional.of(new SymbolLocation(p.getFile(), offset, offset + name.length()));
+            }
+            else
+                return Optional.of(new SymbolLocation(p.getFile(), p.getOffset(), p.getOffset() + symbol.name.length()));
+        } catch (IOException e) {
+            LOG.log(Level.SEVERE, "Error getting location of symbol " + symbol, e);
+
+            return Optional.empty();
         }
-
-        return Optional.of(new SymbolLocation(p.getFile(), p.getOffset(), p.getOffset() + symbol.name.length()));
     }
 
     private

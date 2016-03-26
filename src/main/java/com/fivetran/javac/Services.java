@@ -3,6 +3,7 @@ package com.fivetran.javac;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fivetran.javac.message.*;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.tree.JCTree;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
@@ -18,6 +19,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.logging.Logger;
 
+import static java.util.stream.Collectors.toList;
+
 public class Services {
     private static final Logger LOG = Logger.getLogger("");
 
@@ -27,9 +30,7 @@ public class Services {
         StringFileObject file = new StringFileObject(request.text, path);
         LineMap lines = LineMap.fromString(request.text);
         long cursor = lines.offset(request.position.line, request.position.character);
-        JavacHolder compiler = new JavacHolder(classPath(request.config),
-                                               request.config.sourcePath,
-                                               request.config.outputDirectory.orElse("target"));
+        JavacHolder compiler = getCompiler(request.config);
         AutocompleteVisitor autocompleter = new AutocompleteVisitor(file, cursor, compiler.context);
 
         compiler.afterAnalyze(autocompleter);
@@ -42,13 +43,22 @@ public class Services {
 
         return new ResponseAutocomplete(autocompleter.suggestions);
     }
-    
+
+    private JavacHolder getCompiler(JavaConfig config) {
+        List<Path> sourcePath = config.sourcePath.stream()
+                                                 .map(config.rootPath::resolve)
+                                                 .collect(toList());
+        Path outputDirectory = config.rootPath.resolve(config.outputDirectory.orElse("target"));
+
+        return new JavacHolder(classPath(config),
+                               sourcePath,
+                               outputDirectory);
+    }
+
     public ResponseGoto doGoto(RequestGoto request) throws IOException {
         Path path = Paths.get(request.path);
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        JavacHolder compiler = new JavacHolder(classPath(request.config),
-                                               request.config.sourcePath,
-                                               request.config.outputDirectory.orElse("target"));
+        JavacHolder compiler = getCompiler(request.config);
         StringFileObject file = new StringFileObject(request.text, path);
         LineMap lines = LineMap.fromString(request.text);
         long cursor = lines.offset(request.position.line, request.position.character);
@@ -60,23 +70,18 @@ public class Services {
 
         ResponseGoto response = new ResponseGoto();
 
-        for (Symbol s : visitor.definitions) {
-            Optional<SymbolLocation> maybeLocate = compiler.locate(s);
+        for (SymbolLocation locate : visitor.definitions) {
+            URI uri = locate.file.toUri();
+            Path symbolPath = Paths.get(uri);
+            // If this is the currently open file, use text
+            // Otherwise use file on disk
+            LineMap symbolLineMap = path.equals(symbolPath) ? lines : LineMap.fromPath(symbolPath);
+            Position start = symbolLineMap.point(locate.startPosition);
+            Position end = symbolLineMap.point(locate.endPosition);
+            Range range = new Range(start, end);
+            Location location = new Location(uri, range);
 
-            if (maybeLocate.isPresent()) {
-                SymbolLocation locate = maybeLocate.get();
-                URI uri = locate.file.toUri();
-                Path symbolPath = Paths.get(uri);
-                // If this is the currently open file, use text
-                // Otherwise use file on disk
-                LineMap symbolLineMap = path.equals(symbolPath) ? lines : LineMap.fromPath(symbolPath);
-                Position start = symbolLineMap.point(locate.startPosition);
-                Position end = symbolLineMap.point(locate.endPosition);
-                Range range = new Range(start, end);
-                Location location = new Location(uri, range);
-
-                response.definitions.add(location);
-            }
+            response.definitions.add(location);
         }
 
         return response;
@@ -89,9 +94,7 @@ public class Services {
     public ResponseLint lint(RequestLint request) throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         Path path = Paths.get(request.path);
-        JavacHolder compiler = new JavacHolder(classPath(request.config),
-                                               request.config.sourcePath,
-                                               request.config.outputDirectory.orElse("target"));
+        JavacHolder compiler = getCompiler(request.config);
         JavaFileObject file = compiler.fileManager.getRegularFile(path.toFile());
 
         compiler.onError(errors);

@@ -27,8 +27,8 @@ public class ParserTest extends Fixtures {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/MissingSemicolon.java");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList("src/test/resources"),
-                                               "out");
+                                               Collections.singletonList(Paths.get("src/test/resources")),
+                                               Paths.get("out"));
         List<String> methods = new ArrayList<>();
 
         compiler.afterParse(new TreeScanner() {

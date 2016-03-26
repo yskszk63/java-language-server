@@ -23,8 +23,8 @@ public class Recompile extends Fixtures {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/CompileTwice.java");
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList("src/test/resources"),
-                                               "out");
+                                               Collections.singletonList(Paths.get("src/test/resources")),
+                                               Paths.get("out"));
         List<String> visits = new ArrayList<>();
         compiler.afterAnalyze(new GetClass(compiler.context, visits));
         compiler.onError(errors);
@@ -47,8 +47,8 @@ public class Recompile extends Fixtures {
         StringFileObject bad = new StringFileObject("public class FixParseError { public String foo() { return \"foo\"; }", path);
         StringFileObject good = new StringFileObject("public class FixParseError { public String foo() { return \"foo\"; } }", path);
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList("src/test/resources"),
-                                               "out");
+                                               Collections.singletonList(Paths.get("src/test/resources")),
+                                               Paths.get("out"));
         DiagnosticCollector<JavaFileObject> badErrors = new DiagnosticCollector<>();
 
         compiler.onError(badErrors);
@@ -75,8 +75,8 @@ public class Recompile extends Fixtures {
         StringFileObject bad = new StringFileObject("public class FixTypeError { public String foo() { return 1; } }", path);
         StringFileObject good = new StringFileObject("public class FixTypeError { public String foo() { return \"foo\"; } }", path);
         JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList("src/test/resources"),
-                                               "out");
+                                               Collections.singletonList(Paths.get("src/test/resources")),
+                                               Paths.get("out"));
         DiagnosticCollector<JavaFileObject> badErrors = new DiagnosticCollector<>();
 
         compiler.onError(badErrors);

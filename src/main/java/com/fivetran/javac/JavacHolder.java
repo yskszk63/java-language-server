@@ -12,7 +12,6 @@ import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.Todo;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
-import com.sun.tools.javac.model.FindSymbol;
 import com.sun.tools.javac.parser.FuzzyParserFactory;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeScanner;
@@ -22,13 +21,20 @@ import com.sun.tools.javac.util.Options;
 
 import javax.tools.*;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
 import java.util.*;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class JavacHolder {
     private static final Logger LOG = Logger.getLogger("");
-    private final List<String> classPath, sourcePath;
-    private final String outputDirectory;
+    private final List<String> classPath;
+    private final List<Path> sourcePath;
+    private final Path outputDirectory;
     public final Context context = new Context();
     private DiagnosticListener<JavaFileObject> errorsDelegate = diagnostic -> {};
     private final DiagnosticListener<JavaFileObject> errors = diagnostic -> {
@@ -49,14 +55,14 @@ public class JavacHolder {
     private final JavacTrees trees = JavacTrees.instance(context);
     private final Map<TaskEvent.Kind, List<TreeScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
 
-    public JavacHolder(List<String> classPath, List<String> sourcePath, String outputDirectory) {
+    public JavacHolder(List<String> classPath, List<Path> sourcePath, Path outputDirectory) {
         this.classPath = classPath;
         this.sourcePath = sourcePath;
         this.outputDirectory = outputDirectory;
 
         options.put("-classpath", Joiner.on(":").join(classPath));
         options.put("-sourcepath", Joiner.on(":").join(sourcePath));
-        options.put("-d", outputDirectory);
+        options.put("-d", outputDirectory.toString());
 
         MultiTaskListener.instance(context).add(new TaskListener() {
             @Override
@@ -85,6 +91,22 @@ public class JavacHolder {
                 }
             }
         });
+
+        clearOutputDirectory(outputDirectory);
+    }
+
+    private static void clearOutputDirectory(Path file) {
+        try {
+            if (file.getFileName().toString().endsWith(".class")) {
+                LOG.info("Invalidate " + file);
+
+                Files.setLastModifiedTime(file, FileTime.from(Instant.EPOCH));
+            }
+            else if (Files.isDirectory(file))
+                Files.list(file).forEach(JavacHolder::clearOutputDirectory);
+        } catch (IOException e) {
+            LOG.log(Level.SEVERE, e.getMessage(), e);
+        }
     }
 
     public void afterParse(TreeScanner... scan) {
@@ -137,14 +159,6 @@ public class JavacHolder {
      */
     private void clear(Name name) {
         check.compiled.remove(name);
-    }
-
-    /**
-     * Find a symbol in the known sources
-     */
-    public Optional<SymbolLocation> locate(Symbol symbol) throws IOException {
-        // We need to use this other class so we can access javac package-private symbols
-        return FindSymbol.locate(context, symbol);
     }
 
     private CompilationUnitTree compilationUnit(Symbol symbol) {

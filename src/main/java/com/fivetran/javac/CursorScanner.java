@@ -2,6 +2,7 @@ package com.fivetran.javac;
 
 import com.fivetran.javac.BaseScanner;
 import com.sun.tools.javac.api.JavacTrees;
+import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 
@@ -24,7 +25,9 @@ public class CursorScanner extends BaseScanner {
     }
 
     protected boolean containsCursor(JCTree node) {
-        if (!compilationUnit.getSourceFile().equals(file))
+        JavaFileObject nodeFile = compilationUnit.getSourceFile();
+
+        if (!nodeFile.equals(file))
             return false;
 
         JavacTrees trees = JavacTrees.instance(context);

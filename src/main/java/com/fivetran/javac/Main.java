@@ -3,9 +3,8 @@ package com.fivetran.javac;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.MappingIterator;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
 import com.fivetran.javac.message.Request;
@@ -18,6 +17,8 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.net.Socket;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -28,12 +29,37 @@ import java.util.logging.Logger;
 public class Main {
     public static final ObjectMapper JSON = new ObjectMapper().registerModule(new Jdk8Module())
                                                               .registerModule(new JSR310Module())
+                                                              .registerModule(pathAsJson())
                                                               .configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+
+    private static SimpleModule pathAsJson() {
+        SimpleModule m = new SimpleModule();
+
+        m.addSerializer(Path.class, new JsonSerializer<Path>() {
+            @Override
+            public void serialize(Path path,
+                                  JsonGenerator gen,
+                                  SerializerProvider serializerProvider) throws IOException, JsonProcessingException {
+                gen.writeString(path.toString());
+            }
+        });
+
+        m.addDeserializer(Path.class, new JsonDeserializer<Path>() {
+            @Override
+            public Path deserialize(JsonParser parse,
+                                    DeserializationContext deserializationContext) throws IOException, JsonProcessingException {
+                return Paths.get(parse.getText());
+            }
+        });
+
+        return m;
+    }
+
     private static final ObjectMapper PRETTY_JSON = new ObjectMapper().registerModule(new Jdk8Module())
                                                                       .registerModule(new JSR310Module())
+                                                                      .registerModule(pathAsJson())
                                                                       .configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false)
-                                                                      .configure(SerializationFeature.WRITE_NULL_MAP_VALUES,
-                                                                                 false);
+                                                                      .configure(SerializationFeature.WRITE_NULL_MAP_VALUES, false);
 
     private static final Logger LOG = Logger.getLogger("");
 
@@ -163,7 +189,7 @@ public class Main {
                 LOG.severe("Unrecognized message " + request);
         } catch (ReturnError error) {
             response.error = Optional.of(new ResponseError(error.message));
-        } catch (Exception e) {
+        } catch (Throwable e) {
             response.error = Optional.of(new ResponseError(e.getClass().getSimpleName() + ": " + e.getMessage()));
 
             LOG.log(Level.SEVERE, e.getMessage(), e);

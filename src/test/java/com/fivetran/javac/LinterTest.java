@@ -10,6 +10,7 @@ import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -23,9 +24,7 @@ public class LinterTest extends Fixtures {
     public void compile() throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/HelloWorld.java");
-        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList("src/test/resources"),
-                                               "out");
+        JavacHolder compiler = newCompiler();
         compiler.onError(errors);
         compiler.compile(compiler.parse(file));
 
@@ -36,9 +35,7 @@ public class LinterTest extends Fixtures {
     public void inspectTree() throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/HelloWorld.java");
-        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList("src/test/resources"),
-                                               "out");
+        JavacHolder compiler = newCompiler();
         CollectMethods scanner = new CollectMethods(compiler.context);
 
         compiler.afterAnalyze(scanner);
@@ -53,9 +50,7 @@ public class LinterTest extends Fixtures {
     public void missingMethodBody() throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/MissingMethodBody.java");
-        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList("src/test/resources"),
-                                               "out");
+        JavacHolder compiler = newCompiler();
         CollectMethods scanner = new CollectMethods(compiler.context);
 
         compiler.afterAnalyze(scanner);
@@ -71,9 +66,7 @@ public class LinterTest extends Fixtures {
     public void incompleteAssignment() throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/IncompleteAssignment.java");
-        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList("src/test/resources"),
-                                               "out");
+        JavacHolder compiler = newCompiler();
         CollectMethods parsed = new CollectMethods(compiler.context);
         CollectMethods compiled = new CollectMethods(compiler.context);
 
@@ -92,9 +85,7 @@ public class LinterTest extends Fixtures {
     public void undefinedSymbol() throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/UndefinedSymbol.java");
-        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList("src/test/resources"),
-                                               "out");
+        JavacHolder compiler = newCompiler();
         CollectMethods scanner = new CollectMethods(compiler.context);
 
         compiler.afterAnalyze(scanner);
@@ -117,9 +108,7 @@ public class LinterTest extends Fixtures {
     public void getType() {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/FooString.java");
-        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList("src/test/resources"),
-                                               "out");
+        JavacHolder compiler = newCompiler();
         MethodTypes scanner = new MethodTypes(compiler.context);
 
         compiler.afterAnalyze(scanner);
@@ -141,9 +130,7 @@ public class LinterTest extends Fixtures {
     public void notJava() {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/NotJava.java.txt");
-        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList("src/test/resources"),
-                                               "out");
+        JavacHolder compiler = newCompiler();
         compiler.onError(errors);
         compiler.compile(compiler.parse(file));
 
@@ -181,5 +168,11 @@ public class LinterTest extends Fixtures {
 
             methodNames.add(tree.getName().toString());
         }
+    }
+
+    private static JavacHolder newCompiler() {
+        return new JavacHolder(Collections.emptyList(),
+                               Collections.singletonList(Paths.get("src/test/resources")),
+                               Paths.get("out"));
     }
 }
