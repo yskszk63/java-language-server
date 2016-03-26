@@ -31,7 +31,6 @@ public class GotoTest extends Fixtures {
     }
 
     @Test
-    @Ignore // TODO
     public void defaultConstructor() throws IOException {
         Set<Location> suggestions = doGoto(file, 7, 20);
 
@@ -47,7 +46,6 @@ public class GotoTest extends Fixtures {
     }
 
     @Test
-    @Ignore // TODO
     public void className() throws IOException {
         Set<Location> suggestions = doGoto(file, 13, 8);
 

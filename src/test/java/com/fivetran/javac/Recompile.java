@@ -1,7 +1,5 @@
 package com.fivetran.javac;
 
-import com.fivetran.javac.message.BaseScanner;
-import com.sun.source.tree.ClassTree;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import org.junit.Test;

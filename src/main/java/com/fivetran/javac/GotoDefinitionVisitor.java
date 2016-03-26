@@ -1,19 +1,10 @@
-package com.fivetran.javac.message;
+package com.fivetran.javac;
 
-import com.sun.source.tree.CompilationUnitTree;
-import com.sun.source.tree.IdentifierTree;
-import com.sun.source.tree.MemberReferenceTree;
-import com.sun.source.tree.MemberSelectTree;
-import com.sun.source.util.TreePath;
-import com.sun.tools.javac.api.JavacScope;
-import com.sun.tools.javac.api.JavacTrees;
+import com.fivetran.javac.CursorScanner;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.TreeScanner;
 import com.sun.tools.javac.util.Context;
 
-import javax.lang.model.element.Name;
-import javax.lang.model.type.TypeMirror;
 import javax.tools.JavaFileObject;
 import java.util.HashSet;
 import java.util.Set;

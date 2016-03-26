@@ -3,10 +3,8 @@ package com.fivetran.javac;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.sun.source.tree.CompilationUnitTree;
-import com.sun.source.util.DocSourcePositions;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
-import com.sun.source.util.TreePath;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.api.MultiTaskListener;
 import com.sun.tools.javac.code.Symbol;
@@ -14,6 +12,7 @@ import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.Todo;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
+import com.sun.tools.javac.model.FindSymbol;
 import com.sun.tools.javac.parser.FuzzyParserFactory;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeScanner;
@@ -21,8 +20,8 @@ import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Name;
 import com.sun.tools.javac.util.Options;
 
-import javax.lang.model.element.TypeElement;
 import javax.tools.*;
+import java.io.IOException;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -64,11 +63,11 @@ public class JavacHolder {
             public void started(TaskEvent e) {
                 LOG.info("started " + e);
 
+                JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
+
                 List<TreeScanner> todo = beforeTask.getOrDefault(e.getKind(), Collections.emptyList());
 
                 for (TreeScanner visitor : todo) {
-                    JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
-
                     unit.accept(visitor);
                 }
             }
@@ -77,11 +76,11 @@ public class JavacHolder {
             public void finished(TaskEvent e) {
                 LOG.info("finished " + e);
 
+                JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
+
                 List<TreeScanner> todo = afterTask.getOrDefault(e.getKind(), Collections.emptyList());
 
                 for (TreeScanner visitor : todo) {
-                    JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
-
                     unit.accept(visitor);
                 }
             }
@@ -140,50 +139,12 @@ public class JavacHolder {
         check.compiled.remove(name);
     }
 
-    public static class SymbolLocation {
-        public final JavaFileObject file;
-        public final long startPosition, endPosition;
-
-        public SymbolLocation(JavaFileObject file, long startPosition, long endPosition) {
-            this.file = file;
-            this.startPosition = startPosition;
-            this.endPosition = endPosition;
-        }
-    }
-    public Optional<SymbolLocation> locate(Symbol symbol) {
-        JavaFileObject file = symbol.enclClass().classfile;
-
-        if (!file.toUri().getScheme().equals("file"))
-            return Optional.empty();
-        else if (symbol instanceof Symbol.VarSymbol) {
-            int startPosition = ((Symbol.VarSymbol) symbol).pos;
-            int endPosition = startPosition + symbol.name.length();
-
-            return Optional.of(new SymbolLocation(file, startPosition, endPosition));
-        }
-        else if (symbol instanceof Symbol.ClassSymbol) {
-            Symbol.ClassSymbol type = (Symbol.ClassSymbol) symbol;
-            JCTree.JCClassDecl tree = trees.getTree(type);
-            CompilationUnitTree unit = compilationUnit(symbol);
-            DocSourcePositions pos = trees.getSourcePositions();
-            long startPosition = pos.getStartPosition(unit, tree);
-            long endPosition = pos.getEndPosition(unit, tree);
-
-            return Optional.of(new SymbolLocation(file, startPosition, endPosition));
-        }
-        else if (symbol instanceof Symbol.MethodSymbol) {
-            Symbol.MethodSymbol method = (Symbol.MethodSymbol) symbol;
-            JCTree.JCMethodDecl tree = trees.getTree(method);
-            long startPosition = tree.pos;
-            long endPosition = startPosition + symbol.name.length();
-
-            return Optional.of(new SymbolLocation(file, startPosition, endPosition));
-        }
-        else {
-            LOG.severe("Don't know what to do with " + symbol);
-
-            return Optional.empty();
-        }
+    /**
+     * Find a symbol in the known sources
+     */
+    public Optional<SymbolLocation> locate(Symbol symbol) throws IOException {
+        // We need to use this other class so we can access javac package-private symbols
+        return FindSymbol.locate(context, symbol);
     }
 
     private CompilationUnitTree compilationUnit(Symbol symbol) {

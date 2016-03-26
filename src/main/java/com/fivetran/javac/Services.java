@@ -2,10 +2,7 @@ package com.fivetran.javac;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fivetran.javac.message.*;
-import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.main.JavaCompiler;
-import com.sun.tools.javac.util.Name;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
@@ -64,10 +61,10 @@ public class Services {
         ResponseGoto response = new ResponseGoto();
 
         for (Symbol s : visitor.definitions) {
-            Optional<JavacHolder.SymbolLocation> maybeLocate = compiler.locate(s);
+            Optional<SymbolLocation> maybeLocate = compiler.locate(s);
 
             if (maybeLocate.isPresent()) {
-                JavacHolder.SymbolLocation locate = maybeLocate.get();
+                SymbolLocation locate = maybeLocate.get();
                 URI uri = locate.file.toUri();
                 Path symbolPath = Paths.get(uri);
                 // If this is the currently open file, use text

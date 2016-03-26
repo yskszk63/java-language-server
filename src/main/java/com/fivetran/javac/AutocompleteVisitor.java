@@ -1,15 +1,14 @@
-package com.fivetran.javac.message;
+package com.fivetran.javac;
 
 import com.fivetran.javac.BridgeTypeVisitor;
+import com.fivetran.javac.CursorScanner;
+import com.fivetran.javac.message.AutocompleteSuggestion;
 import com.google.common.base.Joiner;
 import com.sun.source.tree.*;
-import com.sun.source.util.TreePath;
 import com.sun.tools.javac.api.JavacScope;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.model.JavacElements;
-import com.sun.tools.javac.model.JavacTypes;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 

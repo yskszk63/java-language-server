@@ -204,7 +204,7 @@ export class JavacServices {
                 var options = { stdio: 'inherit', cwd: projectDirectoryPath };
                 
                 // Start the child java process
-                child_process.spawn(javaExecutablePath, args, options);
+                // child_process.spawn(javaExecutablePath, args, options);
             });
         });
     }

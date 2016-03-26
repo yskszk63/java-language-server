@@ -1,4 +1,4 @@
-package com.fivetran.javac.message;
+package com.fivetran.javac;
 
 import com.sun.source.util.TreePath;
 import com.sun.tools.javac.tree.JCTree;
