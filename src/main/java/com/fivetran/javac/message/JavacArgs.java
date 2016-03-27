@@ -15,6 +15,4 @@ public class JavacArgs {
      * Path to a file we want to compile. But we'll use content for the actual source code.
      */
     public String path;
-
-    public JavaConfig config = new JavaConfig();
 }

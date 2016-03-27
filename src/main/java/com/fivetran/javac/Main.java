@@ -19,12 +19,15 @@ import java.io.UncheckedIOException;
 import java.net.Socket;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.*;
+import static java.util.stream.Collectors.toList;
 
 public class Main {
     public static final ObjectMapper JSON = new ObjectMapper().registerModule(new Jdk8Module())
@@ -81,7 +84,7 @@ public class Main {
     }
 
     private static Connection connectToNode() throws IOException {
-        String port = System.getProperty("servicePort");
+        String port = System.getProperty("javac-services.port");
 
         if (port != null) {
             Socket socket = new Socket("localhost", Integer.parseInt(port));
@@ -132,9 +135,12 @@ public class Main {
     /**
      * Thread pool that gets used to execute requests
      */
+    // TODO java compiler is shared, consider removing threads
     private final ScheduledThreadPoolExecutor pool;
 
-    private final Services services = new Services();
+    private final JavacHolder compiler = systemPropsCompiler();
+
+    private final Services services = new Services(compiler);
 
     /**
      * Listen for requests from the parent node process.
@@ -210,4 +216,21 @@ public class Main {
         return PRETTY_JSON.writeValueAsString(asMap);
     }
 
+    private JavacHolder systemPropsCompiler() {
+        String sourcePathString = System.getProperty("javac-services.sourcePath");
+        String classPathString = System.getProperty("javac-services.classPath");
+        String outputDirectoryString = System.getProperty("javac-services.outputDirectory");
+
+        Objects.requireNonNull(sourcePathString, "You must specify -Djavac-services.sourcePath as a command-line argument");
+        Objects.requireNonNull(classPathString, "You must specify -Djavac-services.classPath as a command-line argument");
+        Objects.requireNonNull(outputDirectoryString, "You must specify -Djavac-services.outputDirectory as a command-line argument");
+
+        List<Path> sourcePath = Arrays.stream(sourcePathString.split(":")).map(Paths::get).collect(toList());
+        List<Path> classPath = Arrays.stream(classPathString.split(":")).map(Paths::get).collect(toList());
+        Path outputDirectory = Paths.get(outputDirectoryString);
+
+        return new JavacHolder(classPath,
+                               sourcePath,
+                               outputDirectory);
+    }
 }

@@ -2,12 +2,12 @@
 import * as V from 'vscode';
 
 import {findJavaConfig} from './Finder';
-import {JavacServices, LintMessage} from './JavacServices';
+import {JavacFactory, JavacServices, LintMessage} from './JavacServices';
 import {JavaConfig} from './JavaConfig';
 
 export class Lint {
     
-    constructor(private provideJavac: Promise<JavacServices>, 
+    constructor(private javac: JavacFactory, 
                 private diagnosticCollection: V.DiagnosticCollection) {
     }
     
@@ -23,10 +23,12 @@ export class Lint {
     
     private runBuilds(document: V.TextDocument, 
                       vsCodeJavaConfig: V.WorkspaceConfiguration) {
-        this.provideJavac.then(javac => {
+        let config = findJavaConfig(V.workspace.rootPath, document.fileName);
+        let javac = this.javac.forConfig(config.sourcePath, config.classPath, config.outputDirectory);
+        
+        javac.then(javac => {
             javac.lint({
-                path: document.fileName,
-                config: findJavaConfig(V.workspace.rootPath, document.fileName)
+                path: document.fileName
             }).then(lint => {
                 this.diagnosticCollection.clear();
                 

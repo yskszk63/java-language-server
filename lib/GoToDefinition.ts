@@ -3,13 +3,14 @@ import * as J from './JavacServices';
 import * as F from './Finder';
 
 export class GotoDefinition implements V.DefinitionProvider {
-    constructor (private provideJavac: Promise<J.JavacServices>) { }
+    constructor (private javac: J.JavacFactory) { }
     
     provideDefinition(document: V.TextDocument, position: V.Position, token: V.CancellationToken): Promise<V.Location[]> {
         let text = document.getText();
         let path = document.uri.fsPath;
         let config = F.findJavaConfig(V.workspace.rootPath, document.fileName)
-        let response = this.provideJavac.then(javac => javac.goto({path, text, position, config}));
+        let javac = this.javac.forConfig(config.sourcePath, config.classPath, config.outputDirectory);
+        let response = javac.then(javac => javac.goto({path, text, position}));
         
         return response.then(asDefinition);
     } 

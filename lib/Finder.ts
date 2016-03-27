@@ -80,17 +80,27 @@ export function invalidateCaches() {
     locationCache = {};
 }
 
+interface JavaConfigFile {
+    sourcePath?: string[];
+    classPathFile?: string;
+    outputDirectory?: string;
+}
+
 function loadConfig(javaConfig: string) {
     if (javaConfig == null)
         return DEFAULT_JAVA_CONFIG;
         
     if (!javaConfigCache.hasOwnProperty(javaConfig)) {
+        let rootPath = Path.dirname(javaConfig);
         let text = FS.readFileSync(javaConfig, 'utf8');
-        let json = JSON.parse(text) as JavaConfig;
+        let json = JSON.parse(text) as JavaConfigFile;
+        let classPathPath = Path.resolve(rootPath, json.classPathFile);
+        let classPathText = FS.readFileSync(classPathPath, 'utf8');
+        let classPath = classPathText.split(':');
+        let sourcePath = json.sourcePath.map(s => Path.resolve(rootPath, s));
+        let outputDirectory = Path.resolve(rootPath, json.outputDirectory);
         
-        json.rootPath = Path.dirname(javaConfig);
-        
-        javaConfigCache[javaConfig] = json;
+        javaConfigCache[javaConfig] = {sourcePath, classPath, outputDirectory};
     }
     
     return javaConfigCache[javaConfig];

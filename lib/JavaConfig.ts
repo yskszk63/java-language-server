@@ -5,12 +5,7 @@ export interface MavenDependency {
 }
 
 export interface JavaConfig {
-    /**
-     * Parent directory of javaconfig.json
-     */
-    rootPath?: string;
     sourcePath?: string[];
     classPath?: string[];
-    classPathFile?: string;
     outputDirectory?: string;
 }

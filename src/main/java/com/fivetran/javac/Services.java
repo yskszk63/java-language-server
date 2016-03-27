@@ -2,8 +2,6 @@ package com.fivetran.javac;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fivetran.javac.message.*;
-import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.tree.JCTree;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
@@ -23,6 +21,11 @@ import static java.util.stream.Collectors.toList;
 
 public class Services {
     private static final Logger LOG = Logger.getLogger("");
+    private final JavacHolder compiler;
+
+    public Services(JavacHolder compiler) {
+        this.compiler = compiler;
+    }
 
     public ResponseAutocomplete autocomplete(RequestAutocomplete request) throws IOException {
         Path path = Paths.get(request.path);
@@ -30,7 +33,6 @@ public class Services {
         StringFileObject file = new StringFileObject(request.text, path);
         LineMap lines = LineMap.fromString(request.text);
         long cursor = lines.offset(request.position.line, request.position.character);
-        JavacHolder compiler = getCompiler(request.config);
         AutocompleteVisitor autocompleter = new AutocompleteVisitor(file, cursor, compiler.context);
 
         compiler.afterAnalyze(autocompleter);
@@ -44,21 +46,9 @@ public class Services {
         return new ResponseAutocomplete(autocompleter.suggestions);
     }
 
-    private JavacHolder getCompiler(JavaConfig config) {
-        List<Path> sourcePath = config.sourcePath.stream()
-                                                 .map(config.rootPath::resolve)
-                                                 .collect(toList());
-        Path outputDirectory = config.rootPath.resolve(config.outputDirectory.orElse("target"));
-
-        return new JavacHolder(classPath(config),
-                               sourcePath,
-                               outputDirectory);
-    }
-
     public ResponseGoto doGoto(RequestGoto request) throws IOException {
         Path path = Paths.get(request.path);
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        JavacHolder compiler = getCompiler(request.config);
         StringFileObject file = new StringFileObject(request.text, path);
         LineMap lines = LineMap.fromString(request.text);
         long cursor = lines.offset(request.position.line, request.position.character);
@@ -94,7 +84,6 @@ public class Services {
     public ResponseLint lint(RequestLint request) throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         Path path = Paths.get(request.path);
-        JavacHolder compiler = getCompiler(request.config);
         JavaFileObject file = compiler.fileManager.getRegularFile(path.toFile());
 
         compiler.onError(errors);
@@ -114,24 +103,6 @@ public class Services {
         }
 
         return response;
-    }
-
-    private List<String> classPath(JavaConfig config) {
-        List<String> acc = new ArrayList<>();
-
-        acc.addAll(config.classPath);
-
-        if (config.classPathFile.isPresent()) {
-            try (BufferedReader reader = Files.newBufferedReader(Paths.get(config.classPathFile.get()))) {
-                reader.lines()
-                      .flatMap(line -> Arrays.stream(line.split(":")))
-                      .forEach(acc::add);
-            } catch (IOException e) {
-                throw new ReturnError("Error reading classPathFile " + config.classPathFile, e);
-            }
-        }
-
-        return acc;
     }
 
     private Range position(Diagnostic<? extends JavaFileObject> error) {

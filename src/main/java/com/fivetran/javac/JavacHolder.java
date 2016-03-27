@@ -32,7 +32,7 @@ import java.util.logging.Logger;
 
 public class JavacHolder {
     private static final Logger LOG = Logger.getLogger("");
-    private final List<String> classPath;
+    private final List<Path> classPath;
     private final List<Path> sourcePath;
     private final Path outputDirectory;
     public final Context context = new Context();
@@ -55,7 +55,7 @@ public class JavacHolder {
     private final JavacTrees trees = JavacTrees.instance(context);
     private final Map<TaskEvent.Kind, List<TreeScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
 
-    public JavacHolder(List<String> classPath, List<Path> sourcePath, Path outputDirectory) {
+    public JavacHolder(List<Path> classPath, List<Path> sourcePath, Path outputDirectory) {
         this.classPath = classPath;
         this.sourcePath = sourcePath;
         this.outputDirectory = outputDirectory;

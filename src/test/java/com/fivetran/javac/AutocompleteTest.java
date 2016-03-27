@@ -84,9 +84,8 @@ public class AutocompleteTest extends Fixtures {
         request.path = path(file);
         request.text = new String(Files.readAllBytes(Paths.get(path(file))));
         request.position = new Position(row, column);
-        request.config.sourcePath = Collections.singletonList("src/test/resources");
 
-        return new Services().autocomplete(request).suggestions.stream().map(s -> s.insertText).collect(toSet());
+        return new Services(compiler).autocomplete(request).suggestions.stream().map(s -> s.insertText).collect(toSet());
     }
 
     private String path(String file) {

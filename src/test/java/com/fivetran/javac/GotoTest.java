@@ -12,9 +12,7 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Set;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
-import static java.util.stream.Collectors.*;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.not;
@@ -110,9 +108,8 @@ public class GotoTest extends Fixtures {
         request.path = path(file);
         request.text = new String(Files.readAllBytes(Paths.get(path(file))));
         request.position = new Position(row, column);
-        request.config.sourcePath = Collections.singletonList("src/test/resources");
 
-        return new Services().doGoto(request).definitions;
+        return new Services(compiler).doGoto(request).definitions;
     }
 
     private static URI uri(String file) {

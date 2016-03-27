@@ -44,6 +44,10 @@ public class RequestResponseTest extends Fixtures {
         MappingIterator<Request> in = Main.JSON.readValues(parser, Request.class);
         ResponseCollector out = new ResponseCollector();
 
+        System.setProperty("javac-services.sourcePath", "src/test/resources");
+        System.setProperty("javac-services.classPath", "");
+        System.setProperty("javac-services.outputDirectory", "target");
+
         new Main(in, out).run();
 
         return out.responses;

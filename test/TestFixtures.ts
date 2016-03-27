@@ -1,6 +1,6 @@
-import Java = require('../lib/JavacServices');
+import {JavacFactory} from '../lib/JavacServices';
 
-export const EMPTY_JAVAC = Java.provideJavac('.', '.', message => console.error(message));
+export const EMPTY_JAVAC = new JavacFactory('.', '.', message => console.log(message)).forConfig([], [], 'target');
 
 process.on('unhandledRejection', function(reason, p){
     if (reason instanceof Error)

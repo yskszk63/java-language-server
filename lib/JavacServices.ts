@@ -9,20 +9,75 @@ import {DiagnosticSeverity,CompletionItemKind} from 'vscode';
 import {findJavaExecutable, findJavaConfig} from './Finder';
 import {JavaConfig} from './JavaConfig';
 
-export function provideJavac(projectDirectoryPath: string, 
-                             extensionDirectoryPath: string,
-                             onErrorWithoutRequestId: (message: string) => void): Promise<JavacServices> {
-    return new Promise((resolve, reject) => {
-        PortFinder.basePort = 55220;
-        
-        var javaPath = findJavaExecutable('java');
+PortFinder.basePort = 55220;
 
-        PortFinder.getPort((err, port) => {
-            let classpath = [path.resolve(extensionDirectoryPath, "out/fat-jar.jar")];
+export class JavacFactory {
+    constructor(private projectDirectoryPath: string, 
+                private extensionDirectoryPath: string, 
+                private onError: (message: string) => void) {
+        
+    }
+    
+    private cachedSourcePath: string[];
+    private cachedClassPath: string[];
+    private cachedOutputDirectory: string;
+    private cachedCompiler: Promise<JavacServices>;
+    
+    forConfig(sourcePath: string[], classPath: string[], outputDirectory: string): Promise<JavacServices> {
+        sourcePath = sourcePath.sort();
+        classPath = classPath.sort();
+        
+        if (!sortedArrayEquals(sourcePath, this.cachedSourcePath) || 
+            !sortedArrayEquals(classPath, this.cachedClassPath) || 
+            outputDirectory != this.cachedOutputDirectory) {
             
-            resolve(new JavacServices(projectDirectoryPath, javaPath, classpath, port, onErrorWithoutRequestId));
+            this.cachedSourcePath = sourcePath;
+            this.cachedClassPath = classPath;
+            this.cachedOutputDirectory = outputDirectory;
+            this.cachedCompiler = this.newJavac(sourcePath, classPath, outputDirectory);
+        }
+        
+        return this.cachedCompiler;
+    }
+    
+    private newJavac(sourcePath: string[], 
+                     classPath: string[], 
+                     outputDirectory: string): Promise<JavacServices> {
+        return new Promise((resolve, reject) => {
+            let javaPath = findJavaExecutable('java');
+
+            PortFinder.getPort((err, port) => {
+                let javacServicesClassPath = [path.resolve(this.extensionDirectoryPath, "out/fat-jar.jar")];           
+                let javac = new JavacServices(javaPath, 
+                                            javacServicesClassPath, 
+                                            port, 
+                                            this.projectDirectoryPath, 
+                                            this.extensionDirectoryPath,
+                                            sourcePath, 
+                                            classPath, 
+                                            outputDirectory, 
+                                            this.onError);
+                resolve(javac);
+            });
         });
-    });
+    }
+}
+
+function sortedArrayEquals(xs: string[], ys: string[]) {
+    if (xs == null && ys == null)
+        return true;
+    else if (xs == null || ys == null)
+        return false;
+    else if (xs.length != ys.length)
+        return false;
+    else {
+        for (var i = 0; i < xs.length; i++) {
+            if (xs[i] != ys[i])
+                return false;
+        }
+        
+        return true;
+    }
 }
 
 interface JavacOptions {
@@ -36,11 +91,6 @@ interface JavacOptions {
      * If not specified, file at [path] will be read.
      */
     text?: string;
-    
-    /**
-     * Contents of nearest parent javaconfig.json
-     */
-    config?: JavaConfig;
 }
 
 export interface RequestLint extends JavacOptions {
@@ -183,16 +233,22 @@ export class JavacServices {
     /** What to do after each response comes back */
     private requestCallbacks: { [requestId: number]: (response: Response) => void } = {};
 
-    constructor(projectDirectoryPath: string,
-                javaExecutablePath: string,
-                classPath: string[],
+    constructor(javaExecutablePath: string,
+                javacServicesClassPath: string[],
                 port: number,
+                projectDirectoryPath: string, 
+                extensionDirectoryPath: string,
+                sourcePath: string[],
+                classPath: string[],
+                outputDirectory: string,
                 private onError: (message: string) => void) {
-
-        var args = ['-cp', classPath.join(':')];
+        var args = ['-cp', javacServicesClassPath.join(':')];
 
         //args.push('-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005');
-        args.push('-DservicePort=' + port);
+        args.push('-Djavac-services.port=' + port);
+        args.push('-Djavac-services.sourcePath=' + sourcePath);
+        args.push('-Djavac-services.classPath=' + classPath);
+        args.push('-Djavac-services.outputDirectory=' + outputDirectory);
         args.push('com.fivetran.javac.Main');
 
         console.log(javaExecutablePath + ' ' + args.join(' '));
@@ -215,7 +271,7 @@ export class JavacServices {
                 var options = { stdio: 'inherit', cwd: projectDirectoryPath };
                 
                 // Start the child java process
-                // child_process.spawn(javaExecutablePath, args, options);
+                child_process.spawn(javaExecutablePath, args, options);
             });
         });
     }
