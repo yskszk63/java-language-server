@@ -1,16 +1,16 @@
-import V = require('vscode');
+import * as VSCode from 'vscode';
 import {JavacFactory, JavacServices, ResponseAutocomplete, AutocompleteSuggestion} from './JavacServices';
 import {findJavaConfig} from './Finder';
 
-export class Autocomplete implements V.CompletionItemProvider {
+export class Autocomplete implements VSCode.CompletionItemProvider {
     constructor(private javac: JavacFactory) { }
     
-    provideCompletionItems(document: V.TextDocument, 
-                           position: V.Position,
-                           token: V.CancellationToken): Promise<V.CompletionItem[]> {
+    provideCompletionItems(document: VSCode.TextDocument, 
+                           position: VSCode.Position,
+                           token: VSCode.CancellationToken): Promise<VSCode.CompletionItem[]> {
         let text = document.getText();
         let path = document.uri.fsPath;
-        let config = findJavaConfig(V.workspace.rootPath, document.fileName);
+        let config = findJavaConfig(VSCode.workspace.rootPath, document.fileName);
         let javac = this.javac.forConfig(config.sourcePath, config.classPath, config.outputDirectory);
         let response = javac.then(javac => javac.autocomplete({path, text, position}));
         
@@ -18,12 +18,12 @@ export class Autocomplete implements V.CompletionItemProvider {
     }
 }
 
-function asCompletionItems(response: ResponseAutocomplete): V.CompletionItem[] {
+function asCompletionItems(response: ResponseAutocomplete): VSCode.CompletionItem[] {
     return response.suggestions.map(asCompletionItem);
 }
 
-function asCompletionItem(s: AutocompleteSuggestion): V.CompletionItem {
-    let item = new V.CompletionItem(s.label);
+function asCompletionItem(s: AutocompleteSuggestion): VSCode.CompletionItem {
+    let item = new VSCode.CompletionItem(s.label);
     
     item.detail = s.detail;
     item.documentation = s.documentation;

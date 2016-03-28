@@ -1,13 +1,13 @@
-import child_process = require('child_process');
-import split = require('split');
-import path = require('path');
-import PortFinder = require('portfinder');
-import Net = require('net');
+import * as ChildProcess from 'child_process';
+import * as Path from 'path';
+import * as PortFinder from 'portfinder';
+import * as Net from 'net';
 import {MavenDependency} from './JavaConfig';
 // Don't import members, just types, otherwise the tests will break
 import {DiagnosticSeverity,CompletionItemKind} from 'vscode';
 import {findJavaExecutable, findJavaConfig} from './Finder';
 import {JavaConfig} from './JavaConfig';
+import split = require('split');
 
 PortFinder.basePort = 55220;
 
@@ -47,7 +47,7 @@ export class JavacFactory {
             let javaPath = findJavaExecutable('java');
 
             PortFinder.getPort((err, port) => {
-                let javacServicesClassPath = [path.resolve(this.extensionDirectoryPath, "out/fat-jar.jar")];           
+                let javacServicesClassPath = [Path.resolve(this.extensionDirectoryPath, "out/fat-jar.jar")];           
                 let javac = new JavacServices(javaPath, 
                                             javacServicesClassPath, 
                                             port, 
@@ -271,7 +271,7 @@ export class JavacServices {
                 var options = { stdio: 'inherit', cwd: projectDirectoryPath };
                 
                 // Start the child java process
-                // child_process.spawn(javaExecutablePath, args, options);
+                ChildProcess.spawn(javaExecutablePath, args, options);
             });
         });
     }

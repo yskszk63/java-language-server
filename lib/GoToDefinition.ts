@@ -1,14 +1,14 @@
-import * as V from 'vscode';
-import * as J from './JavacServices';
-import * as F from './Finder';
+import * as VSCode from 'vscode';
+import * as Finder from './Finder';
+import {JavacFactory, GotoLocation, Position, ResponseGoto} from './JavacServices';
 
-export class GotoDefinition implements V.DefinitionProvider {
-    constructor (private javac: J.JavacFactory) { }
+export class GotoDefinition implements VSCode.DefinitionProvider {
+    constructor (private javac: JavacFactory) { }
     
-    provideDefinition(document: V.TextDocument, position: V.Position, token: V.CancellationToken): Promise<V.Location[]> {
+    provideDefinition(document: VSCode.TextDocument, position: VSCode.Position, token: VSCode.CancellationToken): Promise<VSCode.Location[]> {
         let text = document.getText();
         let path = document.uri.fsPath;
-        let config = F.findJavaConfig(V.workspace.rootPath, document.fileName)
+        let config = Finder.findJavaConfig(VSCode.workspace.rootPath, document.fileName)
         let javac = this.javac.forConfig(config.sourcePath, config.classPath, config.outputDirectory);
         let response = javac.then(javac => javac.goto({path, text, position}));
         
@@ -16,18 +16,18 @@ export class GotoDefinition implements V.DefinitionProvider {
     } 
 }
 
-function asDefinition(response: J.ResponseGoto): V.Location[] {
+function asDefinition(response: ResponseGoto): VSCode.Location[] {
     return response.definitions.map(asLocation);
 }
 
-function asLocation(d: J.GotoLocation): V.Location {
+function asLocation(d: GotoLocation): VSCode.Location {
     let start = asPosition(d.range.start);
     let end = asPosition(d.range.end);
-    let range = new V.Range(start, end);
+    let range = new VSCode.Range(start, end);
     
-    return new V.Location(V.Uri.parse(d.uri), range);
+    return new VSCode.Location(VSCode.Uri.parse(d.uri), range);
 }
 
-function asPosition(r: J.Position): V.Position {
-    return new V.Position(r.line, r.character);
+function asPosition(r: Position): VSCode.Position {
+    return new VSCode.Position(r.line, r.character);
 }

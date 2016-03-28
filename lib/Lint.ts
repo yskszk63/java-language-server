@@ -1,5 +1,5 @@
 
-import * as V from 'vscode';
+import * as VSCode from 'vscode';
 
 import {findJavaConfig} from './Finder';
 import {JavacFactory, JavacServices, LintMessage} from './JavacServices';
@@ -8,22 +8,22 @@ import {JavaConfig} from './JavaConfig';
 export class Lint {
     
     constructor(private javac: JavacFactory, 
-                private diagnosticCollection: V.DiagnosticCollection) {
+                private diagnosticCollection: VSCode.DiagnosticCollection) {
     }
     
-    public onSaveOrOpen(document: V.TextDocument) {
+    public onSaveOrOpen(document: VSCode.TextDocument) {
         if (document.languageId !== 'java') 
             return;
             
-        let vsCodeJavaConfig = V.workspace.getConfiguration('java');
-        let textEditor = V.window.activeTextEditor;
+        let vsCodeJavaConfig = VSCode.workspace.getConfiguration('java');
+        let textEditor = VSCode.window.activeTextEditor;
         
         this.runBuilds(document, vsCodeJavaConfig);
     }
     
-    private runBuilds(document: V.TextDocument, 
-                      vsCodeJavaConfig: V.WorkspaceConfiguration) {
-        let config = findJavaConfig(V.workspace.rootPath, document.fileName);
+    private runBuilds(document: VSCode.TextDocument, 
+                      vsCodeJavaConfig: VSCode.WorkspaceConfiguration) {
+        let config = findJavaConfig(VSCode.workspace.rootPath, document.fileName);
         let javac = this.javac.forConfig(config.sourcePath, config.classPath, config.outputDirectory);
         
         javac.then(javac => {
@@ -33,20 +33,20 @@ export class Lint {
                 this.diagnosticCollection.clear();
                 
                 for (let uri of Object.keys(lint.messages)) {
-                    let file = V.Uri.file(uri);
+                    let file = VSCode.Uri.file(uri);
                     let diagnostics = lint.messages[uri].map(asDiagnostic);
                     
                     this.diagnosticCollection.set(file, diagnostics);
                 }
             }).catch(error => {
-                V.window.showErrorMessage(error);
+                VSCode.window.showErrorMessage(error);
             });
         });                       
     }
 }
 
-function asDiagnostic(m: LintMessage): V.Diagnostic {
-    let range = new V.Range(m.range.start.line, m.range.start.character, m.range.end.line, m.range.end.character);
+function asDiagnostic(m: LintMessage): VSCode.Diagnostic {
+    let range = new VSCode.Range(m.range.start.line, m.range.start.character, m.range.end.line, m.range.end.character);
     
-    return new V.Diagnostic(range, m.message, m.severity);
+    return new VSCode.Diagnostic(range, m.message, m.severity);
 }

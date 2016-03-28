@@ -1,9 +1,9 @@
 
 'use strict';
 
-import FS = require('fs');
-import Path = require('path');
-import OS = require('os');
+import * as FS from 'fs';
+import * as Path from 'path';
+import * as OS from 'os';
 
 import {JavaConfig} from './JavaConfig';
 
