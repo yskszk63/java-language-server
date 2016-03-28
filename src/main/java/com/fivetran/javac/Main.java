@@ -61,8 +61,27 @@ public class Main {
     private static final ObjectMapper PRETTY_JSON = new ObjectMapper().registerModule(new Jdk8Module())
                                                                       .registerModule(new JSR310Module())
                                                                       .registerModule(pathAsJson())
+                                                                      .registerModule(truncateStrings())
                                                                       .configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false)
                                                                       .configure(SerializationFeature.WRITE_NULL_MAP_VALUES, false);
+
+    private static SimpleModule truncateStrings() {
+        SimpleModule m = new SimpleModule();
+
+        m.addSerializer(String.class, new JsonSerializer<String>() {
+            @Override
+            public void serialize(String s,
+                                  JsonGenerator gen,
+                                  SerializerProvider serializerProvider) throws IOException, JsonProcessingException {
+                if (s.length() > 50)
+                    s = s.substring(0, 50 - 3) + "...";
+
+                gen.writeString(s);
+            }
+        });
+
+        return m;
+    }
 
     private static final Logger LOG = Logger.getLogger("");
 
@@ -119,7 +138,6 @@ public class Main {
     public Main(MappingIterator<Request> in, ResponseChannel out) {
         this.in = in;
         this.out = out;
-        this.pool = new ScheduledThreadPoolExecutor(8);
     }
 
     /**
@@ -131,12 +149,6 @@ public class Main {
      * Where to send the responses
      */
     public final ResponseChannel out;
-
-    /**
-     * Thread pool that gets used to execute requests
-     */
-    // TODO java compiler is shared, consider removing threads
-    private final ScheduledThreadPoolExecutor pool;
 
     private final JavacHolder compiler = systemPropsCompiler();
 
@@ -152,7 +164,7 @@ public class Main {
             while (in.hasNextValue()) {
                 final Request request = in.nextValue();
 
-                pool.submit(() -> handleRequest(request));
+                handleRequest(request);
             }
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "Error reading request", e);
@@ -162,14 +174,6 @@ public class Main {
             response.error = Optional.of(new ResponseError(e.getMessage()));
 
             out.next(response);
-        }
-
-        pool.shutdown();
-
-        try {
-            pool.awaitTermination(5, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            LOG.log(Level.SEVERE, e.getMessage(), e);
         }
     }
 

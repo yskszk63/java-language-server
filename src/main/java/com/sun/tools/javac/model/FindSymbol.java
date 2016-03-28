@@ -23,7 +23,7 @@ public class FindSymbol {
             JavacElements elements = JavacElements.instance(context);
             JavacSourcePosition p = elements.getSourcePosition(symbol);
 
-            if (p == null)  
+            if (p == null)
                 return Optional.empty();
             else if (symbol instanceof Symbol.ClassSymbol) {
                 JavaFileObject file = p.getFile();
@@ -48,8 +48,6 @@ public class FindSymbol {
         }
     }
 
-    private
-
     /**
      * Adapted from java.util.String.
      *
@@ -57,14 +55,10 @@ public class FindSymbol {
      * is the string being searched for.
      *
      * @param   source       the characters being searched.
-     * @param   sourceOffset offset of the source string.
-     * @param   sourceCount  count of the source string.
      * @param   target       the characters being searched for.
-     * @param   targetOffset offset of the target string.
-     * @param   targetCount  count of the target string.
      * @param   fromIndex    the index to begin searching from.
      */
-    static int indexOf(CharSequence source, CharSequence target, int fromIndex) {
+    private static int indexOf(CharSequence source, CharSequence target, int fromIndex) {
         int sourceOffset = 0, sourceCount = source.length(), targetOffset = 0, targetCount = target.length();
 
         if (fromIndex >= sourceCount) {
