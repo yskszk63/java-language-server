@@ -23,15 +23,24 @@ public class FindSymbol {
             JavacElements elements = JavacElements.instance(context);
             JavacSourcePosition p = elements.getSourcePosition(symbol);
 
-            if (symbol instanceof Symbol.ClassSymbol) {
+            if (p == null)  
+                return Optional.empty();
+            else if (symbol instanceof Symbol.ClassSymbol) {
+                JavaFileObject file = p.getFile();
                 CharSequence content = p.sourcefile.getCharContent(false);
                 Name name = symbol.getSimpleName();
                 int offset = indexOf(content, name, p.getOffset());
+                int end = offset + name.length();
 
-                return Optional.of(new SymbolLocation(p.getFile(), offset, offset + name.length()));
+                return Optional.of(new SymbolLocation(file, offset, end));
             }
-            else
-                return Optional.of(new SymbolLocation(p.getFile(), p.getOffset(), p.getOffset() + symbol.name.length()));
+            else {
+                JavaFileObject file = p.getFile();
+                int offset = p.getOffset();
+                int end = offset + symbol.name.length();
+
+                return Optional.of(new SymbolLocation(file, offset, end));
+            }
         } catch (IOException e) {
             LOG.log(Level.SEVERE, "Error getting location of symbol " + symbol, e);
 
