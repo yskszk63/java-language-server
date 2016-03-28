@@ -245,11 +245,11 @@ export class JavacServices {
         var args = ['-cp', javacServicesClassPath.join(':')];
 
         //args.push('-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005');
-        args.push('-Djavac-services.port=' + port);
-        args.push('-Djavac-services.sourcePath=' + sourcePath);
-        args.push('-Djavac-services.classPath=' + classPath);
-        args.push('-Djavac-services.outputDirectory=' + outputDirectory);
-        args.push('com.fivetran.javac.Main');
+        args.push('-Djavacs.port=' + port);
+        args.push('-Djavacs.sourcePath=' + sourcePath);
+        args.push('-Djavacs.classPath=' + classPath);
+        args.push('-Djavacs.outputDirectory=' + outputDirectory);
+        args.push('org.javacs.Main');
 
         console.log(javaExecutablePath + ' ' + args.join(' '));
 
@@ -271,7 +271,7 @@ export class JavacServices {
                 var options = { stdio: 'inherit', cwd: projectDirectoryPath };
                 
                 // Start the child java process
-                child_process.spawn(javaExecutablePath, args, options);
+                // child_process.spawn(javaExecutablePath, args, options);
             });
         });
     }
