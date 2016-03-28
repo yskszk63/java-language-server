@@ -2,7 +2,6 @@ package com.fivetran.javac;
 
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.model.FindSymbol;
 import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
@@ -32,7 +31,7 @@ public class GotoDefinitionVisitor extends CursorScanner {
         if (!containsCursor(id))
             return;
 
-        FindSymbol.locate(context, id.sym).map(definitions::add);
+        context.get(ClassIndex.class).locate(id.sym).map(definitions::add);
     }
 
     @Override
@@ -45,7 +44,7 @@ public class GotoDefinitionVisitor extends CursorScanner {
         if (containsCursor(tree.getExpression()))
             super.visitSelect(tree);
         else
-            FindSymbol.locate(context, tree.sym).map(definitions::add);
+            context.get(ClassIndex.class).locate(tree.sym).map(definitions::add);
     }
 
     @Override
@@ -58,6 +57,6 @@ public class GotoDefinitionVisitor extends CursorScanner {
         if (containsCursor(tree.getQualifierExpression()))
             super.visitReference(tree);
         else
-            FindSymbol.locate(context, tree.sym).map(definitions::add);
+            context.get(ClassIndex.class).locate(tree.sym).map(definitions::add);
     }
 }

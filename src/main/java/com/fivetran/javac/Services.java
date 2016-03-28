@@ -2,6 +2,7 @@ package com.fivetran.javac;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fivetran.javac.message.*;
+import com.sun.tools.javac.tree.JCTree;
 
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;

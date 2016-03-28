@@ -23,7 +23,6 @@ import javax.tools.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.*;
@@ -54,6 +53,7 @@ public class JavacHolder {
     private final Todo todo = Todo.instance(context);
     private final JavacTrees trees = JavacTrees.instance(context);
     private final Map<TaskEvent.Kind, List<TreeScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
+    private final ClassIndex index = new ClassIndex(context);
 
     public JavacHolder(List<Path> classPath, List<Path> sourcePath, Path outputDirectory) {
         this.classPath = classPath;
@@ -83,6 +83,9 @@ public class JavacHolder {
                 LOG.info("finished " + e);
 
                 JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
+
+                if (e.getKind() == TaskEvent.Kind.ANALYZE)
+                    unit.accept(index);
 
                 List<TreeScanner> todo = afterTask.getOrDefault(e.getKind(), Collections.emptyList());
 
@@ -143,8 +146,10 @@ public class JavacHolder {
     public void compile(JCTree.JCCompilationUnit source) {
         compiler.processAnnotations(compiler.enterTrees(com.sun.tools.javac.util.List.of(source)));
 
-        while (!todo.isEmpty())
-            compiler.generate(compiler.desugar(compiler.flow(compiler.attribute(todo.remove()))));
+        while (!todo.isEmpty()) {
+            // We don't do the desugar or generate phases, because they remove method bodies and methods
+            compiler.flow(compiler.attribute(todo.remove()));
+        }
     }
 
     /**
