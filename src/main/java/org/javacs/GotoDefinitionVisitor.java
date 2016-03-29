@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 
@@ -24,7 +25,9 @@ public class GotoDefinitionVisitor extends CursorScanner {
         if (!containsCursor(id))
             return;
 
-        context.get(ClassIndex.class).locate(id.sym).map(definitions::add);
+        Symbol symbol = id.sym;
+
+        addSymbol(symbol);
     }
 
     @Override
@@ -36,8 +39,11 @@ public class GotoDefinitionVisitor extends CursorScanner {
         // Check cursor is in name
         if (containsCursor(tree.getExpression()))
             super.visitSelect(tree);
-        else
-            context.get(ClassIndex.class).locate(tree.sym).map(definitions::add);
+        else {
+            Symbol symbol = tree.sym;
+
+            addSymbol(symbol);
+        }
     }
 
     @Override
@@ -49,7 +55,16 @@ public class GotoDefinitionVisitor extends CursorScanner {
         // Check cursor is in name
         if (containsCursor(tree.getQualifierExpression()))
             super.visitReference(tree);
-        else
-            context.get(ClassIndex.class).locate(tree.sym).map(definitions::add);
+        else {
+            Symbol symbol = tree.sym;
+
+            addSymbol(symbol);
+        }
+    }
+
+    private void addSymbol(Symbol symbol) {
+        LOG.info("Goto " + symbol);
+
+        context.get(ClassIndex.class).locate(symbol).map(definitions::add);
     }
 }
