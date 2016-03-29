@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.sun.source.util.TreePath;
 import org.javacs.message.AutocompleteSuggestion;
 import com.google.common.base.Joiner;
 import com.sun.source.tree.*;
@@ -84,7 +85,9 @@ public class AutocompleteVisitor extends CursorScanner {
     public void visitIdent(JCTree.JCIdent node) {
         super.visitIdent(node);
 
-        JavacScope scope = JavacTrees.instance(context).getScope(path);
+        JavacTrees trees = JavacTrees.instance(context);
+        TreePath path = trees.getPath(compilationUnit, node);
+        JavacScope scope = trees.getScope(path);
 
         while (scope != null) {
             LOG.info(Joiner.on(", ").join(scope.getLocalElements()));

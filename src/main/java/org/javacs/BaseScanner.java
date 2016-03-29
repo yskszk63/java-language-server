@@ -9,7 +9,6 @@ import com.sun.tools.javac.util.List;
 public class BaseScanner extends TreeScanner {
     protected final Context context;
     protected JCTree.JCCompilationUnit compilationUnit;
-    protected TreePath path;
 
     public BaseScanner(Context context) {
         this.context = context;
@@ -17,7 +16,6 @@ public class BaseScanner extends TreeScanner {
 
     @Override
     public void visitTopLevel(JCTree.JCCompilationUnit tree) {
-        this.path = new TreePath(tree);
         this.compilationUnit = tree;
 
         super.visitTopLevel(tree);
@@ -26,15 +24,7 @@ public class BaseScanner extends TreeScanner {
     @Override
     public void scan(JCTree node) {
         if (node != null) {
-            TreePath prev = path;
-
-            path = new TreePath(path, node);
-
-            try {
-                node.accept(this);
-            } finally {
-                path = prev;
-            }
+            node.accept(this);
         }
     }
 

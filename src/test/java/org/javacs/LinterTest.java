@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.sun.source.util.TreePath;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.tree.JCTree;
@@ -149,6 +150,7 @@ public class LinterTest extends Fixtures {
             super.visitMethodDef(node);
 
             JavacTrees trees = JavacTrees.instance(super.context);
+            TreePath path = trees.getPath(compilationUnit, node);
             Type.MethodType typeMirror = (Type.MethodType) trees.getTypeMirror(path);
 
             methodTypes.put(node.getName().toString(), typeMirror);
