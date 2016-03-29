@@ -9,7 +9,13 @@ mvn package
 # Ensure .vscode/extensions/vscode-javac exists
 mkdir -p ~/.vscode/extensions/vscode-javac
 
+# Clear .vscode/extensions/vscode-javac
+rm -rf ~/.vscode/extensions/vscode-javac
+
 # Copy runtime to .vscode/extensions/vscode-javac
-cp -r ./out ~/.vscode/extensions/vscode-javac/out
+mkdir -p ~/.vscode/extensions/vscode-javac/out/lib/
+
+cp ./out/lib/*.js ~/.vscode/extensions/vscode-javac/out/lib/
+cp ./out/fat-jar.jar ~/.vscode/extensions/vscode-javac/out/
 cp -r ./node_modules ~/.vscode/extensions/vscode-javac/node_modules
 cp ./package.json ~/.vscode/extensions/vscode-javac/package.json
