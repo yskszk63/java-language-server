@@ -125,6 +125,25 @@ public class JavacHolder {
     }
 
     public JCTree.JCCompilationUnit parse(JavaFileObject source) {
+        StringJoiner command = new StringJoiner(" ");
+        
+        command.add("javac");
+        
+        for (String key : options.keySet()) {
+            String value = options.get(key);
+            
+            command.add(key);
+            command.add(value);
+        }
+        
+        if (source instanceof SimpleJavaFileObject) {
+            SimpleJavaFileObject simple = (SimpleJavaFileObject) source;
+            
+            command.add(simple.toUri().getPath());
+        }
+        
+        LOG.info(command.toString());
+        
         clear(source);
 
         JCTree.JCCompilationUnit result = compiler.parse(source);
