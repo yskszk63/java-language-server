@@ -246,8 +246,8 @@ export class JavacServices {
 
         //args.push('-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005');
         args.push('-Djavacs.port=' + port);
-        args.push('-Djavacs.sourcePath=' + sourcePath);
-        args.push('-Djavacs.classPath=' + classPath);
+        args.push('-Djavacs.sourcePath=' + sourcePath.join(':'));
+        args.push('-Djavacs.classPath=' + classPath.join(':'));
         args.push('-Djavacs.outputDirectory=' + outputDirectory);
         args.push('org.javacs.Main');
 
