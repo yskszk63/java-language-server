@@ -11,6 +11,7 @@ export class Lint {
                 private diagnosticCollection: VSCode.DiagnosticCollection) {
     }
     
+    // TODO debounce multiple calls
     public onSaveOrOpen(document: VSCode.TextDocument) {
         if (document.languageId !== 'java') 
             return;

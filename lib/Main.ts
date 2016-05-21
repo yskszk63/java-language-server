@@ -46,6 +46,8 @@ export function activate(ctx: VSCode.ExtensionContext) {
     
     ctx.subscriptions.push(VSCode.workspace.onDidOpenTextDocument(document => lint.onSaveOrOpen(document)));
     ctx.subscriptions.push(VSCode.workspace.onDidSaveTextDocument(document => lint.onSaveOrOpen(document)));
+    ctx.subscriptions.push(VSCode.window.onDidChangeActiveTextEditor(editor => lint.onSaveOrOpen(editor.document)));
+    
 	ctx.subscriptions.push(diagnosticCollection);
     
     // When a javaconfig.json file is saved, invalidate cache
