@@ -44,8 +44,13 @@ export function activate(ctx: VSCode.ExtensionContext) {
     let diagnosticCollection: VSCode.DiagnosticCollection = VSCode.languages.createDiagnosticCollection('java');
     let lint = new Lint(provideJavac, diagnosticCollection);
     
-    ctx.subscriptions.push(VSCode.workspace.onDidOpenTextDocument(document => lint.onSaveOrOpen(document)));
+    // Lint the currently visible text editors
+    VSCode.window.visibleTextEditors.forEach(editor => lint.onSaveOrOpen(editor.document))
+    
+    // Lint on save
     ctx.subscriptions.push(VSCode.workspace.onDidSaveTextDocument(document => lint.onSaveOrOpen(document)));
+    
+    // Lint on open
     ctx.subscriptions.push(VSCode.window.onDidChangeActiveTextEditor(editor => lint.onSaveOrOpen(editor.document)));
     
 	ctx.subscriptions.push(diagnosticCollection);
