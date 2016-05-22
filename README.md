@@ -91,7 +91,9 @@ and implements various features of the Visual Studio Code extension API.
 
 This extension consists of an external java process,
 and some typescript glue code that talks to the VS Code API.
-The tyescript glue code communicates with the external java process using a randomly assigned network port.
+The typescript glue code communicates with the external java process using a randomly assigned network port.
+
+In the future, the javac service process could be used separately by other tools that need Java code insight.
 
 ### Java service process
 
@@ -111,3 +113,9 @@ We accomplish this by maintaining a single copy of the Java compiler in memory a
 When we want to recompile a file, 
 we clear that *one* file from the internal caches of the Java compiler,
 and then rerun the compiler.
+
+### Multiple javaconfig.json
+
+If you have multiple javaconfig.json files in different subdirectories of your project,
+the parent directory of each javaconfig.json will be treated as a separate java root.
+A separate java service process will be started for each javaconfig.json.
