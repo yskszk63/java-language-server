@@ -3,6 +3,10 @@
 Provides Java support using the javac API.
 Requires that you have Java 8 installed on your system.
 
+## Installation
+
+[Install from the VS Code marketplace](https://marketplace.visualstudio.com/items?itemName=georgewfraser.vscode-javac)
+
 ## Features
 
 ### Lint
