@@ -142,3 +142,7 @@ and then rerun the compiler.
 If you have multiple javaconfig.json files in different subdirectories of your project,
 the parent directory of each javaconfig.json will be treated as a separate java root.
 A separate java service process will be started for each javaconfig.json.
+
+## Contributing
+
+You should be able to install locally on a mac using ./scripts/install.sh
