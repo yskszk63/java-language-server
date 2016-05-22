@@ -3,7 +3,11 @@
 	"displayName": "vscode-javac",
 	"description": "Java support using javac",
 	"version": "0.0.1",
-	"publisher": "fivetran",
+	"publisher": "George Fraser",
+	"repository": { 
+		"type" : "git", 
+		"url" : "https://github.com/georgewfraser/vscode-javac.git"
+  	},
 	"engines": {
 		"vscode": "^0.10.10"
 	},
