@@ -1,6 +1,6 @@
 {
 	"name": "vscode-javac",
-	"displayName": "vscode-javac",
+	"displayName": "Java Language Support",
 	"description": "Java support using javac",
 	"version": "0.0.1",
 	"publisher": "georgewfraser",

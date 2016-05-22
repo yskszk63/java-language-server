@@ -27,4 +27,3 @@ target/**
 # Extensions
 .gitignore
 **/*.map
-**/*.md
