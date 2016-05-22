@@ -5,6 +5,9 @@ import com.sun.tools.javac.util.Log;
 
 import javax.tools.JavaFileObject;
 
+/**
+ * Allows use to clear files from Log when we recompile 
+ */
 public class IncrementalLog extends Log {
 
     public IncrementalLog(Context context) {

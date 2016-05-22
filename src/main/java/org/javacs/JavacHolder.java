@@ -31,13 +31,25 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Maintains a reference to a Java compiler, 
+ * and several of its internal data structures,
+ * which we need to fiddle with to get incremental compilation 
+ * and extract the diagnostic information we want.
+ */
 public class JavacHolder {
     private static final Logger LOG = Logger.getLogger("main");
     private final List<Path> classPath;
     private final List<Path> sourcePath;
     private final Path outputDirectory;
+    // javac places all of its internal state into this Context object,
+    // which is basically a Map<String, Object>
     public final Context context = new Context();
+    // Error reporting initially goes nowhere
+    // When we want to report errors back to VS Code, we'll replace this with something else
     private DiagnosticListener<JavaFileObject> errorsDelegate = diagnostic -> {};
+    // javac isn't friendly to swapping out the error-reporting DiagnosticListener,
+    // so we install this intermediate DiagnosticListener, which forwards to errorsDelegate
     private final DiagnosticListener<JavaFileObject> errors = diagnostic -> {
         errorsDelegate.report(diagnostic);
     };
@@ -45,15 +57,18 @@ public class JavacHolder {
     {
         context.put(DiagnosticListener.class, errors);
     }
-
+    // IncrementalLog registers itself in context and pre-empts the normal Log from being created
     private final IncrementalLog log = new IncrementalLog(context);
     public final JavacFileManager fileManager = new JavacFileManager(context, true, null);
     private final Check check = Check.instance(context);
+    // FuzzyParserFactory registers itself in context and pre-empts the normal ParserFactory from being created
     private final FuzzyParserFactory parserFactory = FuzzyParserFactory.instance(context);
     private final Options options = Options.instance(context);
     private final JavaCompiler compiler = JavaCompiler.instance(context);
     private final Todo todo = Todo.instance(context);
     private final JavacTrees trees = JavacTrees.instance(context);
+    // TreeScanner tasks we want to perform before or after compilation stages
+    // We'll use these scanners to implement features like go-to-definition
     private final Map<TaskEvent.Kind, List<TreeScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
     private final ClassIndex index = new ClassIndex(context);
 
@@ -114,18 +129,35 @@ public class JavacHolder {
         }
     }
 
+    /**
+     * After the parse phase of compilation,
+     * scan the source trees with these scanners.
+     * Replaces any existing after-parse scanners.
+     */
     public void afterParse(TreeScanner... scan) {
         afterTask.put(TaskEvent.Kind.PARSE, ImmutableList.copyOf(scan));
     }
 
+    /**
+     * After the analysis phase of compilation,
+     * scan the source trees with these scanners.
+     * Replaces any existing after-analyze scanners.
+     */
     public void afterAnalyze(TreeScanner... scan) {
         afterTask.put(TaskEvent.Kind.ANALYZE, ImmutableList.copyOf(scan));
     }
 
+    /**
+     * Send all errors to callback, replacing any existing callback
+     */
     public void onError(DiagnosticListener<JavaFileObject> callback) {
         errorsDelegate = callback;
     }
 
+    /**
+     * Compile the indicated source file, and its dependencies if they have been modified.
+     * Clears source from internal caches of javac, so that compile(parse(source)) will re-compile.
+     */
     public JCTree.JCCompilationUnit parse(JavaFileObject source) {
         StringJoiner command = new StringJoiner(" ");
         
@@ -153,6 +185,9 @@ public class JavacHolder {
         return result;
     }
 
+    /**
+     * Compile a source tree produced by this.parse
+     */
     public void compile(JCTree.JCCompilationUnit source) {
         compiler.processAnnotations(compiler.enterTrees(com.sun.tools.javac.util.List.of(source)));
 
