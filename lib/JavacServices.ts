@@ -11,7 +11,11 @@ import split = require('split');
 
 PortFinder.basePort = 55220;
 
-export class JavacFactory {
+/**
+ * Holds a single instance of JavacServices with a particular source path, class path, and output directory.
+ * If classpath, source path, or output directory change, starts a new JavacServices.
+ */
+export class JavacServicesHolder {
     constructor(private projectDirectoryPath: string, 
                 private extensionDirectoryPath: string, 
                 private onError: (message: string) => void) {
@@ -23,13 +27,19 @@ export class JavacFactory {
     private cachedOutputDirectory: string;
     private cachedCompiler: Promise<JavacServices>;
     
-    forConfig(sourcePath: string[], classPath: string[], outputDirectory: string): Promise<JavacServices> {
+    /**
+     * Get an instance of JavacServices with given source path, class path, output directory.
+     * If these arguments are the same as the last time this function was called,
+     * returns the same, cached JavacServices.
+     */
+    getJavac(sourcePath: string[], classPath: string[], outputDirectory: string): Promise<JavacServices> {
         sourcePath = sourcePath.sort();
         classPath = classPath.sort();
         
         if (!sortedArrayEquals(sourcePath, this.cachedSourcePath) || 
             !sortedArrayEquals(classPath, this.cachedClassPath) || 
             outputDirectory != this.cachedOutputDirectory) {
+            // TODO kill old compiler
             
             this.cachedSourcePath = sourcePath;
             this.cachedClassPath = classPath;
@@ -224,7 +234,12 @@ export interface GotoLocation {
     range: Range;
 }
 
+/**
+ * Starts an external java process running org.javacs.Main
+ * Invokes functions on this process using a local network socket.
+ */
 export class JavacServices {
+    /** Socket we use to communicate with external java process */
     private socket: Promise<Net.Socket>;
 
     /** # requests we've made so far, used to generate unique request ids */
@@ -333,14 +348,35 @@ export class JavacServices {
     }
 }
 
+/**
+ * Common format of all requests
+ */
 interface Request {
+    /**
+     * Sequential ID of this request
+     */
     requestId: number;
+    
+    /**
+     * Arguments specific to the request type (line, autocomplete, etc)
+     */
     [requestType: string]: any;
 }
 
 interface Response {
+    /**
+     * Matches Request#requestId
+     */
     requestId: number;
+    
+    /**
+     * Response data specific to the request type (line, autocomplete, etc)
+     */
     [requestType: string]: any;
+    
+    /**
+     * Error message, if there is a general error
+     */
     error?: {
         message: string;
     }

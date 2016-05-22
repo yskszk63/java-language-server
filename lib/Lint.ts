@@ -2,17 +2,22 @@
 import * as VSCode from 'vscode';
 
 import {findJavaConfig} from './Finder';
-import {JavacFactory, JavacServices, LintMessage} from './JavacServices';
+import {JavacServicesHolder, JavacServices, LintMessage} from './JavacServices';
 import {JavaConfig} from './JavaConfig';
 
+/**
+ * Provides lint on open, save
+ */
 export class Lint {
     
-    constructor(private javac: JavacFactory, 
+    constructor(private javac: JavacServicesHolder, 
                 private diagnosticCollection: VSCode.DiagnosticCollection) {
     }
     
-    // TODO debounce multiple calls
-    public onSaveOrOpen(document: VSCode.TextDocument) {
+    /**
+     * Lint document and place results in this.diagnosticCollection
+     */
+    public doLint(document: VSCode.TextDocument) {
         if (document.languageId !== 'java') 
             return;
             
@@ -25,7 +30,7 @@ export class Lint {
     private runBuilds(document: VSCode.TextDocument, 
                       vsCodeJavaConfig: VSCode.WorkspaceConfiguration) {
         let config = findJavaConfig(VSCode.workspace.rootPath, document.fileName);
-        let javac = this.javac.forConfig(config.sourcePath, config.classPath, config.outputDirectory);
+        let javac = this.javac.getJavac(config.sourcePath, config.classPath, config.outputDirectory);
         
         javac.then(javac => {
             javac.lint({
@@ -46,6 +51,9 @@ export class Lint {
     }
 }
 
+/**
+ * Convert JSON (returned by javac service process) to Diagnostic
+ */
 function asDiagnostic(m: LintMessage): VSCode.Diagnostic {
     let range = new VSCode.Range(m.range.start.line, m.range.start.character, m.range.end.line, m.range.end.character);
     

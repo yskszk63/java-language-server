@@ -4,7 +4,9 @@ Provides Java support using the javac API.
 
 ## Features
 
-* Compile-on-save
+* Lint
+* Autocomplete
+* Go-to-definition
 
 ## javaconfig.json
 
@@ -12,19 +14,9 @@ The presence of a `javaconfig.json` file indicates that this directory is the ro
 
 ### Examples
 
-### Compile without a build tool
-
-Set the source and class path:
-
-    {
-        "sourcePath": ["src"],
-        "classPath": ["lib/MyJar.jar"],
-        "outputDirectory": "out"
-    }
-
 ### Compile using maven
 
-`javaconfig.json`
+#### javaconfig.json
 
 Set the source path, and get the class path from a file:
 
@@ -34,7 +26,7 @@ Set the source path, and get the class path from a file:
         "outputDirectory": "target"
     }
 
-`pom.xml`
+#### pom.xml
 
 Configure maven to output `classpath.txt`
 
@@ -65,7 +57,7 @@ Configure maven to output `classpath.txt`
         </build>
     </project>
 
-`gitignore.txt`
+#### .gitignore
 
 Ignore `classpath.txt`, since it will be different on every host
 
