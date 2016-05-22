@@ -61,6 +61,14 @@ public class LinterTest extends Fixtures {
 
         assertThat(scanner.methodNames, hasItem("test"));
         assertThat(errors.getDiagnostics(), not(empty()));
+
+        // Lint again
+        errors = new DiagnosticCollector<>();
+
+        compiler.onError(errors);
+        compiler.compile(compiler.parse(file));
+
+        assertThat(errors.getDiagnostics(), not(empty()));
     }
 
     @Test

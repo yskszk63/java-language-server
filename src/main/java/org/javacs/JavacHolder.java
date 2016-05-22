@@ -203,7 +203,12 @@ public class JavacHolder {
      * Remove source file from caches in the parse stage
      */
     private void clear(JavaFileObject source) {
+        // Forget about this file
         log.clear(source);
+
+        // javac's flow stage will stop early if there are errors
+        log.nerrors = 0;
+        log.nwarnings = 0;
 
         // Remove all cached classes that came from this files
         List<Name> remove = new ArrayList<>();
