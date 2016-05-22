@@ -8,16 +8,22 @@
 		"type" : "git", 
 		"url" : "https://github.com/georgewfraser/vscode-javac.git"
   	},
+	"license": "MIT",
 	"engines": {
 		"vscode": "^0.10.10"
 	},
 	"categories": [
-		"Other"
+		"Languages",
+		"Linters"
+	],
+	"keywords": [
+		"java"
 	],
 	"activationEvents": [
         "onLanguage:java"
 	],
 	"main": "./out/lib/Main",
+	"files": ["target/fat-jar.jar"],
 	"contributes": {
         "languages": [
             {
