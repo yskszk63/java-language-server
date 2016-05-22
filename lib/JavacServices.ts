@@ -57,7 +57,7 @@ export class JavacServicesHolder {
             let javaPath = findJavaExecutable('java');
 
             PortFinder.getPort((err, port) => {
-                let javacServicesClassPath = [Path.resolve(this.extensionDirectoryPath, "out/fat-jar.jar")];           
+                let javacServicesClassPath = [Path.resolve(this.extensionDirectoryPath, "out", "fat-jar.jar")];           
                 let javac = new JavacServices(javaPath, 
                                             javacServicesClassPath, 
                                             port, 

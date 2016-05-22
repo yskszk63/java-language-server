@@ -1,21 +1,14 @@
 # Installs locally
+# You will need java, maven, vsce, and visual studio code to run this script
 
-# Compile typescript
-tsc
+# Clear existing installation
+rm -rf ~/.vscode/extensions/georgewfraser.vscode-javac-*
 
 # Build fat jar
 mvn package 
 
-# Ensure .vscode/extensions/vscode-javac exists
-mkdir -p ~/.vscode/extensions/vscode-javac
+# Build vsix
+vsce package -o build.vsix
 
-# Clear .vscode/extensions/vscode-javac
-rm -rf ~/.vscode/extensions/vscode-javac
-
-# Copy runtime to .vscode/extensions/vscode-javac
-mkdir -p ~/.vscode/extensions/vscode-javac/out/lib/
-
-cp ./out/lib/*.js ~/.vscode/extensions/vscode-javac/out/lib/
-cp ./out/fat-jar.jar ~/.vscode/extensions/vscode-javac/out/
-cp -r ./node_modules ~/.vscode/extensions/vscode-javac/node_modules
-cp ./package.json ~/.vscode/extensions/vscode-javac/package.json
+# Install vsix
+code build.vsix
