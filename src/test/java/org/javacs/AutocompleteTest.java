@@ -9,8 +9,10 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.Matchers.hasItems;
@@ -75,6 +77,40 @@ public class AutocompleteTest extends Fixtures {
 
         assertThat(suggestions, not(hasItems("methodStatic")));
         assertThat(suggestions, hasItems("method", "getClass"));
+    }
+
+    @Test
+    public void docstring() throws IOException {
+        String file = "/org/javacs/example/AutocompleteDocstring.java";
+
+        // Static method
+        RequestAutocomplete request = new RequestAutocomplete();
+
+        request.path = path(file);
+        request.text = new String(Files.readAllBytes(Paths.get(path(file))));
+        request.position = new Position(7, 14);
+
+        Set<String> docstrings = new Services(compiler)
+                .autocomplete(request)
+                .suggestions
+                .stream()
+                .flatMap(s -> s.documentation.map(Stream::of).orElse(Stream.empty()))
+                .map(String::trim)
+                .collect(toSet());
+
+        assertThat(docstrings, hasItems("A method", "A field"));
+
+        request.position = new Position(11, 31);
+
+        docstrings = new Services(compiler)
+                .autocomplete(request)
+                .suggestions
+                .stream()
+                .flatMap(s -> s.documentation.map(Stream::of).orElse(Stream.empty()))
+                .map(String::trim)
+                .collect(toSet());
+
+        assertThat(docstrings, hasItems("A fieldStatic", "A methodStatic"));
     }
 
     private Set<String> autocomplete(String file, int row, int column) throws IOException {

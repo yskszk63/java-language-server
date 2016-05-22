@@ -37,26 +37,26 @@ public class AutocompleteSuggestion {
      * A human-readable string with additional information
      * about this item, like type or symbol information.
      */
-    public Optional<String> detail;
+    public Optional<String> detail = Optional.empty();
 
     /**
      * A human-readable string that represents a doc-comment.
      */
-    public Optional<String> documentation;
+    public Optional<String> documentation = Optional.empty();
 
     /**
      * A string that should be used when comparing this item
      * with other items. When `falsy` the [label](#CompletionItem.label)
      * is used.
      */
-    public Optional<String> sortText;
+    public Optional<String> sortText = Optional.empty();
 
     /**
      * A string that should be used when filtering a set of
      * completion items. When `falsy` the [label](#CompletionItem.label)
      * is used.
      */
-    public Optional<String> filterText;
+    public Optional<String> filterText = Optional.empty();
 
     public AutocompleteSuggestion(String label, String insertText, Type kind) {
         this.label = label;

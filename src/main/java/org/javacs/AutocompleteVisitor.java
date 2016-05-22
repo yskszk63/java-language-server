@@ -125,7 +125,7 @@ public class AutocompleteVisitor extends CursorScanner {
 
                 break;
             case FIELD:
-                addField(e);
+                addField((Symbol.VarSymbol) e);
 
                 break;
             case PARAMETER:
@@ -168,15 +168,24 @@ public class AutocompleteVisitor extends CursorScanner {
         AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name, name, AutocompleteSuggestion.Type.Method);
 
         suggestion.detail = Optional.of(e.getEnclosingElement().getSimpleName().toString());
+        suggestion.documentation = docstring(e);
 
         suggestions.add(suggestion);
     }
 
-    private void addField(Element e) {
+    private Optional<String> docstring(Symbol symbol) {
+        JavacTrees trees = JavacTrees.instance(context);
+        Optional<TreePath> path = Optional.ofNullable(trees.getPath(symbol));
+
+        return path.map(trees::getDocComment);
+    }
+
+    private void addField(Symbol.VarSymbol e) {
         String name = e.getSimpleName().toString();
         AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name, name, AutocompleteSuggestion.Type.Property);
 
         suggestion.detail = Optional.of(e.getEnclosingElement().getSimpleName().toString());
+        suggestion.documentation = docstring(e);
 
         suggestions.add(suggestion);
     }

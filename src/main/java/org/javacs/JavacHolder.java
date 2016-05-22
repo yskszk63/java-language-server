@@ -65,6 +65,11 @@ public class JavacHolder {
     private final FuzzyParserFactory parserFactory = FuzzyParserFactory.instance(context);
     private final Options options = Options.instance(context);
     private final JavaCompiler compiler = JavaCompiler.instance(context);
+
+    {
+        compiler.keepComments = true;
+    }
+
     private final Todo todo = Todo.instance(context);
     private final JavacTrees trees = JavacTrees.instance(context);
     // TreeScanner tasks we want to perform before or after compilation stages
