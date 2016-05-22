@@ -79,7 +79,7 @@ public class Main {
         return m;
     }
 
-    private static final Logger LOG = Logger.getLogger("");
+    private static final Logger LOG = Logger.getLogger("main");
 
     public static void main(String[] args) throws IOException {
         LoggingFormat.startLogging();

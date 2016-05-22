@@ -17,7 +17,7 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 
-public class Recompile extends Fixtures {
+public class RecompileTest extends Fixtures {
     @Test
     public void compileTwice() {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();

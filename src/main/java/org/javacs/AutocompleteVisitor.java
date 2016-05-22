@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 public class AutocompleteVisitor extends CursorScanner {
-    private static final Logger LOG = Logger.getLogger("");
+    private static final Logger LOG = Logger.getLogger("main");
     public final Set<AutocompleteSuggestion> suggestions = new LinkedHashSet<>();
 
     public AutocompleteVisitor(JavaFileObject file, long cursor, Context context) {

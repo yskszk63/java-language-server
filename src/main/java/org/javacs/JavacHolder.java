@@ -30,7 +30,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class JavacHolder {
-    private static final Logger LOG = Logger.getLogger("");
+    private static final Logger LOG = Logger.getLogger("main");
     private final List<Path> classPath;
     private final List<Path> sourcePath;
     private final Path outputDirectory;

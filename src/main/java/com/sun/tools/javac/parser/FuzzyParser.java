@@ -5,7 +5,7 @@ import java.util.logging.Logger;
 import static com.sun.tools.javac.parser.Tokens.TokenKind.SEMI;
 
 public class FuzzyParser extends JavacParser {
-    private static final Logger LOG = Logger.getLogger("");
+    private static final Logger LOG = Logger.getLogger("main");
 
     protected FuzzyParser(ParserFactory parserFactory,
                           Lexer lexer,

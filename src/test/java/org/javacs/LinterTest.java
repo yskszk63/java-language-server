@@ -5,6 +5,7 @@ import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import javax.tools.Diagnostic;
@@ -19,7 +20,7 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
 public class LinterTest extends Fixtures {
-    private static final Logger LOG = Logger.getLogger("");
+    private static final Logger LOG = Logger.getLogger("main");
 
     @Test
     public void compile() throws IOException {

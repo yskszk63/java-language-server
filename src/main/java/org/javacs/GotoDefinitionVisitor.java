@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 public class GotoDefinitionVisitor extends CursorScanner {
-    private static final Logger LOG = Logger.getLogger("");
+    private static final Logger LOG = Logger.getLogger("main");
 
     public final Set<SymbolLocation> definitions = new HashSet<>();
 

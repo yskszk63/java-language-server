@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.logging.Logger;
 
 public class Services {
-    private static final Logger LOG = Logger.getLogger("");
+    private static final Logger LOG = Logger.getLogger("main");
     private final JavacHolder compiler;
 
     public Services(JavacHolder compiler) {

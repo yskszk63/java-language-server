@@ -8,8 +8,12 @@ import java.util.Collections;
 
 public class Fixtures {
     @BeforeClass
-    public static void setup() throws IOException {
-        LoggingFormat.startLogging();
+    public static void setup() {
+        try {
+            LoggingFormat.startLogging();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     protected static final JavacHolder compiler =

@@ -18,7 +18,7 @@ import java.util.logging.Logger;
  * Remembers the tree of every class symbol so we can locate symbols later.
  */
 public class ClassIndex extends BaseScanner {
-    private static final Logger LOG = Logger.getLogger("");
+    private static final Logger LOG = Logger.getLogger("main");
 
     private final Map<Symbol.ClassSymbol, Declared> classes = new HashMap<>();
 

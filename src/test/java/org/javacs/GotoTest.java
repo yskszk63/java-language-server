@@ -20,7 +20,7 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 
 public class GotoTest extends Fixtures {
-    private static final Logger LOG = Logger.getLogger("");
+    private static final Logger LOG = Logger.getLogger("main");
     private static final String file = "/Goto.java";
     private static final URI uri = uri(file);
 

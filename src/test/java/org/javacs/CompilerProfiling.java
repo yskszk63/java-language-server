@@ -21,7 +21,7 @@ import static org.junit.Assert.assertNotNull;
 
 @Ignore
 public class CompilerProfiling extends Fixtures {
-    private static final Logger LOG = Logger.getLogger("");
+    private static final Logger LOG = Logger.getLogger("main");
 
     @Test
     public void parsingSpeed() throws IOException, URISyntaxException {

@@ -18,7 +18,7 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 
 public class AutocompleteTest extends Fixtures {
-    private static final Logger LOG = Logger.getLogger("");
+    private static final Logger LOG = Logger.getLogger("main");
 
     @Test
     public void staticMember() throws IOException {
