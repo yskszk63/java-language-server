@@ -7,14 +7,15 @@ import java.nio.file.Paths;
 import java.util.Collections;
 
 public class Fixtures {
-    @BeforeClass
-    public static void setup() {
+    static {
         try {
             LoggingFormat.startLogging();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
+
+    public static void init() { }
 
     protected static final JavacHolder compiler =
             new JavacHolder(Collections.emptyList(),

@@ -8,7 +8,9 @@ import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.api.MultiTaskListener;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.Check;
+import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.comp.Todo;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
@@ -167,7 +169,9 @@ public class JavacHolder {
 
         while (!todo.isEmpty()) {
             // We don't do the desugar or generate phases, because they remove method bodies and methods
-            compiler.flow(compiler.attribute(todo.remove()));
+            Env<AttrContext> next = todo.remove();
+            Env<AttrContext> attributedTree = compiler.attribute(next);
+            Queue<Env<AttrContext>> analyzedTree = compiler.flow(attributedTree);
         }
     }
 

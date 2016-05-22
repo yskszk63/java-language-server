@@ -9,6 +9,8 @@ public class IncrementalLog extends Log {
 
     public IncrementalLog(Context context) {
         super(context);
+
+        super.multipleErrors = true;
     }
 
     public void clear(JavaFileObject source) {

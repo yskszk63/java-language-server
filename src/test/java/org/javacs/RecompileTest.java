@@ -6,6 +6,7 @@ import org.junit.Test;
 
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -18,13 +19,15 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 
 public class RecompileTest extends Fixtures {
+    static {
+        Fixtures.init();
+    }
+
     @Test
     public void compileTwice() {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/CompileTwice.java");
-        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList(Paths.get("src/test/resources")),
-                                               Paths.get("out"));
+        JavacHolder compiler = newCompiler();
         List<String> visits = new ArrayList<>();
         compiler.afterAnalyze(new GetClass(compiler.context, visits));
         compiler.onError(errors);
@@ -46,9 +49,7 @@ public class RecompileTest extends Fixtures {
         Path path = Paths.get("FixParseError.java");
         StringFileObject bad = new StringFileObject("public class FixParseError { public String foo() { return \"foo\"; }", path);
         StringFileObject good = new StringFileObject("public class FixParseError { public String foo() { return \"foo\"; } }", path);
-        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList(Paths.get("src/test/resources")),
-                                               Paths.get("out"));
+        JavacHolder compiler = newCompiler();
         DiagnosticCollector<JavaFileObject> badErrors = new DiagnosticCollector<>();
 
         compiler.onError(badErrors);
@@ -74,9 +75,7 @@ public class RecompileTest extends Fixtures {
         Path path = Paths.get("FixTypeError.java");
         StringFileObject bad = new StringFileObject("public class FixTypeError { public String foo() { return 1; } }", path);
         StringFileObject good = new StringFileObject("public class FixTypeError { public String foo() { return \"foo\"; } }", path);
-        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList(Paths.get("src/test/resources")),
-                                               Paths.get("out"));
+        JavacHolder compiler = newCompiler();
         DiagnosticCollector<JavaFileObject> badErrors = new DiagnosticCollector<>();
 
         compiler.onError(badErrors);
@@ -95,6 +94,33 @@ public class RecompileTest extends Fixtures {
 
         assertThat(goodErrors.getDiagnostics(), empty());
         assertThat(parsedClassNames, contains("FixTypeError"));
+    }
+
+    private static JavacHolder newCompiler() {
+        return new JavacHolder(Collections.emptyList(),
+                               Collections.singletonList(Paths.get("src/test/resources")),
+                               Paths.get("out"));
+    }
+
+    @Test
+    public void keepTypeError() throws IOException {
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
+        GetResourceFileObject file = new GetResourceFileObject("/UndefinedSymbol.java");
+        JavacHolder compiler = newCompiler();
+
+        // Compile once
+        compiler.onError(errors);
+        compiler.compile(compiler.parse(file));
+
+        assertThat(errors.getDiagnostics(), not(empty()));
+
+        // Compile twice
+        errors = new DiagnosticCollector<>();
+        compiler.onError(errors);
+
+        compiler.compile(compiler.parse(file));
+
+        assertThat(errors.getDiagnostics(), not(empty()));
     }
 
     private static class GetClass extends BaseScanner {
