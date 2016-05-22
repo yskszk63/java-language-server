@@ -26,7 +26,7 @@ public class RecompileTest extends Fixtures {
     @Test
     public void compileTwice() {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        GetResourceFileObject file = new GetResourceFileObject("/CompileTwice.java");
+        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/CompileTwice.java");
         JavacHolder compiler = newCompiler();
         List<String> visits = new ArrayList<>();
         compiler.afterAnalyze(new GetClass(compiler.context, visits));
@@ -46,7 +46,7 @@ public class RecompileTest extends Fixtures {
 
     @Test
     public void fixParseError() {
-        Path path = Paths.get("FixParseError.java");
+        Path path = Paths.get("org/javacs/example/FixParseError.java");
         StringFileObject bad = new StringFileObject("public class FixParseError { public String foo() { return \"foo\"; }", path);
         StringFileObject good = new StringFileObject("public class FixParseError { public String foo() { return \"foo\"; } }", path);
         JavacHolder compiler = newCompiler();
@@ -72,7 +72,7 @@ public class RecompileTest extends Fixtures {
 
     @Test
     public void fixTypeError() {
-        Path path = Paths.get("FixTypeError.java");
+        Path path = Paths.get("org/javacs/example/FixTypeError.java");
         StringFileObject bad = new StringFileObject("public class FixTypeError { public String foo() { return 1; } }", path);
         StringFileObject good = new StringFileObject("public class FixTypeError { public String foo() { return \"foo\"; } }", path);
         JavacHolder compiler = newCompiler();
@@ -105,7 +105,7 @@ public class RecompileTest extends Fixtures {
     @Test
     public void keepTypeError() throws IOException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        GetResourceFileObject file = new GetResourceFileObject("/UndefinedSymbol.java");
+        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/UndefinedSymbol.java");
         JavacHolder compiler = newCompiler();
 
         // Compile once

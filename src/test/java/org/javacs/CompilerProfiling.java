@@ -25,7 +25,7 @@ public class CompilerProfiling extends Fixtures {
 
     @Test
     public void parsingSpeed() throws IOException, URISyntaxException {
-        StringFileObject file = fromResource("/LargeFile.java");
+        StringFileObject file = fromResource("/org/javacs/example/LargeFile.java");
 
         for (int i = 0; i < 10; i++) {
             Duration duration = compileLargeFile(file);

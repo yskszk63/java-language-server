@@ -23,7 +23,7 @@
  * questions.
  */
 
-package com.sun.tools.javac.main;
+package org.javacs.example;
 
 import java.io.*;
 import java.util.HashMap;

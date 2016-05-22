@@ -1,3 +1,5 @@
+package org.javacs.example
+
 public class Goto<Param> {
     public static void test() {
         Object local;

@@ -1,3 +1,5 @@
+package org.javacs.example
+
 public class AutocompleteMembers {
     private String field;
     private static String fieldStatic;

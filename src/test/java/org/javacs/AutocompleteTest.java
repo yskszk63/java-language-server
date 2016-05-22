@@ -22,10 +22,10 @@ public class AutocompleteTest extends Fixtures {
 
     @Test
     public void staticMember() throws IOException {
-        String file = "/AutocompleteStaticMember.java";
+        String file = "/org/javacs/example/AutocompleteStaticMember.java";
 
         // Static method
-        Set<String> suggestions = autocomplete(file, 2, 33);
+        Set<String> suggestions = autocomplete(file, 4, 33);
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic", "class"));
         assertThat(suggestions, not(hasItems("field", "method", "getClass")));
@@ -34,7 +34,7 @@ public class AutocompleteTest extends Fixtures {
     @Test
     @Ignore
     public void staticReference() throws IOException {
-        String file = "/AutocompleteStaticReference.java";
+        String file = "/org/javacs/example/AutocompleteStaticReference.java";
 
         // Static method
         Set<String> suggestions = autocomplete(file, 2, 37);
@@ -45,10 +45,10 @@ public class AutocompleteTest extends Fixtures {
 
     @Test
     public void member() throws IOException {
-        String file = "/AutocompleteMember.java";
+        String file = "/org/javacs/example/AutocompleteMember.java";
 
         // Static method
-        Set<String> suggestions = autocomplete(file, 2, 13);
+        Set<String> suggestions = autocomplete(file, 4, 13);
 
         assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "class")));
         assertThat(suggestions, hasItems("field", "method", "getClass"));
@@ -56,10 +56,10 @@ public class AutocompleteTest extends Fixtures {
 
     @Test
     public void other() throws IOException {
-        String file = "/AutocompleteOther.java";
+        String file = "/org/javacs/example/AutocompleteOther.java";
 
         // Static method
-        Set<String> suggestions = autocomplete(file, 2, 33);
+        Set<String> suggestions = autocomplete(file, 4, 33);
 
         assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "class")));
         assertThat(suggestions, hasItems("field", "method", "getClass"));
@@ -68,7 +68,7 @@ public class AutocompleteTest extends Fixtures {
     @Test
     @Ignore
     public void reference() throws IOException {
-        String file = "/AutocompleteReference.java";
+        String file = "/org/javacs/example/AutocompleteReference.java";
 
         // Static method
         Set<String> suggestions = autocomplete(file, 2, 14);

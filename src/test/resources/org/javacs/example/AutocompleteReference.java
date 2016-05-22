@@ -1,6 +1,8 @@
-public class AutocompleteStaticMember {
-    public static void test() {
-        AutocompleteStaticMember.
+package org.javacs.example
+
+public class AutocompleteReference {
+    public void test() {
+        this::
     }
 
     private static String fieldStatic;

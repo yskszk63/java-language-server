@@ -14,7 +14,7 @@ import static org.junit.Assert.assertThat;
 public class LineMapTest extends Fixtures {
     @Test
     public void firstLine() throws URISyntaxException, IOException {
-        Path path = Paths.get(ParserTest.class.getResource("/HelloWorld.java").toURI().getPath());
+        Path path = Paths.get(ParserTest.class.getResource("/org/javacs/example/HelloWorld.java").toURI().getPath());
         Position found = LineMap.fromPath(path).point(0);
 
         assertThat(found, equalTo(new Position(0, 0)));

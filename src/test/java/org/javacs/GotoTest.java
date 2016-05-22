@@ -21,86 +21,86 @@ import static org.junit.Assert.assertThat;
 
 public class GotoTest extends Fixtures {
     private static final Logger LOG = Logger.getLogger("main");
-    private static final String file = "/Goto.java";
+    private static final String file = "/org/javacs/example/Goto.java";
     private static final URI uri = uri(file);
 
     @Test
     public void localVariable() throws IOException {
-        Set<Location> suggestions = doGoto(file, 7, 8);
+        Set<Location> suggestions = doGoto(file, 9, 8);
 
-        assertThat(suggestions, contains(new Location(uri, 2, 15, 2, 20)));
+        assertThat(suggestions, contains(new Location(uri, 4, 15, 4, 20)));
     }
 
     @Test
     public void defaultConstructor() throws IOException {
-        Set<Location> suggestions = doGoto(file, 7, 20);
+        Set<Location> suggestions = doGoto(file, 9, 20);
 
-        assertThat(suggestions, contains(new Location(uri, 0, 13, 0, 17)));
+        assertThat(suggestions, contains(new Location(uri, 2, 13, 2, 17)));
     }
 
     @Test
     @Ignore // TODO
     public void constructor() throws IOException {
-        Set<Location> suggestions = doGoto(file, 8, 20);
+        Set<Location> suggestions = doGoto(file, 10, 20);
 
-        assertThat(suggestions, contains(new Location(uri, 27, 11, 27, 15)));
+        assertThat(suggestions, contains(new Location(uri, 29, 11, 29, 15)));
     }
 
     @Test
     public void className() throws IOException {
-        Set<Location> suggestions = doGoto(file, 13, 8);
+        Set<Location> suggestions = doGoto(file, 15, 8);
 
-        assertThat(suggestions, contains(new Location(uri, 0, 13, 0, 17)));
+        assertThat(suggestions, contains(new Location(uri, 2, 13, 2, 17)));
     }
 
     @Test
     public void staticField() throws IOException {
-        Set<Location> suggestions = doGoto(file, 10, 21);
+        Set<Location> suggestions = doGoto(file, 12, 21);
 
-        assertThat(suggestions, contains(new Location(uri, 33, 25, 33, 36)));
+        assertThat(suggestions, contains(new Location(uri, 35, 25, 35, 36)));
     }
 
     @Test
     public void field() throws IOException {
-        Set<Location> suggestions = doGoto(file, 11, 21);
+        Set<Location> suggestions = doGoto(file, 13, 21);
 
-        assertThat(suggestions, contains(new Location(uri, 34, 18, 34, 23)));
+        assertThat(suggestions, contains(new Location(uri, 36, 18, 36, 23)));
     }
 
     @Test
     public void staticMethod() throws IOException {
-        Set<Location> suggestions = doGoto(file, 13, 13);
+        Set<Location> suggestions = doGoto(file, 15, 13);
 
-        assertThat(suggestions, contains(new Location(uri, 35, 25, 35, 37)));
+        assertThat(suggestions, contains(new Location(uri, 37, 25, 37, 37)));
     }
 
     @Test
     public void method() throws IOException {
-        Set<Location> suggestions = doGoto(file, 14, 13);
+        Set<Location> suggestions = doGoto(file, 16, 13);
 
-        assertThat(suggestions, contains(new Location(uri, 38, 18, 38, 24)));
+        assertThat(suggestions, contains(new Location(uri, 40, 18, 40, 24)));
     }
 
     @Test
     public void staticMethodReference() throws IOException {
-        Set<Location> suggestions = doGoto(file, 16, 26);
+        Set<Location> suggestions = doGoto(file, 18, 26);
 
-        assertThat(suggestions, contains(new Location(uri, 35, 25, 35, 37)));
+        assertThat(suggestions, contains(new Location(uri, 37, 25, 37, 37)));
     }
 
     @Test
     public void methodReference() throws IOException {
-        Set<Location> suggestions = doGoto(file, 17, 26);
+        Set<Location> suggestions = doGoto(file, 19, 26);
 
-        assertThat(suggestions, contains(new Location(uri, 38, 18, 38, 24)));
+        assertThat(suggestions, contains(new Location(uri, 40, 18, 40, 24)));
     }
 
     @Test
     @Ignore // TODO
     public void typeParam() throws IOException {
-        Set<Location> suggestions = doGoto(file, 43, 11);
+        Set<Location> suggestions = doGoto(file, 45, 11);
 
-        assertThat(suggestions, contains(new Location(uri, 0, 18, 0, 23)));
+        assertThat(suggestions, contains(new Location(uri, 2, 18, 2, 23)));
     }
 
     private Set<Location> doGoto(String file, int row, int column) throws IOException {

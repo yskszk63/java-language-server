@@ -1,3 +1,5 @@
+package com.javacs.example
+
 public class NotJava {
     public String test() {
         return "Not .java";

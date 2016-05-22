@@ -157,7 +157,16 @@ public class JavacHolder {
             public void visitClassDef(JCTree.JCClassDecl that) {
                 super.visitClassDef(that);
 
-                clear(that.name);
+                Name name = that.name;
+                JCTree.JCExpression p = result.pid;
+
+                if (p != null) {
+                    Name pName = name.table.fromString(p.toString());
+
+                    name = pName.append('.', name);
+                }
+
+                clear(name);
             }
         });
 

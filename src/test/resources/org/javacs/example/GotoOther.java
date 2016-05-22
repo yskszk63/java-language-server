@@ -1,8 +1,6 @@
-public class AutocompleteMember {
-    public void test() {
-        this.
-    }
+package org.javacs.example
 
+public class GotoOther {
     public static String fieldStatic;
     public String field;
     public static String methodStatic() {
@@ -10,5 +8,7 @@ public class AutocompleteMember {
     }
     public String method() {
         return "foo";
+    }
+    public GotoOther(String nonDefaultConstructor) {
     }
 }

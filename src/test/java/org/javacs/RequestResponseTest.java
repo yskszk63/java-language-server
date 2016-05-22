@@ -55,7 +55,7 @@ public class RequestResponseTest extends Fixtures {
 
     @Test
     public void lintUndefinedSymbol() throws URISyntaxException, IOException {
-        Path file = Paths.get(RequestResponseTest.class.getResource("/UndefinedSymbol.java").toURI());
+        Path file = Paths.get(RequestResponseTest.class.getResource("/org/javacs/example/UndefinedSymbol.java").toURI());
 
         RequestLint lint = new RequestLint();
         lint.path = file.toString();
@@ -67,8 +67,8 @@ public class RequestResponseTest extends Fixtures {
         List<Response> responses = responses(request.toString());
 
         ResponseLint responseLint = new ResponseLint();
-        String message = "cannot find symbol\n  symbol:   variable foo\n  location: class UndefinedSymbol";
-        Range range = new Range(new Position(2, 15), new Position(2, 18));
+        String message = "cannot find symbol\n  symbol:   variable foo\n  location: class org.javacs.example.UndefinedSymbol";
+        Range range = new Range(new Position(4, 15), new Position(4, 18));
         responseLint.messages.put(file.toString(),
                                   Collections.singletonList(new LintMessage(range, message, LintMessage.Type.Error)));
 
@@ -80,7 +80,7 @@ public class RequestResponseTest extends Fixtures {
 
     @Test
     public void lintSingleLineUndefinedSymbol() throws URISyntaxException, IOException {
-        Path file = Paths.get(RequestResponseTest.class.getResource("/SingleLineUndefinedSymbol.java").toURI());
+        Path file = Paths.get(RequestResponseTest.class.getResource("/org/javacs/example/SingleLineUndefinedSymbol.java").toURI());
 
         RequestLint lint = new RequestLint();
         lint.path = file.toString();
@@ -92,8 +92,8 @@ public class RequestResponseTest extends Fixtures {
         List<Response> responses = responses(request.toString());
 
         ResponseLint responseLint = new ResponseLint();
-        String message = "cannot find symbol\n  symbol:   variable foo\n  location: class SingleLineUndefinedSymbol";
-        Range range = new Range(new Position(0, 71), new Position(0, 74));
+        String message = "cannot find symbol\n  symbol:   variable foo\n  location: class org.javacs.example.SingleLineUndefinedSymbol";
+        Range range = new Range(new Position(2, 71), new Position(2, 74));
         responseLint.messages.put(file.toString(),
                                   Collections.singletonList(new LintMessage(range, message, LintMessage.Type.Error)));
 
@@ -105,7 +105,7 @@ public class RequestResponseTest extends Fixtures {
 
     @Test
     public void lintNotJava() throws URISyntaxException, IOException {
-        Path file = Paths.get(RequestResponseTest.class.getResource("/NotJava.java.txt").toURI());
+        Path file = Paths.get(RequestResponseTest.class.getResource("/org/javacs/example/NotJava.java.txt").toURI());
 
         RequestLint lint = new RequestLint();
         lint.path = file.toString();
