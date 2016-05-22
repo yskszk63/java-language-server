@@ -1,30 +1,32 @@
 {
-	"name": "vscode-javac",
-	"displayName": "Java Language Support",
-	"description": "Java support using javac",
-	"version": "0.0.1",
-	"publisher": "georgewfraser",
-	"repository": { 
-		"type" : "git", 
-		"url" : "https://github.com/georgewfraser/vscode-javac.git"
-  	},
-	"license": "MIT",
-	"engines": {
-		"vscode": "^0.10.10"
-	},
-	"categories": [
-		"Languages",
-		"Linters"
-	],
-	"keywords": [
-		"java"
-	],
-	"activationEvents": [
+    "name": "vscode-javac",
+    "displayName": "Java Language Support",
+    "description": "Java support using javac",
+    "version": "0.0.2",
+    "publisher": "georgewfraser",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/georgewfraser/vscode-javac.git"
+    },
+    "license": "MIT",
+    "engines": {
+        "vscode": "^0.10.10"
+    },
+    "categories": [
+        "Languages",
+        "Linters"
+    ],
+    "keywords": [
+        "java"
+    ],
+    "activationEvents": [
         "onLanguage:java"
-	],
-	"main": "./out/lib/Main",
-	"files": ["target/fat-jar.jar"],
-	"contributes": {
+    ],
+    "main": "./out/lib/Main",
+    "files": [
+        "target/fat-jar.jar"
+    ],
+    "contributes": {
         "languages": [
             {
                 "id": "java",
@@ -36,24 +38,26 @@
                 ]
             }
         ],
-        "jsonValidation": [{ 
-            "fileMatch": "javaconfig.json",
-            "url": "./lib/javaconfig.schema.json"
-        }]
-	},
-	"scripts": {
-		"vscode:prepublish": "node ./node_modules/vscode/bin/compile",
-		"compile": "node ./node_modules/vscode/bin/compile -watch -p ./",
-		"postinstall": "node ./node_modules/vscode/bin/install",
+        "jsonValidation": [
+            {
+                "fileMatch": "javaconfig.json",
+                "url": "./lib/javaconfig.schema.json"
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "node ./node_modules/vscode/bin/compile",
+        "compile": "node ./node_modules/vscode/bin/compile -watch -p ./",
+        "postinstall": "node ./node_modules/vscode/bin/install",
         "test": "mocha out/test"
-	},
-	"dependencies": {
+    },
+    "dependencies": {
         "portfinder": "^0.4.0",
         "split": "^1.0.0"
-	},
-	"devDependencies": {
-		"typescript": "^1.8.5",
-		"vscode": "^0.11.0",
+    },
+    "devDependencies": {
+        "typescript": "^1.8.5",
+        "vscode": "^0.11.0",
         "mocha": "^2.4.5"
-	}
+    }
 }
