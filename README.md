@@ -4,9 +4,17 @@ Provides Java support using the javac API.
 
 ## Features
 
-* Lint
-* Autocomplete
-* Go-to-definition
+### Lint
+
+<img src="http://g.recordit.co/DGTYfpFdSD.gif">
+
+### Autocomplete
+
+<img src="http://g.recordit.co/bCbYuegVRV.gif">
+
+### Go-to-definition
+
+<img src="http://g.recordit.co/Fg7cpH1rnz.gif">
 
 ## javaconfig.json
 
@@ -14,7 +22,10 @@ The presence of a `javaconfig.json` file indicates that this directory is the ro
 
 ### Examples
 
-### Compile using maven
+### Maven
+
+You can configure maven to output the current classpath to a file, 
+classpath.txt, where Visual Studio Code will find it.
 
 #### javaconfig.json
 
