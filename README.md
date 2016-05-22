@@ -1,6 +1,7 @@
 # VS Code support for Java using the javac API
 
 Provides Java support using the javac API.
+Requires that you have Java 8 installed on your system.
 
 ## Features
 
@@ -145,4 +146,9 @@ A separate java service process will be started for each javaconfig.json.
 
 ## Contributing
 
-You should be able to install locally on a mac using ./scripts/install.sh
+If you have npm and maven installed,
+you should be able to install locally using 
+
+    npm install -g vsce
+    npm install
+    ./scripts/install.sh
