@@ -48,14 +48,12 @@
         "test": "mocha out/test"
 	},
 	"dependencies": {
+        "portfinder": "^0.4.0",
+        "split": "^1.0.0"
+	},
+	"devDependencies": {
 		"typescript": "^1.8.5",
 		"vscode": "^0.11.0",
-        "async": "^1.5.2",
-        "mkdirp": "^0.5.1",
-        "portfinder": "^0.4.0",
-        "request": "^2.69.0",
-        "split": "^1.0.0",
-        "xml2js": "^0.4.16",
         "mocha": "^2.4.5"
 	}
 }
