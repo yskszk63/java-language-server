@@ -87,16 +87,22 @@ public class AutocompleteVisitor extends CursorScanner {
 
         JavacTrees trees = JavacTrees.instance(context);
         TreePath path = trees.getPath(compilationUnit, node);
-        JavacScope scope = trees.getScope(path);
 
-        while (scope != null) {
-            LOG.info(Joiner.on(", ").join(scope.getLocalElements()));
+        if (path != null) {
+            JavacScope scope = trees.getScope(path);
 
-            for (Element e : scope.getLocalElements())
-                addElement(e);
-            // TODO add to suggestions
+            while (scope != null) {
+                LOG.info(Joiner.on(", ").join(scope.getLocalElements()));
 
-            scope = scope.getEnclosingScope();
+                for (Element e : scope.getLocalElements())
+                    addElement(e);
+                // TODO add to suggestions
+
+                scope = scope.getEnclosingScope();
+            }
+        }
+        else {
+            LOG.info("Node " + node + " not found in compilation unit " + compilationUnit);
         }
     }
 
