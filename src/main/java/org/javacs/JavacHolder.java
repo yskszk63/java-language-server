@@ -150,26 +150,6 @@ public class JavacHolder {
 
         JCTree.JCCompilationUnit result = compiler.parse(source);
 
-        // Search for class definitions in this file
-        // Remove them from downstream caches so that we can re-compile this class
-        result.accept(new TreeScanner() {
-            @Override
-            public void visitClassDef(JCTree.JCClassDecl that) {
-                super.visitClassDef(that);
-
-                Name name = that.name;
-                JCTree.JCExpression p = result.pid;
-
-                if (p != null) {
-                    Name pName = name.table.fromString(p.toString());
-
-                    name = pName.append('.', name);
-                }
-
-                clear(name);
-            }
-        });
-
         return result;
     }
 
@@ -189,16 +169,15 @@ public class JavacHolder {
      */
     private void clear(JavaFileObject source) {
         log.clear(source);
-    }
 
-    /**
-     * Remove class definitions from caches in the compile stage
-     */
-    private void clear(Name name) {
-        check.compiled.remove(name);
-    }
+        // Remove all cached classes that came from this files
+        List<Name> remove = new ArrayList<>();
 
-    private CompilationUnitTree compilationUnit(Symbol symbol) {
-        return trees.getPath(symbol).getCompilationUnit();
+        check.compiled.forEach((name, symbol) -> {
+            if (symbol.sourcefile.getName().equals(source.getName()))
+                remove.add(name);
+        });
+
+        remove.forEach(check.compiled::remove);
     }
 }
