@@ -1,7 +1,7 @@
 {
     "name": "vscode-javac",
     "displayName": "Java Language Support",
-    "description": "Java support using javac",
+    "description": "Java support using the javac API",
     "version": "0.0.3",
     "publisher": "georgewfraser",
     "repository": {
