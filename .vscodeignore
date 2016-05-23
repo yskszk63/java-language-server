@@ -16,6 +16,7 @@ typings/**
 src/**
 test/**
 lib/**
+!lib/javaconfig.schema.json
 repo/**
 scripts/**
 
