@@ -170,13 +170,23 @@ public class AutocompleteVisitor extends CursorScanner {
 
     private void addMethod(Symbol.MethodSymbol e) {
         String name = e.getSimpleName().toString();
-        String params = e.getParameters().stream().map(p -> shortTypeName(p.type) + " " + p.name).collect(Collectors.joining(", "));
+        String params = e.getParameters().stream().map(p -> shortName(p)).collect(Collectors.joining(", "));
         AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name + "(" + params + ")", name, AutocompleteSuggestion.Type.Method);
 
         suggestion.detail = Optional.of(e.getEnclosingElement().getSimpleName().toString());
         suggestion.documentation = docstring(e);
 
         suggestions.add(suggestion);
+    }
+
+    private String shortName(Symbol.VarSymbol p) {
+        String type = shortTypeName(p.type);
+        String name = p.name.toString();
+
+        if (name.matches("arg\\d+"))
+            return type;
+        else
+            return type + " " + name;
     }
 
     private static String shortTypeName(Type type) {
