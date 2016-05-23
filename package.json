@@ -38,6 +38,10 @@
                 ]
             }
         ],
+        "snippets": [{
+            "language": "java",
+            "path": "./snippets/java.json"
+        }],
         "jsonValidation": [
             {
                 "fileMatch": "javaconfig.json",

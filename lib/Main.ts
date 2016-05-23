@@ -64,6 +64,54 @@ export function activate(ctx: VSCode.ExtensionContext) {
         if (Path.basename(document.fileName) == 'javaconfig.json')
             Finder.invalidateCaches();
     }));
+    
+    // Set indentation rules
+    VSCode.languages.setLanguageConfiguration('java', {
+        indentationRules: {
+            // ^(.*\*/)?\s*\}.*$
+            decreaseIndentPattern: /^(.*\*\/)?\s*\}.*$/,
+            // ^.*\{[^}"']*$
+            increaseIndentPattern: /^.*\{[^}"']*$/
+        },
+        wordPattern: /(-?\d*\.\d\w*)|([^\`\~\!\@\#\%\^\&\*\(\)\-\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\?\s]+)/g,
+        comments: {
+            lineComment: '//',
+            blockComment: ['/*', '*/']
+        },
+        brackets: [
+            ['{', '}'],
+            ['[', ']'],
+            ['(', ')'],
+        ],
+        onEnterRules: [
+            {
+                // e.g. /** | */
+                beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
+                afterText: /^\s*\*\/$/,
+                action: { indentAction: VSCode.IndentAction.IndentOutdent, appendText: ' * ' }
+            },
+            {
+                // e.g. /** ...|
+                beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
+                action: { indentAction: VSCode.IndentAction.None, appendText: ' * ' }
+            },
+            {
+                // e.g.  * ...|
+                beforeText: /^(\t|(\ \ ))*\ \*(\ ([^\*]|\*(?!\/))*)?$/,
+                action: { indentAction: VSCode.IndentAction.None, appendText: '* ' }
+            },
+            {
+                // e.g.  */|
+                beforeText: /^(\t|(\ \ ))*\ \*\/\s*$/,
+                action: { indentAction: VSCode.IndentAction.None, removeText: 1 }
+            }
+        ],
+        
+        // TODO equivalent of this from typescript when replacement for __electricCharacterSupport API is released
+        // __electricCharacterSupport: {
+        //     docComment: { scope: 'comment.documentation', open: '/**', lineStart: ' * ', close: ' */' }
+        // }
+    });
 }
 
 function onErrorWithoutRequestId(message: string) {
