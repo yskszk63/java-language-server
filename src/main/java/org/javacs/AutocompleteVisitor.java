@@ -1,6 +1,7 @@
 package org.javacs;
 
 import com.sun.source.util.TreePath;
+import com.sun.tools.javac.code.Type;
 import org.javacs.message.AutocompleteSuggestion;
 import com.google.common.base.Joiner;
 import com.sun.source.tree.*;
@@ -20,9 +21,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class AutocompleteVisitor extends CursorScanner {
     private static final Logger LOG = Logger.getLogger("main");
+    public static final Pattern REMOVE_PACKAGE_NAME = Pattern.compile("(?:\\w+\\.)+(.*)");
     public final Set<AutocompleteSuggestion> suggestions = new LinkedHashSet<>();
 
     public AutocompleteVisitor(JavaFileObject file, long cursor, Context context) {
@@ -165,12 +170,23 @@ public class AutocompleteVisitor extends CursorScanner {
 
     private void addMethod(Symbol.MethodSymbol e) {
         String name = e.getSimpleName().toString();
-        AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name, name, AutocompleteSuggestion.Type.Method);
+        String params = e.getParameters().stream().map(p -> shortTypeName(p.type) + " " + p.name).collect(Collectors.joining(", "));
+        AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name + "(" + params + ")", name, AutocompleteSuggestion.Type.Method);
 
         suggestion.detail = Optional.of(e.getEnclosingElement().getSimpleName().toString());
         suggestion.documentation = docstring(e);
 
         suggestions.add(suggestion);
+    }
+
+    private static String shortTypeName(Type type) {
+        String longName = type.toString();
+        Matcher matcher = REMOVE_PACKAGE_NAME.matcher(longName);
+
+        if (matcher.matches())
+            return matcher.group(1);
+        else
+            return longName;
     }
 
     private Optional<String> docstring(Symbol symbol) {
