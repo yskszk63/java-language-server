@@ -3,7 +3,6 @@ import * as VSCode from 'vscode';
 
 import {findJavaConfig} from './Finder';
 import {JavacServicesHolder, JavacServices, LintMessage} from './JavacServices';
-import {JavaConfig} from './JavaConfig';
 
 /**
  * Provides lint on open, save

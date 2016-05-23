@@ -5,7 +5,6 @@ import * as VSCode from 'vscode';
 import * as Path from 'path';
 import * as Finder from './Finder';
 import {JavacServicesHolder} from './JavacServices';
-import {JavaConfig} from './JavaConfig';
 import {Autocomplete} from './Autocomplete';
 import {Lint} from './Lint';
 import {GotoDefinition} from './GotoDefinition';

@@ -2,11 +2,9 @@ import * as ChildProcess from 'child_process';
 import * as Path from 'path';
 import * as PortFinder from 'portfinder';
 import * as Net from 'net';
-import {MavenDependency} from './JavaConfig';
 // Don't import members, just types, otherwise the tests will break
 import {DiagnosticSeverity,CompletionItemKind} from 'vscode';
 import {findJavaExecutable, findJavaConfig} from './Finder';
-import {JavaConfig} from './JavaConfig';
 import split = require('split');
 
 PortFinder.basePort = 55220;

@@ -5,8 +5,6 @@ import * as FS from 'fs';
 import * as Path from 'path';
 import * as OS from 'os';
 
-import {JavaConfig} from './JavaConfig';
-
 let binPathCache: { [bin: string]: string; } = {};
 let runtimePathCache: string = null;
 
@@ -57,6 +55,12 @@ const DEFAULT_JAVA_CONFIG: JavaConfig = {
     sourcePath: ["src"],
     outputDirectory: "target",
     classPath: [] 
+}
+
+export interface JavaConfig {
+    sourcePath?: string[];
+    classPath?: string[];
+    outputDirectory?: string;
 }
 
 /**
