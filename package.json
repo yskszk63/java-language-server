@@ -2,7 +2,7 @@
     "name": "vscode-javac",
     "displayName": "Java Language Support",
     "description": "Java support using the javac API",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "publisher": "georgewfraser",
     "repository": {
         "type": "git",
@@ -38,10 +38,12 @@
                 ]
             }
         ],
-        "snippets": [{
-            "language": "java",
-            "path": "./snippets/java.json"
-        }],
+        "snippets": [
+            {
+                "language": "java",
+                "path": "./snippets/java.json"
+            }
+        ],
         "jsonValidation": [
             {
                 "fileMatch": "javaconfig.json",
