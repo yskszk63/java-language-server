@@ -7,15 +7,6 @@
   "installed": {
     "node/node.d.ts": {
       "commit": "d22516f9f089de107d7e7d5938566377370631f6"
-    },
-    "split/split.d.ts": {
-      "commit": "d22516f9f089de107d7e7d5938566377370631f6"
-    },
-    "es6-promise/es6-promise.d.ts": {
-      "commit": "d22516f9f089de107d7e7d5938566377370631f6"
-    },
-    "mocha/mocha.d.ts": {
-      "commit": "d22516f9f089de107d7e7d5938566377370631f6"
     }
   }
 }

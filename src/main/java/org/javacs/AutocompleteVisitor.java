@@ -2,7 +2,6 @@ package org.javacs;
 
 import com.sun.source.util.TreePath;
 import com.sun.tools.javac.code.Type;
-import org.javacs.message.AutocompleteSuggestion;
 import com.google.common.base.Joiner;
 import com.sun.source.tree.*;
 import com.sun.tools.javac.api.JavacScope;
@@ -11,6 +10,8 @@ import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import io.typefox.lsapi.CompletionItem;
+import io.typefox.lsapi.CompletionItemImpl;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
@@ -28,7 +29,7 @@ import java.util.stream.Collectors;
 public class AutocompleteVisitor extends CursorScanner {
     private static final Logger LOG = Logger.getLogger("main");
     public static final Pattern REMOVE_PACKAGE_NAME = Pattern.compile("(?:\\w+\\.)+(.*)");
-    public final Set<AutocompleteSuggestion> suggestions = new LinkedHashSet<>();
+    public final Set<CompletionItem> suggestions = new LinkedHashSet<>();
 
     public AutocompleteVisitor(JavaFileObject file, long cursor, Context context) {
         super(file, cursor, context);
@@ -50,7 +51,13 @@ public class AutocompleteVisitor extends CursorScanner {
             if (type == null)
                 LOG.warning("No type for " + expression);
             else if (isClassReference(expression)) {
-                suggestions.add(new AutocompleteSuggestion("class", "class", AutocompleteSuggestion.Type.Property));
+                CompletionItemImpl item = new CompletionItemImpl();
+
+                item.setKind(CompletionItem.KIND_PROPERTY);
+                item.setLabel("class");
+                item.setInsertText("class");
+
+                suggestions.add(item);
 
                 type.accept(new CollectStatics(), null);
             }
@@ -77,7 +84,13 @@ public class AutocompleteVisitor extends CursorScanner {
             if (type == null)
                 LOG.warning("No type for " + expression);
             else if (isClassReference(expression)) {
-                suggestions.add(new AutocompleteSuggestion("new", "new", AutocompleteSuggestion.Type.Method));
+                CompletionItemImpl item = new CompletionItemImpl();
+
+                item.setKind(CompletionItem.KIND_METHOD);
+                item.setLabel("new");
+                item.setInsertText("new");
+
+                suggestions.add(item);
 
                 type.accept(new CollectStatics(), null);
             }
@@ -121,10 +134,17 @@ public class AutocompleteVisitor extends CursorScanner {
             case CLASS:
             case ANNOTATION_TYPE:
             case INTERFACE:
-            case TYPE_PARAMETER:
-                suggestions.add(new AutocompleteSuggestion(name, name, AutocompleteSuggestion.Type.Interface));
+            case TYPE_PARAMETER: {
+                CompletionItemImpl item = new CompletionItemImpl();
+
+                item.setKind(CompletionItem.KIND_INTERFACE);
+                item.setLabel(name);
+                item.setInsertText(name);
+
+                suggestions.add(item);
 
                 break;
+            }
             case ENUM_CONSTANT:
                 addEnumConstant(e);
 
@@ -135,10 +155,17 @@ public class AutocompleteVisitor extends CursorScanner {
                 break;
             case PARAMETER:
             case LOCAL_VARIABLE:
-            case EXCEPTION_PARAMETER:
-                suggestions.add(new AutocompleteSuggestion(name, name, AutocompleteSuggestion.Type.Variable));
+            case EXCEPTION_PARAMETER: {
+                CompletionItemImpl item = new CompletionItemImpl();
+
+                item.setKind(CompletionItem.KIND_VARIABLE);
+                item.setLabel(name);
+                item.setInsertText(name);
+
+                suggestions.add(item);
 
                 break;
+            }
             case METHOD:
                 addMethod((Symbol.MethodSymbol) e);
 
@@ -161,22 +188,30 @@ public class AutocompleteVisitor extends CursorScanner {
 
     private void addEnumConstant(Element e) {
         String name = e.getSimpleName().toString();
-        AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name, name, AutocompleteSuggestion.Type.Enum);
+        CompletionItemImpl item = new CompletionItemImpl();
 
-        suggestion.detail = Optional.of(e.getEnclosingElement().getSimpleName().toString());
+        item.setKind(CompletionItem.KIND_ENUM);
+        item.setLabel(name);
+        item.setInsertText(name);
+        item.setDetail(e.getEnclosingElement().getSimpleName().toString());
 
-        suggestions.add(suggestion);
+        suggestions.add(item);
     }
 
     private void addMethod(Symbol.MethodSymbol e) {
         String name = e.getSimpleName().toString();
         String params = e.getParameters().stream().map(p -> shortName(p)).collect(Collectors.joining(", "));
-        AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name + "(" + params + ")", name, AutocompleteSuggestion.Type.Method);
+        String label = name + "(" + params + ")";
 
-        suggestion.detail = Optional.of(e.getEnclosingElement().getSimpleName().toString());
-        suggestion.documentation = docstring(e);
+        CompletionItemImpl item = new CompletionItemImpl();
 
-        suggestions.add(suggestion);
+        item.setKind(CompletionItem.KIND_METHOD);
+        item.setLabel(label);
+        item.setInsertText(name);
+        item.setDetail(e.getEnclosingElement().getSimpleName().toString());
+        item.setDocumentation(docstring(e));
+
+        suggestions.add(item);
     }
 
     private String shortName(Symbol.VarSymbol p) {
@@ -199,21 +234,28 @@ public class AutocompleteVisitor extends CursorScanner {
             return longName;
     }
 
-    private Optional<String> docstring(Symbol symbol) {
+    private String docstring(Symbol symbol) {
         JavacTrees trees = JavacTrees.instance(context);
-        Optional<TreePath> path = Optional.ofNullable(trees.getPath(symbol));
+        TreePath path = trees.getPath(symbol);
 
-        return path.map(trees::getDocComment);
+        if (path != null)
+            return trees.getDocComment(path);
+        else
+            return null;
     }
 
     private void addField(Symbol.VarSymbol e) {
         String name = e.getSimpleName().toString();
-        AutocompleteSuggestion suggestion = new AutocompleteSuggestion(name, name, AutocompleteSuggestion.Type.Property);
 
-        suggestion.detail = Optional.of(e.getEnclosingElement().getSimpleName().toString());
-        suggestion.documentation = docstring(e);
+        CompletionItemImpl item = new CompletionItemImpl();
 
-        suggestions.add(suggestion);
+        item.setKind(CompletionItem.KIND_METHOD);
+        item.setLabel(name);
+        item.setInsertText(name);
+        item.setDetail(e.getEnclosingElement().getSimpleName().toString());
+        item.setDocumentation(docstring(e));
+
+        suggestions.add(item);
     }
 
     private class CollectStatics extends BridgeTypeVisitor {
@@ -248,11 +290,13 @@ public class AutocompleteVisitor extends CursorScanner {
         @Override
         public void visitArray(ArrayType t) {
             // Array types just have 'length'
-            AutocompleteSuggestion length = new AutocompleteSuggestion("length",
-                                                                       "length",
-                                                                       AutocompleteSuggestion.Type.Property);
+            CompletionItemImpl item = new CompletionItemImpl();
 
-            suggestions.add(length);
+            item.setLabel("length");
+            item.setInsertText("length");
+            item.setKind(CompletionItem.KIND_PROPERTY);
+
+            suggestions.add(item);
         }
 
         @Override

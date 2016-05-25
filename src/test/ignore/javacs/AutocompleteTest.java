@@ -1,7 +1,5 @@
 package org.javacs;
 
-import org.javacs.message.Position;
-import org.javacs.message.RequestAutocomplete;
 import org.junit.Ignore;
 import org.junit.Test;
 

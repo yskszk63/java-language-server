@@ -3,118 +3,101 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as VSCode from 'vscode';
 import * as Path from 'path';
-import * as Finder from './Finder';
-import {JavacServicesHolder} from './JavacServices';
-import {Autocomplete} from './Autocomplete';
-import {Lint} from './Lint';
-import {GotoDefinition} from './GotoDefinition';
-
-const JAVA_MODE: VSCode.DocumentFilter = { language: 'java', scheme: 'file' };
+import * as FS from 'fs';
+import * as PortFinder from 'portfinder';
+import * as Net from 'net';
+import * as ChildProcess from 'child_process';
+import {LanguageClient, LanguageClientOptions, SettingMonitor, ServerOptions, StreamInfo} from 'vscode-languageclient';
 
 /** Called when extension is activated */
-export function activate(ctx: VSCode.ExtensionContext) {
-    // Creates one javac for each javaconfig.json 
-    let provideJavac = new JavacServicesHolder(VSCode.workspace.rootPath, ctx.extensionPath, onErrorWithoutRequestId);
-    
-    // Autocomplete feature
-    let autocomplete = new Autocomplete(provideJavac);
-    
-    ctx.subscriptions.push(VSCode.languages.registerCompletionItemProvider(JAVA_MODE, autocomplete));
-    
-    // Go-to-symbol
-    let goto = new GotoDefinition(provideJavac);
-    
-    VSCode.languages.registerDefinitionProvider('java', goto);
-    
-    /**
-     * When a .java file is opened, ensure that compiler is started with appropriate config
-     */
-    function ensureJavac(document: VSCode.TextDocument) {
-        if (document.languageId === 'java') {
-            let config = Finder.findJavaConfig(VSCode.workspace.rootPath, document.fileName);
-            
-            provideJavac.getJavac(config.sourcePath, config.classPath, config.outputDirectory);
+export function activate(context: VSCode.ExtensionContext) {
+    // Options to control the language client
+    let clientOptions: LanguageClientOptions = {
+        // Register the server for java documents
+        documentSelector: ['java'],
+        synchronize: {
+            // Synchronize the setting section 'java' to the server
+            // NOTE: this currently doesn't do anything
+            configurationSection: 'java',
+            // Notify the server about file changes to '.clientrc files contain in the workspace
+            fileEvents: VSCode.workspace.createFileSystemWatcher('**/javaconfig.json')
         }
     }
     
-    // For each open document, ensure that a javac has been initialized with appropriate class and source paths
-    VSCode.workspace.textDocuments.forEach(ensureJavac);
-    
-    // Every time a new document is open, ensure that a javac has been initialized
-    ctx.subscriptions.push(VSCode.workspace.onDidOpenTextDocument(ensureJavac)); 
-    
-    // When a .java file is opened or save, compile it with javac and mark any errors
-    let diagnosticCollection: VSCode.DiagnosticCollection = VSCode.languages.createDiagnosticCollection('java');
-    let lint = new Lint(provideJavac, diagnosticCollection);
-    
-    // Lint the currently visible text editors
-    VSCode.window.visibleTextEditors.forEach(editor => lint.doLint(editor.document))
-    
-    // Lint on save
-    ctx.subscriptions.push(VSCode.workspace.onDidSaveTextDocument(document => lint.doLint(document)));
-    
-    // Lint on open
-    ctx.subscriptions.push(VSCode.window.onDidChangeActiveTextEditor(editor => lint.doLint(editor.document)));
-    
-	ctx.subscriptions.push(diagnosticCollection);
-    
-    // When a javaconfig.json file is saved, invalidate cache
-    ctx.subscriptions.push(VSCode.workspace.onDidSaveTextDocument(document => {
-        if (Path.basename(document.fileName) == 'javaconfig.json')
-            Finder.invalidateCaches();
-    }));
-    
-    // Set indentation rules
-    VSCode.languages.setLanguageConfiguration('java', {
-        indentationRules: {
-            // ^(.*\*/)?\s*\}.*$
-            decreaseIndentPattern: /^(.*\*\/)?\s*\}.*$/,
-            // ^.*\{[^}"']*$
-            increaseIndentPattern: /^.*\{[^}"']*$/
-        },
-        wordPattern: /(-?\d*\.\d\w*)|([^\`\~\!\@\#\%\^\&\*\(\)\-\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\?\s]+)/g,
-        comments: {
-            lineComment: '//',
-            blockComment: ['/*', '*/']
-        },
-        brackets: [
-            ['{', '}'],
-            ['[', ']'],
-            ['(', ')'],
-        ],
-        onEnterRules: [
-            {
-                // e.g. /** | */
-                beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
-                afterText: /^\s*\*\/$/,
-                action: { indentAction: VSCode.IndentAction.IndentOutdent, appendText: ' * ' }
-            },
-            {
-                // e.g. /** ...|
-                beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
-                action: { indentAction: VSCode.IndentAction.None, appendText: ' * ' }
-            },
-            {
-                // e.g.  * ...|
-                beforeText: /^(\t|(\ \ ))*\ \*(\ ([^\*]|\*(?!\/))*)?$/,
-                action: { indentAction: VSCode.IndentAction.None, appendText: '* ' }
-            },
-            {
-                // e.g.  */|
-                beforeText: /^(\t|(\ \ ))*\ \*\/\s*$/,
-                action: { indentAction: VSCode.IndentAction.None, removeText: 1 }
-            }
-        ],
-        
-        // TODO equivalent of this from typescript when replacement for __electricCharacterSupport API is released
-        // __electricCharacterSupport: {
-        //     docComment: { scope: 'comment.documentation', open: '/**', lineStart: ' * ', close: ' */' }
-        // }
-    });
+    function createServer(): Promise<StreamInfo> {
+        return new Promise((resolve, reject) => {
+            PortFinder.getPort((err, port) => {
+                let javaExecutablePath = findJavaExecutable('java');
+                let fatJar = Path.resolve(context.extensionPath, "out", "fat-jar.jar");
+                
+                let args = [
+                    '-cp', fatJar, 
+                    '-Djavacs.port=' + port,
+                    'org.javacs.Main'
+                ];
+                   
+                console.log(javaExecutablePath + ' ' + args.join(' '));
+                
+                Net.createServer(socket => {
+                    console.log('Child process connected on port ' + port);
+
+                    resolve({
+                        reader: socket,
+                        writer: socket
+                    });
+                }).listen(port, () => {
+                    var options = { stdio: 'inherit', cwd: VSCode.workspace.rootPath };
+                    
+                    // Start the child java process
+                    // ChildProcess.spawn(javaExecutablePath, args, options);
+                });
+            });
+        });
+    }
+
+    // Create the language client and start the client.
+    let client = new LanguageClient('Language Server Example', createServer, clientOptions);
+    let disposable = client.start();
+
+    // Push the disposable to the context's subscriptions so that the 
+    // client can be deactivated on extension deactivation
+    context.subscriptions.push(disposable);
 }
 
-function onErrorWithoutRequestId(message: string) {
-    VSCode.window.showErrorMessage(message);
+export function findJavaExecutable(binname: string) {
+	binname = correctBinname(binname);
+
+	// First search each JAVA_HOME bin folder
+	if (process.env['JAVA_HOME']) {
+		let workspaces = process.env['JAVA_HOME'].split(Path.delimiter);
+		for (let i = 0; i < workspaces.length; i++) {
+			let binpath = Path.join(workspaces[i], 'bin', binname);
+			if (FS.existsSync(binpath)) {
+				return binpath;
+			}
+		}
+	}
+
+	// Then search PATH parts
+	if (process.env['PATH']) {
+		let pathparts = process.env['PATH'].split(Path.delimiter);
+		for (let i = 0; i < pathparts.length; i++) {
+			let binpath = Path.join(pathparts[i], binname);
+			if (FS.existsSync(binpath)) {
+				return binpath;
+			}
+		}
+	}
+    
+	// Else return the binary name directly (this will likely always fail downstream) 
+	return binname;
+}
+
+function correctBinname(binname: string) {
+	if (process.platform === 'win32')
+		return binname + '.exe';
+	else
+		return binname;
 }
 
 // this method is called when your extension is deactivated

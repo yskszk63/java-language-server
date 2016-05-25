@@ -1,6 +1,7 @@
 package org.javacs;
 
-import org.javacs.message.Position;
+import io.typefox.lsapi.Position;
+import io.typefox.lsapi.PositionImpl;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -47,11 +48,16 @@ public class LineMap {
 
     public Position point(long offset) {
         for (int row = 0; row < startOfLineOffset.size() - 1; row++) {
-            Long startOffset = startOfLineOffset.get(row);
-            Long endOffset = startOfLineOffset.get(row + 1);
+            long startOffset = startOfLineOffset.get(row);
+            long endOffset = startOfLineOffset.get(row + 1);
+            int column = (int) (offset - startOffset);
 
-            if (endOffset >= offset)
-                return new Position(row, (int) (offset - startOffset));
+            if (endOffset >= offset) {
+                PositionImpl p = new PositionImpl();
+
+                p.setLine(row);
+                p.setCharacter(column);
+            }
         }
 
         throw new IllegalArgumentException("Offset " + offset + " is after the end of the file " + startOfLineOffset.get(startOfLineOffset.size() - 1));

@@ -1,5 +1,7 @@
 package org.javacs;
 
+import io.typefox.lsapi.Position;
+import io.typefox.lsapi.PositionImpl;
 import org.javacs.message.Position;
 import org.junit.Test;
 
@@ -17,10 +19,19 @@ public class LineMapTest extends Fixtures {
         Path path = Paths.get(ParserTest.class.getResource("/org/javacs/example/HelloWorld.java").toURI().getPath());
         Position found = LineMap.fromPath(path).point(0);
 
-        assertThat(found, equalTo(new Position(0, 0)));
+        assertThat(found, equalTo(position(0, 0)));
 
         found = LineMap.fromPath(path).point(5);
 
-        assertThat(found, equalTo(new Position(0, 5)));
+        assertThat(found, equalTo(position(0, 5)));
+    }
+
+    public static Position position(int row, int column) {
+        PositionImpl p = new PositionImpl();
+
+        p.setLine(row);
+        p.setCharacter(column);
+
+        return p;
     }
 }
