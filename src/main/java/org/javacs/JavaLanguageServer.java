@@ -13,7 +13,6 @@ import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import static org.javacs.Main.JSON;
 
@@ -30,13 +29,13 @@ class JavaLanguageServer implements LanguageServer {
 
         InitializeResultImpl result = new InitializeResultImpl();
 
-        result.setCapabilities(new ServerCapabilitiesImpl());
-
-        ServerCapabilitiesImpl capabilities = result.getCapabilities();
+        ServerCapabilitiesImpl c = new ServerCapabilitiesImpl();
 
         // TODO incremental mode
-        capabilities.setTextDocumentSync(ServerCapabilities.SYNC_FULL);
-        capabilities.setDefinitionProvider(true);
+        c.setTextDocumentSync(ServerCapabilities.SYNC_FULL);
+        c.setDefinitionProvider(true);
+
+        result.setCapabilities(c);
 
         return result;
     }
@@ -76,7 +75,7 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public List<? extends Location> definition(TextDocumentPositionParams position) {
-                return null;
+                return gotoDefinition(position);
             }
 
             @Override
@@ -247,14 +246,7 @@ class JavaLanguageServer implements LanguageServer {
 
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
 
-        JavacHolder compiler = findCompiler(path).orElseThrow(() -> {
-            MessageParamsImpl message = new MessageParamsImpl();
-
-            message.setMessage("Can't find configuration file for " + path);
-            message.setType(MessageParams.TYPE_WARNING);
-
-            return new ShowMessageException(message, null);
-        });
+        JavacHolder compiler = findCompiler(path);
         JavaFileObject file = findFile(compiler, path);
 
         compiler.onError(errors);
@@ -284,11 +276,19 @@ class JavaLanguageServer implements LanguageServer {
     /**
      * Look for a configuration in a parent directory of uri
      */
-    private Optional<JavacHolder> findCompiler(Path path) {
+    private JavacHolder findCompiler(Path path) {
         Path dir = path.getParent();
         Optional<JavacConfig> config = findConfig(dir);
+        Optional<JavacHolder> maybeHolder = config.map(c -> compilerCache.computeIfAbsent(c, this::newJavac));
 
-        return config.map(c -> compilerCache.computeIfAbsent(c, this::newJavac));
+        return maybeHolder.orElseThrow(() -> {
+            MessageParamsImpl message = new MessageParamsImpl();
+
+            message.setMessage("Can't find configuration file for " + path);
+            message.setType(MessageParams.TYPE_WARNING);
+
+            return new ShowMessageException(message, null);
+        });
     }
 
     private JavacHolder newJavac(JavacConfig c) {
@@ -417,8 +417,7 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private PositionImpl endPosition(javax.tools.Diagnostic<? extends JavaFileObject> error) {
-        try {
-            Reader reader = error.getSource().openReader(true);
+        try (Reader reader = error.getSource().openReader(true)) {
             long startOffset = error.getStartPosition();
             long endOffset = error.getEndPosition();
 
@@ -446,6 +445,137 @@ class JavaLanguageServer implements LanguageServer {
             return end;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    public List<LocationImpl> gotoDefinition(TextDocumentPositionParams position) {
+        Path path = getFilePath(URI.create(position.getTextDocument().getUri()));
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
+        JavacHolder compiler = findCompiler(path);
+        JavaFileObject file = findFile(compiler, path);
+        long cursor = findOffset(file, position.getPosition().getLine(), position.getPosition().getCharacter());
+        GotoDefinitionVisitor visitor = new GotoDefinitionVisitor(file, cursor, compiler.context);
+
+        compiler.afterAnalyze(visitor);
+        compiler.onError(errors);
+        compiler.compile(compiler.parse(file));
+
+        List<LocationImpl> result = new ArrayList<>();
+
+        for (SymbolLocation locate : visitor.definitions) {
+            URI uri = locate.file.toUri();
+            Path symbolPath = Paths.get(uri);
+            JavaFileObject symbolFile = findFile(compiler, symbolPath);
+            RangeImpl range = findPosition(symbolFile, locate.startPosition, locate.endPosition);
+            LocationImpl location = new LocationImpl();
+
+            location.setRange(range);
+            location.setUri(uri.toString());
+
+            result.add(location);
+        }
+
+        return result;
+    }
+
+    private static RangeImpl findPosition(JavaFileObject file, long startOffset, long endOffset) {
+        try (Reader in = file.openReader(true)) {
+            long offset = 0;
+            int line = 0;
+            int character = 0;
+
+            // Find the start position
+            while (offset < startOffset) {
+                int next = in.read();
+
+                if (next < 0)
+                    break;
+                else {
+                    offset++;
+                    character++;
+
+                    if (next == '\n') {
+                        line++;
+                        character = 0;
+                    }
+                }
+            }
+
+            PositionImpl start = createPosition(line, character);
+
+            // Find the end position
+            while (offset < endOffset) {
+                int next = in.read();
+
+                if (next < 0)
+                    break;
+                else {
+                    offset++;
+                    character++;
+
+                    if (next == '\n') {
+                        line++;
+                        character = 0;
+                    }
+                }
+            }
+
+            PositionImpl end = createPosition(line, character);
+
+            // Combine into range
+            RangeImpl range = new RangeImpl();
+
+            range.setStart(start);
+            range.setEnd(end);
+
+            return range;
+        } catch (IOException e) {
+            throw ShowMessageException.error(e.getMessage(), e);
+        }
+    }
+
+    private static PositionImpl createPosition(int line, int character) {
+        PositionImpl p = new PositionImpl();
+
+        p.setLine(line);
+        p.setCharacter(character);
+
+        return p;
+    }
+
+    private static long findOffset(JavaFileObject file, int targetLine, int targetCharacter) {
+        try (Reader in = file.openReader(true)) {
+            long offset = 0;
+            int line = 0;
+            int character = 0;
+
+            while (line < targetLine) {
+                int next = in.read();
+
+                if (next < 0)
+                    return offset;
+                else {
+                    offset++;
+
+                    if (next == '\n')
+                        line++;
+                }
+            }
+
+            while (character < targetCharacter) {
+                int next = in.read();
+
+                if (next < 0)
+                    return offset;
+                else {
+                    offset++;
+                    character++;
+                }
+            }
+
+            return offset;
+        } catch (IOException e) {
+            throw ShowMessageException.error(e.getMessage(), e);
         }
     }
 }

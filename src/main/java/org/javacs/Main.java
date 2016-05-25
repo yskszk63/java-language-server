@@ -136,37 +136,6 @@ public class Main {
 //        return new ResponseAutocomplete(autocompleter.suggestions);
 //    }
 //
-//    public ResponseGoto doGoto(RequestGoto request) throws IOException {
-//        Path path = Paths.get(request.path);
-//        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-//        StringFileObject file = new StringFileObject(request.text, path);
-//        LineMap lines = LineMap.fromString(request.text);
-//        long cursor = lines.offset(request.position.line, request.position.character);
-//        GotoDefinitionVisitor visitor = new GotoDefinitionVisitor(file, cursor, compiler.context);
-//
-//        compiler.afterAnalyze(visitor);
-//        compiler.onError(errors);
-//        compiler.compile(compiler.parse(file));
-//
-//        ResponseGoto response = new ResponseGoto();
-//
-//        for (SymbolLocation locate : visitor.definitions) {
-//            URI uri = locate.file.toUri();
-//            Path symbolPath = Paths.get(uri);
-//            // If this is the currently open file, use text
-//            // Otherwise use file on disk
-//            LineMap symbolLineMap = path.equals(symbolPath) ? lines : LineMap.fromPath(symbolPath);
-//            Position start = symbolLineMap.point(locate.startPosition);
-//            Position end = symbolLineMap.point(locate.endPosition);
-//            Range range = new Range(start, end);
-//            Location location = new Location(uri, range);
-//
-//            response.definitions.add(location);
-//        }
-//
-//        return response;
-//    }
-//
 //    public JsonNode echo(JsonNode echo) {
 //        return echo;
 //    }
