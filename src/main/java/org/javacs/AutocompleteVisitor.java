@@ -197,7 +197,7 @@ public class AutocompleteVisitor extends CursorScanner {
 
     private void addMethod(Symbol.MethodSymbol e) {
         String name = e.getSimpleName().toString();
-        String params = e.getParameters().stream().map(p -> shortName(p)).collect(Collectors.joining(", "));
+        String params = e.getParameters().stream().map(this::shortName).collect(Collectors.joining(", "));
         String label = name + "(" + params + ")";
 
         CompletionItemImpl item = new CompletionItemImpl();
