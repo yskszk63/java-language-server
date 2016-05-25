@@ -120,12 +120,12 @@ class JavaLanguageServer implements LanguageServer {
             public void didOpen(DidOpenTextDocumentParams params) {
                 String text = params.getTextDocument().getText();
 
-                LOG.info("Show open message");
+                LOG.info("Show open message for " + params);
 
                 MessageParamsImpl message = new MessageParamsImpl();
 
                 message.setType(MessageParams.TYPE_INFO);
-                message.setMessage("Opened " + params.getUri());
+                message.setMessage("Opened " + params.getTextDocument().getUri());
 
                 showMessage.call(message);
             }
