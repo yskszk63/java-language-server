@@ -39,8 +39,8 @@ import java.util.logging.Logger;
  */
 public class JavacHolder {
     private static final Logger LOG = Logger.getLogger("main");
-    private final List<Path> classPath;
-    private final List<Path> sourcePath;
+    private final Set<Path> classPath;
+    private final Set<Path> sourcePath;
     private final Path outputDirectory;
     // javac places all of its internal state into this Context object,
     // which is basically a Map<String, Object>
@@ -77,7 +77,7 @@ public class JavacHolder {
     private final Map<TaskEvent.Kind, List<TreeScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
     private final ClassIndex index = new ClassIndex(context);
 
-    public JavacHolder(List<Path> classPath, List<Path> sourcePath, Path outputDirectory) {
+    public JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
         this.classPath = classPath;
         this.sourcePath = sourcePath;
         this.outputDirectory = outputDirectory;
@@ -117,7 +117,20 @@ public class JavacHolder {
             }
         });
 
+        ensureOutputDirectory(outputDirectory);
         clearOutputDirectory(outputDirectory);
+    }
+
+    private void ensureOutputDirectory(Path dir) {
+        if (!Files.exists(dir)) {
+            try {
+                Files.createDirectories(dir);
+            } catch (IOException e) {
+                throw ShowMessageException.error("Error created output directory " + dir, null);
+            }
+        }
+        else if (!Files.isDirectory(dir))
+            throw ShowMessageException.error("Output directory " + dir + " is not a directory", null);
     }
 
     private static void clearOutputDirectory(Path file) {
