@@ -2,7 +2,9 @@ package org.javacs;
 
 import io.typefox.lsapi.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 class JavaLanguageServer implements LanguageServer {
@@ -10,6 +12,7 @@ class JavaLanguageServer implements LanguageServer {
     private String workspaceRoot;
     private NotificationCallback<PublishDiagnosticsParams> publishDiagnostics = p -> {};
     private NotificationCallback<MessageParams> showMessage = m -> {};
+    private Map<String, String> sourceByUri = new HashMap<>();
 
     @Override
     public InitializeResult initialize(InitializeParams params) {
@@ -118,22 +121,24 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public void didOpen(DidOpenTextDocumentParams params) {
-                String text = params.getTextDocument().getText();
+                TextDocumentItem document = params.getTextDocument();
+                String uri = document.getUri();
+                String text = document.getText();
 
-                LOG.info("Show open message for " + params);
-
-                MessageParamsImpl message = new MessageParamsImpl();
-
-                message.setType(MessageParams.TYPE_INFO);
-                message.setMessage("Opened " + params.getTextDocument().getUri());
-
-                showMessage.call(message);
+                sourceByUri.put(uri, text);
             }
 
             @Override
             public void didChange(DidChangeTextDocumentParams params) {
-                // TODO
-                String text = params.getContentChanges().get(0).getText();
+                VersionedTextDocumentIdentifier document = params.getTextDocument();
+                String uri = document.getUri();
+
+                for (TextDocumentContentChangeEvent change : params.getContentChanges()) {
+                    // TODO incremental updates
+                    String text = change.getText();
+
+                    sourceByUri.put(uri, text);
+                }
             }
 
             @Override
