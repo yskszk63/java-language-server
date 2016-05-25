@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.typefox.lsapi.*;
 import io.typefox.lsapi.Diagnostic;
 
@@ -34,6 +35,7 @@ class JavaLanguageServer implements LanguageServer {
         // TODO incremental mode
         c.setTextDocumentSync(ServerCapabilities.SYNC_FULL);
         c.setDefinitionProvider(true);
+        c.setCompletionProvider(new CompletionOptionsImpl());
 
         result.setCapabilities(c);
 
@@ -55,7 +57,7 @@ class JavaLanguageServer implements LanguageServer {
         return new TextDocumentService() {
             @Override
             public List<? extends CompletionItem> completion(TextDocumentPositionParams position) {
-                return null;
+                return autocomplete(position);
             }
 
             @Override
@@ -577,5 +579,25 @@ class JavaLanguageServer implements LanguageServer {
         } catch (IOException e) {
             throw ShowMessageException.error(e.getMessage(), e);
         }
+    }
+
+
+    public List<CompletionItemImpl> autocomplete(TextDocumentPositionParams position) {
+        Path path = getFilePath(URI.create(position.getTextDocument().getUri()));
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
+        JavacHolder compiler = findCompiler(path);
+        JavaFileObject file = findFile(compiler, path);
+        long cursor = findOffset(file, position.getPosition().getLine(), position.getPosition().getCharacter());
+        AutocompleteVisitor autocompleter = new AutocompleteVisitor(file, cursor, compiler.context);
+
+        compiler.afterAnalyze(autocompleter);
+        compiler.onError(errors);
+        compiler.compile(compiler.parse(file));
+
+        return autocompleter.suggestions;
+    }
+
+    public JsonNode echo(JsonNode echo) {
+        return echo;
     }
 }

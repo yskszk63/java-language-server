@@ -17,10 +17,7 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import javax.tools.JavaFileObject;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,7 +26,7 @@ import java.util.stream.Collectors;
 public class AutocompleteVisitor extends CursorScanner {
     private static final Logger LOG = Logger.getLogger("main");
     public static final Pattern REMOVE_PACKAGE_NAME = Pattern.compile("(?:\\w+\\.)+(.*)");
-    public final Set<CompletionItem> suggestions = new LinkedHashSet<>();
+    public final List<CompletionItemImpl> suggestions = new ArrayList<>();
 
     public AutocompleteVisitor(JavaFileObject file, long cursor, Context context) {
         super(file, cursor, context);

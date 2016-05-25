@@ -115,28 +115,4 @@ public class Main {
         jsonServer.start();
         jsonServer.join();
     }
-
-    //
-//    public ResponseAutocomplete autocomplete(RequestAutocomplete request) throws IOException {
-//        Path path = Paths.get(request.path);
-//        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-//        StringFileObject file = new StringFileObject(request.text, path);
-//        LineMap lines = LineMap.fromString(request.text);
-//        long cursor = lines.offset(request.position.line, request.position.character);
-//        AutocompleteVisitor autocompleter = new AutocompleteVisitor(file, cursor, compiler.context);
-//
-//        compiler.afterAnalyze(autocompleter);
-//        compiler.onError(errors);
-//        compiler.compile(compiler.parse(file));
-//
-//        for (Diagnostic<? extends JavaFileObject> error : errors.getDiagnostics()) {
-//            LOG.warning(error.toString());
-//        }
-//
-//        return new ResponseAutocomplete(autocompleter.suggestions);
-//    }
-//
-//    public JsonNode echo(JsonNode echo) {
-//        return echo;
-//    }
 }
