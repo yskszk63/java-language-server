@@ -38,7 +38,7 @@ public class CompilerProfiling extends Fixtures {
         long start = System.nanoTime();
 
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        JavacHolder compiler = new JavacHolder(Collections.emptyList(), Collections.emptyList(), Paths.get("out"));
+        JavacHolder compiler = new JavacHolder(Collections.emptySet(), Collections.emptySet(), Paths.get("out"));
         GetCompilationUnit compilationUnit = new GetCompilationUnit(compiler.context);
         compiler.afterParse(compilationUnit);
         compiler.onError(errors);

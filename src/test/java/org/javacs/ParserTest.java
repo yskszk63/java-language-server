@@ -21,8 +21,8 @@ public class ParserTest extends Fixtures {
     public void missingSemicolon() throws IOException, URISyntaxException {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/MissingSemicolon.java");
-        JavacHolder compiler = new JavacHolder(Collections.emptyList(),
-                                               Collections.singletonList(Paths.get("src/test/resources")),
+        JavacHolder compiler = new JavacHolder(Collections.emptySet(),
+                                               Collections.singleton(Paths.get("src/test/resources")),
                                                Paths.get("out"));
         List<String> methods = new ArrayList<>();
 

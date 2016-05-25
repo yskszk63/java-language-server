@@ -96,8 +96,8 @@ public class RecompileTest extends Fixtures {
     }
 
     private static JavacHolder newCompiler() {
-        return new JavacHolder(Collections.emptyList(),
-                               Collections.singletonList(Paths.get("src/test/resources")),
+        return new JavacHolder(Collections.emptySet(),
+                               Collections.singleton(Paths.get("src/test/resources")),
                                Paths.get("out"));
     }
 

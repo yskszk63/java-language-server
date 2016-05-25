@@ -16,9 +16,4 @@ public class Fixtures {
     }
 
     public static void init() { }
-
-    protected static final JavacHolder compiler =
-            new JavacHolder(Collections.emptyList(),
-                            Collections.singletonList(Paths.get("src/test/resources")),
-                            Paths.get("target"));
 }

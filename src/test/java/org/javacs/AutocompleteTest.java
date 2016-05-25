@@ -1,15 +1,18 @@
 package org.javacs;
 
+import io.typefox.lsapi.*;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Optional;
+import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toSet;
@@ -25,7 +28,7 @@ public class AutocompleteTest extends Fixtures {
         String file = "/org/javacs/example/AutocompleteStaticMember.java";
 
         // Static method
-        Set<String> suggestions = autocomplete(file, 4, 33);
+        Set<String> suggestions = insertText(file, 4, 33);
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic", "class"));
         assertThat(suggestions, not(hasItems("field", "method", "getClass")));
@@ -37,7 +40,7 @@ public class AutocompleteTest extends Fixtures {
         String file = "/org/javacs/example/AutocompleteStaticReference.java";
 
         // Static method
-        Set<String> suggestions = autocomplete(file, 2, 37);
+        Set<String> suggestions = insertText(file, 2, 37);
 
         assertThat(suggestions, hasItems("methodStatic"));
         assertThat(suggestions, not(hasItems( "method", "new")));
@@ -48,7 +51,7 @@ public class AutocompleteTest extends Fixtures {
         String file = "/org/javacs/example/AutocompleteMember.java";
 
         // Static method
-        Set<String> suggestions = autocomplete(file, 4, 13);
+        Set<String> suggestions = insertText(file, 4, 13);
 
         assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "class")));
         assertThat(suggestions, hasItems("field", "method", "getClass"));
@@ -59,7 +62,7 @@ public class AutocompleteTest extends Fixtures {
         String file = "/org/javacs/example/AutocompleteOther.java";
 
         // Static method
-        Set<String> suggestions = autocomplete(file, 4, 33);
+        Set<String> suggestions = insertText(file, 4, 33);
 
         assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "class")));
         assertThat(suggestions, hasItems("field", "method", "getClass"));
@@ -71,7 +74,7 @@ public class AutocompleteTest extends Fixtures {
         String file = "/org/javacs/example/AutocompleteReference.java";
 
         // Static method
-        Set<String> suggestions = autocomplete(file, 2, 14);
+        Set<String> suggestions = insertText(file, 2, 14);
 
         assertThat(suggestions, not(hasItems("methodStatic")));
         assertThat(suggestions, hasItems("method", "getClass"));
@@ -81,49 +84,61 @@ public class AutocompleteTest extends Fixtures {
     public void docstring() throws IOException {
         String file = "/org/javacs/example/AutocompleteDocstring.java";
 
-        // Static method
-        RequestAutocomplete request = new RequestAutocomplete();
-
-        request.path = path(file);
-        request.text = new String(Files.readAllBytes(Paths.get(path(file))));
-        request.position = new Position(7, 14);
-
-        Set<String> docstrings = new Services(compiler)
-                .autocomplete(request)
-                .suggestions
-                .stream()
-                .flatMap(s -> s.documentation.map(Stream::of).orElse(Stream.empty()))
-                .map(String::trim)
-                .collect(toSet());
+        Set<String> docstrings = documentation(file, 7, 14);
 
         assertThat(docstrings, hasItems("A method", "A field"));
 
-        request.position = new Position(11, 31);
-
-        docstrings = new Services(compiler)
-                .autocomplete(request)
-                .suggestions
-                .stream()
-                .flatMap(s -> s.documentation.map(Stream::of).orElse(Stream.empty()))
-                .map(String::trim)
-                .collect(toSet());
+        docstrings = documentation(file, 11, 31);
 
         assertThat(docstrings, hasItems("A fieldStatic", "A methodStatic"));
     }
 
-    private Set<String> autocomplete(String file, int row, int column) throws IOException {
-        RequestAutocomplete request = new RequestAutocomplete();
+    private Set<String> insertText(String file, int row, int column) throws IOException {
+        List<CompletionItemImpl> items = items(file, row, column);
 
-        request.path = path(file);
-        request.text = new String(Files.readAllBytes(Paths.get(path(file))));
-        request.position = new Position(row, column);
-
-        return new Services(compiler).autocomplete(request).suggestions.stream().map(s -> s.insertText).collect(toSet());
+        return items
+                .stream()
+                .map(CompletionItemImpl::getInsertText)
+                .collect(Collectors.toSet());
     }
 
-    private String path(String file) {
+    private Set<String> documentation(String file, int row, int column) throws IOException {
+        List<CompletionItemImpl> items = items(file, row, column);
+
+        return items
+                .stream()
+                .flatMap(i -> {
+                    if (i.getDocumentation() != null)
+                        return Stream.of(i.getDocumentation());
+                    else
+                        return Stream.empty();
+                })
+                .collect(Collectors.toSet());
+    }
+
+    private List<CompletionItemImpl> items(String file, int row, int column) {
+        TextDocumentPositionParamsImpl position = new TextDocumentPositionParamsImpl();
+
+        position.setPosition(new PositionImpl());
+        position.getPosition().setLine(row);
+        position.getPosition().setCharacter(column);
+        position.setTextDocument(new TextDocumentIdentifierImpl());
+        position.getTextDocument().setUri(uri(file).toString());
+
+        JavaLanguageServer server = new JavaLanguageServer();
+
+        InitializeParamsImpl init = new InitializeParamsImpl();
+
+        init.setRootPath(Paths.get(".").toAbsolutePath().toString());
+
+        server.initialize(init);
+
+        return server.autocomplete(position);
+    }
+
+    private URI uri(String file) {
         try {
-            return AutocompleteTest.class.getResource(file).toURI().getPath();
+            return AutocompleteTest.class.getResource(file).toURI();
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
