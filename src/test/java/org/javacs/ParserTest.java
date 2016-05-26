@@ -4,8 +4,6 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeScanner;
 import org.junit.Test;
 
-import javax.tools.DiagnosticCollector;
-import javax.tools.JavaFileObject;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Paths;
@@ -19,11 +17,7 @@ import static org.junit.Assert.assertThat;
 public class ParserTest extends Fixtures {
     @Test
     public void missingSemicolon() throws IOException, URISyntaxException {
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/MissingSemicolon.java");
-        JavacHolder compiler = new JavacHolder(Collections.emptySet(),
-                                               Collections.singleton(Paths.get("src/test/resources")),
-                                               Paths.get("out"));
+        JavacHolder compiler = newCompiler();
         List<String> methods = new ArrayList<>();
 
         compiler.afterParse(new TreeScanner() {
@@ -33,10 +27,17 @@ public class ParserTest extends Fixtures {
             }
         });
 
-        compiler.onError(errors);
+        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/MissingSemicolon.java");
+
         compiler.parse(file);
 
         assertThat(methods, hasItem("methodWithMissingSemicolon"));
         assertThat(methods, hasItem("methodAfterMissingSemicolon"));
+    }
+
+    private JavacHolder newCompiler() {
+        return new JavacHolder(Collections.emptySet(),
+                               Collections.singleton(Paths.get("src/test/resources")),
+                               Paths.get("out"));
     }
 }

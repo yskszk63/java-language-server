@@ -619,13 +619,42 @@ class JavaLanguageServer implements LanguageServer {
         JavacHolder compiler = findCompiler(path);
         JavaFileObject file = findFile(compiler, path);
         long cursor = findOffset(file, position.getPosition().getLine(), position.getPosition().getCharacter());
-        AutocompleteVisitor autocompleter = new AutocompleteVisitor(file, cursor, compiler.context);
+        JavaFileObject withSemi = withSemicolonAfterCursor(file, path, cursor);
+        AutocompleteVisitor autocompleter = new AutocompleteVisitor(withSemi, cursor, compiler.context);
 
         compiler.afterAnalyze(autocompleter);
         compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+        compiler.compile(compiler.parse(withSemi));
 
         return autocompleter.suggestions;
+    }
+
+    /**
+     * Insert ';' after the users cursor so we recover from parse errors in a helpful way when doing autocomplete.
+     */
+    private JavaFileObject withSemicolonAfterCursor(JavaFileObject file, Path path, long cursor) {
+        try (Reader reader = file.openReader(true)) {
+            StringBuilder acc = new StringBuilder();
+
+            for (int i = 0; i < cursor; i++) {
+                int next = reader.read();
+
+                if (next == -1)
+                    throw new RuntimeException("End of file " + file + " before cursor " + cursor);
+
+                acc.append((char) next);
+            }
+
+            acc.append(";");
+
+            for (int next = reader.read(); next > 0; next = reader.read()) {
+                acc.append((char) next);
+            }
+
+            return new StringFileObject(acc.toString(), path);
+        } catch (IOException e) {
+            throw ShowMessageException.error("Error reading " + file, e);
+        }
     }
 
     public JsonNode echo(JsonNode echo) {

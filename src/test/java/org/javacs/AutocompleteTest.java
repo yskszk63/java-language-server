@@ -76,6 +76,16 @@ public class AutocompleteTest extends Fixtures {
     }
 
     @Test
+    public void betweenLines() throws IOException {
+        String file = "/org/javacs/example/AutocompleteBetweenLines.java";
+
+        // Static method
+        Set<String> suggestions = insertText(file, 8, 17);
+
+        assertThat(suggestions, hasItems("add"));
+    }
+
+    @Test
     @Ignore
     public void reference() throws IOException {
         String file = "/org/javacs/example/AutocompleteReference.java";

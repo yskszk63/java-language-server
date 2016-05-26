@@ -104,7 +104,6 @@ public class Main {
      */
     public static void run(Connection connection) {
         JavaLanguageServer server = new JavaLanguageServer();
-
         LanguageServerToJsonAdapter jsonServer = new LanguageServerToJsonAdapter(server);
 
         jsonServer.connect(connection.in, connection.out);
