@@ -156,25 +156,30 @@ class JavaLanguageServer implements LanguageServer {
             public void didOpen(DidOpenTextDocumentParams params) {
                 TextDocumentItem document = params.getTextDocument();
                 URI uri = URI.create(document.getUri());
-                Path path = getFilePath(uri);
-                String text = document.getText();
+                Optional<Path> path = getFilePath(uri);
 
-                sourceByPath.put(path, text);
+                if (path.isPresent()) {
+                    String text = document.getText();
 
-                doLint(path);
+                    sourceByPath.put(path.get(), text);
+
+                    doLint(path.get());
+                }
             }
 
             @Override
             public void didChange(DidChangeTextDocumentParams params) {
                 VersionedTextDocumentIdentifier document = params.getTextDocument();
                 URI uri = URI.create(document.getUri());
-                Path path = getFilePath(uri);
+                Optional<Path> path = getFilePath(uri);
 
-                for (TextDocumentContentChangeEvent change : params.getContentChanges()) {
-                    // TODO incremental updates
-                    String text = change.getText();
+                if (path.isPresent()) {
+                    for (TextDocumentContentChangeEvent change : params.getContentChanges()) {
+                        // TODO incremental updates
+                        String text = change.getText();
 
-                    sourceByPath.put(path, text);
+                        sourceByPath.put(path.get(), text);
+                    }
                 }
             }
 
@@ -187,9 +192,10 @@ class JavaLanguageServer implements LanguageServer {
             public void didSave(DidSaveTextDocumentParams params) {
                 TextDocumentIdentifier document = params.getTextDocument();
                 URI uri = URI.create(document.getUri());
-                Path path = getFilePath(uri);
+                Optional<Path> path = getFilePath(uri);
 
-                doLint(path);
+                if (path.isPresent())
+                    doLint(path.get());
             }
 
             @Override
@@ -199,17 +205,11 @@ class JavaLanguageServer implements LanguageServer {
         };
     }
 
-    private Path getFilePath(URI uri) {
-        if (!uri.getScheme().equals("file")) {
-            MessageParamsImpl message = new MessageParamsImpl();
-
-            message.setMessage(uri + " is not a file");
-            message.setType(MessageParams.TYPE_ERROR);
-
-            throw new ShowMessageException(message, null);
-        }
-
-        return Paths.get(uri.getPath());
+    private Optional<Path> getFilePath(URI uri) {
+        if (!uri.getScheme().equals("file"))
+            return Optional.empty();
+        else
+            return Optional.of(Paths.get(uri.getPath()));
     }
 
     private void doLint(Path path) {
@@ -482,33 +482,38 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     public List<LocationImpl> gotoDefinition(TextDocumentPositionParams position) {
-        Path path = getFilePath(URI.create(position.getTextDocument().getUri()));
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        JavacHolder compiler = findCompiler(path);
-        JavaFileObject file = findFile(compiler, path);
-        long cursor = findOffset(file, position.getPosition().getLine(), position.getPosition().getCharacter());
-        GotoDefinitionVisitor visitor = new GotoDefinitionVisitor(file, cursor, compiler.context);
+        Optional<Path> maybePath = getFilePath(URI.create(position.getTextDocument().getUri()));
 
-        compiler.afterAnalyze(visitor);
-        compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+        if (maybePath.isPresent()) {
+            Path path = maybePath.get();
+            DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
+            JavacHolder compiler = findCompiler(path);
+            JavaFileObject file = findFile(compiler, path);
+            long cursor = findOffset(file, position.getPosition().getLine(), position.getPosition().getCharacter());
+            GotoDefinitionVisitor visitor = new GotoDefinitionVisitor(file, cursor, compiler.context);
 
-        List<LocationImpl> result = new ArrayList<>();
+            compiler.afterAnalyze(visitor);
+            compiler.onError(errors);
+            compiler.compile(compiler.parse(file));
 
-        for (SymbolLocation locate : visitor.definitions) {
-            URI uri = locate.file.toUri();
-            Path symbolPath = Paths.get(uri);
-            JavaFileObject symbolFile = findFile(compiler, symbolPath);
-            RangeImpl range = findPosition(symbolFile, locate.startPosition, locate.endPosition);
-            LocationImpl location = new LocationImpl();
+            List<LocationImpl> result = new ArrayList<>();
 
-            location.setRange(range);
-            location.setUri(uri.toString());
+            for (SymbolLocation locate : visitor.definitions) {
+                URI uri = locate.file.toUri();
+                Path symbolPath = Paths.get(uri);
+                JavaFileObject symbolFile = findFile(compiler, symbolPath);
+                RangeImpl range = findPosition(symbolFile, locate.startPosition, locate.endPosition);
+                LocationImpl location = new LocationImpl();
 
-            result.add(location);
+                location.setRange(range);
+                location.setUri(uri.toString());
+
+                result.add(location);
+            }
+
+            return result;
         }
-
-        return result;
+        else return Collections.emptyList();
     }
 
     private static RangeImpl findPosition(JavaFileObject file, long startOffset, long endOffset) {
@@ -614,19 +619,24 @@ class JavaLanguageServer implements LanguageServer {
 
 
     public List<CompletionItemImpl> autocomplete(TextDocumentPositionParams position) {
-        Path path = getFilePath(URI.create(position.getTextDocument().getUri()));
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        JavacHolder compiler = findCompiler(path);
-        JavaFileObject file = findFile(compiler, path);
-        long cursor = findOffset(file, position.getPosition().getLine(), position.getPosition().getCharacter());
-        JavaFileObject withSemi = withSemicolonAfterCursor(file, path, cursor);
-        AutocompleteVisitor autocompleter = new AutocompleteVisitor(withSemi, cursor, compiler.context);
+        Optional<Path> maybePath = getFilePath(URI.create(position.getTextDocument().getUri()));
 
-        compiler.afterAnalyze(autocompleter);
-        compiler.onError(errors);
-        compiler.compile(compiler.parse(withSemi));
+        if (maybePath.isPresent()) {
+            Path path = maybePath.get();
+            DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
+            JavacHolder compiler = findCompiler(path);
+            JavaFileObject file = findFile(compiler, path);
+            long cursor = findOffset(file, position.getPosition().getLine(), position.getPosition().getCharacter());
+            JavaFileObject withSemi = withSemicolonAfterCursor(file, path, cursor);
+            AutocompleteVisitor autocompleter = new AutocompleteVisitor(withSemi, cursor, compiler.context);
 
-        return autocompleter.suggestions;
+            compiler.afterAnalyze(autocompleter);
+            compiler.onError(errors);
+            compiler.compile(compiler.parse(withSemi));
+
+            return autocompleter.suggestions;
+        }
+        else return Collections.emptyList();
     }
 
     /**
