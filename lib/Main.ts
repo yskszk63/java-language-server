@@ -9,6 +9,8 @@ import * as Net from 'net';
 import * as ChildProcess from 'child_process';
 import {LanguageClient, LanguageClientOptions, SettingMonitor, ServerOptions, StreamInfo} from 'vscode-languageclient';
 
+PortFinder.basePort = 55282;
+
 /** Called when extension is activated */
 export function activate(context: VSCode.ExtensionContext) {
     // Options to control the language client
@@ -49,7 +51,7 @@ export function activate(context: VSCode.ExtensionContext) {
                     var options = { stdio: 'inherit', cwd: VSCode.workspace.rootPath };
                     
                     // Start the child java process
-                    // ChildProcess.spawn(javaExecutablePath, args, options);
+                    ChildProcess.spawn(javaExecutablePath, args, options);
                 });
             });
         });
