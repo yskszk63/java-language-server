@@ -103,13 +103,15 @@ public class Main {
      * When the request stream is closed, wait for 5s for all outstanding responses to compute, then return.
      */
     public static void run(Connection connection) {
-        LanguageServer server = new JavaLanguageServer();
+        JavaLanguageServer server = new JavaLanguageServer();
 
         LanguageServerToJsonAdapter jsonServer = new LanguageServerToJsonAdapter(server);
 
         jsonServer.connect(connection.in, connection.out);
         jsonServer.getProtocol().addErrorListener((message, err) -> {
             LOG.log(Level.SEVERE, message, err);
+
+            server.onError(message, err);
         });
 
         jsonServer.start();

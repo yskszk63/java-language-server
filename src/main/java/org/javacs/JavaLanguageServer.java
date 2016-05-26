@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -30,6 +31,19 @@ class JavaLanguageServer implements LanguageServer {
 
     public JavaLanguageServer(JavacHolder testJavac) {
         this.testJavac = Optional.of(testJavac);
+    }
+
+    public void onError(String message, Throwable error) {
+        if (error instanceof ShowMessageException)
+            showMessage.call(((ShowMessageException) error).message);
+        else {
+            MessageParamsImpl m = new MessageParamsImpl();
+
+            m.setMessage(message);
+            m.setType(MessageParams.TYPE_ERROR);
+
+            showMessage.call(m);
+        }
     }
 
     @Override

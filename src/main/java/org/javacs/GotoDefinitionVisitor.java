@@ -59,8 +59,6 @@ public class GotoDefinitionVisitor extends CursorScanner {
     }
 
     private void addSymbol(Symbol symbol) {
-        LOG.info("Goto " + symbol);
-
         context.get(ClassIndex.class).locate(symbol).map(definitions::add);
     }
 }
