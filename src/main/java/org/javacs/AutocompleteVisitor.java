@@ -7,6 +7,7 @@ import com.sun.source.tree.*;
 import com.sun.tools.javac.api.JavacScope;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.jvm.ClassReader;
 import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
@@ -18,6 +19,7 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import javax.tools.JavaFileObject;
 import java.util.*;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -117,69 +119,75 @@ public class AutocompleteVisitor extends CursorScanner {
             }
         }
         else {
-            LOG.info("Node " + node + " not found in compilation unit " + compilationUnit);
+            LOG.info("Node " + node + " not found in compilation unit " + compilationUnit.getSourceFile());
         }
     }
 
     private void addElement(Element e) {
-        String name = e.getSimpleName().toString();
+        try {
+            String name = e.getSimpleName().toString();
 
-        switch (e.getKind()) {
-            case PACKAGE:
-                break;
-            case ENUM:
-            case CLASS:
-            case ANNOTATION_TYPE:
-            case INTERFACE:
-            case TYPE_PARAMETER: {
-                CompletionItemImpl item = new CompletionItemImpl();
+            switch (e.getKind()) {
+                case PACKAGE:
+                    break;
+                case ENUM:
+                case CLASS:
+                case ANNOTATION_TYPE:
+                case INTERFACE:
+                case TYPE_PARAMETER: {
+                    CompletionItemImpl item = new CompletionItemImpl();
 
-                item.setKind(CompletionItem.KIND_INTERFACE);
-                item.setLabel(name);
-                item.setInsertText(name);
+                    item.setKind(CompletionItem.KIND_INTERFACE);
+                    item.setLabel(name);
+                    item.setInsertText(name);
 
-                suggestions.add(item);
+                    suggestions.add(item);
 
-                break;
+                    break;
+                }
+                case ENUM_CONSTANT:
+                    addEnumConstant(e);
+
+                    break;
+                case FIELD:
+                    addField((Symbol.VarSymbol) e);
+
+                    break;
+                case PARAMETER:
+                case LOCAL_VARIABLE:
+                case EXCEPTION_PARAMETER: {
+                    CompletionItemImpl item = new CompletionItemImpl();
+
+                    item.setKind(CompletionItem.KIND_VARIABLE);
+                    item.setLabel(name);
+                    item.setInsertText(name);
+
+                    suggestions.add(item);
+
+                    break;
+                }
+                case METHOD:
+                    addMethod((Symbol.MethodSymbol) e);
+
+                    break;
+                case CONSTRUCTOR:
+                    // TODO
+                    break;
+                case STATIC_INIT:
+                    // Nothing user-enterable
+                    break;
+                case INSTANCE_INIT:
+                    // Nothing user-enterable
+                    break;
+                case OTHER:
+                    break;
+                case RESOURCE_VARIABLE:
+                    break;
             }
-            case ENUM_CONSTANT:
-                addEnumConstant(e);
-
-                break;
-            case FIELD:
-                addField((Symbol.VarSymbol) e);
-
-                break;
-            case PARAMETER:
-            case LOCAL_VARIABLE:
-            case EXCEPTION_PARAMETER: {
-                CompletionItemImpl item = new CompletionItemImpl();
-
-                item.setKind(CompletionItem.KIND_VARIABLE);
-                item.setLabel(name);
-                item.setInsertText(name);
-
-                suggestions.add(item);
-
-                break;
-            }
-            case METHOD:
-                addMethod((Symbol.MethodSymbol) e);
-
-                break;
-            case CONSTRUCTOR:
-                // TODO
-                break;
-            case STATIC_INIT:
-                // Nothing user-enterable
-                break;
-            case INSTANCE_INIT:
-                // Nothing user-enterable
-                break;
-            case OTHER:
-                break;
-            case RESOURCE_VARIABLE:
-                break;
+        } catch (ClassReader.BadClassFile bad) {
+            // Element#getKind() sometimes throws this when it finds something on the class path it doesn't like
+            // We just skip that element and log a warning
+            LOG.log(Level.WARNING, bad.getMessage(), bad);
         }
     }
 
