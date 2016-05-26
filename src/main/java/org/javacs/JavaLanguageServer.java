@@ -24,6 +24,14 @@ class JavaLanguageServer implements LanguageServer {
     private NotificationCallback<MessageParams> showMessage = m -> {};
     private Map<Path, String> sourceByPath = new HashMap<>();
 
+    public JavaLanguageServer() {
+        this.testJavac = Optional.empty();
+    }
+
+    public JavaLanguageServer(JavacHolder testJavac) {
+        this.testJavac = Optional.of(testJavac);
+    }
+
     @Override
     public InitializeResult initialize(InitializeParams params) {
         workspaceRoot = Paths.get(params.getRootPath());
@@ -276,9 +284,18 @@ class JavaLanguageServer implements LanguageServer {
     private Map<JavacConfig, JavacHolder> compilerCache = new HashMap<>();
 
     /**
+     * Instead of looking for javaconfig.json and creating a JavacHolder, just use this.
+     * For testing.
+     */
+    private final Optional<JavacHolder> testJavac;
+
+    /**
      * Look for a configuration in a parent directory of uri
      */
     private JavacHolder findCompiler(Path path) {
+        if (testJavac.isPresent())
+            return testJavac.get();
+
         Path dir = path.getParent();
         Optional<JavacConfig> config = findConfig(dir);
         Optional<JavacHolder> maybeHolder = config.map(c -> compilerCache.computeIfAbsent(c, this::newJavac));

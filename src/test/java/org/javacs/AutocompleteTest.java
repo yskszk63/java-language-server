@@ -7,15 +7,12 @@ import org.junit.Test;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
@@ -109,7 +106,7 @@ public class AutocompleteTest extends Fixtures {
                 .stream()
                 .flatMap(i -> {
                     if (i.getDocumentation() != null)
-                        return Stream.of(i.getDocumentation());
+                        return Stream.of(i.getDocumentation().trim());
                     else
                         return Stream.empty();
                 })
@@ -125,13 +122,7 @@ public class AutocompleteTest extends Fixtures {
         position.setTextDocument(new TextDocumentIdentifierImpl());
         position.getTextDocument().setUri(uri(file).toString());
 
-        JavaLanguageServer server = new JavaLanguageServer();
-
-        InitializeParamsImpl init = new InitializeParamsImpl();
-
-        init.setRootPath(Paths.get(".").toAbsolutePath().toString());
-
-        server.initialize(init);
+        JavaLanguageServer server = getJavaLanguageServer();
 
         return server.autocomplete(position);
     }

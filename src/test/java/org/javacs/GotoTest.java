@@ -1,17 +1,14 @@
 package org.javacs;
 
 import io.typefox.lsapi.*;
-import org.hamcrest.Matcher;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Set;
 import java.util.logging.Logger;
 
 import static org.hamcrest.Matchers.contains;
@@ -142,13 +139,7 @@ public class GotoTest extends Fixtures {
         p.setTextDocument(document);
         p.setPosition(position);
 
-        JavaLanguageServer server = new JavaLanguageServer();
-
-        InitializeParamsImpl init = new InitializeParamsImpl();
-
-        init.setRootPath(Paths.get(".").toAbsolutePath().toString());
-
-        server.initialize(init);
+        JavaLanguageServer server = Fixtures.getJavaLanguageServer();
 
         return server.gotoDefinition(p);
     }
