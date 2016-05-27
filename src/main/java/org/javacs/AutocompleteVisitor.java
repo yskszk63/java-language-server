@@ -1,6 +1,7 @@
 package org.javacs;
 
 import com.sun.source.util.TreePath;
+import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Type;
 import com.google.common.base.Joiner;
 import com.sun.source.tree.*;
@@ -102,10 +103,10 @@ public class AutocompleteVisitor extends CursorScanner {
     public void visitIdent(JCTree.JCIdent node) {
         super.visitIdent(node);
 
-        JavacTrees trees = JavacTrees.instance(context);
-        TreePath path = trees.getPath(compilationUnit, node);
+        TreePath path = getPath(new TreePath(compilationUnit), node);
 
         if (path != null) {
+            JavacTrees trees = JavacTrees.instance(context);
             JavacScope scope = trees.getScope(path);
 
             while (scope != null) {
@@ -121,6 +122,49 @@ public class AutocompleteVisitor extends CursorScanner {
         else {
             LOG.info("Node " + node + " not found in compilation unit " + compilationUnit.getSourceFile());
         }
+    }
+
+
+    /**
+     * Gets a tree path for a tree node within a subtree identified by a TreePath object.
+     * @return null if the node is not found
+     */
+    private static TreePath getPath(TreePath path, Tree target) {
+        path.getClass();
+        target.getClass();
+
+        class Result extends Error {
+            static final long serialVersionUID = -5942088234594905625L;
+            TreePath path;
+            Result(TreePath path) {
+                this.path = path;
+            }
+        }
+
+        class PathFinder extends TreePathScanner<TreePath,Tree> {
+            public TreePath scan(Tree tree, Tree target) {
+                if (tree == target) {
+                    throw new Result(new TreePath(getCurrentPath(), target));
+                }
+                return super.scan(tree, target);
+            }
+
+            @Override
+            public TreePath visitErroneous(ErroneousTree node, Tree tree) {
+                return super.scan(node.getErrorTrees(), tree);
+            }
+        }
+
+        if (path.getLeaf() == target) {
+            return path;
+        }
+
+        try {
+            new PathFinder().scan(path, target);
+        } catch (Result result) {
+            return result.path;
+        }
+        return null;
     }
 
     private void addElement(Element e) {
