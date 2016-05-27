@@ -11,7 +11,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -338,48 +337,29 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private Optional<JavacConfig> doFindConfig(Path dir) {
-        try {
-            while (true) {
-                Optional<JavacConfig> found = Files.list(dir)
-                                                   .flatMap(this::streamIfConfig)
-                                                   .sorted((x, y) -> Integer.compare(x.precedence, y.precedence))
-                                                   .findFirst();
+        while (true) {
+            Optional<JavacConfig> found = readIfConfig(dir);
 
-                if (found.isPresent())
-                    return found;
-                else if (workspaceRoot.startsWith(dir))
-                    return Optional.empty();
-                else
-                    dir = dir.getParent();
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            if (found.isPresent())
+                return found;
+            else if (workspaceRoot.startsWith(dir))
+                return Optional.empty();
+            else
+                dir = dir.getParent();
         }
     }
 
-    private Stream<JavacConfig> streamIfConfig(Path configFile) {
-        Optional<JavacConfig> config = readIfConfig(configFile);
-
-        if (config.isPresent())
-            return Stream.of(config.get());
-        else
-            return Stream.empty();
-    }
-
     /**
-     * If configFile is a config file, for example javaconfig.json or an eclipse project file, read it.
+     * If directory contains a config file, for example javaconfig.json or an eclipse project file, read it.
      */
-    private Optional<JavacConfig> readIfConfig(Path configFile) {
-        String fileName = configFile.getFileName().toString();
-
-        if (fileName.equals("javaconfig.json")) {
-            JavaConfigJson json = readJavaConfigJson(configFile);
-            Path dir = configFile.getParent();
+    private Optional<JavacConfig> readIfConfig(Path dir) {
+        if (Files.exists(dir.resolve("javaconfig.json"))) {
+            JavaConfigJson json = readJavaConfigJson(dir.resolve("javaconfig.json"));
             Path classPathFilePath = dir.resolve(json.classPathFile);
             Set<Path> classPath = readClassPathFile(classPathFilePath);
             Set<Path> sourcePath = json.sourcePath.stream().map(dir::resolve).collect(Collectors.toSet());
             Path outputDirectory = dir.resolve(json.outputDirectory);
-            JavacConfig config = new JavacConfig(sourcePath, classPath, outputDirectory, 0);
+            JavacConfig config = new JavacConfig(sourcePath, classPath, outputDirectory);
 
             return Optional.of(config);
         }
