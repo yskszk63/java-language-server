@@ -1,6 +1,7 @@
 package org.javacs;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.sun.tools.javac.tree.JCTree;
 import io.typefox.lsapi.*;
 import io.typefox.lsapi.Diagnostic;
 
@@ -213,15 +214,12 @@ class JavaLanguageServer implements LanguageServer {
 
     private void doLint(Path path) {
         List<DiagnosticImpl> errors = lint(path);
+        PublishDiagnosticsParamsImpl publish = new PublishDiagnosticsParamsImpl();
 
-        if (!errors.isEmpty()) {
-            PublishDiagnosticsParamsImpl publish = new PublishDiagnosticsParamsImpl();
+        publish.setDiagnostics(errors);
+        publish.setUri(path.toFile().toURI().toString());
 
-            publish.setDiagnostics(errors);
-            publish.setUri(path.toFile().toURI().toString());
-
-            publishDiagnostics.call(publish);
-        }
+        publishDiagnostics.call(publish);
     }
 
     @Override
@@ -612,7 +610,14 @@ class JavaLanguageServer implements LanguageServer {
 
             compiler.afterAnalyze(autocompleter);
             compiler.onError(errors);
-            compiler.compile(compiler.parse(withSemi));
+
+            JCTree.JCCompilationUnit ast = compiler.parse(withSemi);
+
+            // Remove all statements after the cursor
+            // There are often parse errors after the cursor, which can generate unrecoverable type errors
+            ast.accept(new AutocompletePruner(withSemi, cursor, compiler.context));
+
+            compiler.compile(ast);
 
             return autocompleter.suggestions;
         }
