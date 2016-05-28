@@ -21,6 +21,10 @@ Requires that you have Java 8 installed on your system.
 
 <img src="http://g.recordit.co/Fg7cpH1rnz.gif">
 
+### Type information on hover
+
+<img src="http://g.recordit.co/R3T0nLUpZJ.gif">
+
 ## Usage
 
 The presence of a `javaconfig.json` file indicates that 
