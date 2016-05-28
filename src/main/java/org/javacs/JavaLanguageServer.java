@@ -2,6 +2,7 @@ package org.javacs;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.code.Symbol;
 import io.typefox.lsapi.*;
 import io.typefox.lsapi.Diagnostic;
 
@@ -58,6 +59,7 @@ class JavaLanguageServer implements LanguageServer {
         c.setTextDocumentSync(ServerCapabilities.SYNC_INCREMENTAL);
         c.setDefinitionProvider(true);
         c.setCompletionProvider(new CompletionOptionsImpl());
+        c.setHoverProvider(true);
 
         result.setCapabilities(c);
 
@@ -89,7 +91,7 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public Hover hover(TextDocumentPositionParams position) {
-                return null;
+                return doHover(position);
             }
 
             @Override
@@ -514,15 +516,18 @@ class JavaLanguageServer implements LanguageServer {
             JavacHolder compiler = findCompiler(path);
             JavaFileObject file = findFile(compiler, path);
             long cursor = findOffset(file, position.getPosition().getLine(), position.getPosition().getCharacter());
-            GotoDefinitionVisitor visitor = new GotoDefinitionVisitor(file, cursor, compiler.context);
+            SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, cursor, compiler.context);
 
             compiler.afterAnalyze(visitor);
             compiler.onError(errors);
             compiler.compile(compiler.parse(file));
 
             List<LocationImpl> result = new ArrayList<>();
-
-            for (SymbolLocation locate : visitor.definitions) {
+            ClassIndex index = compiler.context.get(ClassIndex.class);
+            Optional<SymbolLocation> maybeLocate = visitor.found.flatMap(s -> index.locate(s));
+            
+            if (maybeLocate.isPresent()) {
+                SymbolLocation locate = maybeLocate.get();
                 URI uri = locate.file.toUri();
                 Path symbolPath = Paths.get(uri);
                 JavaFileObject symbolFile = findFile(compiler, symbolPath);
@@ -639,6 +644,88 @@ class JavaLanguageServer implements LanguageServer {
         } catch (IOException e) {
             throw ShowMessageException.error(e.getMessage(), e);
         }
+    }
+    
+    public HoverImpl doHover(TextDocumentPositionParams position) {
+        HoverImpl result = new HoverImpl();
+        
+        Optional<Path> maybePath = getFilePath(URI.create(position.getTextDocument().getUri()));
+
+        if (maybePath.isPresent()) {
+            Path path = maybePath.get();
+            DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
+            JavacHolder compiler = findCompiler(path);
+            JavaFileObject file = findFile(compiler, path);
+            long cursor = findOffset(file, position.getPosition().getLine(), position.getPosition().getCharacter());
+            SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, cursor, compiler.context);
+
+            compiler.afterAnalyze(visitor);
+            compiler.onError(errors);
+            compiler.compile(compiler.parse(file));
+            
+            if (visitor.found.isPresent()) {
+                Symbol symbol = visitor.found.get();
+                List<MarkedStringImpl> contents = new ArrayList<>();
+
+                switch (symbol.getKind()) {
+                    case PACKAGE:
+                        contents.add(markedString("package " + symbol.getQualifiedName()));
+
+                        break;
+                    case ENUM:
+                        contents.add(markedString("enum " + symbol.getQualifiedName()));
+
+                        break;
+                    case CLASS:
+                        contents.add(markedString("class " + symbol.getQualifiedName()));
+
+                        break;
+                    case ANNOTATION_TYPE:
+                        contents.add(markedString("@interface " + symbol.getQualifiedName()));
+
+                        break;
+                    case INTERFACE:
+                        contents.add(markedString("interface " + symbol.getQualifiedName()));
+
+                        break;
+                    case METHOD:
+                    case CONSTRUCTOR:
+                    case STATIC_INIT:
+                    case INSTANCE_INIT:
+                        Symbol.MethodSymbol method = (Symbol.MethodSymbol) symbol;
+                        String signature = AutocompleteVisitor.methodSignature(method);
+
+                        contents.add(markedString(signature));
+
+                        break;
+                    case PARAMETER:
+                    case LOCAL_VARIABLE:
+                    case EXCEPTION_PARAMETER:
+                    case ENUM_CONSTANT:
+                    case FIELD:
+                        contents.add(markedString(symbol.type + " " + symbol.getSimpleName()));
+
+                        break;
+                    case TYPE_PARAMETER:
+                    case OTHER:
+                    case RESOURCE_VARIABLE:
+                        break;
+                }
+                
+                result.setContents(contents);
+            }
+        }
+        
+        return result;
+    }
+
+    private MarkedStringImpl markedString(String value) {
+        MarkedStringImpl result = new MarkedStringImpl();
+
+        result.setLanguage("java");
+        result.setValue(value);
+
+        return result;
     }
 
     public List<CompletionItemImpl> autocomplete(TextDocumentPositionParams position) {

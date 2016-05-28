@@ -5,16 +5,18 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 
 import javax.tools.JavaFileObject;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
 
-public class GotoDefinitionVisitor extends CursorScanner {
+/**
+ * Finds symbol under the cursor
+ */
+public class SymbolUnderCursorVisitor extends CursorScanner {
     private static final Logger LOG = Logger.getLogger("main");
+    
+    public Optional<Symbol> found = Optional.empty();
 
-    public final Set<SymbolLocation> definitions = new HashSet<>();
-
-    public GotoDefinitionVisitor(JavaFileObject file, long cursor, Context context) {
+    public SymbolUnderCursorVisitor(JavaFileObject file, long cursor, Context context) {
         super(file, cursor, context);
     }
 
@@ -27,7 +29,7 @@ public class GotoDefinitionVisitor extends CursorScanner {
 
         Symbol symbol = id.sym;
 
-        addSymbol(symbol);
+        found(symbol);
     }
 
     @Override
@@ -40,7 +42,7 @@ public class GotoDefinitionVisitor extends CursorScanner {
         if (!containsCursor(tree.getExpression())) {
             Symbol symbol = tree.sym;
 
-            addSymbol(symbol);
+            found(symbol);
         }
     }
 
@@ -54,11 +56,11 @@ public class GotoDefinitionVisitor extends CursorScanner {
         if (!containsCursor(tree.getQualifierExpression())) {
             Symbol symbol = tree.sym;
 
-            addSymbol(symbol);
+            found(symbol);
         }
     }
 
-    private void addSymbol(Symbol symbol) {
-        context.get(ClassIndex.class).locate(symbol).map(definitions::add);
+    private void found(Symbol symbol) {
+        found = Optional.of(symbol);
     }
 }

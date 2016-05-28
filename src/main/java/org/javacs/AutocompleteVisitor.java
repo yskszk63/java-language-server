@@ -257,15 +257,12 @@ public class AutocompleteVisitor extends CursorScanner {
     }
 
     private void addMethod(Symbol.MethodSymbol e, int superRemoved) {
-        String name = e.getSimpleName().toString();
-        String params = e.getParameters().stream().map(this::shortName).collect(Collectors.joining(", "));
-        String label = name + "(" + params + ")";
-
+        String label = methodSignature(e);
         CompletionItemImpl item = new CompletionItemImpl();
 
         item.setKind(CompletionItem.KIND_METHOD);
         item.setLabel(label);
-        item.setInsertText(name);
+        item.setInsertText(e.getSimpleName().toString());
         item.setDetail(e.getEnclosingElement().getSimpleName().toString());
         item.setDocumentation(docstring(e));
         item.setSortText(superRemoved + "/" + label);
@@ -273,7 +270,13 @@ public class AutocompleteVisitor extends CursorScanner {
         suggestions.add(item);
     }
 
-    private String shortName(Symbol.VarSymbol p) {
+    public static String methodSignature(Symbol.MethodSymbol e) {
+        String name = e.getSimpleName().toString();
+        String params = e.getParameters().stream().map(AutocompleteVisitor::shortName).collect(Collectors.joining(", "));
+        return name + "(" + params + ")";
+    }
+
+    private static String shortName(Symbol.VarSymbol p) {
         String type = shortTypeName(p.type);
         String name = p.name.toString();
 
