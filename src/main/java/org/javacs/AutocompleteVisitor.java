@@ -13,6 +13,7 @@ import com.sun.tools.javac.jvm.ClassReader;
 import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Name;
 import io.typefox.lsapi.CompletionItem;
 import io.typefox.lsapi.CompletionItemImpl;
 
@@ -111,11 +112,18 @@ public class AutocompleteVisitor extends CursorScanner {
             JavacScope scope = trees.getScope(path);
 
             while (scope != null) {
-                LOG.info(Joiner.on(", ").join(scope.getLocalElements()));
-
                 for (Element e : scope.getLocalElements())
                     addElement(e);
-                // TODO add to suggestions
+
+                // Add inner classes
+                TypeElement enclosingClass = scope.getEnclosingClass();
+
+                if (enclosingClass != null) {
+                    for (Element element : enclosingClass.getEnclosedElements()) {
+                        if (element instanceof Symbol.ClassSymbol)
+                            addElement(element);
+                    }
+                }
 
                 scope = scope.getEnclosingScope();
             }

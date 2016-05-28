@@ -126,7 +126,7 @@ public class AutocompleteTest extends Fixtures {
         // Static method
         Set<String> suggestions = insertText(file, 4, 9);
 
-        assertThat(suggestions, hasItems("String"));
+        assertThat(suggestions, hasItems("String", "SomeInnerClass"));
     }
 
     private Set<String> insertText(String file, int row, int column) throws IOException {

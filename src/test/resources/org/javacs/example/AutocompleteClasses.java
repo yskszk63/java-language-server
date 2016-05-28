@@ -4,4 +4,8 @@ public class AutocompleteClasses {
     public static void test() {
         S // String
     }
+    
+    public static class SomeInnerClass {
+        
+    }
 }
