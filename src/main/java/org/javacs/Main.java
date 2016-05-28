@@ -49,11 +49,17 @@ public class Main {
 
 
     public static void main(String[] args) throws IOException {
-        LoggingFormat.startLogging();
+        try {
+            LoggingFormat.startLogging();
 
-        Connection connection = connectToNode();
+            Connection connection = connectToNode();
 
-        run(connection);
+            run(connection);
+        } catch (Throwable t) {
+            LOG.log(Level.SEVERE, t.getMessage(), t);
+
+            System.exit(1);
+        }
     }
 
     private static Connection connectToNode() throws IOException {
