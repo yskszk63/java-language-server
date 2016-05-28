@@ -55,7 +55,7 @@ class JavaLanguageServer implements LanguageServer {
         ServerCapabilitiesImpl c = new ServerCapabilitiesImpl();
 
         // TODO incremental mode
-        c.setTextDocumentSync(ServerCapabilities.SYNC_FULL);
+        c.setTextDocumentSync(ServerCapabilities.SYNC_INCREMENTAL);
         c.setDefinitionProvider(true);
         c.setCompletionProvider(new CompletionOptionsImpl());
 
@@ -175,10 +175,18 @@ class JavaLanguageServer implements LanguageServer {
 
                 if (path.isPresent()) {
                     for (TextDocumentContentChangeEvent change : params.getContentChanges()) {
-                        // TODO incremental updates
-                        String text = change.getText();
+                        if (change.getRange() == null)
+                            sourceByPath.put(path.get(), change.getText());
+                        else {
+                            String existingText = sourceByPath.get(path.get());
+                            String newText = patch(existingText, change);
 
-                        sourceByPath.put(path.get(), text);
+                            sourceByPath.put(path.get(), newText);
+
+                            LOG.info(path.get().toString());
+                            LOG.info(change.getText());
+                            LOG.info(newText);
+                        }
                     }
                 }
             }
@@ -203,6 +211,44 @@ class JavaLanguageServer implements LanguageServer {
                 publishDiagnostics = callback;
             }
         };
+    }
+
+    private String patch(String sourceText, TextDocumentContentChangeEvent change) {
+        try {
+            Range range = change.getRange();
+            BufferedReader reader = new BufferedReader(new StringReader(sourceText));
+            StringWriter writer = new StringWriter();
+
+            // Skip unchanged lines
+            int line = 0;
+
+            while (line < range.getStart().getLine()) {
+                writer.write(reader.readLine() + '\n');
+                line++;
+            }
+
+            // Skip unchanged chars
+            for (int character = 0; character < range.getStart().getCharacter(); character++)
+                writer.write(reader.read());
+
+            // Write replacement text
+            writer.write(change.getText());
+
+            // Skip replaced text
+            reader.skip(change.getRangeLength());
+
+            // Write remaining text
+            while (true) {
+                int next = reader.read();
+
+                if (next == -1)
+                    return writer.toString();
+                else
+                    writer.write(next);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private Optional<Path> getFilePath(URI uri) {
@@ -594,7 +640,6 @@ class JavaLanguageServer implements LanguageServer {
             throw ShowMessageException.error(e.getMessage(), e);
         }
     }
-
 
     public List<CompletionItemImpl> autocomplete(TextDocumentPositionParams position) {
         Optional<Path> maybePath = getFilePath(URI.create(position.getTextDocument().getUri()));
