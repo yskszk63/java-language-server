@@ -64,6 +64,54 @@ export function activate(context: VSCode.ExtensionContext) {
     // Push the disposable to the context's subscriptions so that the 
     // client can be deactivated on extension deactivation
     context.subscriptions.push(disposable);
+    
+    // Set indentation rules
+    VSCode.languages.setLanguageConfiguration('java', {
+        indentationRules: {
+            // ^(.*\*/)?\s*\}.*$
+            decreaseIndentPattern: /^(.*\*\/)?\s*\}.*$/,
+            // ^.*\{[^}"']*$
+            increaseIndentPattern: /^.*\{[^}"']*$/
+        },
+        wordPattern: /(-?\d*\.\d\w*)|([^\`\~\!\@\#\%\^\&\*\(\)\-\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\?\s]+)/g,
+        comments: {
+            lineComment: '//',
+            blockComment: ['/*', '*/']
+        },
+        brackets: [
+            ['{', '}'],
+            ['[', ']'],
+            ['(', ')'],
+        ],
+        onEnterRules: [
+            {
+                // e.g. /** | */
+                beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
+                afterText: /^\s*\*\/$/,
+                action: { indentAction: VSCode.IndentAction.IndentOutdent, appendText: ' * ' }
+            },
+            {
+                // e.g. /** ...|
+                beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
+                action: { indentAction: VSCode.IndentAction.None, appendText: ' * ' }
+            },
+            {
+                // e.g.  * ...|
+                beforeText: /^(\t|(\ \ ))*\ \*(\ ([^\*]|\*(?!\/))*)?$/,
+                action: { indentAction: VSCode.IndentAction.None, appendText: '* ' }
+            },
+            {
+                // e.g.  */|
+                beforeText: /^(\t|(\ \ ))*\ \*\/\s*$/,
+                action: { indentAction: VSCode.IndentAction.None, removeText: 1 }
+            }
+        ],
+        
+        // TODO equivalent of this from typescript when replacement for __electricCharacterSupport API is released
+        // __electricCharacterSupport: {
+        //     docComment: { scope: 'comment.documentation', open: '/**', lineStart: ' * ', close: ' */' }
+        // }
+    });
 }
 
 export function findJavaExecutable(binname: string) {
