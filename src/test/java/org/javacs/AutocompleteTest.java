@@ -13,8 +13,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.hamcrest.Matchers.hasItems;
-import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
 public class AutocompleteTest extends Fixtures {
@@ -52,6 +51,16 @@ public class AutocompleteTest extends Fixtures {
 
         assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "class")));
         assertThat(suggestions, hasItems("field", "method", "getClass"));
+    }
+    
+    @Test
+    public void order() throws IOException {
+        String file = "/org/javacs/example/AutocompleteOrder.java";
+
+        // Static method
+        Set<String> suggestions = items(file, 4, 26).stream().map(i -> i.getSortText()).collect(Collectors.toSet());
+
+        assertThat(suggestions, hasItems("0/getMethod()", "1/getInheritedMethod()", "2/getClass()"));
     }
 
     @Test
