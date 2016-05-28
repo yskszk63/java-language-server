@@ -11,6 +11,10 @@
 * Open symbol by name
 * Go-to-subclasses
 
+### Refactoring
+* Inline method, variable
+* Extract method, variable
+
 ### Code generation
 * New .java file class boilerplate
 * Missing method definition

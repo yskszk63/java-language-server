@@ -305,10 +305,10 @@ public class AutocompleteVisitor extends CursorScanner {
 
         CompletionItemImpl item = new CompletionItemImpl();
 
-        item.setKind(CompletionItem.KIND_METHOD);
+        item.setKind(CompletionItem.KIND_PROPERTY);
         item.setLabel(name);
         item.setInsertText(name);
-        item.setDetail(e.getEnclosingElement().getSimpleName().toString());
+        item.setDetail(ShortTypePrinter.print(e.type));
         item.setDocumentation(docstring(e));
 
         suggestions.add(item);
