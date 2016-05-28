@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 
 public class AutocompleteVisitor extends CursorScanner {
     private static final Logger LOG = Logger.getLogger("main");
-    public static final Pattern REMOVE_PACKAGE_NAME = Pattern.compile("(?:\\w+\\.)+(.*)");
     public final List<CompletionItemImpl> suggestions = new ArrayList<>();
 
     public AutocompleteVisitor(JavaFileObject file, long cursor, Context context) {
@@ -273,6 +272,7 @@ public class AutocompleteVisitor extends CursorScanner {
     public static String methodSignature(Symbol.MethodSymbol e) {
         String name = e.getSimpleName().toString();
         String params = e.getParameters().stream().map(AutocompleteVisitor::shortName).collect(Collectors.joining(", "));
+        
         return name + "(" + params + ")";
     }
 
@@ -287,13 +287,7 @@ public class AutocompleteVisitor extends CursorScanner {
     }
 
     private static String shortTypeName(Type type) {
-        String longName = type.toString();
-        Matcher matcher = REMOVE_PACKAGE_NAME.matcher(longName);
-
-        if (matcher.matches())
-            return matcher.group(1);
-        else
-            return longName;
+        return ShortTypePrinter.print(type);
     }
 
     private String docstring(Symbol symbol) {

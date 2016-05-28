@@ -694,8 +694,9 @@ class JavaLanguageServer implements LanguageServer {
                     case INSTANCE_INIT:
                         Symbol.MethodSymbol method = (Symbol.MethodSymbol) symbol;
                         String signature = AutocompleteVisitor.methodSignature(method);
-
-                        contents.add(markedString(signature));
+                        String returnType = ShortTypePrinter.print(method.getReturnType());
+                        
+                        contents.add(markedString(returnType + " " + signature));
 
                         break;
                     case PARAMETER:
