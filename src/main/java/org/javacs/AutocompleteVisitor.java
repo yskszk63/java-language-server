@@ -8,6 +8,7 @@ import com.sun.source.tree.*;
 import com.sun.tools.javac.api.JavacScope;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.jvm.ClassReader;
 import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
@@ -211,7 +212,7 @@ public class AutocompleteVisitor extends CursorScanner {
                     break;
                 }
                 case METHOD:
-                    addMethod((Symbol.MethodSymbol) e);
+                    addMethod((Symbol.MethodSymbol) e, 0);
 
                     break;
                 case CONSTRUCTOR:
@@ -247,7 +248,7 @@ public class AutocompleteVisitor extends CursorScanner {
         suggestions.add(item);
     }
 
-    private void addMethod(Symbol.MethodSymbol e) {
+    private void addMethod(Symbol.MethodSymbol e, int superRemoved) {
         String name = e.getSimpleName().toString();
         String params = e.getParameters().stream().map(this::shortName).collect(Collectors.joining(", "));
         String label = name + "(" + params + ")";
@@ -259,6 +260,7 @@ public class AutocompleteVisitor extends CursorScanner {
         item.setInsertText(name);
         item.setDetail(e.getEnclosingElement().getSimpleName().toString());
         item.setDocumentation(docstring(e));
+        item.setSortText(superRemoved + "/" + label);
 
         suggestions.add(item);
     }
@@ -327,7 +329,7 @@ public class AutocompleteVisitor extends CursorScanner {
                         Symbol.MethodSymbol method = (Symbol.MethodSymbol) e;
 
                         if (method.isStatic())
-                            addMethod(method);
+                            addMethod(method, 0);
 
                         break;
                 }
@@ -370,8 +372,11 @@ public class AutocompleteVisitor extends CursorScanner {
                     case METHOD:
                         Symbol.MethodSymbol method = (Symbol.MethodSymbol) e;
 
-                        if (!method.isStatic())
-                            addMethod(method);
+                        if (!method.isStatic()) {
+                            int removed = supersRemoved(method, t);
+                            
+                            addMethod(method, removed);
+                        }
 
                         break;
                 }
@@ -382,5 +387,23 @@ public class AutocompleteVisitor extends CursorScanner {
         public void visitWildcard(WildcardType t) {
             visit(t.getExtendsBound());
         }
+    }
+
+    /**
+     * When autocompleting [inType].[method], is [method] part of [inType], or a superclass?
+     */
+    private int supersRemoved(Symbol.MethodSymbol method, DeclaredType inType) {
+        Element inElement = inType.asElement();
+        Symbol methodType = method.getEnclosingElement();
+
+        // If method is a member of java.lang.Object, sort order 2
+        if (methodType.getQualifiedName().contentEquals("java.lang.Object"))
+            return 2;
+        // If method is inherited, sort order 1
+        else if (!methodType.equals(inElement))
+            return 1;
+        // If method is not inherited, sort order 0
+        else
+            return 0;
     }
 }
