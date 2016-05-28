@@ -262,7 +262,7 @@ public class AutocompleteVisitor extends CursorScanner {
         item.setKind(CompletionItem.KIND_METHOD);
         item.setLabel(label);
         item.setInsertText(e.getSimpleName().toString());
-        item.setDetail(e.getEnclosingElement().getSimpleName().toString());
+        item.setDetail(ShortTypePrinter.print(e.getReturnType()));
         item.setDocumentation(docstring(e));
         item.setSortText(superRemoved + "/" + label);
 
