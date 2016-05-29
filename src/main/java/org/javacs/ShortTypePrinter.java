@@ -1,15 +1,23 @@
 package org.javacs;
 
+import com.sun.tools.javac.code.Type;
+
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.type.*;
 import javax.lang.model.util.AbstractTypeVisitor8;
 import java.util.stream.Collectors;
+import java.util.logging.*;
 
 public class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
+    private static final Logger LOG = Logger.getLogger("main");
+    
     private ShortTypePrinter() {
 
     }
 
     public static String print(TypeMirror type) {
+        LOG.info(type.toString());
+        
         return type.accept(new ShortTypePrinter(), null);
     }
 
@@ -42,8 +50,12 @@ public class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
     public String visitDeclared(DeclaredType t, Void aVoid) {
         String result = "";
 
-        if (t.getEnclosingType().getKind() == TypeKind.DECLARED)
+        // If type is an inner class, add outer class name
+        if (t.asElement().getKind() == ElementKind.CLASS &&
+            t.getEnclosingType().getKind() == TypeKind.DECLARED) {
+
             result += print(t.getEnclosingType()) + ".";
+        }
 
         result += t.asElement().getSimpleName().toString();
 
@@ -69,8 +81,9 @@ public class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
         String result = t.asElement().toString();
         TypeMirror upper = t.getUpperBound();
 
-        if (!upper.toString().equals("java.lang.Object"))
-            result += " extends " + print(upper);
+        // NOTE this can create infinite recursion
+        // if (!upper.toString().equals("java.lang.Object"))
+        //     result += " extends " + print(upper);
 
         return result;
     }
