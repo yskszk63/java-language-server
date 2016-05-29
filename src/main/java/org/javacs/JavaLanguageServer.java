@@ -261,13 +261,9 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private void doLint(Path path) {
-        List<DiagnosticImpl> errors = lint(path);
-        PublishDiagnosticsParamsImpl publish = new PublishDiagnosticsParamsImpl();
+        List<PublishDiagnosticsParamsImpl> errors = lint(path);
 
-        publish.setDiagnostics(errors);
-        publish.setUri(path.toFile().toURI().toString());
-
-        publishDiagnostics.call(publish);
+        errors.forEach(publishDiagnostics::call);
     }
 
     @Override
@@ -310,7 +306,7 @@ class JavaLanguageServer implements LanguageServer {
         };
     }
 
-    public List<DiagnosticImpl> lint(Path path) {
+    public List<PublishDiagnosticsParamsImpl> lint(Path path) {
         LOG.info("Lint " + path);
 
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
@@ -321,23 +317,37 @@ class JavaLanguageServer implements LanguageServer {
         compiler.onError(errors);
         compiler.compile(compiler.parse(file));
 
-        return errors
-                .getDiagnostics()
-                .stream()
-                .filter(e -> e.getStartPosition() != javax.tools.Diagnostic.NOPOS)
-                .filter(e -> e.getSource().toUri().getPath().equals(path.toString()))
-                .map(error -> {
-                    RangeImpl range = position(error);
-                    DiagnosticImpl diagnostic = new DiagnosticImpl();
+        Map<URI, PublishDiagnosticsParamsImpl> files = new HashMap<>();
+        
+        errors.getDiagnostics().forEach(error -> {
+            if (error.getStartPosition() != javax.tools.Diagnostic.NOPOS) {
+                URI uri = error.getSource().toUri();
+                PublishDiagnosticsParamsImpl publish = files.computeIfAbsent(uri, newUri -> {
+                    PublishDiagnosticsParamsImpl p = new PublishDiagnosticsParamsImpl();
 
-                    diagnostic.setSeverity(Diagnostic.SEVERITY_ERROR);
-                    diagnostic.setRange(range);
-                    diagnostic.setCode(error.getCode());
-                    diagnostic.setMessage(error.getMessage(null));
+                    p.setDiagnostics(new ArrayList<>());
+                    p.setUri(newUri.toString());
 
-                    return diagnostic;
-                })
-                .collect(Collectors.toList());
+                    return p;
+                });
+
+                RangeImpl range = position(error);
+                DiagnosticImpl diagnostic = new DiagnosticImpl();
+
+                diagnostic.setSeverity(Diagnostic.SEVERITY_ERROR);
+                diagnostic.setRange(range);
+                diagnostic.setCode(error.getCode());
+                diagnostic.setMessage(error.getMessage(null));
+
+                publish.getDiagnostics().add(diagnostic);
+            }
+        });
+
+        List<PublishDiagnosticsParamsImpl> result = new ArrayList<>();
+
+        result.addAll(files.values());
+
+        return result;
     }
 
     private Map<JavacConfig, JavacHolder> compilerCache = new HashMap<>();
