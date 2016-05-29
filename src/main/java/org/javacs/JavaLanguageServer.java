@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -37,6 +38,12 @@ class JavaLanguageServer implements LanguageServer {
     public void onError(String message, Throwable error) {
         if (error instanceof ShowMessageException)
             showMessage.call(((ShowMessageException) error).message);
+        else if (error instanceof NoJavaConfigException) {
+            // Swallow error
+            // If you want to show a message for no-java-config, 
+            // you have to specifically catch the error lower down and re-throw it
+            LOG.warning(error.getMessage());
+        }
         else {
             MessageParamsImpl m = new MessageParamsImpl();
 
@@ -156,16 +163,20 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public void didOpen(DidOpenTextDocumentParams params) {
-                TextDocumentItem document = params.getTextDocument();
-                URI uri = URI.create(document.getUri());
-                Optional<Path> path = getFilePath(uri);
+                try {
+                    TextDocumentItem document = params.getTextDocument();
+                    URI uri = URI.create(document.getUri());
+                    Optional<Path> path = getFilePath(uri);
 
-                if (path.isPresent()) {
-                    String text = document.getText();
+                    if (path.isPresent()) {
+                        String text = document.getText();
 
-                    sourceByPath.put(path.get(), text);
+                        sourceByPath.put(path.get(), text);
 
-                    doLint(path.get());
+                        doLint(path.get());
+                    }
+                } catch (NoJavaConfigException e) {
+                    throw ShowMessageException.warning(e.getMessage(), e);
                 }
             }
 
@@ -184,10 +195,6 @@ class JavaLanguageServer implements LanguageServer {
                             String newText = patch(existingText, change);
 
                             sourceByPath.put(path.get(), newText);
-
-                            LOG.info(path.get().toString());
-                            LOG.info(change.getText());
-                            LOG.info(newText);
                         }
                     }
                 }
@@ -204,6 +211,7 @@ class JavaLanguageServer implements LanguageServer {
                 URI uri = URI.create(document.getUri());
                 Optional<Path> path = getFilePath(uri);
 
+                // TODO re-lint dependencies as well as changed files
                 if (path.isPresent())
                     doLint(path.get());
             }
@@ -374,12 +382,7 @@ class JavaLanguageServer implements LanguageServer {
         Optional<JavacHolder> maybeHolder = config.map(c -> compilerCache.computeIfAbsent(c, this::newJavac));
 
         return maybeHolder.orElseThrow(() -> {
-            MessageParamsImpl message = new MessageParamsImpl();
-
-            message.setMessage("Can't find configuration file for " + path);
-            message.setType(MessageParams.TYPE_WARNING);
-
-            return new ShowMessageException(message, null);
+            return new NoJavaConfigException(path);
         });
     }
 

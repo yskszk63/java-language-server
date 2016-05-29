@@ -6,10 +6,12 @@
 * Remove definitions from context when source file is deleted
 * Don't autocomplete inaccessible members
 * Compiler warnings
+* Autocomplete virtuals without this
 
 ## Features 
 * Open symbol by name
 * Go-to-subclasses
+* Signature help
 
 ### Refactoring
 * Inline method, variable
@@ -22,10 +24,13 @@
 * Add variable
 * Enum options
 * Cast to type
+* Import missing file
 
 ## Optimizations
 * Incremental parsing
 * Only run attribution and flow phases on method of interest
+* Kill java process when vscode quits
+* Inactive org.javacs.Main process is grinding CPU
 
 ## Tests
 * Hover info

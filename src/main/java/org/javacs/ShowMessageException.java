@@ -13,10 +13,18 @@ public class ShowMessageException extends RuntimeException {
     }
 
     public static ShowMessageException error(String message, Exception cause) {
+        return create(MessageParams.TYPE_ERROR, message, cause);
+    }
+
+    public static ShowMessageException warning(String message, Exception cause) {
+        return create(MessageParams.TYPE_WARNING, message, cause);
+    }
+    
+    private static ShowMessageException create(int type, String message, Exception cause) {
         MessageParamsImpl m = new MessageParamsImpl();
 
         m.setMessage(message);
-        m.setType(MessageParams.TYPE_ERROR);
+        m.setType(type);
 
         return new ShowMessageException(m, cause);
     }
