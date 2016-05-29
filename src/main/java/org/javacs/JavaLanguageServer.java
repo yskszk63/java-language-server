@@ -319,17 +319,12 @@ class JavaLanguageServer implements LanguageServer {
 
         Map<URI, PublishDiagnosticsParamsImpl> files = new HashMap<>();
         
+        files.put(path.toUri(), newPublishDiagnostics(path.toUri()));
+        
         errors.getDiagnostics().forEach(error -> {
             if (error.getStartPosition() != javax.tools.Diagnostic.NOPOS) {
                 URI uri = error.getSource().toUri();
-                PublishDiagnosticsParamsImpl publish = files.computeIfAbsent(uri, newUri -> {
-                    PublishDiagnosticsParamsImpl p = new PublishDiagnosticsParamsImpl();
-
-                    p.setDiagnostics(new ArrayList<>());
-                    p.setUri(newUri.toString());
-
-                    return p;
-                });
+                PublishDiagnosticsParamsImpl publish = files.computeIfAbsent(uri, this::newPublishDiagnostics);
 
                 RangeImpl range = position(error);
                 DiagnosticImpl diagnostic = new DiagnosticImpl();
@@ -348,6 +343,15 @@ class JavaLanguageServer implements LanguageServer {
         result.addAll(files.values());
 
         return result;
+    }
+    
+    private PublishDiagnosticsParamsImpl newPublishDiagnostics(URI newUri) {
+        PublishDiagnosticsParamsImpl p = new PublishDiagnosticsParamsImpl();
+
+        p.setDiagnostics(new ArrayList<>());
+        p.setUri(newUri.toString());
+
+        return p;
     }
 
     private Map<JavacConfig, JavacHolder> compilerCache = new HashMap<>();
