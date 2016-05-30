@@ -5,6 +5,7 @@
 * Don't autocomplete inaccessible members
 * Autocomplete virtuals without this
 * Show inner classes as Outer.Inner
+* Cannot find symbol errors getting reported twice
 
 ## Features 
 * Open symbol by name
