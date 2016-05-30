@@ -61,6 +61,6 @@ public class SymbolUnderCursorVisitor extends CursorScanner {
     }
 
     private void found(Symbol symbol) {
-        found = Optional.of(symbol);
+        found = Optional.ofNullable(symbol);
     }
 }
