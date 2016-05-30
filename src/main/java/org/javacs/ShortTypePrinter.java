@@ -16,8 +16,6 @@ public class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
     }
 
     public static String print(TypeMirror type) {
-        LOG.info(type.toString());
-        
         return type.accept(new ShortTypePrinter(), null);
     }
 
