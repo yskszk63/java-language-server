@@ -738,7 +738,7 @@ class JavaLanguageServer implements LanguageServer {
                     case EXCEPTION_PARAMETER:
                     case ENUM_CONSTANT:
                     case FIELD:
-                        contents.add(markedString(symbol.type + " " + symbol.getSimpleName()));
+                        contents.add(markedString(ShortTypePrinter.print(symbol.type)));
 
                         break;
                     case TYPE_PARAMETER:

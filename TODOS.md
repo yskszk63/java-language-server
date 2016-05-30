@@ -2,7 +2,6 @@
 
 ## Polish
 * Display rest... properties in autocomplete
-* Hover shows package-qualified name
 * Remove definitions from context when source file is deleted
 * Don't autocomplete inaccessible members
 * Autocomplete virtuals without this
