@@ -396,11 +396,14 @@ class JavaLanguageServer implements LanguageServer {
 
         Path dir = path.getParent();
         Optional<JavacConfig> config = findConfig(dir);
+        
+        // If config source path doesn't contain source file, then source file has no config
+        if (config.isPresent() && !config.get().sourcePath.stream().anyMatch(s -> path.startsWith(s)))
+            throw new NoJavaConfigException(path.getFileName() + " is not on the source path");
+        
         Optional<JavacHolder> maybeHolder = config.map(c -> compilerCache.computeIfAbsent(c, this::newJavac));
 
-        return maybeHolder.orElseThrow(() -> {
-            return new NoJavaConfigException(path);
-        });
+        return maybeHolder.orElseThrow(() -> new NoJavaConfigException(path));
     }
 
     private JavacHolder newJavac(JavacConfig c) {

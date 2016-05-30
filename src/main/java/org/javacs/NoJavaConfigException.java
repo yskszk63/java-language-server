@@ -4,6 +4,10 @@ import java.nio.file.Path;
 
 public class NoJavaConfigException extends RuntimeException {
     public NoJavaConfigException(Path forFile) {
-        super("Can't find configuration file for " + forFile);
+        this("Can't find configuration file for " + forFile);
+    }
+    
+    public NoJavaConfigException(String message) {
+        super(message);
     }
 }
