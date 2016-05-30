@@ -52,6 +52,124 @@ public class AutocompleteTest extends Fixtures {
         assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "class")));
         assertThat(suggestions, hasItems("field", "method", "getClass"));
     }
+
+    @Test
+    public void initBlock() throws IOException {
+        String file = "/org/javacs/example/AutocompleteMembers.java";
+
+        // f
+        Set<String> suggestions = insertText(file, 7, 9);
+
+        assertThat(suggestions, hasItems("field", "fieldStatic", "method", "methodStatic"));
+        
+        // this.f
+        suggestions = insertText(file, 8, 14);
+
+        assertThat(suggestions, hasItems("field", "method"));
+        assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic")));
+        
+        // AutocompleteMembers.f
+        suggestions = insertText(file, 9, 29);
+
+        assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
+        assertThat(suggestions, not(hasItems("field", "method")));
+
+        // TODO
+//        // this::m
+//        suggestions = insertText(file, 10, 15);
+//
+//        assertThat(suggestions, hasItems("method"));
+//        assertThat(suggestions, not(hasItems("field", "fieldStatic", "methodStatic")));
+//
+//        // AutocompleteMembers::m
+//        suggestions = insertText(file, 11, 30);
+//
+//        assertThat(suggestions, hasItems("methodStatic"));
+//        assertThat(suggestions, not(hasItems("field", "fieldStatic", "method")));
+    }
+
+    @Test
+    public void method() throws IOException {
+        String file = "/org/javacs/example/AutocompleteMembers.java";
+
+        // f
+        Set<String> suggestions = insertText(file, 21, 9);
+
+        assertThat(suggestions, hasItems("field", "fieldStatic", "method", "methodStatic", "argument"));
+        
+        // this.f
+        suggestions = insertText(file, 22, 14);
+
+        assertThat(suggestions, hasItems("field", "method"));
+        assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "argument")));
+        
+        // AutocompleteMembers.f
+        suggestions = insertText(file, 23, 29);
+
+        assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
+        assertThat(suggestions, not(hasItems("field", "method", "argument")));
+
+        // TODO
+//        // this::m
+//        suggestions = insertText(file, 10, 15);
+//
+//        assertThat(suggestions, hasItems("method"));
+//        assertThat(suggestions, not(hasItems("field", "fieldStatic", "methodStatic")));
+//
+//        // AutocompleteMembers::m
+//        suggestions = insertText(file, 11, 30);
+//
+//        assertThat(suggestions, hasItems("methodStatic"));
+//        assertThat(suggestions, not(hasItems("field", "fieldStatic", "method")));
+    }
+
+    @Test
+    public void staticInitBlock() throws IOException {
+        String file = "/org/javacs/example/AutocompleteMembers.java";
+
+        // f
+        Set<String> suggestions = insertText(file, 15, 9);
+
+        assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
+        assertThat(suggestions, not(hasItems("field", "method")));
+        
+        // AutocompleteMembers.f
+        suggestions = insertText(file, 16, 29);
+
+        assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
+        assertThat(suggestions, not(hasItems("field", "method")));
+
+        // TODO
+//        // AutocompleteMembers::m
+//        suggestions = insertText(file, 17, 30);
+//
+//        assertThat(suggestions, hasItems("methodStatic"));
+//        assertThat(suggestions, not(hasItems("field", "fieldStatic", "method")));
+    }
+
+    @Test
+    public void staticMethod() throws IOException {
+        String file = "/org/javacs/example/AutocompleteMembers.java";
+
+        // f
+        Set<String> suggestions = insertText(file, 29, 9);
+
+        assertThat(suggestions, hasItems("fieldStatic", "methodStatic", "argument"));
+        assertThat(suggestions, not(hasItems("field", "method")));
+        
+        // AutocompleteMembers.f
+        suggestions = insertText(file, 30, 29);
+
+        assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
+        assertThat(suggestions, not(hasItems("field", "method", "argument")));
+
+        // TODO
+//        // AutocompleteMembers::m
+//        suggestions = insertText(file, 17, 30);
+//
+//        assertThat(suggestions, hasItems("methodStatic"));
+//        assertThat(suggestions, not(hasItems("field", "fieldStatic", "method")));
+    }
     
     @Test
     public void order() throws IOException {

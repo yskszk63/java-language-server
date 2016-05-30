@@ -3,10 +3,10 @@
 ## Polish
 * Remove definitions from context when source file is deleted
 * Don't autocomplete inaccessible members
-* Autocomplete virtuals without this
 * Show inner classes as Outer.Inner
 * Cannot find symbol errors getting reported twice
 * Autocomplete with <>()
+* Only issue no-config-file / not-on-sourcepath messages once
 
 ## Features 
 * Open symbol by name

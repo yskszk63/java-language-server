@@ -10,6 +10,8 @@ import com.sun.tools.javac.api.JavacScope;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Types;
+import com.sun.tools.javac.comp.AttrContext;
+import com.sun.tools.javac.comp.AttrUtils;
 import com.sun.tools.javac.jvm.ClassReader;
 import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
@@ -18,6 +20,8 @@ import io.typefox.lsapi.CompletionItem;
 import io.typefox.lsapi.CompletionItemImpl;
 
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import javax.tools.JavaFileObject;
@@ -110,17 +114,22 @@ public class AutocompleteVisitor extends CursorScanner {
         if (path != null) {
             JavacTrees trees = JavacTrees.instance(context);
             JavacScope scope = trees.getScope(path);
+            AttrContext info = scope.getEnv().info;
+            boolean isStatic = AttrUtils.isStatic(info);
 
             while (scope != null) {
-                for (Element e : scope.getLocalElements())
+                for (Element e : scope.getLocalElements()) {
                     addElement(e);
+                }
 
-                // Add inner classes
+                // Add class members
                 TypeElement enclosingClass = scope.getEnclosingClass();
 
                 if (enclosingClass != null) {
                     for (Element element : enclosingClass.getEnclosedElements()) {
-                        if (element instanceof Symbol.ClassSymbol)
+                        boolean include = !isStatic || element.getModifiers().contains(Modifier.STATIC);
+
+                        if (include)
                             addElement(element);
                     }
                 }
