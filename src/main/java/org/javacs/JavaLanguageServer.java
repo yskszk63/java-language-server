@@ -207,7 +207,20 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public void didClose(DidCloseTextDocumentParams params) {
-                // remove from sourceByPath???
+                TextDocumentIdentifier document = params.getTextDocument();
+                URI uri = URI.create(document.getUri());
+                Optional<Path> path = getFilePath(uri);
+
+                if (path.isPresent()) {
+                    JavacHolder compiler = findCompiler(path.get());
+                    JavaFileObject file = findFile(compiler, path.get());
+                    
+                    // Remove file from javac caches
+                    compiler.clear(file);
+                    
+                    // Remove from source cache
+                    sourceByPath.remove(path.get());
+                }
             }
 
             @Override
