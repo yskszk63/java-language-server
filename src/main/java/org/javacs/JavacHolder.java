@@ -52,6 +52,10 @@ public class JavacHolder {
     {
         context.put(DiagnosticListener.class, errors);
     }
+    private final Options options = Options.instance(context);
+    {
+        options.put("-Xlint", "all");
+    }
     // IncrementalLog registers itself in context and pre-empts the normal Log from being created
     private final IncrementalLog log = new IncrementalLog(context);
     public final JavacFileManager fileManager = new JavacFileManager(context, true, null);
@@ -59,7 +63,6 @@ public class JavacHolder {
     private final Check check = Check.instance(context);
     // FuzzyParserFactory registers itself in context and pre-empts the normal ParserFactory from being created
     private final FuzzyParserFactory parserFactory = FuzzyParserFactory.instance(context);
-    private final Options options = Options.instance(context);
     private final JavaCompiler compiler = JavaCompiler.instance(context);
 
     {

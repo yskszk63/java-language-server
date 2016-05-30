@@ -5,8 +5,8 @@
 * Hover shows package-qualified name
 * Remove definitions from context when source file is deleted
 * Don't autocomplete inaccessible members
-* Compiler warnings
 * Autocomplete virtuals without this
+* Show inner classes as Outer.Inner
 
 ## Features 
 * Open symbol by name

@@ -45,6 +45,8 @@ class JavaLanguageServer implements LanguageServer {
             LOG.warning(error.getMessage());
         }
         else {
+            LOG.log(Level.SEVERE, message, error);
+            
             MessageParamsImpl m = new MessageParamsImpl();
 
             m.setMessage(message);
@@ -336,8 +338,9 @@ class JavaLanguageServer implements LanguageServer {
 
                 RangeImpl range = position(error);
                 DiagnosticImpl diagnostic = new DiagnosticImpl();
+                int severity = severity(error.getKind());
 
-                diagnostic.setSeverity(Diagnostic.SEVERITY_ERROR);
+                diagnostic.setSeverity(severity);
                 diagnostic.setRange(range);
                 diagnostic.setCode(error.getCode());
                 diagnostic.setMessage(error.getMessage(null));
@@ -352,7 +355,21 @@ class JavaLanguageServer implements LanguageServer {
 
         return result;
     }
-    
+
+    private int severity(javax.tools.Diagnostic.Kind kind) {
+        switch (kind) {
+            case ERROR:
+                return Diagnostic.SEVERITY_ERROR;
+            case WARNING:
+            case MANDATORY_WARNING:
+                return Diagnostic.SEVERITY_WARNING;
+            case NOTE:
+            case OTHER:
+            default:
+                return Diagnostic.SEVERITY_INFO;
+        }
+    }
+
     private PublishDiagnosticsParamsImpl newPublishDiagnostics(URI newUri) {
         PublishDiagnosticsParamsImpl p = new PublishDiagnosticsParamsImpl();
 

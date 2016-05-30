@@ -156,6 +156,17 @@ public class LinterTest extends Fixtures {
 
         assertThat(errors.getDiagnostics(), not(empty()));
     }
+    
+    @Test
+    public void deprecationWarning() {
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
+        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/DeprecationWarning.java");
+        JavacHolder compiler = newCompiler();
+        compiler.onError(errors);
+        compiler.compile(compiler.parse(file));
+
+        assertThat(errors.getDiagnostics(), not(empty()));
+    }
 
     public static class MethodTypes extends BaseScanner {
         public final Map<String, Type.MethodType> methodTypes = new HashMap<>();
