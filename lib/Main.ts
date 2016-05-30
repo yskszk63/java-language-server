@@ -48,7 +48,7 @@ export function activate(context: VSCode.ExtensionContext) {
                         writer: socket
                     });
                 }).listen(port, () => {
-                    var options = { stdio: 'inherit', cwd: VSCode.workspace.rootPath };
+                    let options = { stdio: 'inherit', cwd: VSCode.workspace.rootPath };
                     
                     // Start the child java process
                     ChildProcess.spawn(javaExecutablePath, args, options);
