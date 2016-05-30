@@ -2,6 +2,7 @@ package org.javacs;
 
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
+import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Type;
 import com.google.common.base.Joiner;
 import com.sun.source.tree.*;
@@ -12,8 +13,7 @@ import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.jvm.ClassReader;
 import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.util.Context;
-import com.sun.tools.javac.util.Name;
+import com.sun.tools.javac.util.*;
 import io.typefox.lsapi.CompletionItem;
 import io.typefox.lsapi.CompletionItemImpl;
 
@@ -22,6 +22,7 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import javax.tools.JavaFileObject;
 import java.util.*;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -271,19 +272,39 @@ public class AutocompleteVisitor extends CursorScanner {
 
     public static String methodSignature(Symbol.MethodSymbol e) {
         String name = e.getSimpleName().toString();
-        String params = e.getParameters().stream().map(AutocompleteVisitor::shortName).collect(Collectors.joining(", "));
-        
+        boolean varargs = (e.flags() & Flags.VARARGS) != 0;
+        StringJoiner params = new StringJoiner(", ");
+
+        com.sun.tools.javac.util.List<Symbol.VarSymbol> parameters = e.getParameters();
+        for (int i = 0; i < parameters.size(); i++) {
+            Symbol.VarSymbol p = parameters.get(i);
+            String pName = shortName(p, varargs && i == parameters.size() - 1);
+
+            params.add(pName);
+        }
+
         return name + "(" + params + ")";
     }
 
-    private static String shortName(Symbol.VarSymbol p) {
-        String type = shortTypeName(p.type);
+    private static String shortName(Symbol.VarSymbol p, boolean varargs) {
+        Type type = p.type;
+
+        if (varargs) {
+            Type.ArrayType array = (Type.ArrayType) type;
+
+            type = array.getComponentType();
+        }
+
+        String acc = shortTypeName(type);
         String name = p.name.toString();
 
-        if (name.matches("arg\\d+"))
-            return type;
-        else
-            return type + " " + name;
+        if (varargs)
+            acc += "...";
+
+        if (!name.matches("arg\\d+"))
+            acc += " " + name;
+
+        return acc;
     }
 
     private static String shortTypeName(Type type) {

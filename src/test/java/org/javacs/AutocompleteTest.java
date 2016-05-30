@@ -139,6 +139,16 @@ public class AutocompleteTest extends Fixtures {
         assertThat(suggestions, hasItems("getClass"));
     }
 
+    @Test
+    public void restParams() throws IOException {
+        String file = "/org/javacs/example/AutocompleteRest.java";
+
+        // Static method
+        Set<String> suggestions = items(file, 4, 17).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
+
+        assertThat(suggestions, hasItems("restMethod(String... params)"));
+    }
+
     private Set<String> insertText(String file, int row, int column) throws IOException {
         List<CompletionItemImpl> items = items(file, row, column);
 

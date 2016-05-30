@@ -1,7 +1,6 @@
 # Todo
 
 ## Polish
-* Display rest... properties in autocomplete
 * Remove definitions from context when source file is deleted
 * Don't autocomplete inaccessible members
 * Autocomplete virtuals without this
@@ -15,6 +14,7 @@
 ### Refactoring
 * Inline method, variable
 * Extract method, variable
+* Replace for comprehension with loop
 
 ### Code generation
 * New .java file class boilerplate
