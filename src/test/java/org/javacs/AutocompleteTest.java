@@ -150,16 +150,16 @@ public class AutocompleteTest extends Fixtures {
     }
 
     private Set<String> insertText(String file, int row, int column) throws IOException {
-        List<CompletionItemImpl> items = items(file, row, column);
+        List<? extends CompletionItem> items = items(file, row, column);
 
         return items
                 .stream()
-                .map(CompletionItemImpl::getInsertText)
+                .map(CompletionItem::getInsertText)
                 .collect(Collectors.toSet());
     }
 
     private Set<String> documentation(String file, int row, int column) throws IOException {
-        List<CompletionItemImpl> items = items(file, row, column);
+        List<? extends CompletionItem> items = items(file, row, column);
 
         return items
                 .stream()
@@ -172,7 +172,7 @@ public class AutocompleteTest extends Fixtures {
                 .collect(Collectors.toSet());
     }
 
-    private List<CompletionItemImpl> items(String file, int row, int column) {
+    private List<? extends CompletionItem> items(String file, int row, int column) {
         TextDocumentPositionParamsImpl position = new TextDocumentPositionParamsImpl();
 
         position.setPosition(new PositionImpl());
@@ -183,7 +183,7 @@ public class AutocompleteTest extends Fixtures {
 
         JavaLanguageServer server = getJavaLanguageServer();
 
-        return server.autocomplete(position);
+        return server.autocomplete(position).getItems();
     }
 
     private URI uri(String file) {

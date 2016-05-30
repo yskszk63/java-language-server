@@ -3,6 +3,7 @@ package org.javacs;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.code.Symbol;
+import io.typefox.lsapi.services.*;
 import io.typefox.lsapi.*;
 import io.typefox.lsapi.Diagnostic;
 
@@ -13,6 +14,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -23,8 +26,8 @@ import static org.javacs.Main.JSON;
 class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
     private Path workspaceRoot;
-    private NotificationCallback<PublishDiagnosticsParams> publishDiagnostics = p -> {};
-    private NotificationCallback<MessageParams> showMessage = m -> {};
+    private Consumer<PublishDiagnosticsParams> publishDiagnostics = p -> {};
+    private Consumer<MessageParams> showMessage = m -> {};
     private Map<Path, String> sourceByPath = new HashMap<>();
 
     public JavaLanguageServer() {
@@ -37,7 +40,7 @@ class JavaLanguageServer implements LanguageServer {
 
     public void onError(String message, Throwable error) {
         if (error instanceof ShowMessageException)
-            showMessage.call(((ShowMessageException) error).message);
+            showMessage.accept(((ShowMessageException) error).message);
         else if (error instanceof NoJavaConfigException) {
             // Swallow error
             // If you want to show a message for no-java-config, 
@@ -52,12 +55,12 @@ class JavaLanguageServer implements LanguageServer {
             m.setMessage(message);
             m.setType(MessageParams.TYPE_ERROR);
 
-            showMessage.call(m);
+            showMessage.accept(m);
         }
     }
 
     @Override
-    public InitializeResult initialize(InitializeParams params) {
+    public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
         workspaceRoot = Paths.get(params.getRootPath());
 
         InitializeResultImpl result = new InitializeResultImpl();
@@ -72,7 +75,7 @@ class JavaLanguageServer implements LanguageServer {
 
         result.setCapabilities(c);
 
-        return result;
+        return CompletableFuture.completedFuture(result);
     }
 
     @Override
@@ -89,77 +92,77 @@ class JavaLanguageServer implements LanguageServer {
     public TextDocumentService getTextDocumentService() {
         return new TextDocumentService() {
             @Override
-            public List<? extends CompletionItem> completion(TextDocumentPositionParams position) {
-                return autocomplete(position);
+            public CompletableFuture<CompletionList> completion(TextDocumentPositionParams position) {
+                return CompletableFuture.completedFuture(autocomplete(position));
             }
 
             @Override
-            public CompletionItem resolveCompletionItem(CompletionItem unresolved) {
+            public CompletableFuture<CompletionItem> resolveCompletionItem(CompletionItem unresolved) {
                 return null;
             }
 
             @Override
-            public Hover hover(TextDocumentPositionParams position) {
-                return doHover(position);
+            public CompletableFuture<Hover> hover(TextDocumentPositionParams position) {
+                return CompletableFuture.completedFuture(doHover(position));
             }
 
             @Override
-            public SignatureHelp signatureHelp(TextDocumentPositionParams position) {
+            public CompletableFuture<SignatureHelp> signatureHelp(TextDocumentPositionParams position) {
                 return null;
             }
 
             @Override
-            public List<? extends Location> definition(TextDocumentPositionParams position) {
-                return gotoDefinition(position);
+            public CompletableFuture<List<? extends Location>> definition(TextDocumentPositionParams position) {
+                return CompletableFuture.completedFuture(gotoDefinition(position));
             }
 
             @Override
-            public List<? extends Location> references(ReferenceParams params) {
+            public CompletableFuture<List<? extends Location>> references(ReferenceParams params) {
                 return null;
             }
 
             @Override
-            public DocumentHighlight documentHighlight(TextDocumentPositionParams position) {
+            public CompletableFuture<DocumentHighlight> documentHighlight(TextDocumentPositionParams position) {
                 return null;
             }
 
             @Override
-            public List<? extends SymbolInformation> documentSymbol(DocumentSymbolParams params) {
+            public CompletableFuture<List<? extends SymbolInformation>> documentSymbol(DocumentSymbolParams params) {
                 return null;
             }
 
             @Override
-            public List<? extends Command> codeAction(CodeActionParams params) {
+            public CompletableFuture<List<? extends Command>> codeAction(CodeActionParams params) {
                 return null;
             }
 
             @Override
-            public List<? extends CodeLens> codeLens(CodeLensParams params) {
+            public CompletableFuture<List<? extends CodeLens>> codeLens(CodeLensParams params) {
                 return null;
             }
 
             @Override
-            public CodeLens resolveCodeLens(CodeLens unresolved) {
+            public CompletableFuture<CodeLens> resolveCodeLens(CodeLens unresolved) {
                 return null;
             }
 
             @Override
-            public List<? extends TextEdit> formatting(DocumentFormattingParams params) {
+            public CompletableFuture<List<? extends TextEdit>> formatting(DocumentFormattingParams params) {
                 return null;
             }
 
             @Override
-            public List<? extends TextEdit> rangeFormatting(DocumentRangeFormattingParams params) {
+            public CompletableFuture<List<? extends TextEdit>> rangeFormatting(DocumentRangeFormattingParams params) {
                 return null;
             }
 
             @Override
-            public List<? extends TextEdit> onTypeFormatting(DocumentOnTypeFormattingParams params) {
+            public CompletableFuture<List<? extends TextEdit>> onTypeFormatting(DocumentOnTypeFormattingParams params) {
                 return null;
             }
 
             @Override
-            public WorkspaceEdit rename(RenameParams params) {
+            public CompletableFuture<WorkspaceEdit> rename(RenameParams params) {
                 return null;
             }
 
@@ -219,7 +222,7 @@ class JavaLanguageServer implements LanguageServer {
             }
 
             @Override
-            public void onPublishDiagnostics(NotificationCallback<PublishDiagnosticsParams> callback) {
+            public void onPublishDiagnostics(Consumer<PublishDiagnosticsParams> callback) {
                 publishDiagnostics = callback;
             }
         };
@@ -273,14 +276,14 @@ class JavaLanguageServer implements LanguageServer {
     private void doLint(Path path) {
         List<PublishDiagnosticsParamsImpl> errors = lint(path);
 
-        errors.forEach(publishDiagnostics::call);
+        errors.forEach(publishDiagnostics::accept);
     }
 
     @Override
     public WorkspaceService getWorkspaceService() {
         return new WorkspaceService() {
             @Override
-            public List<? extends SymbolInformation> symbol(WorkspaceSymbolParams params) {
+            public CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
                 return null;
             }
 
@@ -300,17 +303,17 @@ class JavaLanguageServer implements LanguageServer {
     public WindowService getWindowService() {
         return new WindowService() {
             @Override
-            public void onShowMessage(NotificationCallback<MessageParams> callback) {
+            public void onShowMessage(Consumer<MessageParams> callback) {
                 showMessage = callback;
             }
 
             @Override
-            public void onShowMessageRequest(NotificationCallback<ShowMessageRequestParams> callback) {
+            public void onShowMessageRequest(Consumer<ShowMessageRequestParams> callback) {
 
             }
 
             @Override
-            public void onLogMessage(NotificationCallback<MessageParams> callback) {
+            public void onLogMessage(Consumer<MessageParams> callback) {
 
             }
         };
@@ -766,7 +769,12 @@ class JavaLanguageServer implements LanguageServer {
         return result;
     }
 
-    public List<CompletionItemImpl> autocomplete(TextDocumentPositionParams position) {
+    public CompletionList autocomplete(TextDocumentPositionParams position) {
+        CompletionListImpl result = new CompletionListImpl();
+
+        result.setIncomplete(false);
+        result.setItems(new ArrayList<>());
+
         Optional<Path> maybePath = getFilePath(URI.create(position.getTextDocument().getUri()));
 
         if (maybePath.isPresent()) {
@@ -789,9 +797,10 @@ class JavaLanguageServer implements LanguageServer {
 
             compiler.compile(ast);
 
-            return autocompleter.suggestions;
+            result.getItems().addAll(autocompleter.suggestions);
         }
-        else return Collections.emptyList();
+
+        return result;
     }
 
     /**

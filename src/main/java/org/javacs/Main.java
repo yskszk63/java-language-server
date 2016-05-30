@@ -7,8 +7,7 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
-import io.typefox.lsapi.*;
-import io.typefox.lsapi.json.LanguageServerToJsonAdapter;
+import io.typefox.lsapi.services.json.LanguageServerToJsonAdapter;
 
 import java.io.*;
 import java.net.Socket;

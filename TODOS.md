@@ -6,7 +6,7 @@
 * Autocomplete virtuals without this
 * Show inner classes as Outer.Inner
 * Cannot find symbol errors getting reported twice
-* Only lint files on the source path, warn files not on source path
+* Autocomplete with <>()
 
 ## Features 
 * Open symbol by name
