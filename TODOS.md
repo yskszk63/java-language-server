@@ -14,7 +14,6 @@
 * Show unused imports (is this a feature of javac? findbugs?)
 
 ## Features 
-* Open symbol by name
 * Go-to-subclasses
 * Signature help
 
