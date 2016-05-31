@@ -98,7 +98,7 @@ public class JavacHolder {
         MultiTaskListener.instance(context).add(new TaskListener() {
             @Override
             public void started(TaskEvent e) {
-                LOG.info("started " + e);
+                LOG.fine("started " + e);
 
                 JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
 
@@ -111,7 +111,7 @@ public class JavacHolder {
 
             @Override
             public void finished(TaskEvent e) {
-                LOG.info("finished " + e);
+                LOG.fine("finished " + e);
 
                 JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
 
