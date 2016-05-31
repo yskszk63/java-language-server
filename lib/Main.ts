@@ -21,7 +21,7 @@ export function activate(context: VSCode.ExtensionContext) {
             // Synchronize the setting section 'java' to the server
             // NOTE: this currently doesn't do anything
             configurationSection: 'java',
-            // Notify the server about file changes to '.clientrc files contain in the workspace
+            // Notify the server about file changes to 'javaconfig.json' files contain in the workspace
             fileEvents: VSCode.workspace.createFileSystemWatcher('**/javaconfig.json')
         }
     }

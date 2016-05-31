@@ -18,11 +18,13 @@ import com.sun.tools.javac.util.Options;
 
 import javax.tools.*;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -54,7 +56,15 @@ public class JavacHolder {
     }
     private final Options options = Options.instance(context);
     {
-        options.put("-Xlint", "all");
+        options.put("-Xlint:cast", "");
+        options.put("-Xlint:deprecation", "");
+        options.put("-Xlint:empty", "");
+        options.put("-Xlint:fallthrough", "");
+        options.put("-Xlint:finally", "");
+        options.put("-Xlint:path", "");
+        options.put("-Xlint:unchecked", "");
+        options.put("-Xlint:varargs", "");
+        options.put("-Xlint:static", "");
     }
     // IncrementalLog registers itself in context and pre-empts the normal Log from being created
     private final IncrementalLog log = new IncrementalLog(context);
@@ -63,7 +73,7 @@ public class JavacHolder {
     private final Check check = Check.instance(context);
     // FuzzyParserFactory registers itself in context and pre-empts the normal ParserFactory from being created
     private final FuzzyParserFactory parserFactory = FuzzyParserFactory.instance(context);
-    private final JavaCompiler compiler = JavaCompiler.instance(context);
+    public final JavaCompiler compiler = JavaCompiler.instance(context);
 
     {
         compiler.keepComments = true;
@@ -173,28 +183,8 @@ public class JavacHolder {
 
     /**
      * Compile the indicated source file, and its dependencies if they have been modified.
-     * Clears source from internal caches of javac, so that compile(parse(source)) will re-compile.
      */
     public JCTree.JCCompilationUnit parse(JavaFileObject source) {
-        StringJoiner command = new StringJoiner(" ");
-        
-        command.add("javac");
-        
-        for (String key : options.keySet()) {
-            String value = options.get(key);
-            
-            command.add(key);
-            command.add(value);
-        }
-        
-        if (source instanceof SimpleJavaFileObject) {
-            SimpleJavaFileObject simple = (SimpleJavaFileObject) source;
-            
-            command.add(simple.toUri().getPath());
-        }
-        
-        LOG.info(command.toString());
-        
         clear(source);
 
         JCTree.JCCompilationUnit result = compiler.parse(source);
@@ -202,11 +192,8 @@ public class JavacHolder {
         return result;
     }
 
-    /**
-     * Compile a source tree produced by this.parse
-     */
-    public void compile(JCTree.JCCompilationUnit source) {
-        compiler.processAnnotations(compiler.enterTrees(com.sun.tools.javac.util.List.of(source)));
+    public void compile(Collection<JCTree.JCCompilationUnit> parsed) {
+        compiler.processAnnotations(compiler.enterTrees(com.sun.tools.javac.util.List.from(parsed)));
 
         while (!todo.isEmpty()) {
             // We don't do the desugar or generate phases, because they remove method bodies and methods
@@ -215,11 +202,19 @@ public class JavacHolder {
             Queue<Env<AttrContext>> analyzedTree = compiler.flow(attributedTree);
         }
     }
+    
+    /**
+     * Compile a source tree produced by this.parse
+     */
+    // TODO inline
+    public void compile(JCTree.JCCompilationUnit source) {
+        compile(Collections.singleton(source));
+    }
 
     /**
      * Remove source file from caches in the parse stage
      */
-    public void clear(JavaFileObject source) {
+    private void clear(JavaFileObject source) {
         // Forget about this file
         log.clear(source);
 

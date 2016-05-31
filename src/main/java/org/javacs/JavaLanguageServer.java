@@ -1,12 +1,12 @@
 package org.javacs;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.code.Symbol;
 import io.typefox.lsapi.services.*;
 import io.typefox.lsapi.*;
 import io.typefox.lsapi.Diagnostic;
 
+import javax.lang.model.element.Modifier;
 import javax.tools.*;
 import java.io.*;
 import java.net.URI;
@@ -19,7 +19,6 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.javacs.Main.JSON;
 
@@ -61,7 +60,7 @@ class JavaLanguageServer implements LanguageServer {
 
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
-        workspaceRoot = Paths.get(params.getRootPath());
+        workspaceRoot = Paths.get(params.getRootPath()).toAbsolutePath().normalize();
 
         InitializeResultImpl result = new InitializeResultImpl();
 
@@ -72,6 +71,7 @@ class JavaLanguageServer implements LanguageServer {
         c.setDefinitionProvider(true);
         c.setCompletionProvider(new CompletionOptionsImpl());
         c.setHoverProvider(true);
+        c.setWorkspaceSymbolProvider(true);
 
         result.setCapabilities(c);
 
@@ -215,9 +215,6 @@ class JavaLanguageServer implements LanguageServer {
                     JavacHolder compiler = findCompiler(path.get());
                     JavaFileObject file = findFile(compiler, path.get());
                     
-                    // Remove file from javac caches
-                    compiler.clear(file);
-                    
                     // Remove from source cache
                     sourceByPath.remove(path.get());
                 }
@@ -297,17 +294,23 @@ class JavaLanguageServer implements LanguageServer {
         return new WorkspaceService() {
             @Override
             public CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
-                return null;
+                List<SymbolInformationImpl> result = new ArrayList<>();
+
+                return CompletableFuture.completedFuture(result);
             }
 
             @Override
             public void didChangeConfiguraton(DidChangeConfigurationParams params) {
-
+                
             }
 
             @Override
             public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
-
+                for (FileEvent event : params.getChanges()) {
+                    // TODO invalidate caches when javaconfig.json changes
+                    
+                    LOG.info(event.toString());
+                }
             }
         };
     }
@@ -338,9 +341,11 @@ class JavaLanguageServer implements LanguageServer {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
 
         JavacHolder compiler = findCompiler(path);
+        SymbolIndex index = findIndex(path);
         JavaFileObject file = findFile(compiler, path);
 
         compiler.onError(errors);
+        compiler.afterAnalyze(index.indexer);
         compiler.compile(compiler.parse(file));
 
         Map<URI, PublishDiagnosticsParamsImpl> files = new HashMap<>();
@@ -406,7 +411,7 @@ class JavaLanguageServer implements LanguageServer {
     /**
      * Look for a configuration in a parent directory of uri
      */
-    private JavacHolder findCompiler(Path path) {
+    public JavacHolder findCompiler(Path path) {
         if (testJavac.isPresent())
             return testJavac.get();
 
@@ -426,6 +431,20 @@ class JavaLanguageServer implements LanguageServer {
         return new JavacHolder(c.classPath,
                                c.sourcePath,
                                c.outputDirectory);
+    }
+
+    private Map<JavacConfig, SymbolIndex> indexCache = new HashMap<>();
+
+    public SymbolIndex findIndex(Path path) {
+        Path dir = path.getParent();
+        Optional<JavacConfig> config = findConfig(dir);
+        Optional<SymbolIndex> index = config.map(c -> indexCache.computeIfAbsent(c, this::newIndex));
+
+        return index.orElseThrow(() -> new NoJavaConfigException(path));
+    }
+
+    private SymbolIndex newIndex(JavacConfig c) {
+        return new SymbolIndex(c.classPath, c.sourcePath, c.outputDirectory);
     }
 
     // TODO invalidate cache when VSCode notifies us config file has changed
@@ -451,11 +470,13 @@ class JavaLanguageServer implements LanguageServer {
     /**
      * If directory contains a config file, for example javaconfig.json or an eclipse project file, read it.
      */
-    private Optional<JavacConfig> readIfConfig(Path dir) {
+    public Optional<JavacConfig> readIfConfig(Path dir) {
         if (Files.exists(dir.resolve("javaconfig.json"))) {
             JavaConfigJson json = readJavaConfigJson(dir.resolve("javaconfig.json"));
-            Path classPathFilePath = dir.resolve(json.classPathFile);
-            Set<Path> classPath = readClassPathFile(classPathFilePath);
+            Set<Path> classPath = json.classPathFile.map(classPathFile -> {
+                Path classPathFilePath = dir.resolve(classPathFile);
+                return readClassPathFile(classPathFilePath);
+            }).orElse(Collections.emptySet());
             Set<Path> sourcePath = json.sourcePath.stream().map(dir::resolve).collect(Collectors.toSet());
             Path outputDirectory = dir.resolve(json.outputDirectory);
             JavacConfig config = new JavacConfig(sourcePath, classPath, outputDirectory);
@@ -502,7 +523,7 @@ class JavaLanguageServer implements LanguageServer {
         }
     }
 
-    private JavaFileObject findFile(JavacHolder compiler, Path path) {
+    public JavaFileObject findFile(JavacHolder compiler, Path path) {
         if (sourceByPath.containsKey(path))
             return new StringFileObject(sourceByPath.get(path), path);
         else
@@ -842,9 +863,5 @@ class JavaLanguageServer implements LanguageServer {
         } catch (IOException e) {
             throw ShowMessageException.error("Error reading " + file, e);
         }
-    }
-
-    public JsonNode echo(JsonNode echo) {
-        return echo;
     }
 }
