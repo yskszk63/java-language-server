@@ -6,6 +6,8 @@ import java.nio.file.*;
 import java.util.logging.*;
 import java.util.concurrent.*;
 import javax.lang.model.element.*;
+
+import java.net.URI;
 import javax.tools.JavaFileObject;
 
 import com.sun.tools.javac.tree.*;
@@ -19,7 +21,7 @@ public class SymbolIndex {
      * Private copy of compiler.
      * Compiler is very stateful, so you can't use the same compiler to do anything else concurrently.
      */
-    private final JavacHolder compiler;
+    public final JavacHolder compiler;
 
     public final BaseScanner indexer;
 
@@ -109,6 +111,10 @@ public class SymbolIndex {
         });
 
         return found;
+    }
+    
+    public Optional<SymbolLocation> locate(Symbol symbol) {
+        return compiler.index.locate(symbol);
     }
 
     /**

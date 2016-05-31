@@ -6,7 +6,7 @@ import io.typefox.lsapi.services.*;
 import io.typefox.lsapi.*;
 import io.typefox.lsapi.Diagnostic;
 
-import javax.lang.model.element.Modifier;
+import javax.lang.model.element.*;
 import javax.tools.*;
 import java.io.*;
 import java.net.URI;
@@ -288,6 +288,38 @@ class JavaLanguageServer implements LanguageServer {
 
         errors.forEach(publishDiagnostics::accept);
     }
+    
+    private int symbolInformationKind(ElementKind kind) {
+        switch (kind) {
+            case PACKAGE:
+                return SymbolInformation.KIND_PACKAGE;
+            case ENUM:
+            case ENUM_CONSTANT:
+                return SymbolInformation.KIND_ENUM;
+            case CLASS:
+                return SymbolInformation.KIND_CLASS;
+            case ANNOTATION_TYPE:
+            case INTERFACE:
+                return SymbolInformation.KIND_INTERFACE;
+            case FIELD:
+                return SymbolInformation.KIND_PROPERTY;
+            case PARAMETER:
+            case LOCAL_VARIABLE:
+            case EXCEPTION_PARAMETER:
+            case TYPE_PARAMETER:
+                return SymbolInformation.KIND_VARIABLE;
+            case METHOD:
+            case STATIC_INIT:
+            case INSTANCE_INIT:
+                return SymbolInformation.KIND_METHOD;
+            case CONSTRUCTOR:
+                return SymbolInformation.KIND_CONSTRUCTOR;
+            case OTHER:
+            case RESOURCE_VARIABLE:
+            default:
+                return SymbolInformation.KIND_STRING;
+        }
+    }
 
     @Override
     public WorkspaceService getWorkspaceService() {
@@ -295,6 +327,30 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
                 List<SymbolInformationImpl> result = new ArrayList<>();
+                
+                indexCache.values().forEach(symbolIndex -> {
+                    symbolIndex.search(params.getQuery()).forEach(symbol -> {
+                        symbolIndex.locate(symbol).ifPresent(locate -> {
+                            URI uri = locate.file.toUri();
+                            Path symbolPath = Paths.get(uri);
+                            JavaFileObject symbolFile = findFile(symbolIndex.compiler, symbolPath);
+                            RangeImpl range = findPosition(symbolFile, locate.startPosition, locate.endPosition);
+                            LocationImpl location = new LocationImpl();
+
+                            location.setRange(range);
+                            location.setUri(uri.toString());
+                            
+                            SymbolInformationImpl info = new SymbolInformationImpl();
+                            
+                            info.setLocation(location);
+                            info.setContainer(symbol.getEnclosingElement().getQualifiedName().toString());
+                            info.setKind(symbolInformationKind(symbol.getKind()));
+                            info.setName(symbol.getSimpleName().toString());
+                            
+                            result.add(info);
+                        });
+                    });
+                });
 
                 return CompletableFuture.completedFuture(result);
             }

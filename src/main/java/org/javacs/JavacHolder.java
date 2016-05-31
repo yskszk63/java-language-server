@@ -84,7 +84,7 @@ public class JavacHolder {
     // TreeScanner tasks we want to perform before or after compilation stages
     // We'll use these scanners to implement features like go-to-definition
     private final Map<TaskEvent.Kind, List<TreeScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
-    private final ClassIndex index = new ClassIndex(context);
+    public final ClassIndex index = new ClassIndex(context);
 
     public JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
         this.classPath = classPath;
