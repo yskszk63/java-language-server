@@ -214,7 +214,8 @@ public class AutocompleteTest extends Fixtures {
         // Name of class
         Set<String> suggestions = insertText(file, 5, 20);
 
-        assertThat(suggestions, hasItems("AutocompleteOther", "AutocompleteMember"));
+        // String is in root scope, List is in import java.util.*
+        assertThat(suggestions, hasItems("AutocompleteOther", "AutocompleteMember", "String", "List"));
     }
 
     @Test
@@ -290,6 +291,16 @@ public class AutocompleteTest extends Fixtures {
         Set<String> suggestions = items(file, 4, 17).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
 
         assertThat(suggestions, hasItems("restMethod(String... params)"));
+    }
+
+    @Test
+    public void constructor() throws IOException {
+        String file = "/org/javacs/example/AutocompleteConstructor.java";
+
+        // Static method
+        Set<String> suggestions = insertText(file, 4, 16);
+
+        assertThat(suggestions, hasItems("AutocompleteConstructor", "String"));
     }
 
     @Test

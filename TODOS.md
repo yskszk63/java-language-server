@@ -12,6 +12,7 @@
 * Resolve methods with badly typed arguments
 * Autocomplete is using the entire method signature
 * Autocomplete method parameter types is returning classes twice
+* Autocomplete is showing both override and super versions
 
 ## Features 
 * Go-to-subclasses

@@ -144,6 +144,85 @@ public class AutocompleteVisitor extends CursorScanner {
     }
 
     @Override
+    public void visitNewClass(JCTree.JCNewClass tree) {
+        scan(tree.encl);
+        scan(tree.typeargs);
+        scan(tree.args);
+        scan(tree.def);
+
+        if (containsCursor(tree.clazz)) {
+            tree.clazz.accept(new CursorScanner(file, cursor, context) {
+                {
+                    compilationUnit = AutocompleteVisitor.this.compilationUnit;
+                }
+
+                @Override
+                public void visitIdent(JCTree.JCIdent tree) {
+                    super.visitIdent(tree);
+
+                    TreePath path = getPath(new TreePath(compilationUnit), tree);
+
+                    if (path != null) {
+                        JavacTrees trees = JavacTrees.instance(context);
+                        JavacScope scope = trees.getScope(path);
+
+                        // Add local elements from each surrounding scope
+                        JavacScope upScope = scope;
+
+                        while (upScope != null) {
+                            for (Element e : upScope.getLocalElements()) {
+                                addConstructorIfClass(e);
+                            }
+
+                            upScope = upScope.getEnclosingScope();
+                        }
+
+                        // Get inner classes
+                        List<Element> locals = localElements(scope);
+
+                        for (Element e : locals) {
+                            addConstructorIfClass(e);
+                        }
+
+                        // Get package classes
+                        List<Symbol.ClassSymbol> classes = packageClasses(scope);
+
+                        for (Symbol.ClassSymbol c : classes) {
+                            addConstructor(c);
+                        }
+                    }
+                }
+
+                private void addConstructorIfClass(Element e) {
+                    if (e.getKind() == ElementKind.CLASS ||
+                        e.getKind() == ElementKind.INTERFACE) {
+                        if (e instanceof Symbol.ClassSymbol) {
+                            addConstructor((Symbol.ClassSymbol) e);
+                        }
+                        else LOG.warning("Expected ClassSymbol but found " + e.getClass());
+                    }
+                }
+
+                private void addConstructor(Symbol.ClassSymbol symbol) {
+                    Name name = symbol.getSimpleName();
+                    String insertText = name.toString();
+
+                    CompletionItemImpl item = new CompletionItemImpl();
+
+                    item.setKind(CompletionItem.KIND_CONSTRUCTOR);
+                    item.setLabel(name.toString());
+                    item.setInsertText(insertText);
+                    item.setSortText("0/" + name.toString());
+                    item.setFilterText(name.toString());
+
+                    suggestions.add(item);
+                }
+            });
+        }
+
+    }
+
+    @Override
     public void visitIdent(JCTree.JCIdent node) {
         super.visitIdent(node);
 
@@ -151,7 +230,7 @@ public class AutocompleteVisitor extends CursorScanner {
 
         if (path != null) {
             JavacTrees trees = JavacTrees.instance(context);
-            final JavacScope scope = trees.getScope(path);
+            JavacScope scope = trees.getScope(path);
             AttrContext info = scope.getEnv().info;
             boolean isStatic = AttrUtils.isStatic(info);
 
@@ -171,45 +250,30 @@ public class AutocompleteVisitor extends CursorScanner {
 
             if (enclosingClass != null) {
                 // Add inner classes
-                Element upClass = enclosingClass;
+                // TODO is this not handled by scope?
+                List<Element> elements = localElements(scope);
 
-                while (upClass != null && upClass.getKind() == ElementKind.CLASS) {
-                    for (Element element : upClass.getEnclosedElements()) {
-                        boolean include = !isStatic || element.getModifiers().contains(Modifier.STATIC);
+                for (Element e : elements) {
+                    boolean include = !isStatic || e.getModifiers().contains(Modifier.STATIC);
 
-                        if (include)
-                            addElement(element);
-                    }
-
-                    upClass = upClass.getEnclosingElement();
+                    if (include)
+                        addElement(e);
                 }
 
                 // Add package members
-                if (upClass != null && upClass.getKind() == ElementKind.PACKAGE) {
-                    // Tell ClassReader to scan the given package name
-                    Names names = Names.instance(context);
-                    ClassReader reader = ClassReader.instance(context);
-                    Name prefix = names.fromString(upClass.toString());
+                List<Symbol.ClassSymbol> packageClasses = packageClasses(scope);
 
-                    reader.enterPackage(prefix);
+                for (Symbol.ClassSymbol c : packageClasses) {
+                    Name end = c.getSimpleName();
 
-                    // Symtab.packages should now be filled in with all sub-packages
-                    Symtab symtab = Symtab.instance(context);
+                    CompletionItemImpl item = new CompletionItemImpl();
 
-                    for (Symbol.ClassSymbol c : symtab.classes.values()) {
-                        if (c.owner != null && c.owner.getQualifiedName().equals(prefix)) {
-                            Name end = c.getSimpleName();
+                    item.setKind(CompletionItem.KIND_CLASS);
+                    item.setLabel(end.toString());
+                    item.setInsertText(end.toString());
+                    item.setSortText(end.toString());
 
-                            CompletionItemImpl item = new CompletionItemImpl();
-
-                            item.setKind(CompletionItem.KIND_CLASS);
-                            item.setLabel(end.toString());
-                            item.setInsertText(end.toString());
-                            item.setSortText(end.toString());
-
-                            suggestions.add(item);
-                        }
-                    }
+                    suggestions.add(item);
                 }
             }
         }
@@ -218,6 +282,47 @@ public class AutocompleteVisitor extends CursorScanner {
         }
     }
 
+    private List<Element> localElements(JavacScope scope) {
+        Element enclosingClass = scope.getEnclosingClass();
+        List<Element> result = new ArrayList<>();
+
+        while (enclosingClass != null && enclosingClass.getKind() == ElementKind.CLASS) {
+            result.addAll(enclosingClass.getEnclosedElements());
+
+            enclosingClass = enclosingClass.getEnclosingElement();
+        }
+
+        return result;
+    }
+
+    private List<Symbol.ClassSymbol> packageClasses(JavacScope scope) {
+        Element enclosingPackage = scope.getEnclosingClass();
+
+        while (enclosingPackage != null && enclosingPackage.getKind() != ElementKind.PACKAGE)
+            enclosingPackage = enclosingPackage.getEnclosingElement();
+
+        List<Symbol.ClassSymbol> result = new ArrayList<>();
+
+        if (enclosingPackage != null) {
+            // Tell ClassReader to scan the given package name
+            Names names = Names.instance(context);
+            ClassReader reader = ClassReader.instance(context);
+            Name prefix = names.fromString(enclosingPackage.toString());
+
+            reader.enterPackage(prefix);
+
+            // Symtab.packages should now be filled in with all sub-packages
+            Symtab symtab = Symtab.instance(context);
+
+            for (Symbol.ClassSymbol c : symtab.classes.values()) {
+                if (c.owner != null && c.owner.getQualifiedName().equals(prefix)) {
+                    result.add(c);
+                }
+            }
+        }
+
+        return result;
+    }
 
     /**
      * Gets a tree path for a tree node within a subtree identified by a TreePath object.
@@ -346,9 +451,9 @@ public class AutocompleteVisitor extends CursorScanner {
 
         item.setKind(CompletionItem.KIND_METHOD);
         item.setLabel(label);
-        item.setInsertText(e.getSimpleName().toString());
         item.setDetail(ShortTypePrinter.print(e.getReturnType()));
         item.setDocumentation(docstring(e));
+        item.setInsertText(e.getSimpleName().toString());
         item.setSortText(superRemoved + "/" + label);
         item.setFilterText(e.getSimpleName().toString());
 
