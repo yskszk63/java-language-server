@@ -13,108 +13,133 @@ PortFinder.basePort = 55282;
 
 /** Called when extension is activated */
 export function activate(context: VSCode.ExtensionContext) {
-    // Options to control the language client
-    let clientOptions: LanguageClientOptions = {
-        // Register the server for java documents
-        documentSelector: ['java'],
-        synchronize: {
-            // Synchronize the setting section 'java' to the server
-            // NOTE: this currently doesn't do anything
-            configurationSection: 'java',
-            // Notify the server about file changes to 'javaconfig.json' files contain in the workspace
-            fileEvents: VSCode.workspace.createFileSystemWatcher('**/javaconfig.json')
-        }
-    }
+    let javaExecutablePath = findJavaExecutable('java');
     
-    function createServer(): Promise<StreamInfo> {
-        return new Promise((resolve, reject) => {
-            PortFinder.getPort((err, port) => {
-                let javaExecutablePath = findJavaExecutable('java');
-                let fatJar = Path.resolve(context.extensionPath, "out", "fat-jar.jar");
-                
-                let args = [
-                    '-cp', fatJar, 
-                    '-Djavacs.port=' + port,
-                    'org.javacs.Main'
-                ];
-                   
-                console.log(javaExecutablePath + ' ' + args.join(' '));
-                
-                Net.createServer(socket => {
-                    console.log('Child process connected on port ' + port);
-
-                    resolve({
-                        reader: socket,
-                        writer: socket
-                    });
-                }).listen(port, () => {
-                    let options = { stdio: 'inherit', cwd: VSCode.workspace.rootPath };
+    if (javaExecutablePath == null) {
+        VSCode.window.showErrorMessage("Couldn't locate java in $JAVA_HOME or $PATH");
+        
+        return;
+    }
+        
+    isJava8(javaExecutablePath).then(eight => {
+        if (!eight) {
+            VSCode.window.showErrorMessage('Java language support requires Java 8 (using ' + javaExecutablePath + ')');
+            
+            return;
+        }
                     
-                    // Start the child java process
-                    ChildProcess.spawn(javaExecutablePath, args, options);
+        // Options to control the language client
+        let clientOptions: LanguageClientOptions = {
+            // Register the server for java documents
+            documentSelector: ['java'],
+            synchronize: {
+                // Synchronize the setting section 'java' to the server
+                // NOTE: this currently doesn't do anything
+                configurationSection: 'java',
+                // Notify the server about file changes to 'javaconfig.json' files contain in the workspace
+                fileEvents: VSCode.workspace.createFileSystemWatcher('**/javaconfig.json')
+            }
+        }
+        
+        function createServer(): Promise<StreamInfo> {
+            return new Promise((resolve, reject) => {
+                PortFinder.getPort((err, port) => {
+                    let fatJar = Path.resolve(context.extensionPath, "out", "fat-jar.jar");
+                    
+                    let args = [
+                        '-cp', fatJar, 
+                        '-Djavacs.port=' + port,
+                        'org.javacs.Main'
+                    ];
+                    
+                    console.log(javaExecutablePath + ' ' + args.join(' '));
+                    
+                    Net.createServer(socket => {
+                        console.log('Child process connected on port ' + port);
+
+                        resolve({
+                            reader: socket,
+                            writer: socket
+                        });
+                    }).listen(port, () => {
+                        let options = { stdio: 'inherit', cwd: VSCode.workspace.rootPath };
+                        
+                        // Start the child java process
+                        ChildProcess.spawn(javaExecutablePath, args, options);
+                    });
                 });
             });
-        });
-    }
+        }
 
-    // Create the language client and start the client.
-    let client = new LanguageClient('Language Server Example', createServer, clientOptions);
-    let disposable = client.start();
+        // Create the language client and start the client.
+        let client = new LanguageClient('Language Server Example', createServer, clientOptions);
+        let disposable = client.start();
 
-    // Push the disposable to the context's subscriptions so that the 
-    // client can be deactivated on extension deactivation
-    context.subscriptions.push(disposable);
-    
-    // Set indentation rules
-    VSCode.languages.setLanguageConfiguration('java', {
-        indentationRules: {
-            // ^(.*\*/)?\s*\}.*$
-            decreaseIndentPattern: /^(.*\*\/)?\s*\}.*$/,
-            // ^.*\{[^}"']*$
-            increaseIndentPattern: /^.*\{[^}"']*$/
-        },
-        wordPattern: /(-?\d*\.\d\w*)|([^\`\~\!\@\#\%\^\&\*\(\)\-\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\?\s]+)/g,
-        comments: {
-            lineComment: '//',
-            blockComment: ['/*', '*/']
-        },
-        brackets: [
-            ['{', '}'],
-            ['[', ']'],
-            ['(', ')'],
-        ],
-        onEnterRules: [
-            {
-                // e.g. /** | */
-                beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
-                afterText: /^\s*\*\/$/,
-                action: { indentAction: VSCode.IndentAction.IndentOutdent, appendText: ' * ' }
-            },
-            {
-                // e.g. /** ...|
-                beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
-                action: { indentAction: VSCode.IndentAction.None, appendText: ' * ' }
-            },
-            {
-                // e.g.  * ...|
-                beforeText: /^(\t|(\ \ ))*\ \*(\ ([^\*]|\*(?!\/))*)?$/,
-                action: { indentAction: VSCode.IndentAction.None, appendText: '* ' }
-            },
-            {
-                // e.g.  */|
-                beforeText: /^(\t|(\ \ ))*\ \*\/\s*$/,
-                action: { indentAction: VSCode.IndentAction.None, removeText: 1 }
-            }
-        ],
+        // Push the disposable to the context's subscriptions so that the 
+        // client can be deactivated on extension deactivation
+        context.subscriptions.push(disposable);
         
-        // TODO equivalent of this from typescript when replacement for __electricCharacterSupport API is released
-        // __electricCharacterSupport: {
-        //     docComment: { scope: 'comment.documentation', open: '/**', lineStart: ' * ', close: ' */' }
-        // }
+        // Set indentation rules
+        VSCode.languages.setLanguageConfiguration('java', {
+            indentationRules: {
+                // ^(.*\*/)?\s*\}.*$
+                decreaseIndentPattern: /^(.*\*\/)?\s*\}.*$/,
+                // ^.*\{[^}"']*$
+                increaseIndentPattern: /^.*\{[^}"']*$/
+            },
+            wordPattern: /(-?\d*\.\d\w*)|([^\`\~\!\@\#\%\^\&\*\(\)\-\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\?\s]+)/g,
+            comments: {
+                lineComment: '//',
+                blockComment: ['/*', '*/']
+            },
+            brackets: [
+                ['{', '}'],
+                ['[', ']'],
+                ['(', ')'],
+            ],
+            onEnterRules: [
+                {
+                    // e.g. /** | */
+                    beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
+                    afterText: /^\s*\*\/$/,
+                    action: { indentAction: VSCode.IndentAction.IndentOutdent, appendText: ' * ' }
+                },
+                {
+                    // e.g. /** ...|
+                    beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
+                    action: { indentAction: VSCode.IndentAction.None, appendText: ' * ' }
+                },
+                {
+                    // e.g.  * ...|
+                    beforeText: /^(\t|(\ \ ))*\ \*(\ ([^\*]|\*(?!\/))*)?$/,
+                    action: { indentAction: VSCode.IndentAction.None, appendText: '* ' }
+                },
+                {
+                    // e.g.  */|
+                    beforeText: /^(\t|(\ \ ))*\ \*\/\s*$/,
+                    action: { indentAction: VSCode.IndentAction.None, removeText: 1 }
+                }
+            ],
+            
+            // TODO equivalent of this from typescript when replacement for __electricCharacterSupport API is released
+            // __electricCharacterSupport: {
+            //     docComment: { scope: 'comment.documentation', open: '/**', lineStart: ' * ', close: ' */' }
+            // }
+        });
     });
 }
 
-export function findJavaExecutable(binname: string) {
+function isJava8(javaExecutablePath: string): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+        let result = ChildProcess.exec(javaExecutablePath + ' -version', { }, (error, stdout, stderr) => {
+            let eight = stderr.indexOf('1.8') >= 0;
+            
+            resolve(eight);
+        });
+    });
+} 
+
+function findJavaExecutable(binname: string) {
 	binname = correctBinname(binname);
 
 	// First search each JAVA_HOME bin folder
@@ -140,7 +165,7 @@ export function findJavaExecutable(binname: string) {
 	}
     
 	// Else return the binary name directly (this will likely always fail downstream) 
-	return binname;
+	return null;
 }
 
 function correctBinname(binname: string) {
