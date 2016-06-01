@@ -7,6 +7,8 @@ Requires that you have Java 8 installed on your system.
 
 [Install from the VS Code marketplace](https://marketplace.visualstudio.com/items?itemName=georgewfraser.vscode-javac)
 
+## [Issues](https://github.com/georgewfraser/vscode-javac/issues)
+
 ## Features
 
 ### Autocomplete
