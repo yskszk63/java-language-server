@@ -10,7 +10,7 @@ public class AutocompleteMember {
     public static String methodStatic() {
         return "foo";
     }
-    public String method() {
+    public String method() throws Exception {
         return "foo";
     }
 }

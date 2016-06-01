@@ -54,6 +54,16 @@ public class AutocompleteTest extends Fixtures {
     }
 
     @Test
+    public void throwsSignature() throws IOException {
+        String file = "/org/javacs/example/AutocompleteMember.java";
+
+        // Static method
+        Set<String> suggestions = items(file, 4, 13).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
+
+        assertThat(suggestions, hasItems("method() throws Exception"));
+    }
+
+    @Test
     public void initBlock() throws IOException {
         String file = "/org/javacs/example/AutocompleteMembers.java";
 

@@ -368,7 +368,18 @@ public class AutocompleteVisitor extends CursorScanner {
             params.add(pName);
         }
 
-        return name + "(" + params + ")";
+        String signature = name + "(" + params + ")";
+        
+        if (!e.getThrownTypes().isEmpty()) {
+            StringJoiner thrown = new StringJoiner(", ");
+            
+            for (Type t : e.getThrownTypes()) 
+                thrown.add(ShortTypePrinter.print(t));
+                
+            signature += " throws " + thrown;
+        }
+        
+        return signature;
     }
 
     private static String shortName(Symbol.VarSymbol p, boolean varargs) {
