@@ -14,14 +14,12 @@ import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.*;
+import com.sun.tools.javac.util.Name;
 import io.typefox.lsapi.CompletionItem;
 import io.typefox.lsapi.CompletionItemImpl;
 
 import javax.lang.model.SourceVersion;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import javax.tools.JavaFileObject;
 import java.util.*;
@@ -153,28 +151,66 @@ public class AutocompleteVisitor extends CursorScanner {
 
         if (path != null) {
             JavacTrees trees = JavacTrees.instance(context);
-            JavacScope scope = trees.getScope(path);
+            final JavacScope scope = trees.getScope(path);
             AttrContext info = scope.getEnv().info;
             boolean isStatic = AttrUtils.isStatic(info);
 
-            while (scope != null) {
-                for (Element e : scope.getLocalElements()) {
+            // Add local elements from each surrounding scope
+            JavacScope upScope = scope;
+
+            while (upScope != null) {
+                for (Element e : upScope.getLocalElements()) {
                     addElement(e);
                 }
 
-                // Add class members
-                TypeElement enclosingClass = scope.getEnclosingClass();
+                upScope = upScope.getEnclosingScope();
+            }
 
-                if (enclosingClass != null) {
-                    for (Element element : enclosingClass.getEnclosedElements()) {
+            // Add class symbols
+            final TypeElement enclosingClass = scope.getEnclosingClass();
+
+            if (enclosingClass != null) {
+                // Add inner classes
+                Element upClass = enclosingClass;
+
+                while (upClass != null && upClass.getKind() == ElementKind.CLASS) {
+                    for (Element element : upClass.getEnclosedElements()) {
                         boolean include = !isStatic || element.getModifiers().contains(Modifier.STATIC);
 
                         if (include)
                             addElement(element);
                     }
+
+                    upClass = upClass.getEnclosingElement();
                 }
 
-                scope = scope.getEnclosingScope();
+                // Add package members
+                if (upClass != null && upClass.getKind() == ElementKind.PACKAGE) {
+                    // Tell ClassReader to scan the given package name
+                    Names names = Names.instance(context);
+                    ClassReader reader = ClassReader.instance(context);
+                    Name prefix = names.fromString(upClass.toString());
+
+                    reader.enterPackage(prefix);
+
+                    // Symtab.packages should now be filled in with all sub-packages
+                    Symtab symtab = Symtab.instance(context);
+
+                    for (Symbol.ClassSymbol c : symtab.classes.values()) {
+                        if (c.owner != null && c.owner.getQualifiedName().equals(prefix)) {
+                            Name end = c.getSimpleName();
+
+                            CompletionItemImpl item = new CompletionItemImpl();
+
+                            item.setKind(CompletionItem.KIND_CLASS);
+                            item.setLabel(end.toString());
+                            item.setInsertText(end.toString());
+                            item.setSortText(end.toString());
+
+                            suggestions.add(item);
+                        }
+                    }
+                }
             }
         }
         else {

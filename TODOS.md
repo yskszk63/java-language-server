@@ -6,7 +6,6 @@
 * Show inner classes as Outer.Inner
 * Cannot find symbol errors getting reported twice
 * Autocomplete with <>()
-* Autocomplete classes in same package
 * Autocomplete constructor signatures instead of just class name
 * Check javac version and warn if < 8
 * Redo lint whenever typing stops for a couple seconds

@@ -182,7 +182,7 @@ public class AutocompleteTest extends Fixtures {
     }
 
     @Test
-    public void other() throws IOException {
+    public void otherMethod() throws IOException {
         String file = "/org/javacs/example/AutocompleteOther.java";
 
         // Static method
@@ -190,6 +190,16 @@ public class AutocompleteTest extends Fixtures {
 
         assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "class")));
         assertThat(suggestions, hasItems("field", "method", "getClass"));
+    }
+
+    @Test
+    public void otherClass() throws IOException {
+        String file = "/org/javacs/example/AutocompleteOther.java";
+
+        // Name of class
+        Set<String> suggestions = insertText(file, 5, 20);
+
+        assertThat(suggestions, hasItems("AutocompleteOther", "AutocompleteMember"));
     }
 
     @Test
