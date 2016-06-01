@@ -3,7 +3,6 @@
 ## Polish
 * Remove definitions from context when source file is deleted
 * Don't autocomplete inaccessible members (see Resolve.isAccessible)
-* Show inner classes as Outer.Inner
 * Cannot find symbol errors getting reported twice
 * Autocomplete with <>()
 * Autocomplete constructor signatures instead of just class name
