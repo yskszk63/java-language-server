@@ -4,7 +4,6 @@
 * Remove definitions from context when source file is deleted
 * Don't autocomplete inaccessible members (see Resolve.isAccessible)
 * Cannot find symbol errors getting reported twice
-* Autocomplete with <>()
 * Autocomplete constructor signatures instead of just class name
 * Redo lint whenever typing stops for a couple seconds
 * Find all source paths and initialize SymbolIndex for each

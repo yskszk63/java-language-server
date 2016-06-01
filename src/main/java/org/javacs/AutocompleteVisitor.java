@@ -165,13 +165,15 @@ public class AutocompleteVisitor extends CursorScanner {
                     if (path != null) {
                         JavacTrees trees = JavacTrees.instance(context);
                         JavacScope scope = trees.getScope(path);
+                        Set<Symbol.ClassSymbol> all = new HashSet<>();
 
                         // Add local elements from each surrounding scope
                         JavacScope upScope = scope;
 
                         while (upScope != null) {
                             for (Element e : upScope.getLocalElements()) {
-                                addConstructorIfClass(e);
+                                if (e instanceof Symbol.ClassSymbol)
+                                    all.add((Symbol.ClassSymbol) e);
                             }
 
                             upScope = upScope.getEnclosingScope();
@@ -181,29 +183,26 @@ public class AutocompleteVisitor extends CursorScanner {
                         List<Element> locals = localElements(scope);
 
                         for (Element e : locals) {
-                            addConstructorIfClass(e);
+                            if (e instanceof Symbol.ClassSymbol)
+                                all.add((Symbol.ClassSymbol) e);
                         }
 
                         // Get package classes
                         List<Symbol.ClassSymbol> classes = packageClasses(scope);
 
                         for (Symbol.ClassSymbol c : classes) {
-                            addConstructor(c);
+                            all.add(c);
                         }
-                    }
-                }
 
-                private void addConstructorIfClass(Element e) {
-                    if (e.getKind() == ElementKind.CLASS ||
-                        e.getKind() == ElementKind.INTERFACE) {
-                        if (e instanceof Symbol.ClassSymbol) {
-                            addConstructor((Symbol.ClassSymbol) e);
+                        for (Symbol.ClassSymbol s : all) {
+                            addConstructor(s);
                         }
-                        else LOG.warning("Expected ClassSymbol but found " + e.getClass());
                     }
                 }
 
                 private void addConstructor(Symbol.ClassSymbol symbol) {
+                    // TODO autocomplete constructor signatures
+                    // beware of bad source files
                     Name name = symbol.getSimpleName();
                     String insertText = name.toString();
 
@@ -233,13 +232,15 @@ public class AutocompleteVisitor extends CursorScanner {
             JavacScope scope = trees.getScope(path);
             AttrContext info = scope.getEnv().info;
             boolean isStatic = AttrUtils.isStatic(info);
+            Set<Symbol> all = new HashSet<>();
 
             // Add local elements from each surrounding scope
             JavacScope upScope = scope;
 
             while (upScope != null) {
                 for (Element e : upScope.getLocalElements()) {
-                    addElement(e);
+                    if (e instanceof Symbol)
+                        all.add((Symbol) e);
                 }
 
                 upScope = upScope.getEnclosingScope();
@@ -256,26 +257,20 @@ public class AutocompleteVisitor extends CursorScanner {
                 for (Element e : elements) {
                     boolean include = !isStatic || e.getModifiers().contains(Modifier.STATIC);
 
-                    if (include)
-                        addElement(e);
+                    if (include && e instanceof Symbol)
+                        all.add((Symbol) e);
                 }
 
                 // Add package members
                 List<Symbol.ClassSymbol> packageClasses = packageClasses(scope);
 
                 for (Symbol.ClassSymbol c : packageClasses) {
-                    Name end = c.getSimpleName();
-
-                    CompletionItemImpl item = new CompletionItemImpl();
-
-                    item.setKind(CompletionItem.KIND_CLASS);
-                    item.setLabel(end.toString());
-                    item.setInsertText(end.toString());
-                    item.setSortText(end.toString());
-
-                    suggestions.add(item);
+                    all.add(c);
                 }
             }
+
+            for (Symbol s : all)
+                addElement(s);
         }
         else {
             LOG.info("Node " + node + " not found in compilation unit " + compilationUnit.getSourceFile());
@@ -380,7 +375,8 @@ public class AutocompleteVisitor extends CursorScanner {
                 case TYPE_PARAMETER: {
                     CompletionItemImpl item = new CompletionItemImpl();
 
-                    item.setKind(CompletionItem.KIND_INTERFACE);
+                    // TODO more kinds
+                    item.setKind(CompletionItem.KIND_CLASS);
                     item.setLabel(name);
                     item.setInsertText(name);
                     item.setSortText("2/" + name);
