@@ -86,6 +86,7 @@ public class AutocompleteVisitor extends CursorScanner {
                         item.setKind(CompletionItem.KIND_MODULE);
                         item.setLabel(end.toString());
                         item.setInsertText(end.toString());
+                        item.setSortText("0/" + end.toString());
 
                         suggestions.add(item);
                     }
@@ -100,6 +101,7 @@ public class AutocompleteVisitor extends CursorScanner {
                         item.setKind(CompletionItem.KIND_CLASS);
                         item.setLabel(end.toString());
                         item.setInsertText(end.toString());
+                        item.setSortText("1/" + end.toString());
 
                         suggestions.add(item);
                     }
