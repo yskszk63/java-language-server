@@ -12,6 +12,8 @@
 * Redo lint whenever typing stops for a couple seconds
 * Show exceptions in method signatures
 * Show unused imports (is this a feature of javac? findbugs?)
+* Find all source paths and initialize SymbolIndex for each
+* Send error diagnostics from SymbolIndex compiler to vscode-javac
 
 ## Features 
 * Go-to-subclasses
