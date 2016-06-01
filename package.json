@@ -2,7 +2,7 @@
     "name": "vscode-javac",
     "displayName": "Java Language Support",
     "description": "Java support using the javac API",
-    "version": "0.0.12",
+    "version": "0.0.13",
     "publisher": "georgewfraser",
     "repository": {
         "type": "git",
