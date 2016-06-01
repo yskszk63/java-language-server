@@ -284,9 +284,19 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private void doLint(Path path) {
-        List<PublishDiagnosticsParamsImpl> errors = lint(path);
+        LOG.info("Lint " + path);
 
-        errors.forEach(publishDiagnostics::accept);
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
+
+        JavacHolder compiler = findCompiler(path);
+        SymbolIndex index = findIndex(path);
+        JavaFileObject file = findFile(compiler, path);
+
+        compiler.onError(errors);
+        compiler.afterAnalyze(index.indexer);
+        compiler.compile(compiler.parse(file));
+        
+        publishDiagnostics(Collections.singleton(path), errors);
     }
     
     private int symbolInformationKind(ElementKind kind) {
@@ -390,23 +400,11 @@ class JavaLanguageServer implements LanguageServer {
             }
         };
     }
-
-    public List<PublishDiagnosticsParamsImpl> lint(Path path) {
-        LOG.info("Lint " + path);
-
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-
-        JavacHolder compiler = findCompiler(path);
-        SymbolIndex index = findIndex(path);
-        JavaFileObject file = findFile(compiler, path);
-
-        compiler.onError(errors);
-        compiler.afterAnalyze(index.indexer);
-        compiler.compile(compiler.parse(file));
-
+    
+    private void publishDiagnostics(Collection<Path> paths, DiagnosticCollector<JavaFileObject> errors) {
         Map<URI, PublishDiagnosticsParamsImpl> files = new HashMap<>();
         
-        files.put(path.toUri(), newPublishDiagnostics(path.toUri()));
+        paths.forEach(p -> files.put(p.toUri(), newPublishDiagnostics(p.toUri())));
         
         errors.getDiagnostics().forEach(error -> {
             if (error.getStartPosition() != javax.tools.Diagnostic.NOPOS) {
@@ -426,11 +424,7 @@ class JavaLanguageServer implements LanguageServer {
             }
         });
 
-        List<PublishDiagnosticsParamsImpl> result = new ArrayList<>();
-
-        result.addAll(files.values());
-
-        return result;
+        files.values().forEach(publishDiagnostics::accept);
     }
 
     private int severity(javax.tools.Diagnostic.Kind kind) {
@@ -500,7 +494,7 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private SymbolIndex newIndex(JavacConfig c) {
-        return new SymbolIndex(c.classPath, c.sourcePath, c.outputDirectory);
+        return new SymbolIndex(c.classPath, c.sourcePath, c.outputDirectory, this::publishDiagnostics);
     }
 
     // TODO invalidate cache when VSCode notifies us config file has changed

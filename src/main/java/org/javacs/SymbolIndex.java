@@ -6,6 +6,8 @@ import java.nio.file.*;
 import java.util.logging.*;
 import java.util.concurrent.*;
 import javax.lang.model.element.*;
+import java.util.function.*;
+import javax.tools.*;
 
 import java.net.URI;
 import javax.tools.JavaFileObject;
@@ -35,7 +37,15 @@ public class SymbolIndex {
      */
     private ConcurrentHashMap<Symbol.ClassSymbol, Set<Symbol>> index = new ConcurrentHashMap<>();
     
-    public SymbolIndex(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
+    @FunctionalInterface
+    public interface ReportDiagnostics {
+        void report(Collection<Path> paths, DiagnosticCollector<JavaFileObject> diagnostics);
+    }
+    
+    public SymbolIndex(Set<Path> classPath, 
+                       Set<Path> sourcePath, 
+                       Path outputDirectory, 
+                       ReportDiagnostics publishDiagnostics) {
         this.compiler = new JavacHolder(classPath, sourcePath, outputDirectory);
         this.indexer = new BaseScanner(compiler.context) {
             @Override
@@ -57,19 +67,29 @@ public class SymbolIndex {
                 }
             }
         };
+        
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
 
         compiler.afterAnalyze(indexer);
+        compiler.onError(errors);
 
         Thread worker = new Thread("InitialIndex") {
             List<JCTree.JCCompilationUnit> parsed = new ArrayList<>();
+            List<Path> paths = new ArrayList<>();
 
             @Override
             public void run() {
                 // Parse each file
-                sourcePath.forEach(s -> parseAll(s, parsed));
+                sourcePath.forEach(s -> parseAll(s, parsed, paths));
 
                 // Compile all parsed files
                 compiler.compile(parsed);
+                
+                // Report diagnostics to language server
+                publishDiagnostics.report(paths, errors);
+                
+                // Stop recording diagnostics
+                compiler.onError(err -> {});
 
                 initialIndexComplete.complete(null);
             }
@@ -77,9 +97,9 @@ public class SymbolIndex {
             /**
              * Look for .java files and invalidate them
              */
-            private void parseAll(Path path, List<JCTree.JCCompilationUnit> acc) {
+            private void parseAll(Path path, List<JCTree.JCCompilationUnit> trees, List<Path> paths) {
                 if (Files.isDirectory(path)) try {
-                    Files.list(path).forEach(p -> parseAll(p, acc));
+                    Files.list(path).forEach(p -> parseAll(p, trees, paths));
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
@@ -88,7 +108,8 @@ public class SymbolIndex {
 
                     JavaFileObject file = compiler.fileManager.getRegularFile(path.toFile());
 
-                    acc.add(compiler.parse(file));
+                    trees.add(compiler.parse(file));
+                    paths.add(path);
                 }
             }
         };

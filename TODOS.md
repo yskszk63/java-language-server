@@ -12,7 +12,10 @@
 * Redo lint whenever typing stops for a couple seconds
 * Show unused imports (is this a feature of javac? findbugs?)
 * Find all source paths and initialize SymbolIndex for each
-* Send error diagnostics from SymbolIndex compiler to vscode-javac
+* Add import code action
+* Resolve methods with badly typed arguments
+* Autocomplete is using the entire method signature
+* Autocomplete method parameter types is returning classes twice
 
 ## Features 
 * Go-to-subclasses
