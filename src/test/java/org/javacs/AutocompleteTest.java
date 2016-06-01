@@ -267,6 +267,26 @@ public class AutocompleteTest extends Fixtures {
         assertThat(suggestions, hasItems("restMethod(String... params)"));
     }
 
+    @Test
+    public void importPackage() throws IOException {
+        String file = "/org/javacs/example/AutocompletePackage.java";
+
+        // Static method
+        Set<String> suggestions = insertText(file, 2, 11);
+
+        assertThat(suggestions, hasItems("javacs"));
+    }
+
+    @Test
+    public void importClass() throws IOException {
+        String file = "/org/javacs/example/AutocompletePackage.java";
+
+        // Static method
+        Set<String> suggestions = insertText(file, 3, 26);
+
+        assertThat(suggestions, hasItems("AutocompletePackage"));
+    }
+
     private Set<String> insertText(String file, int row, int column) throws IOException {
         List<? extends CompletionItem> items = items(file, row, column);
 

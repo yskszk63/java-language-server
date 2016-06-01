@@ -2,23 +2,22 @@ package org.javacs;
 
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
-import com.sun.tools.javac.code.Flags;
-import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.*;
 import com.google.common.base.Joiner;
 import com.sun.source.tree.*;
 import com.sun.tools.javac.api.JavacScope;
 import com.sun.tools.javac.api.JavacTrees;
-import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.code.Types;
-import com.sun.tools.javac.comp.AttrContext;
-import com.sun.tools.javac.comp.AttrUtils;
+import com.sun.tools.javac.comp.*;
 import com.sun.tools.javac.jvm.ClassReader;
+import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.*;
 import io.typefox.lsapi.CompletionItem;
 import io.typefox.lsapi.CompletionItemImpl;
 
+import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
@@ -66,6 +65,45 @@ public class AutocompleteVisitor extends CursorScanner {
                 suggestions.add(item);
 
                 type.accept(new CollectStatics(), null);
+            }
+            else if (type.getKind() == TypeKind.PACKAGE) {
+                // Tell ClassReader to scan the given package name
+                Names names = Names.instance(context);
+                ClassReader reader = ClassReader.instance(context);
+                Name prefix = names.fromString(type.toString());
+
+                reader.enterPackage(prefix);
+
+                // Symtab.packages should now be filled in with all sub-packages
+                Symtab symtab = Symtab.instance(context);
+
+                for (Symbol.PackageSymbol p : symtab.packages.values()) {
+                    if (p.owner != null && p.owner.getQualifiedName().equals(prefix)) {
+                        Name end = p.getSimpleName();
+
+                        CompletionItemImpl item = new CompletionItemImpl();
+
+                        item.setKind(CompletionItem.KIND_MODULE);
+                        item.setLabel(end.toString());
+                        item.setInsertText(end.toString());
+
+                        suggestions.add(item);
+                    }
+                }
+
+                for (Symbol.ClassSymbol c : symtab.classes.values()) {
+                    if (c.owner != null && c.owner.getQualifiedName().equals(prefix)) {
+                        Name end = c.getSimpleName();
+
+                        CompletionItemImpl item = new CompletionItemImpl();
+
+                        item.setKind(CompletionItem.KIND_CLASS);
+                        item.setLabel(end.toString());
+                        item.setInsertText(end.toString());
+
+                        suggestions.add(item);
+                    }
+                }
             }
             else
                 type.accept(new CollectVirtuals(), null);
