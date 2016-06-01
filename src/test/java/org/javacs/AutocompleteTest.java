@@ -185,10 +185,15 @@ public class AutocompleteTest extends Fixtures {
     public void order() throws IOException {
         String file = "/org/javacs/example/AutocompleteOrder.java";
 
-        // Static method
+        // this.
         Set<String> suggestions = items(file, 4, 26).stream().map(i -> i.getSortText()).collect(Collectors.toSet());
 
         assertThat(suggestions, hasItems("0/getMethod()", "1/getInheritedMethod()", "2/getClass()"));
+        
+        // identifier
+        suggestions = items(file, 6, 9).stream().map(i -> i.getSortText()).collect(Collectors.toSet());
+
+        assertThat(suggestions, hasItems("0/localVariable", "0/parameter", "1/test(String parameter)", "2/AutocompleteOrder"));
     }
 
     @Test

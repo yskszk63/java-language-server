@@ -1,8 +1,10 @@
 package org.javacs.example;
 
 public class AutocompleteOrder {
-    public void test() {
-        new SubClass().get
+    public void test(String parameter) {
+        new SubClass().get;
+        String localVariable;
+        t;
     }
     
     public static class SuperClass {

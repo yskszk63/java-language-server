@@ -7,10 +7,7 @@
 * Cannot find symbol errors getting reported twice
 * Autocomplete with <>()
 * Autocomplete constructor signatures instead of just class name
-* Autocomplete locals first
-* Check javac version and warn if < 8
 * Redo lint whenever typing stops for a couple seconds
-* Show unused imports (is this a feature of javac? findbugs?)
 * Find all source paths and initialize SymbolIndex for each
 * Add import code action
 * Resolve methods with badly typed arguments
@@ -43,3 +40,6 @@
 
 ## Tests
 * Hover info
+
+## Lint
+* Add 3rd-party linter (findbugs?)

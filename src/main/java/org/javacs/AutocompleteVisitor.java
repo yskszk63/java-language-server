@@ -278,17 +278,27 @@ public class AutocompleteVisitor extends CursorScanner {
                     item.setKind(CompletionItem.KIND_INTERFACE);
                     item.setLabel(name);
                     item.setInsertText(name);
+                    item.setSortText("2/" + name);
 
                     suggestions.add(item);
 
                     break;
                 }
-                case ENUM_CONSTANT:
-                    addEnumConstant(e);
+                case ENUM_CONSTANT: {
+                    CompletionItemImpl item = new CompletionItemImpl();
+
+                    item.setKind(CompletionItem.KIND_ENUM);
+                    item.setLabel(name);
+                    item.setInsertText(name);
+                    item.setDetail(e.getEnclosingElement().getSimpleName().toString());
+                    item.setSortText("2/" + name);
+
+                    suggestions.add(item);
 
                     break;
+                }
                 case FIELD:
-                    addField((Symbol.VarSymbol) e);
+                    addField((Symbol.VarSymbol) e, 1);
 
                     break;
                 case PARAMETER:
@@ -299,13 +309,14 @@ public class AutocompleteVisitor extends CursorScanner {
                     item.setKind(CompletionItem.KIND_VARIABLE);
                     item.setLabel(name);
                     item.setInsertText(name);
+                    item.setSortText("0/" + name);
 
                     suggestions.add(item);
 
                     break;
                 }
                 case METHOD:
-                    addMethod((Symbol.MethodSymbol) e, 0);
+                    addMethod((Symbol.MethodSymbol) e, 1);
 
                     break;
                 case CONSTRUCTOR:
@@ -327,18 +338,6 @@ public class AutocompleteVisitor extends CursorScanner {
             // We just skip that element and log a warning
             LOG.log(Level.WARNING, bad.getMessage(), bad);
         }
-    }
-
-    private void addEnumConstant(Element e) {
-        String name = e.getSimpleName().toString();
-        CompletionItemImpl item = new CompletionItemImpl();
-
-        item.setKind(CompletionItem.KIND_ENUM);
-        item.setLabel(name);
-        item.setInsertText(name);
-        item.setDetail(e.getEnclosingElement().getSimpleName().toString());
-
-        suggestions.add(item);
     }
 
     private void addMethod(Symbol.MethodSymbol e, int superRemoved) {
@@ -417,7 +416,7 @@ public class AutocompleteVisitor extends CursorScanner {
             return null;
     }
 
-    private void addField(Symbol.VarSymbol e) {
+    private void addField(Symbol.VarSymbol e, int sortOrder) {
         String name = e.getSimpleName().toString();
 
         CompletionItemImpl item = new CompletionItemImpl();
@@ -427,6 +426,7 @@ public class AutocompleteVisitor extends CursorScanner {
         item.setInsertText(name);
         item.setDetail(ShortTypePrinter.print(e.type));
         item.setDocumentation(docstring(e));
+        item.setSortText(sortOrder + "/" + name);
 
         suggestions.add(item);
     }
@@ -444,7 +444,7 @@ public class AutocompleteVisitor extends CursorScanner {
                         Symbol.VarSymbol field = (Symbol.VarSymbol) e;
 
                         if (field.isStatic())
-                            addField(field);
+                            addField(field, 0);
 
                         break;
                     case METHOD:
@@ -487,8 +487,11 @@ public class AutocompleteVisitor extends CursorScanner {
                     case FIELD:
                         Symbol.VarSymbol field = (Symbol.VarSymbol) e;
 
-                        if (!field.isStatic())
-                            addField(field);
+                        if (!field.isStatic()) {
+                            int removed = supersRemoved(field, t);
+                            
+                            addField(field, 0);
+                        }
 
                         break;
                     case METHOD:
@@ -512,19 +515,19 @@ public class AutocompleteVisitor extends CursorScanner {
     }
 
     /**
-     * When autocompleting [inType].[method], is [method] part of [inType], or a superclass?
+     * When autocompleting [inType].[member], is [member] part of [inType], or a superclass?
      */
-    private int supersRemoved(Symbol.MethodSymbol method, DeclaredType inType) {
+    private int supersRemoved(Symbol member, DeclaredType inType) {
         Element inElement = inType.asElement();
-        Symbol methodType = method.getEnclosingElement();
+        Symbol memberType = member.getEnclosingElement();
 
-        // If method is a member of java.lang.Object, sort order 2
-        if (methodType.getQualifiedName().contentEquals("java.lang.Object"))
+        // If member is a member of java.lang.Object, sort order 2
+        if (memberType.getQualifiedName().contentEquals("java.lang.Object"))
             return 2;
-        // If method is inherited, sort order 1
-        else if (!methodType.equals(inElement))
+        // If member is inherited, sort order 1
+        else if (!memberType.equals(inElement))
             return 1;
-        // If method is not inherited, sort order 0
+        // If member is not inherited, sort order 0
         else
             return 0;
     }
