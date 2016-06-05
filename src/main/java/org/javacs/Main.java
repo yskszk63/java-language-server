@@ -118,8 +118,6 @@ public class Main {
 
             server.onError(message, err);
         });
-
-        jsonServer.start();
         
         try {
             jsonServer.join();
