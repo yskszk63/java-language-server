@@ -65,7 +65,7 @@ export function activate(context: VSCode.ExtensionContext) {
                         let options = { stdio: 'inherit', cwd: VSCode.workspace.rootPath };
                         
                         // Start the child java process
-                        ChildProcess.spawn(javaExecutablePath, args, options);
+                        ChildProcess.execFile(javaExecutablePath, args, options);
                     });
                 });
             });
@@ -131,7 +131,7 @@ export function activate(context: VSCode.ExtensionContext) {
 
 function isJava8(javaExecutablePath: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
-        let result = ChildProcess.exec(javaExecutablePath + ' -version', { }, (error, stdout, stderr) => {
+        let result = ChildProcess.execFile(javaExecutablePath, ['-version'], { }, (error, stdout, stderr) => {
             let eight = stderr.indexOf('1.8') >= 0;
             
             resolve(eight);
