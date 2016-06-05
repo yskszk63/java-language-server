@@ -277,10 +277,12 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private Optional<Path> getFilePath(URI uri) {
+        LOG.info(uri.toString());
+        
         if (!uri.getScheme().equals("file"))
             return Optional.empty();
         else
-            return Optional.of(Paths.get(uri.getPath()));
+            return Optional.of(Paths.get(uri));
     }
 
     private void doLint(Path path) {
