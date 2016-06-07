@@ -225,7 +225,9 @@ public class JavacHolder {
     /**
      * Remove source file from caches in the parse stage
      */
-    private void clear(JavaFileObject source) {
+    public void clear(JavaFileObject source) {
+        // TODO clear dependencies as well (dependencies should get stored in SymbolIndex)
+
         // Forget about this file
         log.clear(source);
 

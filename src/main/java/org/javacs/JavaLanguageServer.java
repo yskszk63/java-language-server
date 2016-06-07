@@ -66,7 +66,6 @@ class JavaLanguageServer implements LanguageServer {
 
         ServerCapabilitiesImpl c = new ServerCapabilitiesImpl();
 
-        // TODO incremental mode
         c.setTextDocumentSync(ServerCapabilities.SYNC_INCREMENTAL);
         c.setDefinitionProvider(true);
         c.setCompletionProvider(new CompletionOptionsImpl());
@@ -277,8 +276,6 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private Optional<Path> getFilePath(URI uri) {
-        LOG.info(uri.toString());
-        
         if (!uri.getScheme().equals("file"))
             return Optional.empty();
         else
@@ -375,9 +372,21 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
                 for (FileEvent event : params.getChanges()) {
-                    // TODO invalidate caches when javaconfig.json changes
-                    
-                    LOG.info(event.toString());
+                    if (event.getUri().endsWith(".java")) {
+                        if (event.getType() == FileEvent.TYPE_DELETED) {
+                            URI uri = URI.create(event.getUri());
+
+                            getFilePath(uri).ifPresent(path -> {
+                                JavacHolder compiler = findCompiler(path);
+                                JavaFileObject file = findFile(compiler, path);
+
+                                compiler.clear(file);
+                            });
+                        }
+                    }
+                    else if (event.getUri().endsWith("javaconfig.json")) {
+                        // TODO invalidate caches when javaconfig.json changes
+                    }
                 }
             }
         };

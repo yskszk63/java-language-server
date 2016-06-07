@@ -17,10 +17,6 @@
 * Hover shows javadoc ifa available
 * Javadoc path for hover, autocomplete
 
-## Bugs
-* When file is deleted or renamed, delete it from caches
-* Override interface warning
-
 ## Features 
 * Go-to-subclasses
 * Signature help

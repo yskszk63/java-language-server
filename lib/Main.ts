@@ -37,7 +37,10 @@ export function activate(context: VSCode.ExtensionContext) {
                 // NOTE: this currently doesn't do anything
                 configurationSection: 'java',
                 // Notify the server about file changes to 'javaconfig.json' files contain in the workspace
-                fileEvents: VSCode.workspace.createFileSystemWatcher('**/javaconfig.json')
+                fileEvents: [
+                    VSCode.workspace.createFileSystemWatcher('**/javaconfig.json'),
+                    VSCode.workspace.createFileSystemWatcher('**/*.java')
+                ]
             }
         }
         
