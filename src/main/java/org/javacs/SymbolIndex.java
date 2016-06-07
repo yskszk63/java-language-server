@@ -5,38 +5,29 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.logging.*;
 import java.util.concurrent.*;
-import javax.lang.model.element.*;
 import java.util.function.*;
+import java.util.stream.Stream;
+import javax.lang.model.element.ElementKind;
 import javax.tools.*;
 
-import java.net.URI;
 import javax.tools.JavaFileObject;
 
 import com.sun.tools.javac.tree.*;
 import com.sun.tools.javac.code.*;
-import com.sun.tools.javac.util.Context;
+import io.typefox.lsapi.SymbolInformation;
+import io.typefox.lsapi.SymbolInformationImpl;
 
 public class SymbolIndex {
     private static final Logger LOG = Logger.getLogger("main");
-
-    /**
-     * Private copy of compiler.
-     * Compiler is very stateful, so you can't use the same compiler to do anything else concurrently.
-     */
-    public final JavacHolder compiler;
-
-    public final BaseScanner indexer;
 
     /**
      * Completes when initial index is done. Useful for testing.
      */
     public final CompletableFuture<Void> initialIndexComplete = new CompletableFuture<>();
 
-    /**
-     * Symbols by class
-     */
-    private ConcurrentHashMap<Symbol.ClassSymbol, Set<Symbol>> index = new ConcurrentHashMap<>();
-    
+    private Set<SymbolInformation> methods = new HashSet<>();
+    private Set<SymbolInformation> classes = new HashSet<>();
+
     @FunctionalInterface
     public interface ReportDiagnostics {
         void report(Collection<Path> paths, DiagnosticCollector<JavaFileObject> diagnostics);
@@ -46,27 +37,8 @@ public class SymbolIndex {
                        Set<Path> sourcePath, 
                        Path outputDirectory, 
                        ReportDiagnostics publishDiagnostics) {
-        this.compiler = new JavacHolder(classPath, sourcePath, outputDirectory);
-        this.indexer = new BaseScanner(compiler.context) {
-            @Override
-            public void visitClassDef(JCTree.JCClassDecl tree) {
-                super.visitClassDef(tree);
-
-                if (tree.sym != null) {
-                    Set<Symbol> symbols = index.computeIfAbsent(tree.sym, newClass -> new HashSet<>());
-
-                    symbols.add(tree.sym);
-
-                    tree.accept(new BaseScanner(compiler.context) {
-                        @Override
-                        public void visitMethodDef(JCTree.JCMethodDecl tree) {
-                            if (tree.sym != null)
-                                symbols.add(tree.sym);
-                        }
-                    });
-                }
-            }
-        };
+        JavacHolder compiler = new JavacHolder(classPath, sourcePath, outputDirectory);
+        Indexer indexer = new Indexer(compiler);
         
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
 
@@ -100,9 +72,7 @@ public class SymbolIndex {
 
                 initialIndexComplete.complete(null);
                 
-                // TODO destroy compiler context to recover memory 
-                // We'll need to record all symbol locations up front,
-                // since we'll no longer have access to source trees
+                // TODO verify that compiler and all its resources get destroyed
             }
 
             /**
@@ -130,30 +100,18 @@ public class SymbolIndex {
 
     private static final int MAX_SEARCH_RESULTS = 100;
 
-    public Set<Symbol> search(String query) {
-        Set<Symbol> found = new HashSet<>();
+    public Stream<? extends SymbolInformation> search(String query) {
 
-        index.values().forEach(index -> {
-            if (found.size() < MAX_SEARCH_RESULTS) {
-                index.forEach(s -> {
-                    if (containsCharsInOrder(s.getSimpleName(), query))
-                        found.add(s);
-                });
-            }
-        });
-
-        return found;
+        return Stream.concat(classes.stream(), methods.stream())
+                     .filter(s -> containsCharsInOrder(s.getName(), query))
+                     .limit(MAX_SEARCH_RESULTS);
     }
     
-    public Optional<SymbolLocation> locate(Symbol symbol) {
-        return compiler.index.locate(symbol);
-    }
-
     /**
      * Check if name contains all the characters of query in order.
      * For example, name 'FooBar' contains query 'FB', but not 'BF'
      */
-    private boolean containsCharsInOrder(Name name, String query) {
+    private boolean containsCharsInOrder(String name, String query) {
         int iName = 0, iQuery = 0;
 
         while (iName < name.length() && iQuery < query.length()) {
@@ -172,10 +130,79 @@ public class SymbolIndex {
         return iQuery == query.length();
     }
 
+    private class Indexer extends BaseScanner {
+        private JavacHolder compiler;
+
+        public Indexer(JavacHolder compiler) {
+            super(compiler.context);
+
+            this.compiler = compiler;
+        }
+
+        @Override
+        public void visitClassDef(JCTree.JCClassDecl tree) {
+            super.visitClassDef(tree);
+
+            info(tree.sym).ifPresent(classes::add);
+        }
+
+        @Override
+        public void visitMethodDef(JCTree.JCMethodDecl tree) {
+            info(tree.sym).ifPresent(methods::add);
+        }
+
+        private Optional<SymbolInformationImpl> info(Symbol symbol) {
+            return Optional.ofNullable(symbol)
+                           .flatMap(compiler.index::locate)
+                           .map(location -> {
+                SymbolInformationImpl info = new SymbolInformationImpl();
+
+                info.setLocation(location.location());
+                info.setContainer(symbol.getEnclosingElement().getQualifiedName().toString());
+                info.setKind(symbolInformationKind(symbol.getKind()));
+                info.setName(symbol.getSimpleName().toString());
+
+                return info;
+            });
+        }
+    }
+
+    private static int symbolInformationKind(ElementKind kind) {
+        switch (kind) {
+            case PACKAGE:
+                return SymbolInformation.KIND_PACKAGE;
+            case ENUM:
+            case ENUM_CONSTANT:
+                return SymbolInformation.KIND_ENUM;
+            case CLASS:
+                return SymbolInformation.KIND_CLASS;
+            case ANNOTATION_TYPE:
+            case INTERFACE:
+                return SymbolInformation.KIND_INTERFACE;
+            case FIELD:
+                return SymbolInformation.KIND_PROPERTY;
+            case PARAMETER:
+            case LOCAL_VARIABLE:
+            case EXCEPTION_PARAMETER:
+            case TYPE_PARAMETER:
+                return SymbolInformation.KIND_VARIABLE;
+            case METHOD:
+            case STATIC_INIT:
+            case INSTANCE_INIT:
+                return SymbolInformation.KIND_METHOD;
+            case CONSTRUCTOR:
+                return SymbolInformation.KIND_CONSTRUCTOR;
+            case OTHER:
+            case RESOURCE_VARIABLE:
+            default:
+                return SymbolInformation.KIND_STRING;
+        }
+    }
+
     /**
-     * Update an indexed file
+     * Scanner that will add class and method symbols to the index
      */
-    private void update(JCTree.JCCompilationUnit tree) {
-        tree.accept(indexer);
+    public BaseScanner indexer(JavacHolder compiler) {
+        return new Indexer(compiler);
     }
 }

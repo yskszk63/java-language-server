@@ -46,7 +46,7 @@ public class SymbolIndexTest {
     }
 
     private Set<String> search(String query) {
-        return index().search(query).stream().map(s -> s.getSimpleName().toString()).collect(Collectors.toSet());
+        return index().search(query).map(s -> s.getName()).collect(Collectors.toSet());
     }
 
     private static SymbolIndex index() {

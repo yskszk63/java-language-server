@@ -292,42 +292,10 @@ class JavaLanguageServer implements LanguageServer {
         JavaFileObject file = findFile(compiler, path);
 
         compiler.onError(errors);
-        compiler.afterAnalyze(index.indexer);
+        compiler.afterAnalyze(index.indexer(compiler));
         compiler.compile(compiler.parse(file));
         
         publishDiagnostics(Collections.singleton(path), errors);
-    }
-    
-    private int symbolInformationKind(ElementKind kind) {
-        switch (kind) {
-            case PACKAGE:
-                return SymbolInformation.KIND_PACKAGE;
-            case ENUM:
-            case ENUM_CONSTANT:
-                return SymbolInformation.KIND_ENUM;
-            case CLASS:
-                return SymbolInformation.KIND_CLASS;
-            case ANNOTATION_TYPE:
-            case INTERFACE:
-                return SymbolInformation.KIND_INTERFACE;
-            case FIELD:
-                return SymbolInformation.KIND_PROPERTY;
-            case PARAMETER:
-            case LOCAL_VARIABLE:
-            case EXCEPTION_PARAMETER:
-            case TYPE_PARAMETER:
-                return SymbolInformation.KIND_VARIABLE;
-            case METHOD:
-            case STATIC_INIT:
-            case INSTANCE_INIT:
-                return SymbolInformation.KIND_METHOD;
-            case CONSTRUCTOR:
-                return SymbolInformation.KIND_CONSTRUCTOR;
-            case OTHER:
-            case RESOURCE_VARIABLE:
-            default:
-                return SymbolInformation.KIND_STRING;
-        }
     }
 
     @Override
@@ -335,33 +303,12 @@ class JavaLanguageServer implements LanguageServer {
         return new WorkspaceService() {
             @Override
             public CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
-                List<SymbolInformationImpl> result = new ArrayList<>();
-                
-                indexCache.values().forEach(symbolIndex -> {
-                    symbolIndex.search(params.getQuery()).forEach(symbol -> {
-                        symbolIndex.locate(symbol).ifPresent(locate -> {
-                            URI uri = locate.file.toUri();
-                            Path symbolPath = Paths.get(uri);
-                            JavaFileObject symbolFile = findFile(symbolIndex.compiler, symbolPath);
-                            RangeImpl range = findPosition(symbolFile, locate.startPosition, locate.endPosition);
-                            LocationImpl location = new LocationImpl();
+                List<SymbolInformation> infos = indexCache.values()
+                                                          .stream()
+                                                          .flatMap(symbolIndex -> symbolIndex.search(params.getQuery()))
+                                                          .collect(Collectors.toList());
 
-                            location.setRange(range);
-                            location.setUri(uri.toString());
-                            
-                            SymbolInformationImpl info = new SymbolInformationImpl();
-                            
-                            info.setLocation(location);
-                            info.setContainer(symbol.getEnclosingElement().getQualifiedName().toString());
-                            info.setKind(symbolInformationKind(symbol.getKind()));
-                            info.setName(symbol.getSimpleName().toString());
-                            
-                            result.add(info);
-                        });
-                    });
-                });
-
-                return CompletableFuture.completedFuture(result);
+                return CompletableFuture.completedFuture(infos);
             }
 
             @Override
@@ -680,7 +627,7 @@ class JavaLanguageServer implements LanguageServer {
         else return Collections.emptyList();
     }
 
-    private static RangeImpl findPosition(JavaFileObject file, long startOffset, long endOffset) {
+    public static RangeImpl findPosition(JavaFileObject file, long startOffset, long endOffset) {
         try (Reader in = file.openReader(true)) {
             long offset = 0;
             int line = 0;
