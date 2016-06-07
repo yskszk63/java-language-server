@@ -12,6 +12,14 @@
 * Autocomplete is using the entire method signature
 * Autocomplete method parameter types is returning classes twice
 * Autocomplete is showing both override and super versions
+* Autocomplete annotation fields
+* Hover exported methods and fields on annotations, interfaces, classes that are not on source path
+* Hover shows javadoc ifa available
+* Javadoc path for hover, autocomplete
+
+## Bugs
+* When file is deleted or renamed, delete it from caches
+* Override interface warning
 
 ## Features 
 * Go-to-subclasses
@@ -30,6 +38,10 @@
 * Enum options
 * Cast to type
 * Import missing file
+
+### Code lens
+* "N references" on method, class
+* "N inherited" on class, with generate-override actions
 
 ## Optimizations
 * Incremental parsing
