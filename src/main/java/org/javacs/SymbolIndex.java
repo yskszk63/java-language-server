@@ -85,6 +85,13 @@ public class SymbolIndex {
                 // Compile all parsed files
                 compiler.compile(parsed);
                 
+                // TODO minimize memory use during this process
+                // Instead of doing parse-all / compile-all, 
+                // queue all files, then do parse / compile on each
+                // If invoked correctly, javac should avoid reparsing the same file twice
+                // Then, use the same mechanism as the desugar / generate phases to remove method bodies, 
+                // to reclaim memory as we go
+                
                 // Report diagnostics to language server
                 publishDiagnostics.report(paths, errors);
                 
@@ -92,6 +99,10 @@ public class SymbolIndex {
                 compiler.onError(err -> {});
 
                 initialIndexComplete.complete(null);
+                
+                // TODO destroy compiler context to recover memory 
+                // We'll need to record all symbol locations up front,
+                // since we'll no longer have access to source trees
             }
 
             /**
