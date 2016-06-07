@@ -50,12 +50,17 @@ public class JavacHolder {
     private final DiagnosticListener<JavaFileObject> errors = diagnostic -> {
         errorsDelegate.report(diagnostic);
     };
-
+    
     {
         context.put(DiagnosticListener.class, errors);
     }
+    
+    // Sets command-line options
     private final Options options = Options.instance(context);
+    
     {
+        // You would think we could do -Xlint:all, 
+        // but some lints trigger fatal errors in the presence of parse errors
         options.put("-Xlint:cast", "");
         options.put("-Xlint:deprecation", "");
         options.put("-Xlint:empty", "");
@@ -66,6 +71,7 @@ public class JavacHolder {
         options.put("-Xlint:varargs", "");
         options.put("-Xlint:static", "");
     }
+    
     // IncrementalLog registers itself in context and pre-empts the normal Log from being created
     private final IncrementalLog log = new IncrementalLog(context);
     public final JavacFileManager fileManager = new JavacFileManager(context, true, null);
@@ -76,6 +82,7 @@ public class JavacHolder {
     public final JavaCompiler compiler = JavaCompiler.instance(context);
 
     {
+        // We're going to use the javadoc comments
         compiler.keepComments = true;
     }
 
