@@ -6,25 +6,28 @@ import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.api.MultiTaskListener;
+import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.comp.*;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.parser.FuzzyParserFactory;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeScanner;
-import com.sun.tools.javac.util.Context;
-import com.sun.tools.javac.util.Name;
-import com.sun.tools.javac.util.Options;
+import com.sun.tools.javac.util.*;
 
 import javax.tools.*;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -92,6 +95,7 @@ public class JavacHolder {
     // We'll use these scanners to implement features like go-to-definition
     private final Map<TaskEvent.Kind, List<TreeScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
     public final ClassIndex index = new ClassIndex(context);
+    private final Types types = Types.instance(context);
 
     public JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
         this.classPath = classPath;
@@ -232,11 +236,30 @@ public class JavacHolder {
         // Remove all cached classes that came from this files
         List<Name> remove = new ArrayList<>();
 
+        Consumer<Type> removeFromClosureCache = closureCacheRemover(types);
+
         check.compiled.forEach((name, symbol) -> {
             if (symbol.sourcefile.getName().equals(source.getName()))
                 remove.add(name);
+
+            removeFromClosureCache.accept(symbol.type);
         });
 
         remove.forEach(check.compiled::remove);
+
+    }
+
+    private static Consumer<Type> closureCacheRemover(Types types) {
+        try {
+            Field closureCache = Types.class.getDeclaredField("closureCache");
+
+            closureCache.setAccessible(true);
+
+            Map<Type, com.sun.tools.javac.util.List<Type>> value = (Map<Type, com.sun.tools.javac.util.List<Type>>) closureCache.get(types);
+
+            return value::remove;
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
