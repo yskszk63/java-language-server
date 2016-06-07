@@ -116,8 +116,8 @@ A java process that does the hard work of parsing and analyzing .java source fil
 
 ### Typescript Visual Studio Code extension
 
-"Glue code" that connects to the external java process using a network port,
-and implements various features of the Visual Studio Code extension API.
+"Glue code" that launches the external java process
+and connects to it using [vscode-languageclient](https://www.npmjs.com/package/vscode-languageclient).
 
     package.json (node package file)
     tsconfig.json (typescript compilation configuration file)
@@ -127,11 +127,8 @@ and implements various features of the Visual Studio Code extension API.
 
 ## Design
 
-This extension consists of an external java process,
-and some typescript glue code that talks to the VS Code API.
-The typescript glue code communicates with the external java process using a randomly assigned network port.
-
-In the future, the javac service process could be used separately by other tools that need Java code insight.
+This extension consists of an external java process, 
+which communicates with vscode using the [language server protocol](https://github.com/Microsoft/vscode-languageserver-protocol). 
 
 ### Java service process
 
@@ -156,7 +153,6 @@ and then rerun the compiler.
 
 If you have multiple javaconfig.json files in different subdirectories of your project,
 the parent directory of each javaconfig.json will be treated as a separate java root.
-A separate java service process will be started for each javaconfig.json.
 
 ## Logs
 
