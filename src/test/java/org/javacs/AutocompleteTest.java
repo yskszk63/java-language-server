@@ -49,8 +49,8 @@ public class AutocompleteTest extends Fixtures {
         // Static method
         Set<String> suggestions = insertText(file, 4, 13);
 
-        assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "class")));
-        assertThat(suggestions, hasItems("field", "method", "getClass"));
+        assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "fieldStaticPrivate", "methodStaticPrivate", "class")));
+        assertThat(suggestions, hasItems("field", "method", "fieldPrivate", "methodPrivate", "getClass"));
     }
 
     @Test
@@ -200,11 +200,26 @@ public class AutocompleteTest extends Fixtures {
     public void otherMethod() throws IOException {
         String file = "/org/javacs/example/AutocompleteOther.java";
 
-        // Static method
+        // new AutocompleteMember().
         Set<String> suggestions = insertText(file, 4, 33);
 
         assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "class")));
+        assertThat(suggestions, not(hasItems("fieldStaticPrivate", "methodStaticPrivate")));
+        assertThat(suggestions, not(hasItems("fieldPrivate", "methodPrivate")));
         assertThat(suggestions, hasItems("field", "method", "getClass"));
+    }
+
+    @Test
+    public void otherStatic() throws IOException {
+        String file = "/org/javacs/example/AutocompleteOther.java";
+
+        // new AutocompleteMember().
+        Set<String> suggestions = insertText(file, 6, 27);
+
+        assertThat(suggestions, hasItems("fieldStatic", "methodStatic", "class"));
+        assertThat(suggestions, not(hasItems("fieldStaticPrivate", "methodStaticPrivate")));
+        assertThat(suggestions, not(hasItems("fieldPrivate", "methodPrivate")));
+        assertThat(suggestions, not(hasItems("field", "method", "getClass")));
     }
 
     @Test

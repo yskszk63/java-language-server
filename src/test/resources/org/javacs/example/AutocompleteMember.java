@@ -13,4 +13,13 @@ public class AutocompleteMember {
     public String method() throws Exception {
         return "foo";
     }
+
+    private static String fieldStaticPrivate;
+    private String fieldPrivate;
+    private static String methodStaticPrivate() {
+        return "foo";
+    }
+    private String methodPrivate() {
+        return "foo";
+    }
 }

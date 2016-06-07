@@ -3,22 +3,18 @@ package org.javacs;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.*;
-import com.google.common.base.Joiner;
 import com.sun.source.tree.*;
 import com.sun.tools.javac.api.JavacScope;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.comp.*;
 import com.sun.tools.javac.jvm.ClassReader;
-import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.*;
 import com.sun.tools.javac.util.Name;
 import io.typefox.lsapi.CompletionItem;
 import io.typefox.lsapi.CompletionItemImpl;
 
-import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import javax.tools.JavaFileObject;
@@ -26,9 +22,6 @@ import java.util.*;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 public class AutocompleteVisitor extends CursorScanner {
     private static final Logger LOG = Logger.getLogger("main");
@@ -62,7 +55,7 @@ public class AutocompleteVisitor extends CursorScanner {
 
                 suggestions.add(item);
 
-                type.accept(new CollectStatics(), null);
+                visitMembers(expression);
             }
             else if (type.getKind() == TypeKind.PACKAGE) {
                 // Tell ClassReader to scan the given package name
@@ -106,7 +99,7 @@ public class AutocompleteVisitor extends CursorScanner {
                 }
             }
             else
-                type.accept(new CollectVirtuals(), null);
+                visitMembers(expression);
         }
     }
 
@@ -122,25 +115,31 @@ public class AutocompleteVisitor extends CursorScanner {
 
         if (containsCursor(expression))
             super.visitReference(node);
-        else {
-            TypeMirror type = expression.type;
+        else if (isClassReference(expression)) {
+            CompletionItemImpl item = new CompletionItemImpl();
 
-            if (type == null)
-                LOG.warning("No type for " + expression);
-            else if (isClassReference(expression)) {
-                CompletionItemImpl item = new CompletionItemImpl();
+            item.setKind(CompletionItem.KIND_METHOD);
+            item.setLabel("new");
+            item.setInsertText("new");
 
-                item.setKind(CompletionItem.KIND_METHOD);
-                item.setLabel("new");
-                item.setInsertText("new");
+            suggestions.add(item);
 
-                suggestions.add(item);
-
-                type.accept(new CollectStatics(), null);
-            }
-            else
-                type.accept(new CollectVirtuals(), null);
+            visitMembers(expression);
         }
+        else
+            visitMembers(expression);
+    }
+
+    private void visitMembers(JCTree.JCExpression expression) {
+        Type type = expression.type;
+        TreePath path = getPath(new TreePath(compilationUnit), expression);
+        JavacTrees trees = JavacTrees.instance(context);
+        JavacScope scope = trees.getScope(path);
+
+        if (type == null)
+            LOG.warning("No type for " + expression);
+        else
+            type.accept(new CollectMembers(scope, type, isClassReference(expression)), null);
     }
 
     @Override
@@ -533,45 +532,29 @@ public class AutocompleteVisitor extends CursorScanner {
         suggestions.add(item);
     }
 
-    private class CollectStatics extends BridgeTypeVisitor {
+    private class CollectMembers extends BridgeTypeVisitor {
+        private final JavacScope scope;
+        private final Type type;
+        private final boolean isStatic;
 
-        @Override
-        public void visitDeclared(DeclaredType t) {
-            TypeElement typeElement = (TypeElement) t.asElement();
-            List<? extends Element> members = JavacElements.instance(context).getAllMembers(typeElement);
-
-            for (Element e : members) {
-                switch (e.getKind()) {
-                    case FIELD:
-                        Symbol.VarSymbol field = (Symbol.VarSymbol) e;
-
-                        if (field.isStatic())
-                            addField(field, 0);
-
-                        break;
-                    case METHOD:
-                        Symbol.MethodSymbol method = (Symbol.MethodSymbol) e;
-
-                        if (method.isStatic())
-                            addMethod(method, 0);
-
-                        break;
-                }
-            }
+        public CollectMembers(JavacScope scope, Type type, boolean isStatic) {
+            this.scope = scope;
+            this.type = type;
+            this.isStatic = isStatic;
         }
-    }
 
-    private class CollectVirtuals extends BridgeTypeVisitor {
         @Override
         public void visitArray(ArrayType t) {
-            // Array types just have 'length'
-            CompletionItemImpl item = new CompletionItemImpl();
+            if (!isStatic) {
+                // Array types just have 'length'
+                CompletionItemImpl item = new CompletionItemImpl();
 
-            item.setLabel("length");
-            item.setInsertText("length");
-            item.setKind(CompletionItem.KIND_PROPERTY);
+                item.setLabel("length");
+                item.setInsertText("length");
+                item.setKind(CompletionItem.KIND_PROPERTY);
 
-            suggestions.add(item);
+                suggestions.add(item);
+            }
         }
 
         @Override
@@ -583,29 +566,36 @@ public class AutocompleteVisitor extends CursorScanner {
         public void visitDeclared(DeclaredType t) {
             TypeElement typeElement = (TypeElement) t.asElement();
             List<? extends Element> members = JavacElements.instance(context).getAllMembers(typeElement);
+            Resolve resolve = Resolve.instance(context);
 
             for (Element e : members) {
                 switch (e.getKind()) {
-                    case FIELD:
+                    case FIELD: {
                         Symbol.VarSymbol field = (Symbol.VarSymbol) e;
+                        boolean accessible = resolve.isAccessible(scope.getEnv(), type, field);
+                        boolean matchesStatic = isStatic == field.isStatic();
 
-                        if (!field.isStatic()) {
+                        if (accessible && matchesStatic) {
                             int removed = supersRemoved(field, t);
-                            
-                            addField(field, 0);
+
+                            addField(field, removed);
                         }
 
                         break;
-                    case METHOD:
+                    }
+                    case METHOD: {
                         Symbol.MethodSymbol method = (Symbol.MethodSymbol) e;
+                        boolean accessible = resolve.isAccessible(scope.getEnv(), type, method);
+                        boolean matchesStatic = isStatic == method.isStatic();
 
-                        if (!method.isStatic()) {
+                        if (accessible && matchesStatic) {
                             int removed = supersRemoved(method, t);
-                            
+
                             addMethod(method, removed);
                         }
 
                         break;
+                    }
                 }
             }
         }
