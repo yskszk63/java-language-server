@@ -27,16 +27,25 @@ public class RecompileTest extends Fixtures {
         GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/CompileTwice.java");
         JavacHolder compiler = newCompiler();
         List<String> visits = new ArrayList<>();
-        compiler.afterAnalyze(new GetClass(compiler.context, visits));
+        GetClass getClass = new GetClass(compiler.context, visits);
+
         compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+
+        JCTree.JCCompilationUnit tree = compiler.parse(file);
+
+        compiler.compile(tree);
+
+        tree.accept(getClass);
 
         assertThat(errors.getDiagnostics(), empty());
         assertThat(visits, hasItems("CompileTwice", "NestedStaticClass", "NestedClass"));
 
         // Compile again
-        compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+        tree = compiler.parse(file);
+
+        compiler.compile(tree);
+
+        tree.accept(getClass);
 
         assertThat(errors.getDiagnostics(), empty());
         assertThat(visits, hasItems("CompileTwice", "NestedStaticClass", "NestedClass",
@@ -60,10 +69,13 @@ public class RecompileTest extends Fixtures {
 
         // Parse again
         List<String> parsedClassNames = new ArrayList<>();
+        GetClass getClass = new GetClass(compiler.context, parsedClassNames);
 
-        compiler.afterParse(new GetClass(compiler.context, parsedClassNames));
         compiler.onError(goodErrors);
-        compiler.parse(good);
+
+        JCTree.JCCompilationUnit tree = compiler.parse(good);
+
+        tree.accept(getClass);
 
         assertThat(goodErrors.getDiagnostics(), empty());
         assertThat(parsedClassNames, contains("FixParseError"));
@@ -87,9 +99,15 @@ public class RecompileTest extends Fixtures {
         // Parse again
         List<String> parsedClassNames = new ArrayList<>();
 
-        compiler.afterAnalyze(new GetClass(compiler.context, parsedClassNames));
+        GetClass getClass = new GetClass(compiler.context, parsedClassNames);
+
         compiler.onError(goodErrors);
-        compiler.compile(compiler.parse(good));
+
+        JCTree.JCCompilationUnit tree = compiler.parse(good);
+
+        compiler.compile(tree);
+
+        tree.accept(getClass);
 
         assertThat(goodErrors.getDiagnostics(), empty());
         assertThat(parsedClassNames, contains("FixTypeError"));

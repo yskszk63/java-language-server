@@ -50,7 +50,6 @@ public class SymbolIndex {
         
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
 
-        compiler.afterAnalyze(indexer);
         compiler.onError(errors);
 
         Thread worker = new Thread("InitialIndex") {
@@ -64,6 +63,8 @@ public class SymbolIndex {
 
                 // Compile all parsed files
                 compiler.compile(parsed);
+
+                parsed.forEach(p -> p.accept(indexer));
                 
                 // TODO minimize memory use during this process
                 // Instead of doing parse-all / compile-all, 

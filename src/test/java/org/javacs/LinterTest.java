@@ -39,10 +39,13 @@ public class LinterTest extends Fixtures {
         JavacHolder compiler = newCompiler();
         CollectMethods scanner = new CollectMethods(compiler.context);
 
-        compiler.afterAnalyze(scanner);
-
         compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+
+        JCTree.JCCompilationUnit tree = compiler.parse(file);
+
+        compiler.compile(tree);
+
+        tree.accept(scanner);
 
         assertThat(scanner.methodNames, hasItem("main"));
     }
@@ -54,10 +57,13 @@ public class LinterTest extends Fixtures {
         JavacHolder compiler = newCompiler();
         CollectMethods scanner = new CollectMethods(compiler.context);
 
-        compiler.afterAnalyze(scanner);
-
         compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+
+        JCTree.JCCompilationUnit tree = compiler.parse(file);
+
+        compiler.compile(tree);
+
+        tree.accept(scanner);
 
         assertThat(scanner.methodNames, hasItem("test"));
         assertThat(errors.getDiagnostics(), not(empty()));
@@ -66,7 +72,10 @@ public class LinterTest extends Fixtures {
         errors = new DiagnosticCollector<>();
 
         compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+
+        tree = compiler.parse(file);
+
+        compiler.compile(tree);
 
         assertThat(errors.getDiagnostics(), not(empty()));
     }
@@ -79,11 +88,15 @@ public class LinterTest extends Fixtures {
         CollectMethods parsed = new CollectMethods(compiler.context);
         CollectMethods compiled = new CollectMethods(compiler.context);
 
-        compiler.afterAnalyze(compiled);
-        compiler.afterParse(parsed);
-
         compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+
+        JCTree.JCCompilationUnit tree = compiler.parse(file);
+
+        tree.accept(parsed);
+
+        compiler.compile(tree);
+
+        tree.accept(compiled);
 
         assertThat(parsed.methodNames, hasItem("test")); // Error recovery should have worked
         assertThat(compiled.methodNames, hasItem("test")); // Type error recovery should have worked
@@ -97,10 +110,13 @@ public class LinterTest extends Fixtures {
         JavacHolder compiler = newCompiler();
         CollectMethods scanner = new CollectMethods(compiler.context);
 
-        compiler.afterAnalyze(scanner);
-
         compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+
+        JCTree.JCCompilationUnit tree = compiler.parse(file);
+
+        compiler.compile(tree);
+
+        tree.accept(scanner);
 
         assertThat(scanner.methodNames, hasItem("test")); // Type error, so parse tree is present
 
@@ -120,10 +136,13 @@ public class LinterTest extends Fixtures {
         JavacHolder compiler = newCompiler();
         MethodTypes scanner = new MethodTypes(compiler.context);
 
-        compiler.afterAnalyze(scanner);
-
         compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+
+        JCTree.JCCompilationUnit tree = compiler.parse(file);
+
+        compiler.compile(tree);
+
+        tree.accept(scanner);
 
         assertThat(errors.getDiagnostics(), empty());
         assertThat(scanner.methodTypes, hasKey("test"));

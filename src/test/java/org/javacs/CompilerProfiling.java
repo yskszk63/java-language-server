@@ -40,10 +40,13 @@ public class CompilerProfiling extends Fixtures {
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
         JavacHolder compiler = new JavacHolder(Collections.emptySet(), Collections.emptySet(), Paths.get("out"));
         GetCompilationUnit compilationUnit = new GetCompilationUnit(compiler.context);
-        compiler.afterParse(compilationUnit);
+
         compiler.onError(errors);
+
         try {
-            compiler.parse(file);
+            JCTree.JCCompilationUnit tree = compiler.parse(file);
+
+            tree.accept(compilationUnit);
         } catch (RuntimeException e) {
             if (e.getCause() instanceof AbortCompilation)
                 LOG.info("Aborted further stages");

@@ -293,9 +293,15 @@ class JavaLanguageServer implements LanguageServer {
         JavaFileObject file = findFile(compiler, path);
 
         compiler.onError(errors);
-        compiler.afterAnalyze(index.indexer(compiler));
-        compiler.compile(compiler.parse(file));
-        
+
+        JCTree.JCCompilationUnit parsed = compiler.parse(file);
+
+        compiler.compile(parsed);
+
+        BaseScanner indexer = index.indexer(compiler);
+
+        parsed.accept(indexer);
+
         publishDiagnostics(Collections.singleton(path), errors);
     }
 
@@ -616,9 +622,13 @@ class JavaLanguageServer implements LanguageServer {
             long cursor = findOffset(file, line, character);
             SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, cursor, compiler.context);
 
-            compiler.afterAnalyze(visitor);
             compiler.onError(errors);
-            compiler.compile(compiler.parse(file));
+
+            JCTree.JCCompilationUnit tree = compiler.parse(file);
+
+            compiler.compile(tree);
+
+            tree.accept(visitor);
 
             return visitor.found;
         });
@@ -763,9 +773,13 @@ class JavaLanguageServer implements LanguageServer {
             long cursor = findOffset(file, position.getPosition().getLine(), position.getPosition().getCharacter());
             SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, cursor, compiler.context);
 
-            compiler.afterAnalyze(visitor);
             compiler.onError(errors);
-            compiler.compile(compiler.parse(file));
+
+            JCTree.JCCompilationUnit tree = compiler.parse(file);
+
+            compiler.compile(tree);
+
+            tree.accept(visitor);
             
             if (visitor.found.isPresent()) {
                 Symbol symbol = visitor.found.get();
@@ -850,7 +864,6 @@ class JavaLanguageServer implements LanguageServer {
             JavaFileObject withSemi = withSemicolonAfterCursor(file, path, cursor);
             AutocompleteVisitor autocompleter = new AutocompleteVisitor(withSemi, cursor, compiler.context);
 
-            compiler.afterAnalyze(autocompleter);
             compiler.onError(errors);
 
             JCTree.JCCompilationUnit ast = compiler.parse(withSemi);
@@ -860,6 +873,8 @@ class JavaLanguageServer implements LanguageServer {
             ast.accept(new AutocompletePruner(withSemi, cursor, compiler.context));
 
             compiler.compile(ast);
+
+            ast.accept(autocompleter);
 
             result.getItems().addAll(autocompleter.suggestions);
         }

@@ -91,9 +91,6 @@ public class JavacHolder {
 
     private final Todo todo = Todo.instance(context);
     private final JavacTrees trees = JavacTrees.instance(context);
-    // TreeScanner tasks we want to perform before or after compilation stages
-    // We'll use these scanners to implement features like go-to-definition
-    private final Map<TaskEvent.Kind, List<TreeScanner>> beforeTask = new HashMap<>(), afterTask = new HashMap<>();
     public final ClassIndex index = new ClassIndex(context);
     private final Types types = Types.instance(context);
 
@@ -112,12 +109,6 @@ public class JavacHolder {
                 LOG.fine("started " + e);
 
                 JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
-
-                List<TreeScanner> todo = beforeTask.getOrDefault(e.getKind(), Collections.emptyList());
-
-                for (TreeScanner visitor : todo) {
-                    unit.accept(visitor);
-                }
             }
 
             @Override
@@ -128,12 +119,6 @@ public class JavacHolder {
 
                 if (e.getKind() == TaskEvent.Kind.ANALYZE)
                     unit.accept(index);
-
-                List<TreeScanner> todo = afterTask.getOrDefault(e.getKind(), Collections.emptyList());
-
-                for (TreeScanner visitor : todo) {
-                    unit.accept(visitor);
-                }
             }
         });
 
@@ -165,24 +150,6 @@ public class JavacHolder {
         } catch (IOException e) {
             LOG.log(Level.SEVERE, e.getMessage(), e);
         }
-    }
-
-    /**
-     * After the parse phase of compilation,
-     * scan the source trees with these scanners.
-     * Replaces any existing after-parse scanners.
-     */
-    public void afterParse(TreeScanner... scan) {
-        afterTask.put(TaskEvent.Kind.PARSE, ImmutableList.copyOf(scan));
-    }
-
-    /**
-     * After the analysis phase of compilation,
-     * scan the source trees with these scanners.
-     * Replaces any existing after-analyze scanners.
-     */
-    public void afterAnalyze(TreeScanner... scan) {
-        afterTask.put(TaskEvent.Kind.ANALYZE, ImmutableList.copyOf(scan));
     }
 
     /**

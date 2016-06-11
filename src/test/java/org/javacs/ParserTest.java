@@ -20,16 +20,16 @@ public class ParserTest extends Fixtures {
         JavacHolder compiler = newCompiler();
         List<String> methods = new ArrayList<>();
 
-        compiler.afterParse(new TreeScanner() {
+        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/MissingSemicolon.java");
+
+        JCTree.JCCompilationUnit tree = compiler.parse(file);
+
+        tree.accept(new TreeScanner() {
             @Override
             public void visitMethodDef(JCTree.JCMethodDecl node) {
                 methods.add(node.getName().toString());
             }
         });
-
-        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/MissingSemicolon.java");
-
-        compiler.parse(file);
 
         assertThat(methods, hasItem("methodWithMissingSemicolon"));
         assertThat(methods, hasItem("methodAfterMissingSemicolon"));
