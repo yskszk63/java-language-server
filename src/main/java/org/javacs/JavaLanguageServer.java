@@ -298,9 +298,7 @@ class JavaLanguageServer implements LanguageServer {
 
         compiler.compile(parsed);
 
-        BaseScanner indexer = index.indexer(compiler);
-
-        parsed.accept(indexer);
+        index.update(parsed, compiler.context);
 
         publishDiagnostics(Collections.singleton(path), errors);
     }
@@ -618,6 +616,7 @@ class JavaLanguageServer implements LanguageServer {
         return getFilePath(uri).flatMap(path -> {
             DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
             JavacHolder compiler = findCompiler(path);
+            SymbolIndex index = findIndex(path);
             JavaFileObject file = findFile(compiler, path);
             long cursor = findOffset(file, line, character);
             SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, cursor, compiler.context);
@@ -627,6 +626,8 @@ class JavaLanguageServer implements LanguageServer {
             JCTree.JCCompilationUnit tree = compiler.parse(file);
 
             compiler.compile(tree);
+
+            index.update(tree, compiler.context);
 
             tree.accept(visitor);
 
@@ -638,20 +639,12 @@ class JavaLanguageServer implements LanguageServer {
         URI uri = URI.create(position.getTextDocument().getUri());
         int line = position.getPosition().getLine();
         int character = position.getPosition().getCharacter();
-        List<LocationImpl> result = new ArrayList<>();
+        List<Location> result = new ArrayList<>();
 
         findSymbol(uri, line, character).ifPresent(symbol -> {
-            getFilePath(uri).map(this::findCompiler).ifPresent(compiler -> {
-                compiler.index.locate(symbol).ifPresent(locate -> {
-                    Path symbolPath = Paths.get(locate.file.toUri());
-                    JavaFileObject symbolFile = findFile(compiler, symbolPath);
-                    RangeImpl range = findPosition(symbolFile, locate.startPosition, locate.endPosition);
-                    LocationImpl location = new LocationImpl();
-
-                    location.setRange(range);
-                    location.setUri(uri.toString());
-
-                    result.add(location);
+            getFilePath(uri).map(this::findIndex).ifPresent(index -> {
+                index.findSymbol(symbol).ifPresent(info -> {
+                    result.add(info.getLocation());
                 });
             });
         });

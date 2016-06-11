@@ -96,7 +96,6 @@ public class JavacHolder {
 
     private final Todo todo = Todo.instance(context);
     private final JavacTrees trees = JavacTrees.instance(context);
-    public final ClassIndex index = new ClassIndex(context);
     private final Types types = Types.instance(context);
 
     public JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
@@ -121,9 +120,6 @@ public class JavacHolder {
                 LOG.fine("finished " + e);
 
                 JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
-
-                if (e.getKind() == TaskEvent.Kind.ANALYZE)
-                    unit.accept(index);
             }
         });
 
