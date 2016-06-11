@@ -23,14 +23,14 @@ public class GotoTest extends Fixtures {
 
     @Test
     public void localVariable() throws IOException {
-        List<LocationImpl> suggestions = doGoto(file, 9, 8);
+        List<? extends Location> suggestions = doGoto(file, 9, 8);
 
         assertThat(suggestions, contains(location(uri, 4, 15, 4, 20)));
     }
 
     @Test
     public void defaultConstructor() throws IOException {
-        List<LocationImpl> suggestions = doGoto(file, 9, 20);
+        List<? extends Location> suggestions = doGoto(file, 9, 20);
 
         assertThat(suggestions, contains(location(uri, 2, 13, 2, 17)));
     }
@@ -38,56 +38,56 @@ public class GotoTest extends Fixtures {
     @Test
     @Ignore // TODO
     public void constructor() throws IOException {
-        List<LocationImpl> suggestions = doGoto(file, 10, 20);
+        List<? extends Location> suggestions = doGoto(file, 10, 20);
 
         assertThat(suggestions, contains(location(uri, 29, 11, 29, 15)));
     }
 
     @Test
     public void className() throws IOException {
-        List<LocationImpl> suggestions = doGoto(file, 15, 8);
+        List<? extends Location> suggestions = doGoto(file, 15, 8);
 
         assertThat(suggestions, contains(location(uri, 2, 13, 2, 17)));
     }
 
     @Test
     public void staticField() throws IOException {
-        List<LocationImpl> suggestions = doGoto(file, 12, 21);
+        List<? extends Location> suggestions = doGoto(file, 12, 21);
 
         assertThat(suggestions, contains(location(uri, 35, 25, 35, 36)));
     }
 
     @Test
     public void field() throws IOException {
-        List<LocationImpl> suggestions = doGoto(file, 13, 21);
+        List<? extends Location> suggestions = doGoto(file, 13, 21);
 
         assertThat(suggestions, contains(location(uri, 36, 18, 36, 23)));
     }
 
     @Test
     public void staticMethod() throws IOException {
-        List<LocationImpl> suggestions = doGoto(file, 15, 13);
+        List<? extends Location> suggestions = doGoto(file, 15, 13);
 
         assertThat(suggestions, contains(location(uri, 37, 25, 37, 37)));
     }
 
     @Test
     public void method() throws IOException {
-        List<LocationImpl> suggestions = doGoto(file, 16, 13);
+        List<? extends Location> suggestions = doGoto(file, 16, 13);
 
         assertThat(suggestions, contains(location(uri, 40, 18, 40, 24)));
     }
 
     @Test
     public void staticMethodReference() throws IOException {
-        List<LocationImpl> suggestions = doGoto(file, 18, 26);
+        List<? extends Location> suggestions = doGoto(file, 18, 26);
 
         assertThat(suggestions, contains(location(uri, 37, 25, 37, 37)));
     }
 
     @Test
     public void methodReference() throws IOException {
-        List<LocationImpl> suggestions = doGoto(file, 19, 26);
+        List<? extends Location> suggestions = doGoto(file, 19, 26);
 
         assertThat(suggestions, contains(location(uri, 40, 18, 40, 24)));
     }
@@ -95,7 +95,7 @@ public class GotoTest extends Fixtures {
     @Test
     @Ignore // TODO
     public void typeParam() throws IOException {
-        List<LocationImpl> suggestions = doGoto(file, 45, 11);
+        List<? extends Location> suggestions = doGoto(file, 45, 11);
 
         assertThat(suggestions, contains(location(uri, 2, 18, 2, 23)));
     }
@@ -124,7 +124,7 @@ public class GotoTest extends Fixtures {
         return location;
     }
 
-    private List<LocationImpl> doGoto(String file, int row, int column) throws IOException {
+    private List<? extends Location> doGoto(String file, int row, int column) throws IOException {
         TextDocumentIdentifierImpl document = new TextDocumentIdentifierImpl();
 
         document.setUri(uri(file).toString());

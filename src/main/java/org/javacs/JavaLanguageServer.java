@@ -71,6 +71,7 @@ class JavaLanguageServer implements LanguageServer {
         c.setCompletionProvider(new CompletionOptionsImpl());
         c.setHoverProvider(true);
         c.setWorkspaceSymbolProvider(true);
+        c.setReferencesProvider(true);
 
         result.setCapabilities(c);
 
@@ -117,7 +118,7 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<List<? extends Location>> references(ReferenceParams params) {
-                return null;
+                return CompletableFuture.completedFuture(findReferences(params));
             }
 
             @Override
@@ -306,6 +307,7 @@ class JavaLanguageServer implements LanguageServer {
                 List<SymbolInformation> infos = indexCache.values()
                                                           .stream()
                                                           .flatMap(symbolIndex -> symbolIndex.search(params.getQuery()))
+                                                          .limit(100)
                                                           .collect(Collectors.toList());
 
                 return CompletableFuture.completedFuture(infos);
@@ -326,8 +328,10 @@ class JavaLanguageServer implements LanguageServer {
                             getFilePath(uri).ifPresent(path -> {
                                 JavacHolder compiler = findCompiler(path);
                                 JavaFileObject file = findFile(compiler, path);
+                                SymbolIndex index = findIndex(path);
 
                                 compiler.clear(file);
+                                index.clear(file.toUri());
                             });
                         }
                     }
@@ -589,42 +593,60 @@ class JavaLanguageServer implements LanguageServer {
         }
     }
 
-    public List<LocationImpl> gotoDefinition(TextDocumentPositionParams position) {
-        Optional<Path> maybePath = getFilePath(URI.create(position.getTextDocument().getUri()));
+    private List<? extends Location> findReferences(ReferenceParams params) {
+        URI uri = URI.create(params.getTextDocument().getUri());
+        int line = params.getPosition().getLine();
+        int character = params.getPosition().getCharacter();
+        List<Location> result = new ArrayList<>();
 
-        if (maybePath.isPresent()) {
-            Path path = maybePath.get();
+        findSymbol(uri, line, character).ifPresent(symbol -> {
+            getFilePath(uri).map(this::findIndex).ifPresent(index -> {
+                index.references(symbol).forEach(result::add);
+            });
+        });
+
+        return result;
+    }
+
+    private Optional<Symbol> findSymbol(URI uri, int line, int character) {
+        return getFilePath(uri).flatMap(path -> {
             DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
             JavacHolder compiler = findCompiler(path);
             JavaFileObject file = findFile(compiler, path);
-            long cursor = findOffset(file, position.getPosition().getLine(), position.getPosition().getCharacter());
+            long cursor = findOffset(file, line, character);
             SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, cursor, compiler.context);
 
             compiler.afterAnalyze(visitor);
             compiler.onError(errors);
             compiler.compile(compiler.parse(file));
 
-            List<LocationImpl> result = new ArrayList<>();
-            ClassIndex index = compiler.context.get(ClassIndex.class);
-            Optional<SymbolLocation> maybeLocate = visitor.found.flatMap(s -> index.locate(s));
-            
-            if (maybeLocate.isPresent()) {
-                SymbolLocation locate = maybeLocate.get();
-                URI uri = locate.file.toUri();
-                Path symbolPath = Paths.get(uri);
-                JavaFileObject symbolFile = findFile(compiler, symbolPath);
-                RangeImpl range = findPosition(symbolFile, locate.startPosition, locate.endPosition);
-                LocationImpl location = new LocationImpl();
+            return visitor.found;
+        });
+    }
 
-                location.setRange(range);
-                location.setUri(uri.toString());
+    public List<? extends Location> gotoDefinition(TextDocumentPositionParams position) {
+        URI uri = URI.create(position.getTextDocument().getUri());
+        int line = position.getPosition().getLine();
+        int character = position.getPosition().getCharacter();
+        List<LocationImpl> result = new ArrayList<>();
 
-                result.add(location);
-            }
+        findSymbol(uri, line, character).ifPresent(symbol -> {
+            getFilePath(uri).map(this::findCompiler).ifPresent(compiler -> {
+                compiler.index.locate(symbol).ifPresent(locate -> {
+                    Path symbolPath = Paths.get(locate.file.toUri());
+                    JavaFileObject symbolFile = findFile(compiler, symbolPath);
+                    RangeImpl range = findPosition(symbolFile, locate.startPosition, locate.endPosition);
+                    LocationImpl location = new LocationImpl();
 
-            return result;
-        }
-        else return Collections.emptyList();
+                    location.setRange(range);
+                    location.setUri(uri.toString());
+
+                    result.add(location);
+                });
+            });
+        });
+
+        return result;
     }
 
     public static RangeImpl findPosition(JavaFileObject file, long startOffset, long endOffset) {

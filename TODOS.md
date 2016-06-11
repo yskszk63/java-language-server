@@ -8,9 +8,12 @@
 * Autocomplete method parameter types is returning classes twice
 * Autocomplete is showing both override and super versions
 * Autocomplete annotation fields
+* Autocomplete inner classes
+* Autocomplete members of container of anonymous class, from within anonymous class
 * Hover exported methods and fields on annotations, interfaces, classes that are not on source path
 * Hover shows javadoc ifa available
 * Javadoc path for hover, autocomplete
+* Remove from SymbolIndex on delete file
 
 ## Features 
 * Go-to-subclasses

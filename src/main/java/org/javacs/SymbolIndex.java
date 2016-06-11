@@ -1,5 +1,6 @@
 package org.javacs;
 
+import java.net.URI;
 import java.util.*;
 import java.io.*;
 import java.nio.file.*;
@@ -12,10 +13,12 @@ import javax.tools.*;
 
 import javax.tools.JavaFileObject;
 
+import com.sun.source.tree.Tree;
+import com.sun.source.util.Trees;
 import com.sun.tools.javac.tree.*;
 import com.sun.tools.javac.code.*;
-import io.typefox.lsapi.SymbolInformation;
-import io.typefox.lsapi.SymbolInformationImpl;
+import com.sun.tools.javac.util.Name;
+import io.typefox.lsapi.*;
 
 public class SymbolIndex {
     private static final Logger LOG = Logger.getLogger("main");
@@ -25,8 +28,13 @@ public class SymbolIndex {
      */
     public final CompletableFuture<Void> initialIndexComplete = new CompletableFuture<>();
 
-    private Set<SymbolInformation> methods = new HashSet<>();
-    private Set<SymbolInformation> classes = new HashSet<>();
+    private static class SourceFileIndex {
+        private final Set<SymbolInformation> methods = new HashSet<>();
+        private final Set<SymbolInformation> classes = new HashSet<>();
+        private final EnumMap<ElementKind, Map<String, Set<Location>>> references = new EnumMap<>(ElementKind.class);
+    }
+
+    private Map<URI, SourceFileIndex> files = new HashMap<>();
 
     @FunctionalInterface
     public interface ReportDiagnostics {
@@ -98,13 +106,23 @@ public class SymbolIndex {
         worker.start();
     }
 
-    private static final int MAX_SEARCH_RESULTS = 100;
-
     public Stream<? extends SymbolInformation> search(String query) {
+        Stream<SymbolInformation> classes = files.values().stream().flatMap(f -> f.classes.stream());
+        Stream<SymbolInformation> methods = files.values().stream().flatMap(f -> f.methods.stream());
 
-        return Stream.concat(classes.stream(), methods.stream())
-                     .filter(s -> containsCharsInOrder(s.getName(), query))
-                     .limit(MAX_SEARCH_RESULTS);
+        return Stream.concat(classes, methods)
+                     .filter(s -> containsCharsInOrder(s.getName(), query));
+    }
+
+    public Stream<? extends Location> references(Symbol symbol) {
+        String key = uniqueName(symbol);
+
+        return files.values().stream().flatMap(f -> {
+            Map<String, Set<Location>> bySymbol = f.references.getOrDefault(symbol.getKind(), Collections.emptyMap());
+            Set<Location> locations = bySymbol.getOrDefault(key, Collections.emptySet());
+
+            return locations.stream();
+        });
     }
     
     /**
@@ -132,6 +150,7 @@ public class SymbolIndex {
 
     private class Indexer extends BaseScanner {
         private JavacHolder compiler;
+        private SourceFileIndex index = new SourceFileIndex();
 
         public Indexer(JavacHolder compiler) {
             super(compiler.context);
@@ -140,15 +159,83 @@ public class SymbolIndex {
         }
 
         @Override
+        public void visitTopLevel(JCTree.JCCompilationUnit tree) {
+            super.visitTopLevel(tree);
+
+            URI uri = tree.getSourceFile().toUri();
+
+            files.put(uri, index);
+        }
+
+        @Override
         public void visitClassDef(JCTree.JCClassDecl tree) {
             super.visitClassDef(tree);
 
-            info(tree.sym).ifPresent(classes::add);
+            info(tree.sym).ifPresent(index.classes::add);
         }
 
         @Override
         public void visitMethodDef(JCTree.JCMethodDecl tree) {
-            info(tree.sym).ifPresent(methods::add);
+            super.visitMethodDef(tree);
+
+            info(tree.sym).ifPresent(index.methods::add);
+        }
+
+        @Override
+        public void visitSelect(JCTree.JCFieldAccess tree) {
+            super.visitSelect(tree);
+
+            addReference(tree, tree.sym);
+        }
+
+        @Override
+        public void visitReference(JCTree.JCMemberReference tree) {
+            super.visitReference(tree);
+
+            addReference(tree, tree.sym);
+        }
+
+        @Override
+        public void visitIdent(JCTree.JCIdent tree) {
+            Symbol symbol = tree.sym;
+
+            addReference(tree, symbol);
+        }
+
+        private void addReference(JCTree tree, Symbol symbol) {
+            if (symbol != null) {
+                ElementKind kind = symbol.getKind();
+
+                switch (kind) {
+                    case ENUM:
+                    case CLASS:
+                    case ANNOTATION_TYPE:
+                    case INTERFACE:
+                    case ENUM_CONSTANT:
+                    case FIELD:
+                    case METHOD:
+                    case CONSTRUCTOR:
+                        if (onSourcePath(symbol)) {
+                            String key = uniqueName(symbol);
+                            Map<String, Set<Location>> bySymbol = index.references.computeIfAbsent(kind, newKind -> new HashMap<>());
+                            Set<Location> locations = bySymbol.computeIfAbsent(key, newName -> new HashSet<>());
+                            LocationImpl location = location(tree);
+
+                            locations.add(location);
+                        }
+                }
+            }
+        }
+
+        private LocationImpl location(JCTree tree) {
+            RangeImpl position = JavaLanguageServer.findPosition(compilationUnit.getSourceFile(),
+                                                                 tree.getStartPosition(),
+                                                                 tree.getEndPosition(null));
+            LocationImpl location = new LocationImpl();
+
+            location.setUri(compilationUnit.getSourceFile().toUri().toString());
+            location.setRange(position);
+            return location;
         }
 
         private Optional<SymbolInformationImpl> info(Symbol symbol) {
@@ -164,6 +251,27 @@ public class SymbolIndex {
 
                 return info;
             });
+        }
+    }
+
+    private boolean onSourcePath(Symbol symbol) {
+        return true; // TODO
+    }
+
+    private String uniqueName(Symbol s) {
+        StringJoiner acc = new StringJoiner(".");
+
+        createUniqueName(s, acc);
+
+        return acc.toString();
+    }
+
+    private void createUniqueName(Symbol s, StringJoiner acc) {
+        if (s != null) {
+            createUniqueName(s.owner, acc);
+
+            if (!s.getSimpleName().isEmpty())
+                acc.add(s.getSimpleName().toString());
         }
     }
 
@@ -204,5 +312,9 @@ public class SymbolIndex {
      */
     public BaseScanner indexer(JavacHolder compiler) {
         return new Indexer(compiler);
+    }
+
+    public void clear(URI sourceFile) {
+        files.remove(sourceFile);
     }
 }
