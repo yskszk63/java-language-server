@@ -76,7 +76,12 @@ public class JavacHolder {
     }
     
     // IncrementalLog registers itself in context and pre-empts the normal Log from being created
-    private final IncrementalLog log = new IncrementalLog(context);
+    private final Log log = Log.instance(context);
+
+    {
+        log.multipleErrors = true;
+    }
+
     public final JavacFileManager fileManager = new JavacFileManager(context, true, null);
     private final ForgivingAttr attr = ForgivingAttr.instance(context);
     private final Check check = Check.instance(context);
@@ -196,7 +201,9 @@ public class JavacHolder {
         // TODO clear dependencies as well (dependencies should get stored in SymbolIndex)
 
         // Forget about this file
-        log.clear(source);
+        Consumer<JavaFileObject> removeFromLog = logRemover(log);
+
+        removeFromLog.accept(source);
 
         // javac's flow stage will stop early if there are errors
         log.nerrors = 0;
@@ -225,6 +232,20 @@ public class JavacHolder {
             closureCache.setAccessible(true);
 
             Map<Type, com.sun.tools.javac.util.List<Type>> value = (Map<Type, com.sun.tools.javac.util.List<Type>>) closureCache.get(types);
+
+            return value::remove;
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static Consumer<JavaFileObject> logRemover(Log log) {
+        try {
+            Field sourceMap = AbstractLog.class.getDeclaredField("sourceMap");
+
+            sourceMap.setAccessible(true);
+
+            Map<JavaFileObject, DiagnosticSource> value = (Map<JavaFileObject, DiagnosticSource>) sourceMap.get(log);
 
             return value::remove;
         } catch (IllegalAccessException | NoSuchFieldException e) {
