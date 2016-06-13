@@ -5,6 +5,7 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 
 import javax.tools.JavaFileObject;
+import java.util.Collection;
 
 public class CursorScanner extends BaseScanner {
     protected final JavaFileObject file;
@@ -33,5 +34,14 @@ public class CursorScanner extends BaseScanner {
         long end = trees.getSourcePositions().getEndPosition(compilationUnit, node);
 
         return start <= cursor && cursor <= end;
+    }
+
+    protected boolean containsCursor(Collection<? extends JCTree> node) {
+        for (JCTree t : node) {
+            if (containsCursor(t))
+                return true;
+        }
+
+        return false;
     }
 }

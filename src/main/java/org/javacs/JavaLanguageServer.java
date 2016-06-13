@@ -717,7 +717,7 @@ class JavaLanguageServer implements LanguageServer {
         return p;
     }
 
-    private static long findOffset(JavaFileObject file, int targetLine, int targetCharacter) {
+    public static long findOffset(JavaFileObject file, int targetLine, int targetCharacter) {
         try (Reader in = file.openReader(true)) {
             long offset = 0;
             int line = 0;

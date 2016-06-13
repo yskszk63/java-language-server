@@ -21,6 +21,55 @@ public class SymbolUnderCursorVisitor extends CursorScanner {
     }
 
     @Override
+    public void visitMethodDef(JCTree.JCMethodDecl tree) {
+        super.visitMethodDef(tree);
+
+        boolean containsCursorAnywhere =
+            containsCursor(tree.mods) ||
+            containsCursor(tree.restype) ||
+            containsCursor(tree.typarams) ||
+            containsCursor(tree.recvparam) ||
+            containsCursor(tree.params) ||
+            containsCursor(tree.thrown) ||
+            containsCursor(tree.defaultValue) ||
+            containsCursor(tree.body);
+
+        if (!containsCursorAnywhere) // TODO deal with spaces
+            found(tree.sym);
+    }
+
+    @Override
+    public void visitVarDef(JCTree.JCVariableDecl tree) {
+        super.visitVarDef(tree);
+
+        boolean containsCursorAnywhere =
+            containsCursor(tree.mods) ||
+            containsCursor(tree.vartype) ||
+            containsCursor(tree.nameexpr) ||
+            containsCursor(tree.init);
+
+        if (containsCursor(tree.nameexpr))
+            found(tree.sym);
+        else if (tree.nameexpr == null && !containsCursorAnywhere)
+            found(tree.sym); // TODO deal with spaces
+    }
+
+    @Override
+    public void visitClassDef(JCTree.JCClassDecl tree) {
+        super.visitClassDef(tree);
+
+        boolean containsCursorAnywhere =
+          containsCursor(tree.mods) ||
+          containsCursor(tree.typarams) ||
+          containsCursor(tree.extending) ||
+          containsCursor(tree.implementing) ||
+          containsCursor(tree.defs);
+
+        if (!containsCursorAnywhere) // TODO deal with spaces
+            found(tree.sym);
+    }
+
+    @Override
     public void visitIdent(JCTree.JCIdent id) {
         super.visitIdent(id);
 
