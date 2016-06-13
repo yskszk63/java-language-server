@@ -13,4 +13,8 @@ public class SymbolUnderCursor {
         this.method("foo");
         Function<String, String> m = this::method;
     }
+
+    public SymbolUnderCursor(String constructorParameter) {
+        
+    }
 }

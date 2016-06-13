@@ -74,6 +74,11 @@ public class SymbolUnderCursorTest extends Fixtures {
         assertEquals("localVariable", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 9, 15));
     }
 
+    @Test
+    public void constructorParameterDeclaration() {
+        assertEquals("constructorParameter", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 16, 45));
+    }
+
     private String symbolAt(String file, int line, int character) {
         GetResourceFileObject source = new GetResourceFileObject(file);
         JCTree.JCCompilationUnit tree = compiler.parse(source);
