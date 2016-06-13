@@ -12,6 +12,7 @@ import javax.tools.*;
 
 import javax.tools.JavaFileObject;
 
+import com.sun.source.util.TreePath;
 import com.sun.tools.javac.tree.*;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.util.Context;
@@ -131,14 +132,52 @@ public class SymbolIndex {
     }
 
     public Stream<? extends Location> references(Symbol symbol) {
-        String key = uniqueName(symbol);
+        // For indexed symbols, just look up the precomputed references
+        if (shouldIndex(symbol)) {
+            String key = uniqueName(symbol);
 
-        return sourcePath.values().stream().flatMap(f -> {
-            Map<String, Set<Location>> bySymbol = f.references.getOrDefault(symbol.getKind(), Collections.emptyMap());
-            Set<Location> locations = bySymbol.getOrDefault(key, Collections.emptySet());
+            return sourcePath.values().stream().flatMap(f -> {
+                Map<String, Set<Location>> bySymbol = f.references.getOrDefault(symbol.getKind(), Collections.emptyMap());
+                Set<Location> locations = bySymbol.getOrDefault(key, Collections.emptySet());
 
-            return locations.stream();
-        });
+                return locations.stream();
+            });
+        }
+        // For non-indexed symbols, scan the active set
+        else {
+            return activeDocuments.values().stream().flatMap(compilationUnit -> {
+                List<LocationImpl> references = new ArrayList<>();
+
+                compilationUnit.accept(new TreeScanner() {
+                    @Override
+                    public void visitSelect(JCTree.JCFieldAccess tree) {
+                        super.visitSelect(tree);
+
+                        if (tree.sym != null && tree.sym.equals(symbol))
+                            references.add(location(tree, compilationUnit));
+                    }
+
+                    @Override
+                    public void visitReference(JCTree.JCMemberReference tree) {
+                        super.visitReference(tree);
+
+                        if (tree.sym != null && tree.sym.equals(symbol))
+                            references.add(location(tree, compilationUnit));
+                    }
+
+                    @Override
+                    public void visitIdent(JCTree.JCIdent tree) {
+                        super.visitIdent(tree);
+
+                        if (tree.sym != null && tree.sym.equals(symbol))
+                            references.add(location(tree, compilationUnit));
+                    }
+                });
+
+
+                return references.stream();
+            });
+        }
     }
 
     public Optional<SymbolInformation> findSymbol(Symbol symbol) {
@@ -231,9 +270,7 @@ public class SymbolIndex {
 
         @Override
         public void visitIdent(JCTree.JCIdent tree) {
-            Symbol symbol = tree.sym;
-
-            addReference(tree, symbol);
+            addReference(tree, tree.sym);
         }
 
         private void addDeclaration(JCTree tree, Symbol symbol) {
@@ -256,23 +293,23 @@ public class SymbolIndex {
                 locations.add(location);
             }
         }
+    }
 
-        private boolean shouldIndex(Symbol symbol) {
-            ElementKind kind = symbol.getKind();
+    private static boolean shouldIndex(Symbol symbol) {
+        ElementKind kind = symbol.getKind();
 
-            switch (kind) {
-                case ENUM:
-                case CLASS:
-                case ANNOTATION_TYPE:
-                case INTERFACE:
-                case ENUM_CONSTANT:
-                case FIELD:
-                case METHOD:
-                case CONSTRUCTOR:
-                    return true;
-                default:
-                    return false;
-            }
+        switch (kind) {
+            case ENUM:
+            case CLASS:
+            case ANNOTATION_TYPE:
+            case INTERFACE:
+            case ENUM_CONSTANT:
+            case FIELD:
+            case METHOD:
+            case CONSTRUCTOR:
+                return true;
+            default:
+                return false;
         }
     }
 
