@@ -8,12 +8,10 @@ import org.junit.Test;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -59,15 +57,25 @@ public class SymbolIndexTest {
     private static SymbolIndex index;
     
     private static SymbolIndex getIndex() {
-        Set<Path> classPath = Collections.emptySet();
-        Set<Path> sourcePath = Collections.singleton(Paths.get("src/main/java").toAbsolutePath());
-        Path outputDirectory = Paths.get("out").toAbsolutePath();
-        SymbolIndex index = new SymbolIndex(classPath, sourcePath, outputDirectory, (paths, errs) -> {
-            errs.getDiagnostics().forEach(d -> LOG.info(d.getMessage(Locale.US)));
-        });
+        try {
+            Set<Path> classPath = new HashSet<>();
 
-        index.initialIndexComplete.join();
+            for (String line : Files.readAllLines(Paths.get("classpath.txt"))) {
+                for (String entry : line.split(":")) {
+                    classPath.add(Paths.get(entry).toAbsolutePath());
+                }
+            }
+            Set<Path> sourcePath = Collections.singleton(Paths.get("src/main/java").toAbsolutePath());
+            Path outputDirectory = Paths.get("out").toAbsolutePath();
+            SymbolIndex index = new SymbolIndex(classPath, sourcePath, outputDirectory, (paths, errs) -> {
+                errs.getDiagnostics().forEach(d -> LOG.info(d.getMessage(Locale.US)));
+            });
 
-        return index;
+            index.initialIndexComplete.join();
+
+            return index;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
