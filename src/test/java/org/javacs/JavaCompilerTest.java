@@ -18,7 +18,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
 
-@Ignore // useful for comparing behavior of JavacTool to JavacHolder
+// TODO java compiler can fail badly, handle somehow
+@Ignore
 public class JavaCompilerTest {
     private static final Logger LOG = Logger.getLogger("main");
 
@@ -26,9 +27,9 @@ public class JavaCompilerTest {
     public void javacTool() throws IOException {
         JavaCompiler javaCompiler = JavacTool.create();
         StandardJavaFileManager fileManager = javaCompiler.getStandardFileManager(this::reportError, null, Charset.defaultCharset());
-        List<String> options = ImmutableList.of("-sourcepath", Paths.get("src/main/java").toAbsolutePath().toString());
+        List<String> options = ImmutableList.of("-sourcepath", Paths.get("src/test/resources").toAbsolutePath().toString());
         List<String> classes = Collections.emptyList();
-        File file = Paths.get("src/main/java/org/javacs/Bad.java").toFile();
+        File file = Paths.get("src/test/resources/org/javacs/example/Bad.java").toFile();
         Iterable<? extends JavaFileObject> compilationUnits = fileManager.getJavaFileObjectsFromFiles(Collections.singleton(file));
         JavacTask task = (JavacTask) javaCompiler.getTask(null, fileManager, this::reportError, options, classes, compilationUnits);
 
@@ -40,8 +41,8 @@ public class JavaCompilerTest {
 
     @Test
     public void javacHolder() {
-        JavacHolder javac = new JavacHolder(Collections.emptySet(), Collections.singleton(Paths.get("src/main/java")), Paths.get("target"));
-        File file = Paths.get("src/main/java/org/javacs/Bad.java").toFile();
+        JavacHolder javac = new JavacHolder(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target"));
+        File file = Paths.get("src/test/resources/org/javacs/example/Bad.java").toFile();
         JCTree.JCCompilationUnit parsed = javac.parse(javac.fileManager.getRegularFile(file));
 
         javac.compile(parsed);
