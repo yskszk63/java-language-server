@@ -179,7 +179,7 @@ public class AutocompleteVisitor extends CursorScanner {
                         }
 
                         // Get inner classes
-                        List<Element> locals = localElements(scope);
+                        List<Element> locals = localElements(scope.getEnclosingClass());
 
                         for (Element e : locals) {
                             if (e instanceof Symbol.ClassSymbol)
@@ -251,7 +251,7 @@ public class AutocompleteVisitor extends CursorScanner {
             if (enclosingClass != null) {
                 // Add inner classes
                 // TODO is this not handled by scope?
-                List<Element> elements = localElements(scope);
+                List<Element> elements = localElements(enclosingClass);
 
                 for (Element e : elements) {
                     if (e instanceof Symbol) {
@@ -282,8 +282,7 @@ public class AutocompleteVisitor extends CursorScanner {
         }
     }
 
-    private List<Element> localElements(JavacScope scope) {
-        Element enclosingClass = scope.getEnclosingClass();
+    private List<Element> localElements(Element enclosingClass) {
         List<Element> result = new ArrayList<>();
 
         while (enclosingClass != null && enclosingClass.getKind() == ElementKind.CLASS) {
