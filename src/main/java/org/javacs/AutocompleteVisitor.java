@@ -228,9 +228,9 @@ public class AutocompleteVisitor extends CursorScanner {
 
         if (path != null) {
             JavacTrees trees = JavacTrees.instance(context);
-            JavacScope scope = trees.getScope(path);
-            AttrContext info = scope.getEnv().info;
-            boolean isStatic = AttrUtils.isStatic(info);
+            final JavacScope scope = trees.getScope(path);
+            Resolve resolve = Resolve.instance(context);
+            boolean isStatic = AttrUtils.isStatic(scope.getEnv().info);
             Set<Symbol> all = new HashSet<>();
 
             // Add local elements from each surrounding scope
@@ -254,10 +254,16 @@ public class AutocompleteVisitor extends CursorScanner {
                 List<Element> elements = localElements(scope);
 
                 for (Element e : elements) {
-                    boolean include = !isStatic || e.getModifiers().contains(Modifier.STATIC);
+                    if (e instanceof Symbol) {
+                        Symbol s = (Symbol) e;
+                        Type type = (Type) scope.getEnclosingClass().asType();
 
-                    if (include && e instanceof Symbol)
-                        all.add((Symbol) e);
+                        boolean accessible = resolve.isAccessible(scope.getEnv(), type, s);
+                        boolean matchesStatic = !isStatic || s.isStatic();
+
+                        if (accessible && matchesStatic)
+                            all.add(s);
+                    }
                 }
 
                 // Add package members
