@@ -230,7 +230,6 @@ public class AutocompleteVisitor extends CursorScanner {
             JavacTrees trees = JavacTrees.instance(context);
             final JavacScope scope = trees.getScope(path);
             Resolve resolve = Resolve.instance(context);
-            boolean isStatic = AttrUtils.isStatic(scope.getEnv().info);
             Set<Symbol> all = new HashSet<>();
 
             // Add local elements from each surrounding scope
@@ -246,20 +245,21 @@ public class AutocompleteVisitor extends CursorScanner {
             }
 
             // Add class symbols
-            final TypeElement enclosingClass = scope.getEnclosingClass();
+            TypeElement enclosingClass = scope.getEnclosingClass();
+            boolean scopeIsStatic = AttrUtils.isStatic(scope.getEnv().info);
 
             if (enclosingClass != null) {
+                Type enclosingClassType = (Type) enclosingClass.asType();
                 // Add inner classes
-                // TODO is this not handled by scope?
                 List<Element> elements = localElements(enclosingClass);
 
                 for (Element e : elements) {
                     if (e instanceof Symbol) {
                         Symbol s = (Symbol) e;
-                        Type type = (Type) scope.getEnclosingClass().asType();
 
-                        boolean accessible = resolve.isAccessible(scope.getEnv(), type, s);
-                        boolean matchesStatic = !isStatic || s.isStatic();
+                        boolean accessible = resolve.isAccessible(scope.getEnv(), enclosingClassType, s);
+                        boolean symbolIsStatic = s.isStatic();
+                        boolean matchesStatic = !scopeIsStatic || symbolIsStatic;
 
                         if (accessible && matchesStatic)
                             all.add(s);
