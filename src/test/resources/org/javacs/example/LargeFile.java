@@ -79,7 +79,7 @@ import static com.sun.tools.javac.util.JCDiagnostic.DiagnosticFlag.*;
  *  This code and its internal interfaces are subject to change or
  *  deletion without notice.</b>
  */
-public class JavaCompiler {
+public class LargeFile {
     /** The context key for the compiler. */
     protected static final Context.Key<JavaCompiler> compilerKey =
             new Context.Key<JavaCompiler>();
