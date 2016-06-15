@@ -5,15 +5,11 @@
 * Add import code action
 * Resolve methods with badly typed arguments
 * Autocomplete is using the entire method signature
-* Autocomplete method parameter types is returning classes twice
-* Autocomplete is showing both override and super versions
 * Autocomplete annotation fields
 * Autocomplete inner classes
-* Autocomplete members of container of anonymous class, from within anonymous class
 * Hover exported methods and fields on annotations, interfaces, classes that are not on source path
-* Hover shows javadoc ifa available
+* Hover shows javadoc if available
 * Javadoc path for hover, autocomplete
-* Remove from SymbolIndex on delete file
 
 ## Features 
 * Go-to-subclasses
@@ -40,8 +36,6 @@
 ## Optimizations
 * Incremental parsing
 * Only run attribution and flow phases on method of interest
-* Kill java process when vscode quits
-* Inactive org.javacs.Main process is grinding CPU
 
 ## Tests
 * Hover info

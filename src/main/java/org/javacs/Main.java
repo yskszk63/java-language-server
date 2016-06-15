@@ -47,7 +47,6 @@ public class Main {
         return m;
     }
 
-
     public static void main(String[] args) throws IOException {
         try {
             LoggingFormat.startLogging();
