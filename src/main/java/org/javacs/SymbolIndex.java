@@ -6,13 +6,13 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.logging.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.lang.model.element.ElementKind;
 import javax.tools.*;
 
 import javax.tools.JavaFileObject;
 
-import com.sun.source.util.TreePath;
 import com.sun.tools.javac.tree.*;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.util.Context;
@@ -225,7 +225,7 @@ public class SymbolIndex {
     }
 
     private class Indexer extends BaseScanner {
-        private SourceFileIndex index = new SourceFileIndex();
+        private SourceFileIndex index;
 
         public Indexer(Context context) {
             super(context);
@@ -233,11 +233,13 @@ public class SymbolIndex {
 
         @Override
         public void visitTopLevel(JCTree.JCCompilationUnit tree) {
-            super.visitTopLevel(tree);
-
             URI uri = tree.getSourceFile().toUri();
 
+            index = new SourceFileIndex();
             sourcePath.put(uri, index);
+
+            super.visitTopLevel(tree);
+
         }
 
         @Override
@@ -420,11 +422,11 @@ public class SymbolIndex {
         return -1;
     }
 
-    private boolean onSourcePath(Symbol symbol) {
+    private static boolean onSourcePath(Symbol symbol) {
         return true; // TODO
     }
 
-    private String uniqueName(Symbol s) {
+    private static String uniqueName(Symbol s) {
         StringJoiner acc = new StringJoiner(".");
 
         createUniqueName(s, acc);
@@ -432,7 +434,7 @@ public class SymbolIndex {
         return acc.toString();
     }
 
-    private void createUniqueName(Symbol s, StringJoiner acc) {
+    private static void createUniqueName(Symbol s, StringJoiner acc) {
         if (s != null) {
             createUniqueName(s.owner, acc);
 
