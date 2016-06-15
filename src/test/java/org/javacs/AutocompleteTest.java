@@ -338,6 +338,23 @@ public class AutocompleteTest extends Fixtures {
         assertThat(suggestions, hasItems("AutocompletePackage"));
     }
 
+    @Test
+    public void outerClass() throws IOException {
+        String file = "/org/javacs/example/AutocompleteOuter.java";
+
+        // Initializer of static inner class
+        Set<String> suggestions = insertText(file, 11, 13);
+
+        assertThat(suggestions, hasItems("methodStatic", "fieldStatic"));
+        assertThat(suggestions, not(hasItems("method", "field")));
+
+        // Initializer of inner class
+        suggestions = insertText(file, 17, 13);
+
+        assertThat(suggestions, hasItems("methodStatic", "fieldStatic"));
+        assertThat(suggestions, hasItems("method", "field"));
+    }
+
     private Set<String> insertText(String file, int row, int column) throws IOException {
         List<? extends CompletionItem> items = items(file, row, column);
 

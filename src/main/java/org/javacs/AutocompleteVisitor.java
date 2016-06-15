@@ -245,13 +245,13 @@ public class AutocompleteVisitor extends CursorScanner {
             }
 
             // Add class symbols
-            TypeElement enclosingClass = scope.getEnclosingClass();
+            Element enclosingClass = scope.getEnclosingClass();
             boolean scopeIsStatic = AttrUtils.isStatic(scope.getEnv().info);
 
-            if (enclosingClass != null) {
-                Type enclosingClassType = (Type) enclosingClass.asType();
-                // Add inner classes
-                List<Element> elements = localElements(enclosingClass);
+            while (enclosingClass instanceof Symbol.ClassSymbol) {
+                Symbol.ClassSymbol enclosingClassSymbol = (Symbol.ClassSymbol) enclosingClass;
+                Type enclosingClassType = enclosingClassSymbol.asType();
+                List<? extends Element> elements = enclosingClassSymbol.getEnclosedElements();
 
                 for (Element e : elements) {
                     if (e instanceof Symbol) {
@@ -272,6 +272,11 @@ public class AutocompleteVisitor extends CursorScanner {
                 for (Symbol.ClassSymbol c : packageClasses) {
                     all.add(c);
                 }
+
+                enclosingClass = enclosingClass.getEnclosingElement();
+
+                // If inner class is static, scope becomes static when we move to outer class
+                scopeIsStatic = scopeIsStatic || enclosingClassSymbol.isStatic();
             }
 
             for (Symbol s : all)
