@@ -526,7 +526,7 @@ class JavaLanguageServer implements LanguageServer {
                     .collect(Collectors.joining());
             Path dir = classPathFilePath.getParent();
 
-            return Arrays.stream(text.split(":"))
+            return Arrays.stream(text.split(File.pathSeparator))
                          .map(dir::resolve)
                          .collect(Collectors.toSet());
         } catch (IOException e) {

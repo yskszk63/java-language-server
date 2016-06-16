@@ -17,8 +17,7 @@ import com.sun.tools.javac.tree.TreeScanner;
 import com.sun.tools.javac.util.*;
 
 import javax.tools.*;
-import java.io.IOException;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -103,8 +102,8 @@ public class JavacHolder {
         this.sourcePath = sourcePath;
         this.outputDirectory = outputDirectory;
 
-        options.put("-classpath", Joiner.on(":").join(classPath));
-        options.put("-sourcepath", Joiner.on(":").join(sourcePath));
+        options.put("-classpath", Joiner.on(File.pathSeparator).join(classPath));
+        options.put("-sourcepath", Joiner.on(File.pathSeparator).join(sourcePath));
         options.put("-d", outputDirectory.toString());
 
         MultiTaskListener.instance(context).add(new TaskListener() {

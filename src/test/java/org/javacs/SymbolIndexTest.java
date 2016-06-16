@@ -7,7 +7,7 @@ import com.sun.tools.javac.tree.*;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import java.io.IOException;
+import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
@@ -76,7 +76,7 @@ public class SymbolIndexTest {
             Set<Path> classPath = new HashSet<>();
 
             for (String line : Files.readAllLines(Paths.get("classpath.txt"))) {
-                for (String entry : line.split(":")) {
+                for (String entry : line.split(File.pathSeparator)) {
                     classPath.add(Paths.get(entry).toAbsolutePath());
                 }
             }
