@@ -275,6 +275,13 @@ public class SymbolIndex {
             addReference(tree, tree.sym);
         }
 
+        @Override
+        public void visitNewClass(JCTree.JCNewClass tree) {
+            super.visitNewClass(tree);
+
+            addReference(tree, tree.constructor);
+        }
+
         private void addDeclaration(JCTree tree, Symbol symbol) {
             if (symbol != null && onSourcePath(symbol) && shouldIndex(symbol)) {
                 String key = uniqueName(symbol);

@@ -2,6 +2,8 @@ package org.javacs;
 
 import com.sun.tools.javac.code.Symbol;
 import io.typefox.lsapi.*;
+import javax.tools.*;
+import com.sun.tools.javac.tree.*;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -43,18 +45,31 @@ public class SymbolIndexTest {
         assertThat(all, hasItem("getTextDocumentService"));
     }
 
+    @Test
+    public void referenceConstructor() {
+        JavaFileObject file = new GetResourceFileObject("/org/javacs/example/ReferenceConstructor.java");
+        JCTree.JCCompilationUnit tree = compiler.parse(file);
+        
+        compiler.compile(tree);
+        index.update(tree, compiler.context);
+        
+        long offset = JavaLanguageServer.findOffset(file, 2, 22);
+        SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, offset, compiler.context);
+
+        tree.accept(visitor);
+
+        Symbol classSymbol = visitor.found.get();
+        List<Integer> references = index.references(classSymbol).map(ref -> ref.getRange().getStart().getLine()).collect(Collectors.toList());
+
+        // Constructor reference on line 8
+        assertThat(references, hasItem(8));
+    }
+
     private Set<String> search(String query) {
-        return index().search(query).map(s -> s.getName()).collect(Collectors.toSet());
+        return index.search(query).map(s -> s.getName()).collect(Collectors.toSet());
     }
 
-    private static SymbolIndex index() {
-        if (index == null)
-            index = getIndex();
-
-        return index;
-    }
-
-    private static SymbolIndex index;
+    private SymbolIndex index = getIndex();
     
     private static SymbolIndex getIndex() {
         try {
@@ -77,5 +92,13 @@ public class SymbolIndexTest {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static JavacHolder compiler = newCompiler();
+
+    private static JavacHolder newCompiler() {
+        return new JavacHolder(Collections.emptySet(),
+                               Collections.singleton(Paths.get("src/test/resources")),
+                               Paths.get("out"));
     }
 }
