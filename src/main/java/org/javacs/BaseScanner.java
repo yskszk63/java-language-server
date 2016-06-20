@@ -31,16 +31,8 @@ public class BaseScanner extends TreeScanner {
     @Override
     public void scan(List<? extends JCTree> nodes) {
         if (nodes != null) {
-            boolean first = true;
-
-            for (JCTree node : nodes) {
-                if (first)
-                    scan(node);
-                else
-                    scan(node);
-
-                first = false;
-            }
+            for (JCTree node : nodes)
+                scan(node);
         }
     }
 
