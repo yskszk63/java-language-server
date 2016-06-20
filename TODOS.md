@@ -8,6 +8,7 @@
 * Autocomplete annotation fields
 * Autocomplete inner classes
 * Autocomplete enum options in switch statement
+* Autocomplete EnumClass.*
 * Hover enum options on class symbol
 * Hover public members on class symbol
 * Hover shows javadoc if available
