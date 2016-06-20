@@ -52,25 +52,64 @@ public class SymbolIndexTest {
         int character = 22;
 
         Symbol classSymbol = symbol(path, line, character);
-        List<Integer> references = index.references(classSymbol).map(ref -> ref.getRange().getStart().getLine()).collect(Collectors.toList());
+        List<Integer> references = index.references(classSymbol)
+                                        .map(ref -> ref.getRange().getStart().getLine())
+                                        .collect(Collectors.toList());
 
         // Constructor reference on line 8
         assertThat(references, hasItem(8));
     }
 
+    @Test
+    public void symbolsInFile() {
+        String path = "/org/javacs/example/AutocompleteMember.java";
+
+        compile(path);
+
+        List<String> all = index.allInFile(new GetResourceFileObject(path).toUri())
+                                .map(s -> s.getName())
+                                .collect(Collectors.toList());
+
+        assertThat(all, hasItems("methodStatic", "method",
+                                 "methodStaticPrivate", "methodPrivate"));
+
+        assertThat(all, hasItems("fieldStatic", "field",
+                                 "fieldStaticPrivate", "fieldPrivate"));
+
+        // TODO
+        // assertThat("excludes implicit constructor", all, not(hasItems("AutocompleteMember")));
+    }
+
+    @Test
+    public void explicitConstructor() {
+        String path = "/org/javacs/example/ReferenceConstructor.java";
+
+        compile(path);
+
+        List<String> all = index.allInFile(new GetResourceFileObject(path).toUri())
+                                .map(s -> s.getName())
+                                .collect(Collectors.toList());
+
+        assertThat("includes explicit constructor", all, hasItem("ReferenceConstructor"));
+    }
+
     private Symbol symbol(String path, int line, int character) {
+        JCTree.JCCompilationUnit tree = compile(path);
+        long offset = JavaLanguageServer.findOffset(tree.getSourceFile(), line, character);
+        SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(tree.getSourceFile(), offset, compiler.context);
+
+        tree.accept(visitor);
+
+        return visitor.found.get();
+    }
+
+    private JCTree.JCCompilationUnit compile(String path) {
         JavaFileObject file = new GetResourceFileObject(path);
         JCTree.JCCompilationUnit tree = compiler.parse(file);
 
         compiler.compile(tree);
         index.update(tree, compiler.context);
-
-        long offset = JavaLanguageServer.findOffset(file, line, character);
-        SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, offset, compiler.context);
-
-        tree.accept(visitor);
-
-        return visitor.found.get();
+        return tree;
     }
 
     private Set<String> search(String query) {
