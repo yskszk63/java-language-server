@@ -47,22 +47,30 @@ public class SymbolIndexTest {
 
     @Test
     public void referenceConstructor() {
-        JavaFileObject file = new GetResourceFileObject("/org/javacs/example/ReferenceConstructor.java");
-        JCTree.JCCompilationUnit tree = compiler.parse(file);
-        
-        compiler.compile(tree);
-        index.update(tree, compiler.context);
-        
-        long offset = JavaLanguageServer.findOffset(file, 2, 22);
-        SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, offset, compiler.context);
+        String path = "/org/javacs/example/ReferenceConstructor.java";
+        int line = 2;
+        int character = 22;
 
-        tree.accept(visitor);
-
-        Symbol classSymbol = visitor.found.get();
+        Symbol classSymbol = symbol(path, line, character);
         List<Integer> references = index.references(classSymbol).map(ref -> ref.getRange().getStart().getLine()).collect(Collectors.toList());
 
         // Constructor reference on line 8
         assertThat(references, hasItem(8));
+    }
+
+    private Symbol symbol(String path, int line, int character) {
+        JavaFileObject file = new GetResourceFileObject(path);
+        JCTree.JCCompilationUnit tree = compiler.parse(file);
+
+        compiler.compile(tree);
+        index.update(tree, compiler.context);
+
+        long offset = JavaLanguageServer.findOffset(file, line, character);
+        SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, offset, compiler.context);
+
+        tree.accept(visitor);
+
+        return visitor.found.get();
     }
 
     private Set<String> search(String query) {
