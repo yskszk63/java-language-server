@@ -72,6 +72,7 @@ class JavaLanguageServer implements LanguageServer {
         c.setHoverProvider(true);
         c.setWorkspaceSymbolProvider(true);
         c.setReferencesProvider(true);
+        c.setDocumentSymbolProvider(true);
 
         result.setCapabilities(c);
 
@@ -128,7 +129,7 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<List<? extends SymbolInformation>> documentSymbol(DocumentSymbolParams params) {
-                return null;
+                return CompletableFuture.completedFuture(findDocumentSymbols(params));
             }
 
             @Override
@@ -610,6 +611,17 @@ class JavaLanguageServer implements LanguageServer {
         });
 
         return result;
+    }
+
+    private List<? extends SymbolInformation> findDocumentSymbols(DocumentSymbolParams params) {
+        URI uri = URI.create(params.getTextDocument().getUri());
+
+        return getFilePath(uri).map(path -> {
+            SymbolIndex index = findIndex(path);
+            List<? extends SymbolInformation> found = index.allInFile(uri).collect(Collectors.toList());
+
+            return found;
+        }).orElse(Collections.emptyList());
     }
 
     private Optional<Symbol> findSymbol(URI uri, int line, int character) {

@@ -121,6 +121,12 @@ public class SymbolIndex {
                      .filter(s -> containsCharsInOrder(s.getName(), query));
     }
 
+    public Stream<? extends SymbolInformation> allInFile(URI source) { 
+        SourceFileIndex index = sourcePath.getOrDefault(source, new SourceFileIndex());
+        
+        return index.declarations.values().stream().flatMap(map -> map.values().stream());
+    }
+
     private Stream<SymbolInformation> allSymbols(ElementKind kind) {
         return sourcePath.values().stream().flatMap(f -> allSymbolsInFile(f, kind));
     }
