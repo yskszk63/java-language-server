@@ -334,7 +334,13 @@ public class SymbolIndex {
 
         info.setContainer(symbol.getEnclosingElement().getQualifiedName().toString());
         info.setKind(symbolInformationKind(symbol.getKind()));
-        info.setName(symbol.getSimpleName().toString());
+        
+        // Constructors have name <init>, use class name instead
+        if (symbol.getKind() == ElementKind.CONSTRUCTOR)
+            info.setName(symbol.getEnclosingElement().getSimpleName().toString());            
+        else
+            info.setName(symbol.getSimpleName().toString());
+
         info.setLocation(location);
 
         return info;
