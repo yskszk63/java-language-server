@@ -263,6 +263,13 @@ public class SymbolIndex {
         }
 
         @Override
+        public void visitVarDef(JCTree.JCVariableDecl tree) {
+            super.visitVarDef(tree);
+
+            addDeclaration(tree, tree.sym);
+        }
+
+        @Override
         public void visitSelect(JCTree.JCFieldAccess tree) {
             super.visitSelect(tree);
 
