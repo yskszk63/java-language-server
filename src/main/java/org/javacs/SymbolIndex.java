@@ -328,8 +328,10 @@ public class SymbolIndex {
             case ENUM_CONSTANT:
             case FIELD:
             case METHOD:
-            case CONSTRUCTOR:
                 return true;
+            case CONSTRUCTOR:
+                // TODO also skip generated constructors
+                return !symbol.getEnclosingElement().isAnonymous();
             default:
                 return false;
         }
