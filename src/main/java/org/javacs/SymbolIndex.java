@@ -322,13 +322,14 @@ public class SymbolIndex {
 
         switch (kind) {
             case ENUM:
-            case CLASS:
             case ANNOTATION_TYPE:
             case INTERFACE:
             case ENUM_CONSTANT:
             case FIELD:
             case METHOD:
                 return true;
+            case CLASS:
+                return !symbol.isAnonymous();
             case CONSTRUCTOR:
                 // TODO also skip generated constructors
                 return !symbol.getEnclosingElement().isAnonymous();
