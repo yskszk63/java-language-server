@@ -355,6 +355,45 @@ public class AutocompleteTest extends Fixtures {
         assertThat(suggestions, hasItems("method", "field"));
     }
 
+    @Test
+    public void innerDeclaration() throws IOException {
+        String file = "/org/javacs/example/AutocompleteInners.java";
+
+        Set<String> suggestions = insertText(file, 4, 28);
+
+        assertThat("suggests qualified inner class declaration", suggestions, hasItem("InnerClass"));
+        assertThat("suggests qualified inner enum declaration", suggestions, hasItem("InnerEnum"));
+
+        suggestions = insertText(file, 5, 9);
+
+        assertThat("suggests unqualified inner class declaration", suggestions, hasItem("InnerClass"));
+        assertThat("suggests unqualified inner enum declaration", suggestions, hasItem("InnerEnum"));
+    }
+
+    @Test
+    public void innerNew() throws IOException {
+        String file = "/org/javacs/example/AutocompleteInners.java";
+
+        Set<String> suggestions = insertText(file, 9, 32);
+
+        assertThat("suggests qualified inner class declaration", suggestions, hasItem("InnerClass"));
+        assertThat("suggests qualified inner enum declaration", suggestions, not(hasItem("InnerEnum")));
+
+        suggestions = insertText(file, 10, 13);
+
+        assertThat("suggests unqualified inner class declaration", suggestions, hasItem("InnerClass"));
+        assertThat("suggests unqualified inner enum declaration", suggestions, hasItem("InnerEnum"));
+    }
+
+    @Test
+    public void innerEnum() throws IOException {
+        String file = "/org/javacs/example/AutocompleteInners.java";
+
+        Set<String> suggestions = insertText(file, 14, 39);
+
+        assertThat("suggests enum constants", suggestions, hasItems("Foo", "Bar"));
+    }
+
     private Set<String> insertText(String file, int row, int column) throws IOException {
         List<? extends CompletionItem> items = items(file, row, column);
 

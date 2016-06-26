@@ -156,6 +156,32 @@ public class AutocompleteVisitor extends CursorScanner {
                 }
 
                 @Override
+                public void visitSelect(JCTree.JCFieldAccess tree) {
+                    super.visitSelect(tree);
+
+                    if (tree.selected instanceof JCTree.JCIdent) {
+                        Resolve resolve = Resolve.instance(context);
+                        Symbol sym = ((JCTree.JCIdent) tree.selected).sym;
+                        TreePath path = getPath(new TreePath(compilationUnit), tree);
+
+                        if (path != null) {
+                            JavacTrees trees = JavacTrees.instance(context);
+                            final JavacScope scope = trees.getScope(path);
+
+                            for (Symbol s : sym.getEnclosedElements()) {
+                                if (s instanceof Symbol.ClassSymbol) {
+                                    Symbol.ClassSymbol classSymbol = (Symbol.ClassSymbol) s;
+                                    boolean accessible = resolve.isAccessible(scope.getEnv(), sym.asType(), s);
+
+                                    if (accessible && classSymbol.isStatic() && !classSymbol.isEnum())
+                                        addConstructor(classSymbol);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                @Override
                 public void visitIdent(JCTree.JCIdent tree) {
                     super.visitIdent(tree);
 
@@ -450,6 +476,36 @@ public class AutocompleteVisitor extends CursorScanner {
         }
     }
 
+    private void addEnumConstant(Symbol.VarSymbol e, int superRemoved) {
+        String label = e.getSimpleName().toString();
+        CompletionItemImpl item = new CompletionItemImpl();
+
+        item.setKind(CompletionItem.KIND_ENUM);
+        item.setLabel(label);
+        item.setDetail(e.getEnclosingElement().getSimpleName().toString());
+        item.setDocumentation(docstring(e));
+        item.setInsertText(e.getSimpleName().toString());
+        item.setSortText(superRemoved + "/" + label);
+        item.setFilterText(e.getSimpleName().toString());
+
+        suggestions.add(item);
+    }
+
+    private void addClass(Symbol.ClassSymbol e, int superRemoved) {
+        String label = e.getSimpleName().toString();
+        CompletionItemImpl item = new CompletionItemImpl();
+
+        item.setKind(CompletionItem.KIND_CLASS);
+        item.setLabel(label);
+        // item.setDetail(?); TODO
+        item.setDocumentation(docstring(e));
+        item.setInsertText(e.getSimpleName().toString());
+        item.setSortText(superRemoved + "/" + label);
+        item.setFilterText(e.getSimpleName().toString());
+
+        suggestions.add(item);
+    }
+
     private void addMethod(Symbol.MethodSymbol e, int superRemoved) {
         String label = methodSignature(e);
         CompletionItemImpl item = new CompletionItemImpl();
@@ -605,6 +661,25 @@ public class AutocompleteVisitor extends CursorScanner {
                         }
 
                         break;
+                    }
+                    case ENUM:
+                    case CLASS: {
+                        Symbol.ClassSymbol classSymbol = (Symbol.ClassSymbol) e;
+                        boolean accessible = resolve.isAccessible(scope.getEnv(), type, classSymbol);
+                        boolean matchesStatic = isStatic == classSymbol.isStatic();
+
+                        if (accessible && matchesStatic) {
+                            int removed = supersRemoved(classSymbol, t);
+
+                            addClass(classSymbol, removed);
+                        }
+                        break;
+                    }
+                    case ENUM_CONSTANT: {
+                        Symbol.VarSymbol enumConstant = (Symbol.VarSymbol) e;
+                        int removed = supersRemoved(enumConstant, t);
+
+                        addEnumConstant(enumConstant, removed);
                     }
                 }
             }
