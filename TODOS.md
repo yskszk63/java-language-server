@@ -6,9 +6,7 @@
 * Resolve methods with badly typed arguments
 * Autocomplete is using the entire method signature
 * Autocomplete annotation fields
-* Autocomplete inner classes
 * Autocomplete enum options in switch statement
-* Autocomplete EnumClass.*
 * Hover enum options on class symbol
 * Hover public members on class symbol
 * Hover shows javadoc if available
