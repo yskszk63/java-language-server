@@ -1,7 +1,7 @@
 package org.javacs;
 
-import io.typefox.lsapi.LocationImpl;
-import io.typefox.lsapi.RangeImpl;
+import io.typefox.lsapi.impl.LocationImpl;
+import io.typefox.lsapi.impl.RangeImpl;
 
 import javax.tools.JavaFileObject;
 import java.net.URI;

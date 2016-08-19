@@ -1,6 +1,7 @@
 package org.javacs;
 
 import io.typefox.lsapi.*;
+import io.typefox.lsapi.impl.*;
 import org.junit.Ignore;
 import org.junit.Test;
 

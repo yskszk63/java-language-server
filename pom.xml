@@ -35,6 +35,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
   <properties>
     <jackson-2-version>2.5.0</jackson-2-version>
     <jersey-2-version>2.10</jersey-2-version>
+    <lsApiVersion>0.3.0-SNAPSHOT</lsApiVersion>
   </properties>
   <dependencies>
     <dependency>
@@ -46,17 +47,17 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
     <dependency>
       <groupId>io.typefox.lsapi</groupId>
       <artifactId>io.typefox.lsapi</artifactId>
-      <version>0.2.0-SNAPSHOT</version>
+      <version>${lsApiVersion}</version>
     </dependency>
     <dependency>
       <groupId>io.typefox.lsapi</groupId>
       <artifactId>io.typefox.lsapi.services</artifactId>
-      <version>0.2.0-SNAPSHOT</version>
+      <version>${lsApiVersion}</version>
     </dependency>
     <dependency>
       <groupId>io.typefox.lsapi</groupId>
       <artifactId>io.typefox.lsapi.annotations</artifactId>
-      <version>0.2.0-SNAPSHOT</version>
+      <version>${lsApiVersion}</version>
     </dependency>
     <!-- JSON -->
     <dependency>

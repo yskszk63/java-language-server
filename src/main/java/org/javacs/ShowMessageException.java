@@ -1,7 +1,8 @@
 package org.javacs;
 
 import io.typefox.lsapi.MessageParams;
-import io.typefox.lsapi.MessageParamsImpl;
+import io.typefox.lsapi.MessageType;
+import io.typefox.lsapi.impl.MessageParamsImpl;
 
 public class ShowMessageException extends RuntimeException {
     public final MessageParams message;
@@ -13,14 +14,14 @@ public class ShowMessageException extends RuntimeException {
     }
 
     public static ShowMessageException error(String message, Exception cause) {
-        return create(MessageParams.TYPE_ERROR, message, cause);
+        return create(MessageType.Error, message, cause);
     }
 
     public static ShowMessageException warning(String message, Exception cause) {
-        return create(MessageParams.TYPE_WARNING, message, cause);
+        return create(MessageType.Warning, message, cause);
     }
     
-    private static ShowMessageException create(int type, String message, Exception cause) {
+    private static ShowMessageException create(MessageType type, String message, Exception cause) {
         MessageParamsImpl m = new MessageParamsImpl();
 
         m.setMessage(message);

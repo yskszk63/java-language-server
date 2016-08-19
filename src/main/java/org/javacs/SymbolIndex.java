@@ -18,6 +18,7 @@ import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Name;
 import io.typefox.lsapi.*;
+import io.typefox.lsapi.impl.*;
 
 public class SymbolIndex {
     private static final Logger LOG = Logger.getLogger("main");
@@ -342,7 +343,7 @@ public class SymbolIndex {
         LocationImpl location = location(tree, compilationUnit);
         SymbolInformationImpl info = new SymbolInformationImpl();
 
-        info.setContainer(symbol.getEnclosingElement().getQualifiedName().toString());
+        info.setContainerName(symbol.getEnclosingElement().getQualifiedName().toString());
         info.setKind(symbolInformationKind(symbol.getKind()));
         
         // Constructors have name <init>, use class name instead
@@ -472,35 +473,35 @@ public class SymbolIndex {
         }
     }
 
-    private static int symbolInformationKind(ElementKind kind) {
+    private static SymbolKind symbolInformationKind(ElementKind kind) {
         switch (kind) {
             case PACKAGE:
-                return SymbolInformation.KIND_PACKAGE;
+                return SymbolKind.Package;
             case ENUM:
             case ENUM_CONSTANT:
-                return SymbolInformation.KIND_ENUM;
+                return SymbolKind.Enum;
             case CLASS:
-                return SymbolInformation.KIND_CLASS;
+                return SymbolKind.Class;
             case ANNOTATION_TYPE:
             case INTERFACE:
-                return SymbolInformation.KIND_INTERFACE;
+                return SymbolKind.Interface;
             case FIELD:
-                return SymbolInformation.KIND_PROPERTY;
+                return SymbolKind.Property;
             case PARAMETER:
             case LOCAL_VARIABLE:
             case EXCEPTION_PARAMETER:
             case TYPE_PARAMETER:
-                return SymbolInformation.KIND_VARIABLE;
+                return SymbolKind.Variable;
             case METHOD:
             case STATIC_INIT:
             case INSTANCE_INIT:
-                return SymbolInformation.KIND_METHOD;
+                return SymbolKind.Method;
             case CONSTRUCTOR:
-                return SymbolInformation.KIND_CONSTRUCTOR;
+                return SymbolKind.Constructor;
             case OTHER:
             case RESOURCE_VARIABLE:
             default:
-                return SymbolInformation.KIND_STRING;
+                return SymbolKind.String;
         }
     }
 

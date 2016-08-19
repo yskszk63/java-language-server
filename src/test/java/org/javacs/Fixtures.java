@@ -1,6 +1,6 @@
 package org.javacs;
 
-import io.typefox.lsapi.InitializeParamsImpl;
+import io.typefox.lsapi.impl.InitializeParamsImpl;
 import org.junit.BeforeClass;
 
 import java.io.IOException;

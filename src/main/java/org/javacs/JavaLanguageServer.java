@@ -4,6 +4,7 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.code.Symbol;
 import io.typefox.lsapi.services.*;
 import io.typefox.lsapi.*;
+import io.typefox.lsapi.impl.*;
 import io.typefox.lsapi.Diagnostic;
 
 import javax.lang.model.element.*;
@@ -52,7 +53,7 @@ class JavaLanguageServer implements LanguageServer {
             MessageParamsImpl m = new MessageParamsImpl();
 
             m.setMessage(message);
-            m.setType(MessageParams.TYPE_ERROR);
+            m.setType(MessageType.Error);
 
             showMessage.accept(m);
         }
@@ -66,7 +67,7 @@ class JavaLanguageServer implements LanguageServer {
 
         ServerCapabilitiesImpl c = new ServerCapabilitiesImpl();
 
-        c.setTextDocumentSync(ServerCapabilities.SYNC_INCREMENTAL);
+        c.setTextDocumentSync(TextDocumentSyncKind.Incremental);
         c.setDefinitionProvider(true);
         c.setCompletionProvider(new CompletionOptionsImpl());
         c.setHoverProvider(true);
@@ -87,6 +88,11 @@ class JavaLanguageServer implements LanguageServer {
     @Override
     public void exit() {
 
+    }
+
+    @Override
+    public void onTelemetryEvent(Consumer<Object> consumer) {
+        // Nothing to do
     }
 
     @Override
@@ -329,7 +335,7 @@ class JavaLanguageServer implements LanguageServer {
             public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
                 for (FileEvent event : params.getChanges()) {
                     if (event.getUri().endsWith(".java")) {
-                        if (event.getType() == FileEvent.TYPE_DELETED) {
+                        if (event.getType() == FileChangeType.Deleted) {
                             URI uri = URI.create(event.getUri());
 
                             getFilePath(uri).ifPresent(path -> {
@@ -340,7 +346,7 @@ class JavaLanguageServer implements LanguageServer {
                                 compiler.clear(file);
                                 index.clear(file.toUri());
                             });
-                        } else if(event.getType() == FileEvent.TYPE_CHANGED) {
+                        } else if(event.getType() == FileChangeType.Changed) {
                             URI uri = URI.create(event.getUri());
                             Optional<Path> path = getFilePath(uri);
                             if(path.isPresent()) {
@@ -388,7 +394,7 @@ class JavaLanguageServer implements LanguageServer {
 
                 RangeImpl range = position(error);
                 DiagnosticImpl diagnostic = new DiagnosticImpl();
-                int severity = severity(error.getKind());
+                DiagnosticSeverity severity = severity(error.getKind());
 
                 diagnostic.setSeverity(severity);
                 diagnostic.setRange(range);
@@ -402,17 +408,17 @@ class JavaLanguageServer implements LanguageServer {
         files.values().forEach(publishDiagnostics::accept);
     }
 
-    private int severity(javax.tools.Diagnostic.Kind kind) {
+    private DiagnosticSeverity severity(javax.tools.Diagnostic.Kind kind) {
         switch (kind) {
             case ERROR:
-                return Diagnostic.SEVERITY_ERROR;
+                return DiagnosticSeverity.Error;
             case WARNING:
             case MANDATORY_WARNING:
-                return Diagnostic.SEVERITY_WARNING;
+                return DiagnosticSeverity.Warning;
             case NOTE:
             case OTHER:
             default:
-                return Diagnostic.SEVERITY_INFO;
+                return DiagnosticSeverity.Information;
         }
     }
 
@@ -521,7 +527,7 @@ class JavaLanguageServer implements LanguageServer {
             MessageParamsImpl message = new MessageParamsImpl();
 
             message.setMessage("Error reading " + configFile);
-            message.setType(MessageParams.TYPE_ERROR);
+            message.setType(MessageType.Error);
 
             throw new ShowMessageException(message, e);
         }
@@ -542,7 +548,7 @@ class JavaLanguageServer implements LanguageServer {
             MessageParamsImpl message = new MessageParamsImpl();
 
             message.setMessage("Error reading " + classPathFilePath);
-            message.setType(MessageParams.TYPE_ERROR);
+            message.setType(MessageType.Error);
 
             throw new ShowMessageException(message, e);
         }
