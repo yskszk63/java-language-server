@@ -797,7 +797,7 @@ class JavaLanguageServer implements LanguageServer {
             if (visitor.found.isPresent()) {
                 Symbol symbol = visitor.found.get();
                 List<MarkedStringImpl> contents = new ArrayList<>();
-
+                
                 switch (symbol.getKind()) {
                     case PACKAGE:
                         contents.add(markedString("package " + symbol.getQualifiedName()));

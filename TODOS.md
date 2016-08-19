@@ -7,7 +7,6 @@
 * Autocomplete is using the entire method signature
 * Autocomplete annotation fields
 * Autocomplete enum options in switch statement
-* Hover public members on class symbol
 * Hover shows javadoc if available
 * Javadoc path for hover, autocomplete
 
