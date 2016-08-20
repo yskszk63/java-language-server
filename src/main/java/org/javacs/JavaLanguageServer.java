@@ -77,6 +77,13 @@ class JavaLanguageServer implements LanguageServer {
 
         result.setCapabilities(c);
 
+        LanguageDescriptionImpl java = new LanguageDescriptionImpl();
+
+        java.setLanguageId("java");
+        java.setFileExtensions(Collections.singletonList(".java"));
+
+        result.setSupportedLanguages(Collections.singletonList(java));
+
         return CompletableFuture.completedFuture(result);
     }
 
@@ -773,7 +780,10 @@ class JavaLanguageServer implements LanguageServer {
     
     public HoverImpl doHover(TextDocumentPositionParams position) {
         HoverImpl result = new HoverImpl();
-        
+        List<MarkedStringImpl> contents = new ArrayList<>();
+
+        result.setContents(contents);
+
         Optional<Path> maybePath = getFilePath(URI.create(position.getTextDocument().getUri()));
 
         if (maybePath.isPresent()) {
@@ -794,7 +804,6 @@ class JavaLanguageServer implements LanguageServer {
             
             if (visitor.found.isPresent()) {
                 Symbol symbol = visitor.found.get();
-                List<MarkedStringImpl> contents = new ArrayList<>();
                 
                 switch (symbol.getKind()) {
                     case PACKAGE:
