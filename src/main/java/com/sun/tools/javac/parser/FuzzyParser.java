@@ -23,7 +23,7 @@ public class FuzzyParser extends JavacParser {
         }
         else if (tk == SEMI) {
             // Pretend semicolon is present and continue parsing
-            LOG.info("Inserted semicolon");
+            LOG.fine("Inserted semicolon");
         }
         else {
             super.accept(tk);
