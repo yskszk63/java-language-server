@@ -209,8 +209,6 @@ class JavaLanguageServer implements LanguageServer {
                             sourceByPath.put(path.get(), newText);
                         }
                     }
-
-                    doLint(path.get());
                 }
             }
 
@@ -346,12 +344,6 @@ class JavaLanguageServer implements LanguageServer {
                                 compiler.clear(file);
                                 index.clear(file.toUri());
                             });
-                        } else if(event.getType() == FileChangeType.Changed) {
-                            URI uri = URI.create(event.getUri());
-                            Optional<Path> path = getFilePath(uri);
-                            if(path.isPresent()) {
-                                doLint(path.get());
-                            }
                         }
                     }
                     else if (event.getUri().endsWith("javaconfig.json")) {
