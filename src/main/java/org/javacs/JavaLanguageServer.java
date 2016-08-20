@@ -21,6 +21,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+import javax.xml.parsers.*;
+import javax.xml.xpath.*;
+import org.w3c.dom.*;
+import org.xml.sax.SAXException;
+
 import static org.javacs.Main.JSON;
 
 class JavaLanguageServer implements LanguageServer {
@@ -513,9 +518,87 @@ class JavaLanguageServer implements LanguageServer {
 
             return Optional.of(config);
         }
+        else if (Files.exists(dir.resolve("pom.xml"))) {
+            Path pomXml = dir.resolve("pom.xml");
+
+            // Invoke maven to get classpath
+            Set<Path> classPath = buildClassPath(pomXml);
+
+            // Get source directory from pom.xml
+            Set<Path> sourcePath = sourceDirectories(pomXml);
+
+            // Use target/javacs
+            Path outputDirectory = Paths.get("target/javacs").toAbsolutePath();
+
+            JavacConfig config = new JavacConfig(sourcePath, classPath, outputDirectory);
+
+            return Optional.of(config);
+        }
         // TODO add more file types
         else {
             return Optional.empty();
+        }
+    }
+
+    public static Set<Path> buildClassPath(Path pomXml) {
+        try {
+            Objects.requireNonNull(pomXml, "pom.xml path is null");
+
+            // Tell maven to output classpath to a temporary file
+            // TODO if pom.xml already specifies outputFile, use that location
+            Path classPathTxt = Files.createTempFile("classpath", ".txt");
+
+            LOG.info("Emit classpath to " + classPathTxt);
+
+            String cmd = "mvn dependency:build-classpath -Dmdep.outputFile=" + classPathTxt;
+            File workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
+            int result = Runtime.getRuntime().exec(cmd, null, workingDirectory).waitFor();
+
+            if (result != 0)
+                throw new RuntimeException("`" + cmd + "` returned " + result);
+
+            return readClassPathFile(classPathTxt);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Set<Path> sourceDirectories(Path pomXml) {
+        try {
+            Set<Path> all = new HashSet<>();
+
+            // Parse pom.xml
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(pomXml.toFile());
+
+            // Find source directory
+            String sourceDir = XPathFactory.newInstance().newXPath().compile("/project/build/sourceDirectory").evaluate(doc);
+
+            if (sourceDir == null || sourceDir.isEmpty()) {
+                LOG.info("Use default source directory src/main/java");
+
+                sourceDir = "src/main/java";
+            }
+            else LOG.info("Use source directory from pom.xml " + sourceDir);
+            
+            all.add(pomXml.resolveSibling(sourceDir).toAbsolutePath());
+
+            // Find test directory
+            String testDir = XPathFactory.newInstance().newXPath().compile("/project/build/testSourceDirectory").evaluate(doc);
+
+            if (testDir == null || testDir.isEmpty()) {
+                LOG.info("Use default test directory src/test/java");
+
+                testDir = "src/test/java";
+            }
+            else LOG.info("Use test directory from pom.xml " + testDir);
+            
+            all.add(pomXml.resolveSibling(testDir).toAbsolutePath());
+
+            return all;
+        } catch (IOException | ParserConfigurationException | SAXException | XPathExpressionException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -532,7 +615,7 @@ class JavaLanguageServer implements LanguageServer {
         }
     }
 
-    private Set<Path> readClassPathFile(Path classPathFilePath) {
+    private static Set<Path> readClassPathFile(Path classPathFilePath) {
         try {
             InputStream in = Files.newInputStream(classPathFilePath);
             String text = new BufferedReader(new InputStreamReader(in))

@@ -116,29 +116,19 @@ public class SymbolIndexTest {
         return index.search(query).map(s -> s.getName()).collect(Collectors.toSet());
     }
 
+    private static Set<Path> classPath = JavaLanguageServer.buildClassPath(Paths.get("pom.xml"));
     private SymbolIndex index = getIndex();
     
     private static SymbolIndex getIndex() {
-        try {
-            Set<Path> classPath = new HashSet<>();
+        Set<Path> sourcePath = Collections.singleton(Paths.get("src/main/java").toAbsolutePath());
+        Path outputDirectory = Paths.get("out").toAbsolutePath();
+        SymbolIndex index = new SymbolIndex(classPath, sourcePath, outputDirectory, (paths, errs) -> {
+            errs.getDiagnostics().forEach(d -> LOG.info(d.getMessage(Locale.US)));
+        });
 
-            for (String line : Files.readAllLines(Paths.get("classpath.txt"))) {
-                for (String entry : line.split(File.pathSeparator)) {
-                    classPath.add(Paths.get(entry).toAbsolutePath());
-                }
-            }
-            Set<Path> sourcePath = Collections.singleton(Paths.get("src/main/java").toAbsolutePath());
-            Path outputDirectory = Paths.get("out").toAbsolutePath();
-            SymbolIndex index = new SymbolIndex(classPath, sourcePath, outputDirectory, (paths, errs) -> {
-                errs.getDiagnostics().forEach(d -> LOG.info(d.getMessage(Locale.US)));
-            });
+        index.initialIndexComplete.join();
 
-            index.initialIndexComplete.join();
-
-            return index;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        return index;
     }
 
     private static JavacHolder compiler = newCompiler();

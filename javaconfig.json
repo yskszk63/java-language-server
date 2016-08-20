@@ -1,5 +1,0 @@
-{
-    "sourcePath": ["src/main/java", "src/test/java"],
-    "outputDirectory": "target",
-    "classPathFile": "classpath.txt"
-}
