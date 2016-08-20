@@ -7,13 +7,26 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
+import io.typefox.lsapi.Message;
 import io.typefox.lsapi.services.json.LanguageServerToJsonAdapter;
+import io.typefox.lsapi.services.json.MessageJsonHandler;
+import io.typefox.lsapi.services.json.StreamMessageReader;
+import io.typefox.lsapi.services.json.StreamMessageWriter;
+import io.typefox.lsapi.services.launch.LanguageServerLauncher;
+import io.typefox.lsapi.services.transport.io.ConcurrentMessageReader;
+import io.typefox.lsapi.services.transport.io.MessageReader;
+import io.typefox.lsapi.services.transport.server.LanguageServerEndpoint;
+import io.typefox.lsapi.services.transport.trace.MessageTracer;
+
+import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutionException;
 
 import java.io.*;
 import java.net.Socket;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -108,16 +121,34 @@ public class Main {
      * When the request stream is closed, wait for 5s for all outstanding responses to compute, then return.
      */
     public static void run(Connection connection) {
+        MessageJsonHandler handler = new MessageJsonHandler();
+        StreamMessageReader reader = new StreamMessageReader(connection.in, handler);
+        StreamMessageWriter writer = new StreamMessageWriter(connection.out, handler);
         JavaLanguageServer server = new JavaLanguageServer();
-        LanguageServerToJsonAdapter jsonServer = new LanguageServerToJsonAdapter(server);
+        LanguageServerEndpoint endpoint = new LanguageServerEndpoint(server);
 
-        jsonServer.connect(connection.in, connection.out);
-        jsonServer.getProtocol().addErrorListener((message, err) -> {
-            LOG.log(Level.SEVERE, message, err);
+        endpoint.setMessageTracer(new MessageTracer() {
+            @Override
+            public void onError(String message, Throwable err) {
+                LOG.log(Level.SEVERE, message, err);
+            }
 
-            server.onError(message, err);
+            @Override
+            public void onRead(Message message, String s) {
+
+            }
+
+            @Override
+            public void onWrite(Message message, String s) {
+
+            }
         });
 
-        jsonServer.join();
+        reader.setOnError(err -> LOG.log(Level.SEVERE, err.getMessage(), err));
+        writer.setOnError(err -> LOG.log(Level.SEVERE, err.getMessage(), err));
+
+        endpoint.connect(reader, writer);
+
+        LOG.info("Connection closed");
     }
 }
