@@ -18,13 +18,31 @@ public class AutocompletePruner extends CursorScanner {
 
     @Override
     public void visitBlock(JCTree.JCBlock tree) {
-        List<JCTree.JCStatement> stats = tree.stats;
+        tree.stats = pruneStatements(tree.stats);
 
+        super.visitBlock(tree);
+    }
+
+    @Override
+    public void visitCase(JCTree.JCCase tree) {
+        tree.stats = pruneStatements(tree.stats);
+
+        super.visitCase(tree);
+    }
+
+    @Override
+    public void visitSwitch(JCTree.JCSwitch tree) {
+        tree.cases = pruneStatements(tree.cases);
+
+        super.visitSwitch(tree);
+    }
+
+    private <T extends JCTree> List<T> pruneStatements(List<T> stats) {
         int countStatements = 0;
 
         // Scan up to statement containing cursor
         while (countStatements < stats.size()) {
-            JCTree.JCStatement s = stats.get(countStatements);
+            T s = stats.get(countStatements);
 
             if (containsCursor(s))
                 break;
@@ -38,6 +56,6 @@ public class AutocompletePruner extends CursorScanner {
         countStatements++;
 
         // Remove all statements after statement containing cursor
-        tree.stats = stats.take(countStatements);
+        return stats.take(countStatements);
     }
 }
