@@ -5,9 +5,7 @@ import com.sun.tools.javac.code.Symbol;
 import io.typefox.lsapi.services.*;
 import io.typefox.lsapi.*;
 import io.typefox.lsapi.impl.*;
-import io.typefox.lsapi.Diagnostic;
 
-import javax.lang.model.element.*;
 import javax.tools.*;
 import java.io.*;
 import java.net.URI;
@@ -30,6 +28,9 @@ import static org.javacs.Main.JSON;
 
 class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
+    private static final DiagnosticListener<JavaFileObject> ignore = err -> {
+        // Do nothing
+    };
     private Path workspaceRoot;
     private Consumer<PublishDiagnosticsParams> publishDiagnostics = p -> {};
     private Consumer<MessageParams> showMessage = m -> {};
@@ -700,7 +701,7 @@ class JavaLanguageServer implements LanguageServer {
         int character = params.getPosition().getCharacter();
         List<Location> result = new ArrayList<>();
 
-        findSymbol(uri, line, character).ifPresent(symbol -> {
+        findSymbol(uri, line, character, ignore).ifPresent(symbol -> {
             getFilePath(uri).map(this::findIndex).ifPresent(index -> {
                 index.references(symbol).forEach(result::add);
             });
@@ -720,9 +721,8 @@ class JavaLanguageServer implements LanguageServer {
         }).orElse(Collections.emptyList());
     }
 
-    private Optional<Symbol> findSymbol(URI uri, int line, int character) {
+    private Optional<Symbol> findSymbol(URI uri, int line, int character, DiagnosticListener<JavaFileObject> errors) {
         return getFilePath(uri).flatMap(path -> {
-            DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
             JavacHolder compiler = findCompiler(path);
             SymbolIndex index = findIndex(path);
             JavaFileObject file = findFile(compiler, path);
@@ -749,7 +749,7 @@ class JavaLanguageServer implements LanguageServer {
         int character = position.getPosition().getCharacter();
         List<Location> result = new ArrayList<>();
 
-        findSymbol(uri, line, character).ifPresent(symbol -> {
+        findSymbol(uri, line, character, ignore).ifPresent(symbol -> {
             getFilePath(uri).map(this::findIndex).ifPresent(index -> {
                 index.findSymbol(symbol).ifPresent(info -> {
                     result.add(info.getLocation());
@@ -871,22 +871,12 @@ class JavaLanguageServer implements LanguageServer {
 
         if (maybePath.isPresent()) {
             Path path = maybePath.get();
-            DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-            JavacHolder compiler = findCompiler(path);
-            JavaFileObject file = findFile(compiler, path);
-            long cursor = findOffset(file, position.getPosition().getLine(), position.getPosition().getCharacter());
-            SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, cursor, compiler.context);
-
-            compiler.onError(errors);
-
-            JCTree.JCCompilationUnit tree = compiler.parse(file);
-
-            compiler.compile(tree);
-
-            tree.accept(visitor);
-            
-            if (visitor.found.isPresent()) {
-                Symbol symbol = visitor.found.get();
+            Optional<Symbol> found = findSymbol(path.toUri(),
+                                                position.getPosition().getLine(),
+                                                position.getPosition().getCharacter(),
+                                                ignore);
+            if (found.isPresent()) {
+                Symbol symbol = found.get();
                 
                 switch (symbol.getKind()) {
                     case PACKAGE:
