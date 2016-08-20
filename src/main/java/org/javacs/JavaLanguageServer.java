@@ -811,18 +811,7 @@ class JavaLanguageServer implements LanguageServer {
 
                         break;
                     case ENUM:
-                        Symbol.ClassSymbol classSymbol = (Symbol.ClassSymbol) symbol;
-                        StringJoiner members = new StringJoiner(",\n    ");
-                        
-                        classSymbol.members().getElements().forEach(m -> {
-                            if (m.isEnum()) {
-                                String name = m.getSimpleName().toString();
-
-                                members.add(name);
-                            }
-                        });
-
-                        contents.add(markedString("enum " + symbol.getQualifiedName() + " {\n    " + members + ";\n}"));
+                        contents.add(markedString("enum " + symbol.getQualifiedName()));
 
                         break;
                     case CLASS:
