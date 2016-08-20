@@ -933,8 +933,6 @@ class JavaLanguageServer implements LanguageServer {
                     case RESOURCE_VARIABLE:
                         break;
                 }
-                
-                result.setContents(contents);
             }
         }
         
