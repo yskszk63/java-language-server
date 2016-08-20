@@ -51,6 +51,8 @@ public class SymbolIndexTest {
         int line = 2;
         int character = 22;
 
+        compile(path);
+
         Symbol classSymbol = symbol(path, line, character);
         List<Integer> references = index.references(classSymbol)
                                         .map(ref -> ref.getRange().getStart().getLine())
@@ -94,13 +96,13 @@ public class SymbolIndexTest {
     }
 
     private Symbol symbol(String path, int line, int character) {
-        JCTree.JCCompilationUnit tree = compile(path);
-        long offset = JavaLanguageServer.findOffset(tree.getSourceFile(), line, character);
-        SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(tree.getSourceFile(), offset, compiler.context);
+        try {
+            URI uri = GetResourceFileObject.class.getResource(path).toURI();
 
-        tree.accept(visitor);
-
-        return visitor.found.get();
+            return new JavaLanguageServer(compiler).findSymbol(uri, line, character).orElse(null);
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private JCTree.JCCompilationUnit compile(String path) {
@@ -109,6 +111,7 @@ public class SymbolIndexTest {
 
         compiler.compile(tree);
         index.update(tree, compiler.context);
+
         return tree;
     }
 

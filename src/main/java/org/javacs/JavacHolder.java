@@ -38,9 +38,9 @@ import java.util.logging.Logger;
  */
 public class JavacHolder {
     private static final Logger LOG = Logger.getLogger("main");
-    private final Set<Path> classPath;
-    private final Set<Path> sourcePath;
-    private final Path outputDirectory;
+    public final Set<Path> classPath;
+    public final Set<Path> sourcePath;
+    public final Path outputDirectory;
     // javac places all of its internal state into this Context object,
     // which is basically a Map<String, Object>
     public final Context context = new Context();

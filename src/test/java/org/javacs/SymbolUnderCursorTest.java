@@ -1,9 +1,12 @@
 package org.javacs;
 
+import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.tree.JCTree;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Optional;
@@ -80,20 +83,14 @@ public class SymbolUnderCursorTest extends Fixtures {
     }
 
     private String symbolAt(String file, int line, int character) {
-        GetResourceFileObject source = new GetResourceFileObject(file);
-        JCTree.JCCompilationUnit tree = compiler.parse(source);
+        try {
+            URI uri = GetResourceFileObject.class.getResource(file).toURI();
+            Optional<Symbol> symbol = new JavaLanguageServer(compiler).findSymbol(uri, line, character);
 
-        compiler.compile(tree);
-
-        long cursor = JavaLanguageServer.findOffset(source, line, character);
-        SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(source, cursor, compiler.context);
-
-        tree.accept(visitor);
-
-        if (visitor.found.isPresent())
-            return visitor.found.get().getSimpleName().toString();
-        else
-            return null;
+            return symbol.map(s -> s.getSimpleName().toString()).orElse(null);
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static JavacHolder compiler = newCompiler();

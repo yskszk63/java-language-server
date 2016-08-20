@@ -28,9 +28,6 @@ import static org.javacs.Main.JSON;
 
 class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
-    private static final DiagnosticListener<JavaFileObject> ignore = err -> {
-        // Do nothing
-    };
     private Path workspaceRoot;
     private Consumer<PublishDiagnosticsParams> publishDiagnostics = p -> {};
     private Consumer<MessageParams> showMessage = m -> {};
@@ -491,6 +488,9 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private Optional<JavacConfig> doFindConfig(Path dir) {
+        if (testJavac.isPresent())
+            return testJavac.map(j -> new JavacConfig(j.sourcePath, j.classPath, j.outputDirectory));
+
         while (true) {
             Optional<JavacConfig> found = readIfConfig(dir);
 
@@ -701,7 +701,7 @@ class JavaLanguageServer implements LanguageServer {
         int character = params.getPosition().getCharacter();
         List<Location> result = new ArrayList<>();
 
-        findSymbol(uri, line, character, ignore).ifPresent(symbol -> {
+        findSymbol(uri, line, character).ifPresent(symbol -> {
             getFilePath(uri).map(this::findIndex).ifPresent(index -> {
                 index.references(symbol).forEach(result::add);
             });
@@ -721,7 +721,7 @@ class JavaLanguageServer implements LanguageServer {
         }).orElse(Collections.emptyList());
     }
 
-    private Optional<Symbol> findSymbol(URI uri, int line, int character, DiagnosticListener<JavaFileObject> errors) {
+    public Optional<Symbol> findSymbol(URI uri, int line, int character) {
         return getFilePath(uri).flatMap(path -> {
             JavacHolder compiler = findCompiler(path);
             SymbolIndex index = findIndex(path);
@@ -729,7 +729,7 @@ class JavaLanguageServer implements LanguageServer {
             long cursor = findOffset(file, line, character);
             SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, cursor, compiler.context);
 
-            compiler.onError(errors);
+            compiler.onError(err -> {});
 
             JCTree.JCCompilationUnit tree = compiler.parse(file);
 
@@ -749,7 +749,7 @@ class JavaLanguageServer implements LanguageServer {
         int character = position.getPosition().getCharacter();
         List<Location> result = new ArrayList<>();
 
-        findSymbol(uri, line, character, ignore).ifPresent(symbol -> {
+        findSymbol(uri, line, character).ifPresent(symbol -> {
             getFilePath(uri).map(this::findIndex).ifPresent(index -> {
                 index.findSymbol(symbol).ifPresent(info -> {
                     result.add(info.getLocation());
@@ -873,8 +873,8 @@ class JavaLanguageServer implements LanguageServer {
             Path path = maybePath.get();
             Optional<Symbol> found = findSymbol(path.toUri(),
                                                 position.getPosition().getLine(),
-                                                position.getPosition().getCharacter(),
-                                                ignore);
+                                                position.getPosition().getCharacter()
+            );
             if (found.isPresent()) {
                 Symbol symbol = found.get();
                 
