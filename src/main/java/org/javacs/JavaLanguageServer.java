@@ -551,7 +551,7 @@ class JavaLanguageServer implements LanguageServer {
 
             LOG.info("Emit classpath to " + classPathTxt);
 
-            String cmd = "mvn dependency:build-classpath -Dmdep.outputFile=" + classPathTxt;
+            String cmd = getMvnCommand() + " dependency:build-classpath -Dmdep.outputFile=" + classPathTxt;
             File workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
             int result = Runtime.getRuntime().exec(cmd, null, workingDirectory).waitFor();
 
@@ -562,6 +562,27 @@ class JavaLanguageServer implements LanguageServer {
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static String getMvnCommand() {
+        String mvnCommand = "mvn";
+        if (File.separatorChar == '\\') {
+            mvnCommand = findExecutableOnPath("mvn.cmd");
+            if (mvnCommand == null) {
+                mvnCommand = findExecutableOnPath("mvn.bat");
+            }
+        }
+        return mvnCommand;
+    }
+
+    public static String findExecutableOnPath(String name) {
+        for (String dirname : System.getenv("PATH").split(File.pathSeparator)) {
+            File file = new File(dirname, name);
+            if (file.isFile() && file.canExecute()) {
+                return file.getAbsolutePath();
+            }
+        }
+        return null;
     }
 
     public static Set<Path> sourceDirectories(Path pomXml) {
