@@ -80,13 +80,6 @@ class JavaLanguageServer implements LanguageServer {
 
         result.setCapabilities(c);
 
-        LanguageDescriptionImpl java = new LanguageDescriptionImpl();
-
-        java.setLanguageId("java");
-        java.setFileExtensions(Collections.singletonList(".java"));
-
-        result.setSupportedLanguages(Collections.singletonList(java));
-
         return CompletableFuture.completedFuture(result);
     }
 
