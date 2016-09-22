@@ -124,6 +124,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
         <version>2.4.1</version>
         <configuration>
           <outputFile>${project.basedir}/out/fat-jar.jar</outputFile>
+          <transformers>
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+              <mainClass>org.javacs.Main</mainClass>
+            </transformer>
+          </transformers>
           <filters>
             <filter>
               <artifact>*:*</artifact>
