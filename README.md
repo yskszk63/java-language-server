@@ -176,6 +176,8 @@ android {
 }
 ```
 
+Currently, the generated `classpath.txt` does not contain android platform library, e.g., `/opt/android-sdk-linux/platforms/android-23/android.jar`. You would need to add it manually. See issue #23.
+
 ## Directory structure
 
 ### Java service process
