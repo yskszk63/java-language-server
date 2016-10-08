@@ -164,6 +164,18 @@ Then run `gradlew vscode`. This will generate
 * `javaconfig.json`
 * `build/classpath.txt`
 
+### Gradle Android build
+
+For Android gradle project, put the above tasks in the `android` method of your `build.gradle`:
+```gradle
+android {
+    ...
+    // add the vscode tasks inside the android method
+    task vscodeClasspathFile {
+    ...    
+}
+```
+
 ## Directory structure
 
 ### Java service process
