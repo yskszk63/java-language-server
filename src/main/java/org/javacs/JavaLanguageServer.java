@@ -774,6 +774,9 @@ class JavaLanguageServer implements LanguageServer {
         return result;
     }
 
+    /**
+     * Convert on offset-based range to a {@link io.typefox.lsapi.Range}
+     */
     public static RangeImpl findPosition(JavaFileObject file, long startOffset, long endOffset) {
         try (Reader in = file.openReader(true)) {
             long offset = 0;
