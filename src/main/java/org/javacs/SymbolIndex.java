@@ -61,14 +61,9 @@ public class SymbolIndex {
     
     public SymbolIndex(Set<Path> classPath, 
                        Set<Path> sourcePath, 
-                       Path outputDirectory, 
-                       ReportDiagnostics publishDiagnostics) {
+                       Path outputDirectory) {
         JavacHolder compiler = new JavacHolder(classPath, sourcePath, outputDirectory);
         Indexer indexer = new Indexer(compiler.context);
-        
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-
-        compiler.onError(errors);
 
         Thread worker = new Thread("InitialIndex") {
             List<JCTree.JCCompilationUnit> parsed = new ArrayList<>();
@@ -90,12 +85,6 @@ public class SymbolIndex {
                 // If invoked correctly, javac should avoid reparsing the same file twice
                 // Then, use the same mechanism as the desugar / generate phases to remove method bodies, 
                 // to reclaim memory as we go
-                
-                // Report diagnostics to language server
-                publishDiagnostics.report(paths, errors);
-                
-                // Stop recording diagnostics
-                compiler.onError(err -> {});
 
                 initialIndexComplete.complete(null);
                 

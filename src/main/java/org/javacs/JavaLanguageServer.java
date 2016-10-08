@@ -470,7 +470,7 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private SymbolIndex newIndex(JavacConfig c) {
-        return new SymbolIndex(c.classPath, c.sourcePath, c.outputDirectory, this::publishDiagnostics);
+        return new SymbolIndex(c.classPath, c.sourcePath, c.outputDirectory);
     }
 
     // TODO invalidate cache when VSCode notifies us config file has changed
