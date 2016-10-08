@@ -128,7 +128,10 @@ task vscodeClasspathFile {
     outputs.file destFile
     doLast {
         def classpathString = configurations.compile.collect{ it.absolutePath }.join(File.pathSeparator)
-        assert destFile.parentFile.mkdir()
+        if (!destFile.parentFile.exists()) {
+            destFile.parentFile.mkdirs()
+        }
+        assert destFile.parentFile.exists()
         destFile.text = classpathString
     }
 }
