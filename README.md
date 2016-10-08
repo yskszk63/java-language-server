@@ -127,7 +127,7 @@ task vscodeClasspathFile {
     ext.destFile = file("$buildDir/classpath.txt")
     outputs.file destFile
     doLast {
-        def classpathString = configurations.compile.collect{ it.absolutePath }.join(':')
+        def classpathString = configurations.compile.collect{ it.absolutePath }.join(File.pathSeparator)
         assert destFile.parentFile.mkdir()
         destFile.text = classpathString
     }
