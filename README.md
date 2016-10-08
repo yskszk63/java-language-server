@@ -145,7 +145,7 @@ task vscodeJavaconfigFile(dependsOn: vscodeClasspathFile) {
     ext.destFile = file("javaconfig.json")
     ext.config = [
         sourcePath: sourceSets.collect{ it.java.srcDirs }.flatten().collect{ relativePath(it) },
-        classPathFile: relativePath(tasks.getByPath(':vscodeClasspathFile').outputs.files.singleFile),
+        classPathFile: relativePath(tasks.getByPath('vscodeClasspathFile').outputs.files.singleFile),
         outputDirectory: relativePath(new File(buildDir, 'vscode-classes'))
     ]
     doLast {
