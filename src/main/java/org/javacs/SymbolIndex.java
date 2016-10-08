@@ -21,12 +21,8 @@ import io.typefox.lsapi.*;
 import io.typefox.lsapi.impl.*;
 
 /**
- * Global index of symbol declarations and references.
- * 
- * For all source files on the source path, we index exported declarations and references, 
+ * Global index of exported symbol declarations and references.
  * such as classes, methods, and fields.
- * 
- * For all source files that are active in the editor, we index local variables as well.
  */
 public class SymbolIndex {
     private static final Logger LOG = Logger.getLogger("main");
@@ -50,14 +46,9 @@ public class SymbolIndex {
     private Map<URI, SourceFileIndex> sourcePath = new HashMap<>();
 
     /**
-     * Active files, for which we index locals
+     * Files that are open in the editor. Some functions need to access these.
      */
     private Map<URI, JCTree.JCCompilationUnit> activeDocuments = new HashMap<>();
-
-    @FunctionalInterface
-    public interface ReportDiagnostics {
-        void report(Collection<Path> paths, DiagnosticCollector<JavaFileObject> diagnostics);
-    }
     
     public SymbolIndex(Set<Path> classPath, 
                        Set<Path> sourcePath, 
@@ -65,6 +56,8 @@ public class SymbolIndex {
         JavacHolder compiler = new JavacHolder(classPath, sourcePath, outputDirectory);
         Indexer indexer = new Indexer(compiler.context);
 
+        // Index exported declarations and references for all files on the source path
+        // This may take a while, so we'll do it on an extra thread
         Thread worker = new Thread("InitialIndex") {
             List<JCTree.JCCompilationUnit> parsed = new ArrayList<>();
             List<Path> paths = new ArrayList<>();
@@ -114,6 +107,9 @@ public class SymbolIndex {
         worker.start();
     }
 
+    /**
+     * Search all indexed symbols
+     */
     public Stream<? extends SymbolInformation> search(String query) {
         Stream<SymbolInformation> classes = allSymbols(ElementKind.CLASS);
         Stream<SymbolInformation> methods = allSymbols(ElementKind.METHOD);
@@ -122,6 +118,9 @@ public class SymbolIndex {
                      .filter(s -> containsCharsInOrder(s.getName(), query));
     }
 
+    /**
+     * Get all symbols in an open file
+     */
     public Stream<? extends SymbolInformation> allInFile(URI source) { 
         SourceFileIndex index = sourcePath.getOrDefault(source, new SourceFileIndex());
         
@@ -138,6 +137,9 @@ public class SymbolIndex {
                              .stream();
     }
 
+    /**
+     * Find all references to a symbol
+     */
     public Stream<? extends Location> references(Symbol symbol) {
         // For indexed symbols, just look up the precomputed references
         if (shouldIndex(symbol)) {
