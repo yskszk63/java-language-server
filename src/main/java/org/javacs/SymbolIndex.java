@@ -20,6 +20,14 @@ import com.sun.tools.javac.util.Name;
 import io.typefox.lsapi.*;
 import io.typefox.lsapi.impl.*;
 
+/**
+ * Global index of symbol declarations and references.
+ * 
+ * For all source files on the source path, we index exported declarations and references, 
+ * such as classes, methods, and fields.
+ * 
+ * For all source files that are active in the editor, we index local variables as well.
+ */
 public class SymbolIndex {
     private static final Logger LOG = Logger.getLogger("main");
 
@@ -28,6 +36,9 @@ public class SymbolIndex {
      */
     public final CompletableFuture<Void> initialIndexComplete = new CompletableFuture<>();
 
+    /**
+     * Contains all symbol declarations and referencs in a single source file 
+     */
     private static class SourceFileIndex {
         private final EnumMap<ElementKind, Map<String, SymbolInformation>> declarations = new EnumMap<>(ElementKind.class);
         private final EnumMap<ElementKind, Map<String, Set<Location>>> references = new EnumMap<>(ElementKind.class);
