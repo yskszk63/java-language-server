@@ -127,8 +127,11 @@ task vscodeClasspathFile {
     ext.destFile = file("$buildDir/classpath.txt")
     outputs.file destFile
     doLast {
-        def classpathString = configurations.compile.collect{ it.absolutePath }.join(':')
-        assert destFile.parentFile.mkdir()
+        def classpathString = configurations.compile.collect{ it.absolutePath }.join(File.pathSeparator)
+        if (!destFile.parentFile.exists()) {
+            destFile.parentFile.mkdirs()
+        }
+        assert destFile.parentFile.exists()
         destFile.text = classpathString
     }
 }
@@ -142,7 +145,7 @@ task vscodeJavaconfigFile(dependsOn: vscodeClasspathFile) {
     ext.destFile = file("javaconfig.json")
     ext.config = [
         sourcePath: sourceSets.collect{ it.java.srcDirs }.flatten().collect{ relativePath(it) },
-        classPathFile: relativePath(tasks.getByPath(':vscodeClasspathFile').outputs.files.singleFile),
+        classPathFile: relativePath(tasks.getByPath('vscodeClasspathFile').outputs.files.singleFile),
         outputDirectory: relativePath(new File(buildDir, 'vscode-classes'))
     ]
     doLast {
@@ -160,6 +163,20 @@ task vscode(dependsOn: vscodeJavaconfigFile) {
 Then run `gradlew vscode`. This will generate
 * `javaconfig.json`
 * `build/classpath.txt`
+
+### Gradle Android build
+
+For Android gradle project, put the above tasks in the `android` method of your `build.gradle`:
+```gradle
+android {
+    ...
+    // add the vscode tasks inside the android method
+    task vscodeClasspathFile {
+    ...    
+}
+```
+
+Currently, the generated `classpath.txt` does not contain android platform library, e.g., `/opt/android-sdk-linux/platforms/android-23/android.jar`. You would need to add it manually. See issue #23.
 
 ## Directory structure
 
