@@ -718,23 +718,16 @@ class JavaLanguageServer implements LanguageServer {
         int character = params.getPosition().getCharacter();
         List<Location> result = new ArrayList<>();
 
-        findSymbol(uri, line, character).ifPresent(symbol -> {
-            getFilePath(uri).ifPresent(path -> {
+        getFilePath(uri).ifPresent(path -> {
+            JCTree.JCCompilationUnit compilationUnit = findTree(path);
+
+            findSymbol(compilationUnit, line, character).ifPresent(symbol -> {
                 if (SymbolIndex.shouldIndex(symbol)) {
                     SymbolIndex index = findIndex(path);
 
                     index.references(symbol).forEach(result::add);
                 }
                 else {
-                    JavacHolder compiler = findCompiler(path);
-                    JavaFileObject file = findFile(compiler, path);
-
-                    compiler.onError(err -> {});
-
-                    JCTree.JCCompilationUnit compilationUnit = compiler.parse(file);
-
-                    compiler.compile(compilationUnit);
-
                     compilationUnit.accept(new TreeScanner() {
                         @Override
                         public void visitSelect(JCTree.JCFieldAccess tree) {
@@ -778,22 +771,30 @@ class JavaLanguageServer implements LanguageServer {
         }).orElse(Collections.emptyList());
     }
 
-    public Optional<Symbol> findSymbol(URI uri, int line, int character) {
-        return getFilePath(uri).flatMap(path -> {
+    public JCTree.JCCompilationUnit findTree(Path path) {
+        JavacHolder compiler = findCompiler(path);
+        SymbolIndex index = findIndex(path);
+        JavaFileObject file = findFile(compiler, path);
+
+        compiler.onError(err -> {});
+
+        JCTree.JCCompilationUnit tree = compiler.parse(file);
+
+        compiler.compile(tree);
+
+        // TODO compiler should do this automatically
+        index.update(tree, compiler.context);
+
+        return tree;
+    }
+
+    public Optional<Symbol> findSymbol(JCTree.JCCompilationUnit tree, int line, int character) {
+        JavaFileObject file = tree.getSourceFile();
+
+        return getFilePath(file.toUri()).flatMap(path -> {
             JavacHolder compiler = findCompiler(path);
-            SymbolIndex index = findIndex(path);
-            JavaFileObject file = findFile(compiler, path);
             long cursor = findOffset(file, line, character);
             SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, cursor, compiler.context);
-
-            compiler.onError(err -> {});
-
-            JCTree.JCCompilationUnit tree = compiler.parse(file);
-
-            compiler.compile(tree);
-
-            // TODO compiler should do this automatically
-            index.update(tree, compiler.context);
 
             tree.accept(visitor);
 
@@ -807,8 +808,10 @@ class JavaLanguageServer implements LanguageServer {
         int character = position.getPosition().getCharacter();
         List<Location> result = new ArrayList<>();
 
-        findSymbol(uri, line, character).ifPresent(symbol -> {
-            getFilePath(uri).ifPresent(path -> {
+        getFilePath(uri).ifPresent(path -> {
+            JCTree.JCCompilationUnit compilationUnit = findTree(path);
+
+            findSymbol(compilationUnit, line, character).ifPresent(symbol -> {
                 if (SymbolIndex.shouldIndex(symbol)) {
                     SymbolIndex index = findIndex(path);
 
@@ -817,15 +820,6 @@ class JavaLanguageServer implements LanguageServer {
                     });
                 }
                 else {
-                    JavacHolder compiler = findCompiler(path);
-                    JavaFileObject file = findFile(compiler, path);
-
-                    compiler.onError(err -> {});
-
-                    JCTree.JCCompilationUnit compilationUnit = compiler.parse(file);
-
-                    compiler.compile(compilationUnit);
-
                     JCTree symbolTree = TreeInfo.declarationFor(symbol, compilationUnit);
 
                     if (symbolTree != null)
@@ -947,17 +941,14 @@ class JavaLanguageServer implements LanguageServer {
 
         result.setContents(contents);
 
-        Optional<Path> maybePath = getFilePath(URI.create(position.getTextDocument().getUri()));
+        URI uri = URI.create(position.getTextDocument().getUri());
+        int line = position.getPosition().getLine();
+        int character = position.getPosition().getCharacter();
 
-        if (maybePath.isPresent()) {
-            Path path = maybePath.get();
-            Optional<Symbol> found = findSymbol(path.toUri(),
-                                                position.getPosition().getLine(),
-                                                position.getPosition().getCharacter()
-            );
-            if (found.isPresent()) {
-                Symbol symbol = found.get();
-                
+        getFilePath(uri).ifPresent(path -> {
+            JCTree.JCCompilationUnit compilationUnit = findTree(path);
+
+            findSymbol(compilationUnit, line, character).ifPresent(symbol -> {
                 switch (symbol.getKind()) {
                     case PACKAGE:
                         contents.add(markedString("package " + symbol.getQualifiedName()));
@@ -986,7 +977,7 @@ class JavaLanguageServer implements LanguageServer {
                         Symbol.MethodSymbol method = (Symbol.MethodSymbol) symbol;
                         String signature = AutocompleteVisitor.methodSignature(method);
                         String returnType = ShortTypePrinter.print(method.getReturnType());
-                        
+
                         contents.add(markedString(returnType + " " + signature));
 
                         break;
@@ -1003,9 +994,9 @@ class JavaLanguageServer implements LanguageServer {
                     case RESOURCE_VARIABLE:
                         break;
                 }
-            }
-        }
-        
+            });
+        });
+
         return result;
     }
 

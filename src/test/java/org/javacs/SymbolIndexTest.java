@@ -96,13 +96,7 @@ public class SymbolIndexTest {
     }
 
     private Symbol symbol(String path, int line, int character) {
-        try {
-            URI uri = GetResourceFileObject.class.getResource(path).toURI();
-
-            return new JavaLanguageServer(compiler).findSymbol(uri, line, character).orElse(null);
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
+        return new JavaLanguageServer(compiler).findSymbol(compile(path), line, character).orElse(null);
     }
 
     private JCTree.JCCompilationUnit compile(String path) {
