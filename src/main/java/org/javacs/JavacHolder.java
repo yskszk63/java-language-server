@@ -197,7 +197,7 @@ public class JavacHolder {
     }
 
     /**
-     * Remove source file from caches in the parse stage
+     * Clear a file from javac's internal caches
      */
     public void clear(JavaFileObject source) {
         // TODO clear dependencies as well (dependencies should get stored in SymbolIndex)
@@ -227,6 +227,7 @@ public class JavacHolder {
 
     }
 
+    /** Reflectively invokes Types.closureCache.remove(Type) */
     private static Consumer<Type> closureCacheRemover(Types types) {
         try {
             Field closureCache = Types.class.getDeclaredField("closureCache");
@@ -241,6 +242,7 @@ public class JavacHolder {
         }
     }
 
+    /** Reflectively invokes Log.sourceMap.remove(JavaFileObject) */
     private static Consumer<JavaFileObject> logRemover(Log log) {
         try {
             Field sourceMap = AbstractLog.class.getDeclaredField("sourceMap");
