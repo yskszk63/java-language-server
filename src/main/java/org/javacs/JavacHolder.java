@@ -38,8 +38,11 @@ import java.util.logging.Logger;
  */
 public class JavacHolder {
     private static final Logger LOG = Logger.getLogger("main");
+    /** Where this javac looks for library .class files */
     public final Set<Path> classPath;
+    /** Where this javac looks for .java source files */
     public final Set<Path> sourcePath;
+    /** Where this javac places generated .class files */
     public final Path outputDirectory;
     // javac places all of its internal state into this Context object,
     // which is basically a Map<String, Object>
