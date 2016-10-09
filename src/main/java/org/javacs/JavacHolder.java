@@ -76,8 +76,9 @@ public class JavacHolder {
         options.put("-Xlint:varargs", "");
         options.put("-Xlint:static", "");
     }
+
+    // Pre-register some custom components before javac initializes
     
-    // IncrementalLog registers itself in context and pre-empts the normal Log from being created
     private final Log log = Log.instance(context);
 
     {
@@ -87,14 +88,18 @@ public class JavacHolder {
     public final JavacFileManager fileManager = new JavacFileManager(context, true, null);
     private final ForgivingAttr attr = ForgivingAttr.instance(context);
     private final Check check = Check.instance(context);
-    // FuzzyParserFactory registers itself in context and pre-empts the normal ParserFactory from being created
     private final FuzzyParserFactory parserFactory = FuzzyParserFactory.instance(context);
+    
+    // Initialize javac
+
     public final JavaCompiler compiler = JavaCompiler.instance(context);
 
     {
         // We're going to use the javadoc comments
         compiler.keepComments = true;
     }
+
+    // javac has already been initialized, fetch a few components for easy access
 
     private final Todo todo = Todo.instance(context);
     private final JavacTrees trees = JavacTrees.instance(context);
@@ -129,6 +134,9 @@ public class JavacHolder {
         clearOutputDirectory(outputDirectory);
     }
 
+    /** 
+     * Ensure output directory exists 
+     */
     private void ensureOutputDirectory(Path dir) {
         if (!Files.exists(dir)) {
             try {
@@ -141,6 +149,9 @@ public class JavacHolder {
             throw ShowMessageException.error("Output directory " + dir + " is not a directory", null);
     }
 
+    /** 
+     * Set all .class files to modified-at 1970 so javac won't skip them when we invoke it 
+     */
     private static void clearOutputDirectory(Path file) {
         try {
             if (file.getFileName().toString().endsWith(".class")) {
@@ -173,6 +184,11 @@ public class JavacHolder {
         return result;
     }
 
+    /**
+     * Compile a set of parsed files.
+     * 
+     * If these files reference un-parsed dependencies, those dependencies will also be parsed and compiled.
+     */
     public void compile(Collection<JCTree.JCCompilationUnit> parsed) {
         compiler.processAnnotations(compiler.enterTrees(com.sun.tools.javac.util.List.from(parsed)));
 
@@ -222,7 +238,9 @@ public class JavacHolder {
 
     }
 
-    /** Reflectively invokes Types.closureCache.remove(Type) */
+    /** 
+     * Reflectively invokes Types.closureCache.remove(Type) 
+     */
     private static Consumer<Type> closureCacheRemover(Types types) {
         try {
             Field closureCache = Types.class.getDeclaredField("closureCache");
@@ -237,7 +255,9 @@ public class JavacHolder {
         }
     }
 
-    /** Reflectively invokes Log.sourceMap.remove(JavaFileObject) */
+    /** 
+     * Reflectively invokes Log.sourceMap.remove(JavaFileObject) 
+     */
     private static Consumer<JavaFileObject> logRemover(Log log) {
         try {
             Field sourceMap = AbstractLog.class.getDeclaredField("sourceMap");
