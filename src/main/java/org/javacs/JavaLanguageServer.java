@@ -440,7 +440,7 @@ class JavaLanguageServer implements LanguageServer {
     /**
      * Look for a configuration in a parent directory of uri
      */
-    public JavacHolder findCompiler(Path path) {
+    private JavacHolder findCompiler(Path path) {
         if (testJavac.isPresent())
             return testJavac.get();
 
@@ -464,7 +464,7 @@ class JavaLanguageServer implements LanguageServer {
 
     private Map<JavacConfig, SymbolIndex> indexCache = new HashMap<>();
 
-    public SymbolIndex findIndex(Path path) {
+    private SymbolIndex findIndex(Path path) {
         Path dir = path.getParent();
         Optional<JavacConfig> config = findConfig(dir);
         Optional<SymbolIndex> index = config.map(c -> indexCache.computeIfAbsent(c, this::newIndex));
@@ -502,7 +502,7 @@ class JavaLanguageServer implements LanguageServer {
     /**
      * If directory contains a config file, for example javaconfig.json or an eclipse project file, read it.
      */
-    public Optional<JavacConfig> readIfConfig(Path dir) {
+    private Optional<JavacConfig> readIfConfig(Path dir) {
         if (Files.exists(dir.resolve("javaconfig.json"))) {
             JavaConfigJson json = readJavaConfigJson(dir.resolve("javaconfig.json"));
             Set<Path> classPath = json.classPathFile.map(classPathFile -> {
@@ -560,7 +560,7 @@ class JavaLanguageServer implements LanguageServer {
         }
     }
 
-    public static String getMvnCommand() {
+    private static String getMvnCommand() {
         String mvnCommand = "mvn";
         if (File.separatorChar == '\\') {
             mvnCommand = findExecutableOnPath("mvn.cmd");
@@ -571,7 +571,7 @@ class JavaLanguageServer implements LanguageServer {
         return mvnCommand;
     }
 
-    public static String findExecutableOnPath(String name) {
+    private static String findExecutableOnPath(String name) {
         for (String dirname : System.getenv("PATH").split(File.pathSeparator)) {
             File file = new File(dirname, name);
             if (file.isFile() && file.canExecute()) {
@@ -581,7 +581,7 @@ class JavaLanguageServer implements LanguageServer {
         return null;
     }
 
-    public static Set<Path> sourceDirectories(Path pomXml) {
+    private static Set<Path> sourceDirectories(Path pomXml) {
         try {
             Set<Path> all = new HashSet<>();
 
@@ -654,7 +654,7 @@ class JavaLanguageServer implements LanguageServer {
         }
     }
 
-    public JavaFileObject findFile(JavacHolder compiler, Path path) {
+    private JavaFileObject findFile(JavacHolder compiler, Path path) {
         if (sourceByPath.containsKey(path))
             return new StringFileObject(sourceByPath.get(path), path);
         else
@@ -771,7 +771,7 @@ class JavaLanguageServer implements LanguageServer {
         }).orElse(Collections.emptyList());
     }
 
-    public JCTree.JCCompilationUnit findTree(Path path) {
+    private JCTree.JCCompilationUnit findTree(Path path) {
         JavacHolder compiler = findCompiler(path);
         SymbolIndex index = findIndex(path);
         JavaFileObject file = findFile(compiler, path);
@@ -899,7 +899,7 @@ class JavaLanguageServer implements LanguageServer {
         return p;
     }
 
-    public static long findOffset(JavaFileObject file, int targetLine, int targetCharacter) {
+    private static long findOffset(JavaFileObject file, int targetLine, int targetCharacter) {
         try (Reader in = file.openReader(true)) {
             long offset = 0;
             int line = 0;
@@ -935,7 +935,7 @@ class JavaLanguageServer implements LanguageServer {
         }
     }
     
-    public HoverImpl doHover(TextDocumentPositionParams position) {
+    private HoverImpl doHover(TextDocumentPositionParams position) {
         HoverImpl result = new HoverImpl();
         List<MarkedStringImpl> contents = new ArrayList<>();
 
