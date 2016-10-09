@@ -33,7 +33,7 @@ class JavaLanguageServer implements LanguageServer {
     private Path workspaceRoot;
     private Consumer<PublishDiagnosticsParams> publishDiagnostics = p -> {};
     private Consumer<MessageParams> showMessage = m -> {};
-    private Map<Path, String> sourceByPath = new HashMap<>();
+    private Map<Path, String> activeDocuments = new HashMap<>();
 
     public JavaLanguageServer() {
         this.testJavac = Optional.empty();
@@ -183,15 +183,15 @@ class JavaLanguageServer implements LanguageServer {
                 try {
                     TextDocumentItem document = params.getTextDocument();
                     URI uri = URI.create(document.getUri());
-                    Optional<Path> path = getFilePath(uri);
+                    Optional<Path> maybePath = getFilePath(uri);
 
-                    if (path.isPresent()) {
+                    maybePath.ifPresent(path -> {
                         String text = document.getText();
 
-                        sourceByPath.put(path.get(), text);
+                        activeDocuments.put(path, text);
 
-                        doLint(path.get());
-                    }
+                        doLint(path);
+                    });
                 } catch (NoJavaConfigException e) {
                     throw ShowMessageException.warning(e.getMessage(), e);
                 }
@@ -206,12 +206,12 @@ class JavaLanguageServer implements LanguageServer {
                 if (path.isPresent()) {
                     for (TextDocumentContentChangeEvent change : params.getContentChanges()) {
                         if (change.getRange() == null)
-                            sourceByPath.put(path.get(), change.getText());
+                            activeDocuments.put(path.get(), change.getText());
                         else {
-                            String existingText = sourceByPath.get(path.get());
+                            String existingText = activeDocuments.get(path.get());
                             String newText = patch(existingText, change);
 
-                            sourceByPath.put(path.get(), newText);
+                            activeDocuments.put(path.get(), newText);
                         }
                     }
                 }
@@ -228,7 +228,7 @@ class JavaLanguageServer implements LanguageServer {
                     JavaFileObject file = findFile(compiler, path.get());
                     
                     // Remove from source cache
-                    sourceByPath.remove(path.get());
+                    activeDocuments.remove(path.get());
                 }
             }
 
@@ -236,11 +236,15 @@ class JavaLanguageServer implements LanguageServer {
             public void didSave(DidSaveTextDocumentParams params) {
                 TextDocumentIdentifier document = params.getTextDocument();
                 URI uri = URI.create(document.getUri());
-                Optional<Path> path = getFilePath(uri);
+                Optional<Path> maybePath = getFilePath(uri);
 
-                // TODO re-lint dependencies as well as changed files
-                if (path.isPresent())
-                    doLint(path.get());
+                // Re-lint all active documents
+                // 
+                // We would prefer to just re-lint the documents that the user can see
+                // But there is no didSwitchTo(document) event, so we have no way of knowing when the user switches between tabs
+                // Therefore, we just re-lint all open editors
+                if (maybePath.isPresent()) 
+                    doLint(activeDocuments.keySet());
             }
 
             @Override
@@ -296,24 +300,48 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private void doLint(Path path) {
-        LOG.info("Lint " + path);
+        doLint(Collections.singleton(path));
+    }
+
+    private void doLint(Collection<Path> paths) {
+        LOG.info("Lint " + paths);
 
         DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
 
-        JavacHolder compiler = findCompiler(path);
-        SymbolIndex index = findIndex(path);
-        JavaFileObject file = findFile(compiler, path);
+        Map<JavacConfig, Set<JCTree.JCCompilationUnit>> parsedByConfig = new HashMap<>();
 
-        compiler.onError(errors);
+        // Parse all files and group them by compiler
+        for (Path path : paths) {
+            findConfig(path).ifPresent(config -> {
+                Set<JCTree.JCCompilationUnit> collect = parsedByConfig.computeIfAbsent(config, newCompiler -> new HashSet<>());
 
-        JCTree.JCCompilationUnit parsed = compiler.parse(file);
+                // Find the relevant compiler
+                JavacHolder compiler = findCompilerForConfig(config);
 
-        compiler.compile(parsed);
+                compiler.onError(errors);
 
-        // TODO compiler should do this automatically
-        index.update(parsed, compiler.context);
+                // Parse the file
+                JavaFileObject file = findFile(compiler, path);
+                JCTree.JCCompilationUnit parsed = compiler.parse(file);
 
-        publishDiagnostics(Collections.singleton(path), errors);
+                collect.add(parsed);
+            });
+        }
+
+
+        for (JavacConfig config : parsedByConfig.keySet()) {
+            Set<JCTree.JCCompilationUnit> parsed = parsedByConfig.get(config);
+            JavacHolder compiler = findCompilerForConfig(config);
+            SymbolIndex index = findIndexForConfig(config);
+
+            compiler.compile(parsed);
+
+            // TODO compiler should do this automatically
+            for (JCTree.JCCompilationUnit compilationUnit : parsed) 
+                index.update(compilationUnit, compiler.context);
+        }
+
+        publishDiagnostics(paths, errors);
     }
 
     @Override
@@ -445,15 +473,17 @@ class JavaLanguageServer implements LanguageServer {
             return testJavac.get();
 
         Path dir = path.getParent();
-        Optional<JavacConfig> config = findConfig(dir);
         
-        // If config source path doesn't contain source file, then source file has no config
-        if (config.isPresent() && !config.get().sourcePath.stream().anyMatch(s -> path.startsWith(s)))
-            throw new NoJavaConfigException(path.getFileName() + " is not on the source path");
-        
-        Optional<JavacHolder> maybeHolder = config.map(c -> compilerCache.computeIfAbsent(c, this::newJavac));
+        return findConfig(dir)
+            .map(this::findCompilerForConfig)
+            .orElseThrow(() -> new NoJavaConfigException(path));
+    }
 
-        return maybeHolder.orElseThrow(() -> new NoJavaConfigException(path));
+    private JavacHolder findCompilerForConfig(JavacConfig config) {
+        if (testJavac.isPresent())
+            return testJavac.get();
+        else
+            return compilerCache.computeIfAbsent(config, this::newJavac);
     }
 
     private JavacHolder newJavac(JavacConfig c) {
@@ -467,9 +497,13 @@ class JavaLanguageServer implements LanguageServer {
     private SymbolIndex findIndex(Path path) {
         Path dir = path.getParent();
         Optional<JavacConfig> config = findConfig(dir);
-        Optional<SymbolIndex> index = config.map(c -> indexCache.computeIfAbsent(c, this::newIndex));
+        Optional<SymbolIndex> index = config.map(this::findIndexForConfig);
 
         return index.orElseThrow(() -> new NoJavaConfigException(path));
+    }
+
+    private SymbolIndex findIndexForConfig(JavacConfig config) {
+        return indexCache.computeIfAbsent(config, this::newIndex);
     }
 
     private SymbolIndex newIndex(JavacConfig c) {
@@ -655,8 +689,8 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private JavaFileObject findFile(JavacHolder compiler, Path path) {
-        if (sourceByPath.containsKey(path))
-            return new StringFileObject(sourceByPath.get(path), path);
+        if (activeDocuments.containsKey(path))
+            return new StringFileObject(activeDocuments.get(path), path);
         else
             return compiler.fileManager.getRegularFile(path.toFile());
     }
