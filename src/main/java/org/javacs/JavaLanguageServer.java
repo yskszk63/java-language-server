@@ -2,6 +2,8 @@ package org.javacs;
 
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.tree.TreeInfo;
+import com.sun.tools.javac.tree.TreeScanner;
 import io.typefox.lsapi.services.*;
 import io.typefox.lsapi.*;
 import io.typefox.lsapi.impl.*;
@@ -308,6 +310,7 @@ class JavaLanguageServer implements LanguageServer {
 
         compiler.compile(parsed);
 
+        // TODO compiler should do this automatically
         index.update(parsed, compiler.context);
 
         publishDiagnostics(Collections.singleton(path), errors);
@@ -716,8 +719,48 @@ class JavaLanguageServer implements LanguageServer {
         List<Location> result = new ArrayList<>();
 
         findSymbol(uri, line, character).ifPresent(symbol -> {
-            getFilePath(uri).map(this::findIndex).ifPresent(index -> {
-                index.references(symbol).forEach(result::add);
+            getFilePath(uri).ifPresent(path -> {
+                if (SymbolIndex.shouldIndex(symbol)) {
+                    SymbolIndex index = findIndex(path);
+
+                    index.references(symbol).forEach(result::add);
+                }
+                else {
+                    JavacHolder compiler = findCompiler(path);
+                    JavaFileObject file = findFile(compiler, path);
+
+                    compiler.onError(err -> {});
+
+                    JCTree.JCCompilationUnit compilationUnit = compiler.parse(file);
+
+                    compiler.compile(compilationUnit);
+
+                    compilationUnit.accept(new TreeScanner() {
+                        @Override
+                        public void visitSelect(JCTree.JCFieldAccess tree) {
+                            super.visitSelect(tree);
+
+                            if (tree.sym != null && tree.sym.equals(symbol))
+                                result.add(SymbolIndex.location(tree, compilationUnit));
+                        }
+
+                        @Override
+                        public void visitReference(JCTree.JCMemberReference tree) {
+                            super.visitReference(tree);
+
+                            if (tree.sym != null && tree.sym.equals(symbol))
+                                result.add(SymbolIndex.location(tree, compilationUnit));
+                        }
+
+                        @Override
+                        public void visitIdent(JCTree.JCIdent tree) {
+                            super.visitIdent(tree);
+
+                            if (tree.sym != null && tree.sym.equals(symbol))
+                                result.add(SymbolIndex.location(tree, compilationUnit));
+                        }
+                    });
+                }
             });
         });
 
@@ -749,6 +792,7 @@ class JavaLanguageServer implements LanguageServer {
 
             compiler.compile(tree);
 
+            // TODO compiler should do this automatically
             index.update(tree, compiler.context);
 
             tree.accept(visitor);
@@ -764,10 +808,29 @@ class JavaLanguageServer implements LanguageServer {
         List<Location> result = new ArrayList<>();
 
         findSymbol(uri, line, character).ifPresent(symbol -> {
-            getFilePath(uri).map(this::findIndex).ifPresent(index -> {
-                index.findSymbol(symbol).ifPresent(info -> {
-                    result.add(info.getLocation());
-                });
+            getFilePath(uri).ifPresent(path -> {
+                if (SymbolIndex.shouldIndex(symbol)) {
+                    SymbolIndex index = findIndex(path);
+
+                    index.findSymbol(symbol).ifPresent(info -> {
+                        result.add(info.getLocation());
+                    });
+                }
+                else {
+                    JavacHolder compiler = findCompiler(path);
+                    JavaFileObject file = findFile(compiler, path);
+
+                    compiler.onError(err -> {});
+
+                    JCTree.JCCompilationUnit compilationUnit = compiler.parse(file);
+
+                    compiler.compile(compilationUnit);
+
+                    JCTree symbolTree = TreeInfo.declarationFor(symbol, compilationUnit);
+
+                    if (symbolTree != null)
+                        result.add(SymbolIndex.location(symbolTree, compilationUnit));
+                }
             });
         });
 

@@ -44,11 +44,6 @@ public class SymbolIndex {
      * Source path files, for which we support methods and classes
      */
     private Map<URI, SourceFileIndex> sourcePath = new HashMap<>();
-
-    /**
-     * Files that are open in the editor. Some functions need to access these.
-     */
-    private Map<URI, JCTree.JCCompilationUnit> activeDocuments = new HashMap<>();
     
     public SymbolIndex(Set<Path> classPath, 
                        Set<Path> sourcePath, 
@@ -141,52 +136,14 @@ public class SymbolIndex {
      * Find all references to a symbol
      */
     public Stream<? extends Location> references(Symbol symbol) {
-        // For indexed symbols, just look up the precomputed references
-        if (shouldIndex(symbol)) {
-            String key = uniqueName(symbol);
+        String key = uniqueName(symbol);
 
-            return sourcePath.values().stream().flatMap(f -> {
-                Map<String, Set<Location>> bySymbol = f.references.getOrDefault(symbol.getKind(), Collections.emptyMap());
-                Set<Location> locations = bySymbol.getOrDefault(key, Collections.emptySet());
+        return sourcePath.values().stream().flatMap(f -> {
+            Map<String, Set<Location>> bySymbol = f.references.getOrDefault(symbol.getKind(), Collections.emptyMap());
+            Set<Location> locations = bySymbol.getOrDefault(key, Collections.emptySet());
 
-                return locations.stream();
-            });
-        }
-        // For non-indexed symbols, scan the active set
-        else {
-            return activeDocuments.values().stream().flatMap(compilationUnit -> {
-                List<LocationImpl> references = new ArrayList<>();
-
-                compilationUnit.accept(new TreeScanner() {
-                    @Override
-                    public void visitSelect(JCTree.JCFieldAccess tree) {
-                        super.visitSelect(tree);
-
-                        if (tree.sym != null && tree.sym.equals(symbol))
-                            references.add(location(tree, compilationUnit));
-                    }
-
-                    @Override
-                    public void visitReference(JCTree.JCMemberReference tree) {
-                        super.visitReference(tree);
-
-                        if (tree.sym != null && tree.sym.equals(symbol))
-                            references.add(location(tree, compilationUnit));
-                    }
-
-                    @Override
-                    public void visitIdent(JCTree.JCIdent tree) {
-                        super.visitIdent(tree);
-
-                        if (tree.sym != null && tree.sym.equals(symbol))
-                            references.add(location(tree, compilationUnit));
-                    }
-                });
-
-
-                return references.stream();
-            });
-        }
+            return locations.stream();
+        });
     }
 
     public Optional<SymbolInformation> findSymbol(Symbol symbol) {
@@ -198,13 +155,6 @@ public class SymbolIndex {
 
             if (withKind.containsKey(key))
                 return Optional.of(withKind.get(key));
-        }
-
-        for (JCTree.JCCompilationUnit compilationUnit : activeDocuments.values()) {
-            JCTree symbolTree = TreeInfo.declarationFor(symbol, compilationUnit);
-
-            if (symbolTree != null)
-                return Optional.of(symbolInformation(symbolTree, symbol, compilationUnit));
         }
 
         return Optional.empty();
@@ -320,7 +270,7 @@ public class SymbolIndex {
         }
     }
 
-    private static boolean shouldIndex(Symbol symbol) {
+    public static boolean shouldIndex(Symbol symbol) {
         ElementKind kind = symbol.getKind();
 
         switch (kind) {
@@ -359,7 +309,7 @@ public class SymbolIndex {
         return info;
     }
 
-    private static LocationImpl location(JCTree tree, JCTree.JCCompilationUnit compilationUnit) {
+    public static LocationImpl location(JCTree tree, JCTree.JCCompilationUnit compilationUnit) {
         try {
             // Declaration should include offset
             int offset = tree.pos;
@@ -507,16 +457,19 @@ public class SymbolIndex {
         }
     }
 
+    /**
+     * Update the index when a files changes
+     */
     public void update(JCTree.JCCompilationUnit tree, Context context) {
         Indexer indexer = new Indexer(context);
 
         tree.accept(indexer);
-
-        activeDocuments.put(tree.getSourceFile().toUri(), tree);
     }
 
+    /**
+     * Clear a file from the index when it is deleted
+     */
     public void clear(URI sourceFile) {
         sourcePath.remove(sourceFile);
-        activeDocuments.remove(sourceFile);
     }
 }

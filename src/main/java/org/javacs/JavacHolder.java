@@ -174,10 +174,17 @@ public class JavacHolder {
         compiler.processAnnotations(compiler.enterTrees(com.sun.tools.javac.util.List.from(parsed)));
 
         while (!todo.isEmpty()) {
-            // We don't do the desugar or generate phases, because they remove method bodies and methods
             Env<AttrContext> next = todo.remove();
-            Env<AttrContext> attributedTree = compiler.attribute(next);
-            Queue<Env<AttrContext>> analyzedTree = compiler.flow(attributedTree);
+
+            try {
+                // We don't do the desugar or generate phases, because they remove method bodies and methods
+                Env<AttrContext> attributedTree = compiler.attribute(next);
+                Queue<Env<AttrContext>> analyzedTree = compiler.flow(attributedTree);
+            } catch (Exception e) {
+                LOG.log(Level.SEVERE, "Error compiling " + next.toplevel.sourcefile.getName(), e);
+
+                // Keep going
+            }
         }
     }
     
