@@ -45,7 +45,7 @@ public class JavaCompilerTest {
         File file = Paths.get("src/test/resources/org/javacs/example/Bad.java").toFile();
         JCTree.JCCompilationUnit parsed = javac.parse(javac.fileManager.getRegularFile(file));
 
-        javac.compile(parsed);
+        javac.compile(Collections.singleton(parsed));
 
         LOG.info(parsed.toString());
     }

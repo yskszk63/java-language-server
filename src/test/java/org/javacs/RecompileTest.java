@@ -33,7 +33,7 @@ public class RecompileTest extends Fixtures {
 
         JCTree.JCCompilationUnit tree = compiler.parse(file);
 
-        compiler.compile(tree);
+        compiler.compile(Collections.singleton(tree));
 
         tree.accept(getClass);
 
@@ -43,7 +43,7 @@ public class RecompileTest extends Fixtures {
         // Compile again
         tree = compiler.parse(file);
 
-        compiler.compile(tree);
+        compiler.compile(Collections.singleton(tree));
 
         tree.accept(getClass);
 
@@ -90,7 +90,7 @@ public class RecompileTest extends Fixtures {
         DiagnosticCollector<JavaFileObject> badErrors = new DiagnosticCollector<>();
 
         compiler.onError(badErrors);
-        compiler.compile(compiler.parse(bad));
+        compiler.compile(Collections.singleton(compiler.parse(bad)));
 
         DiagnosticCollector<JavaFileObject> goodErrors = new DiagnosticCollector<>();
 
@@ -105,7 +105,7 @@ public class RecompileTest extends Fixtures {
 
         JCTree.JCCompilationUnit tree = compiler.parse(good);
 
-        compiler.compile(tree);
+        compiler.compile(Collections.singleton(tree));
 
         tree.accept(getClass);
 
@@ -127,7 +127,7 @@ public class RecompileTest extends Fixtures {
 
         // Compile once
         compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+        compiler.compile(Collections.singleton(compiler.parse(file)));
 
         assertThat(errors.getDiagnostics(), not(empty()));
 
@@ -135,7 +135,7 @@ public class RecompileTest extends Fixtures {
         errors = new DiagnosticCollector<>();
         compiler.onError(errors);
 
-        compiler.compile(compiler.parse(file));
+        compiler.compile(Collections.singleton(compiler.parse(file)));
 
         assertThat(errors.getDiagnostics(), not(empty()));
     }

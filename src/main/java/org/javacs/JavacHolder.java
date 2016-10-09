@@ -187,14 +187,6 @@ public class JavacHolder {
             }
         }
     }
-    
-    /**
-     * Compile a source tree produced by this.parse
-     */
-    // TODO inline
-    public void compile(JCTree.JCCompilationUnit source) {
-        compile(Collections.singleton(source));
-    }
 
     /**
      * Clear a file from javac's internal caches

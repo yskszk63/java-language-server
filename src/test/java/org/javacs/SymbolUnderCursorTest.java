@@ -6,12 +6,9 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import javax.tools.JavaFileObject;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 
@@ -93,7 +90,7 @@ public class SymbolUnderCursorTest extends Fixtures {
         JavaFileObject file = new GetResourceFileObject(path);
         JCTree.JCCompilationUnit tree = compiler.parse(file);
 
-        compiler.compile(tree);
+        compiler.compile(Collections.singleton(tree));
 
         return tree;
     }

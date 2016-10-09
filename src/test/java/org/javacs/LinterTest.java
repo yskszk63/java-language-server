@@ -27,7 +27,7 @@ public class LinterTest extends Fixtures {
         GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/HelloWorld.java");
         JavacHolder compiler = newCompiler();
         compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+        compiler.compile(Collections.singleton(compiler.parse(file)));
 
         assertThat(errors.getDiagnostics(), empty());
     }
@@ -43,7 +43,7 @@ public class LinterTest extends Fixtures {
 
         JCTree.JCCompilationUnit tree = compiler.parse(file);
 
-        compiler.compile(tree);
+        compiler.compile(Collections.singleton(tree));
 
         tree.accept(scanner);
 
@@ -61,7 +61,7 @@ public class LinterTest extends Fixtures {
 
         JCTree.JCCompilationUnit tree = compiler.parse(file);
 
-        compiler.compile(tree);
+        compiler.compile(Collections.singleton(tree));
 
         tree.accept(scanner);
 
@@ -75,7 +75,7 @@ public class LinterTest extends Fixtures {
 
         tree = compiler.parse(file);
 
-        compiler.compile(tree);
+        compiler.compile(Collections.singleton(tree));
 
         assertThat(errors.getDiagnostics(), not(empty()));
     }
@@ -94,7 +94,7 @@ public class LinterTest extends Fixtures {
 
         tree.accept(parsed);
 
-        compiler.compile(tree);
+        compiler.compile(Collections.singleton(tree));
 
         tree.accept(compiled);
 
@@ -114,7 +114,7 @@ public class LinterTest extends Fixtures {
 
         JCTree.JCCompilationUnit tree = compiler.parse(file);
 
-        compiler.compile(tree);
+        compiler.compile(Collections.singleton(tree));
 
         tree.accept(scanner);
 
@@ -140,7 +140,7 @@ public class LinterTest extends Fixtures {
 
         JCTree.JCCompilationUnit tree = compiler.parse(file);
 
-        compiler.compile(tree);
+        compiler.compile(Collections.singleton(tree));
 
         tree.accept(scanner);
 
@@ -160,7 +160,7 @@ public class LinterTest extends Fixtures {
         GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/NotJava.java.txt");
         JavacHolder compiler = newCompiler();
         compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+        compiler.compile(Collections.singleton(compiler.parse(file)));
 
         assertThat(errors.getDiagnostics(), not(empty()));
     }
@@ -171,7 +171,7 @@ public class LinterTest extends Fixtures {
         GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/ErrorInDependency.java");
         JavacHolder compiler = newCompiler();
         compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+        compiler.compile(Collections.singleton(compiler.parse(file)));
 
         assertThat(errors.getDiagnostics(), not(empty()));
     }
@@ -182,7 +182,7 @@ public class LinterTest extends Fixtures {
         GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/DeprecationWarning.java");
         JavacHolder compiler = newCompiler();
         compiler.onError(errors);
-        compiler.compile(compiler.parse(file));
+        compiler.compile(Collections.singleton(compiler.parse(file)));
 
         assertThat(errors.getDiagnostics(), not(empty()));
     }

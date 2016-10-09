@@ -814,7 +814,7 @@ class JavaLanguageServer implements LanguageServer {
 
         JCTree.JCCompilationUnit tree = compiler.parse(file);
 
-        compiler.compile(tree);
+        compiler.compile(Collections.singleton(tree));
 
         // TODO compiler should do this automatically
         index.update(tree, compiler.context);
@@ -1068,7 +1068,7 @@ class JavaLanguageServer implements LanguageServer {
             // There are often parse errors after the cursor, which can generate unrecoverable type errors
             ast.accept(new AutocompletePruner(withSemi, cursor, compiler.context));
 
-            compiler.compile(ast);
+            compiler.compile(Collections.singleton(ast));
 
             ast.accept(autocompleter);
 

@@ -1,22 +1,16 @@
 package org.javacs;
 
 import com.sun.tools.javac.code.Symbol;
-import io.typefox.lsapi.*;
+
 import javax.tools.*;
 import com.sun.tools.javac.tree.*;
-import org.junit.Ignore;
 import org.junit.Test;
 
-import java.io.*;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
@@ -103,7 +97,7 @@ public class SymbolIndexTest {
         JavaFileObject file = new GetResourceFileObject(path);
         JCTree.JCCompilationUnit tree = compiler.parse(file);
 
-        compiler.compile(tree);
+        compiler.compile(Collections.singleton(tree));
         index.update(tree, compiler.context);
 
         return tree;
