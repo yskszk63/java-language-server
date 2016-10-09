@@ -98,8 +98,8 @@ public class JavacHolder {
     private final Types types = Types.instance(context);
 
     public JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
-        this.classPath = classPath;
-        this.sourcePath = sourcePath;
+        this.classPath = Collections.unmodifiableSet(classPath);
+        this.sourcePath = Collections.unmodifiableSet(sourcePath);
         this.outputDirectory = outputDirectory;
 
         options.put("-classpath", Joiner.on(File.pathSeparator).join(classPath));
