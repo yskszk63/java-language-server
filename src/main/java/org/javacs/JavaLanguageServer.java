@@ -134,7 +134,7 @@ class JavaLanguageServer implements LanguageServer {
             }
 
             @Override
-            public CompletableFuture<DocumentHighlight> documentHighlight(TextDocumentPositionParams position) {
+            public CompletableFuture<List<? extends DocumentHighlight>> documentHighlight(TextDocumentPositionParams position) {
                 return null;
             }
 
@@ -1046,7 +1046,7 @@ class JavaLanguageServer implements LanguageServer {
     public CompletionList autocomplete(TextDocumentPositionParams position) {
         CompletionListImpl result = new CompletionListImpl();
 
-        result.setIncomplete(false);
+        result.setIsIncomplete(false);
         result.setItems(new ArrayList<>());
 
         Optional<Path> maybePath = getFilePath(URI.create(position.getTextDocument().getUri()));

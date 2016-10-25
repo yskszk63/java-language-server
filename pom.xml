@@ -35,7 +35,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
   <properties>
     <jackson-2-version>2.5.0</jackson-2-version>
     <jersey-2-version>2.10</jersey-2-version>
-    <lsApiVersion>0.3.0-SNAPSHOT</lsApiVersion>
+    <lsApiVersion>0.4.0-SNAPSHOT</lsApiVersion>
   </properties>
   <dependencies>
     <dependency>
