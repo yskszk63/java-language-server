@@ -178,6 +178,47 @@ android {
 
 Currently, the generated `classpath.txt` does not contain android platform library, e.g., `/opt/android-sdk-linux/platforms/android-23/android.jar`. You would need to add it manually. See issue #23.
 
+### SBT (Lightbend Activator)
+
+Add this to your `build.sbt` file to generate `classpath.txt` every time you execute the `compile` or `run` tasks. This has been tested with Lightbend Activator/sbt 0.13.11.
+
+```scala
+val genClasspath = taskKey[String]("Generate classpath.txt for use with VS Code.")
+
+genClasspath := {
+  val log = streams.value.log
+  val cp: Seq[File] = (dependencyClasspath in Compile).value.files
+ 
+  val file = baseDirectory.value / "classpath.txt"
+  log.info("Writing classpath details to: " + file.getAbsolutePath)
+  IO.write(file, cp.map(_.getAbsolutePath).mkString(java.io.File.pathSeparator))
+  file.getAbsolutePath
+}
+
+// Generate classpath.txt every time you compile or run the project
+compile in Compile <<= (compile in Compile).dependsOn(genClasspath)
+run in Compile <<= (run in Compile).dependsOn(genClasspath)
+
+``` 
+
+#### javaconfig.json
+
+Add this file and configure `sourcePath` and `outputDirectory` as needed:
+```json
+{
+    "sourcePath": ["app"],
+    "classPathFile": "classpath.txt",
+    "outputDirectory": "target"
+}
+```
+
+#### .gitignore
+
+Ignore `classpath.txt`, since it will be different on every host
+
+    classpath.txt
+    ...
+
 ## Directory structure
 
 ### Java service process
