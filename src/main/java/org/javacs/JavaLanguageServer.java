@@ -359,8 +359,8 @@ class JavaLanguageServer implements LanguageServer {
             }
 
             @Override
-            public void didChangeConfiguraton(DidChangeConfigurationParams params) {
-                
+            public void didChangeConfiguration(DidChangeConfigurationParams didChangeConfigurationParams) {
+
             }
 
             @Override
