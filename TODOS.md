@@ -10,6 +10,7 @@
 * Hover shows javadoc if available
 * Hover show FQ types if not imported
 * Javadoc path for hover, autocomplete
+* Autocomplete @Override into method def
 
 ## Features 
 * Go-to-subclasses
