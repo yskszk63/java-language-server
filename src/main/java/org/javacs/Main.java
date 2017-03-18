@@ -7,18 +7,12 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
-import io.typefox.lsapi.Message;
-import io.typefox.lsapi.services.json.LanguageServerToJsonAdapter;
-import io.typefox.lsapi.services.json.MessageJsonHandler;
-import io.typefox.lsapi.services.json.StreamMessageReader;
-import io.typefox.lsapi.services.json.StreamMessageWriter;
-import io.typefox.lsapi.services.launch.LanguageServerLauncher;
-import io.typefox.lsapi.services.transport.io.ConcurrentMessageReader;
-import io.typefox.lsapi.services.transport.io.MessageReader;
-import io.typefox.lsapi.services.transport.server.LanguageServerEndpoint;
-import io.typefox.lsapi.services.transport.trace.MessageTracer;
+import org.eclipse.lsp4j.jsonrpc.Launcher;
+import org.eclipse.lsp4j.launch.LSPLauncher;
+import org.eclipse.lsp4j.services.LanguageClient;
 
 import java.net.InetSocketAddress;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
 import java.io.*;
@@ -62,8 +56,6 @@ public class Main {
 
     public static void main(String[] args) throws IOException {
         try {
-            LoggingFormat.startLogging();
-
             Connection connection = connectToNode();
 
             run(connection);
@@ -77,32 +69,26 @@ public class Main {
     private static Connection connectToNode() throws IOException {
         String port = System.getProperty("javacs.port");
 
-        if (port != null) {
-            Socket socket = new Socket("localhost", Integer.parseInt(port));
+        Objects.requireNonNull(port, "-Djavacs.port=? is required");
 
-            InputStream in = socket.getInputStream();
-            OutputStream out = socket.getOutputStream();
+        LOG.info("Connecting to " + port);
 
-            OutputStream intercept = new OutputStream() {
+        Socket socket = new Socket("localhost", Integer.parseInt(port));
 
-                @Override
-                public void write(int b) throws IOException {
-                    out.write(b);
-                }
-            };
+        InputStream in = socket.getInputStream();
+        OutputStream out = socket.getOutputStream();
 
-            LOG.info("Connected to parent using socket on port " + port);
+        OutputStream intercept = new OutputStream() {
 
-            return new Connection(in, intercept);
-        }
-        else {
-            InputStream in = System.in;
-            PrintStream out = System.out;
+            @Override
+            public void write(int b) throws IOException {
+                out.write(b);
+            }
+        };
 
-            LOG.info("Connected to parent using stdio");
+        LOG.info("Connected to parent using socket on port " + port);
 
-            return new Connection(in, out);
-        }
+        return new Connection(in, intercept);
     }
 
     private static class Connection {
@@ -121,33 +107,11 @@ public class Main {
      * When the request stream is closed, wait for 5s for all outstanding responses to compute, then return.
      */
     public static void run(Connection connection) {
-        MessageJsonHandler handler = new MessageJsonHandler();
-        StreamMessageReader reader = new StreamMessageReader(connection.in, handler);
-        StreamMessageWriter writer = new StreamMessageWriter(connection.out, handler);
         JavaLanguageServer server = new JavaLanguageServer();
-        LanguageServerEndpoint endpoint = new LanguageServerEndpoint(server);
+        Launcher<LanguageClient> launcher = LSPLauncher.createServerLauncher(server, connection.in, connection.out);
 
-        endpoint.setMessageTracer(new MessageTracer() {
-            @Override
-            public void onError(String message, Throwable err) {
-                LOG.log(Level.SEVERE, message, err);
-            }
-
-            @Override
-            public void onRead(Message message, String s) {
-
-            }
-
-            @Override
-            public void onWrite(Message message, String s) {
-
-            }
-        });
-
-        reader.setOnError(err -> LOG.log(Level.SEVERE, err.getMessage(), err));
-        writer.setOnError(err -> LOG.log(Level.SEVERE, err.getMessage(), err));
-
-        endpoint.connect(reader, writer);
+        server.installClient(launcher.getRemoteProxy());
+        launcher.startListening();
 
         LOG.info("Connection closed");
     }

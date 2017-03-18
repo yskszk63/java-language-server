@@ -273,8 +273,7 @@ the parent directory of each javaconfig.json will be treated as a separate java 
 
 ## Logs
 
-The java service process will output a log file with a name like 'javac-services.0.log'
-in your project directory.
+The java service process will output a log file to stdout, which is visible using View / Output.
 
 ## Contributing
 

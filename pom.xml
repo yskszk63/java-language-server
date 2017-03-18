@@ -45,19 +45,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
     </dependency>
     <!-- Java implementation of VS Code language server protocol -->
     <dependency>
-      <groupId>io.typefox.lsapi</groupId>
-      <artifactId>io.typefox.lsapi</artifactId>
-      <version>${lsApiVersion}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.typefox.lsapi</groupId>
-      <artifactId>io.typefox.lsapi.services</artifactId>
-      <version>${lsApiVersion}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.typefox.lsapi</groupId>
-      <artifactId>io.typefox.lsapi.annotations</artifactId>
-      <version>${lsApiVersion}</version>
+      <groupId>org.eclipse.lsp4j</groupId>
+      <artifactId>org.eclipse.lsp4j</artifactId>
+      <version>0.1.2</version>
     </dependency>
     <!-- JSON -->
     <dependency>

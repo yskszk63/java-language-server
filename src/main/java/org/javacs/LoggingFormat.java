@@ -47,21 +47,4 @@ public class LoggingFormat extends Formatter {
         else
             return Integer.toString(i);
     }
-
-    private static boolean started = false;
-
-    public static void startLogging() throws IOException {
-        if (!started) {
-            started = true;
-
-            Logger root = Logger.getLogger("");
-
-            FileHandler file = new FileHandler("javac-services.%g.log", 100_000, 1, false);
-
-            root.addHandler(file);
-
-            for (Handler h : root.getHandlers())
-                h.setFormatter(new LoggingFormat());
-        }
-    }
 }

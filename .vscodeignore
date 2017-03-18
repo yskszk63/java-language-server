@@ -12,7 +12,6 @@ tsd.json
 *.log*
 
 # Sources
-typings/**
 src/**
 test/**
 lib/**

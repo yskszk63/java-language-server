@@ -1,8 +1,7 @@
 package org.javacs;
 
-import io.typefox.lsapi.MessageParams;
-import io.typefox.lsapi.MessageType;
-import io.typefox.lsapi.impl.MessageParamsImpl;
+import org.eclipse.lsp4j.services.*;
+import org.eclipse.lsp4j.*;
 
 public class ShowMessageException extends RuntimeException {
     public final MessageParams message;
@@ -22,10 +21,7 @@ public class ShowMessageException extends RuntimeException {
     }
     
     private static ShowMessageException create(MessageType type, String message, Exception cause) {
-        MessageParamsImpl m = new MessageParamsImpl();
-
-        m.setMessage(message);
-        m.setType(type);
+        MessageParams m = new MessageParams(type, message);
 
         return new ShowMessageException(m, cause);
     }

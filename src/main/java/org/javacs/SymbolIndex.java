@@ -17,8 +17,7 @@ import com.sun.tools.javac.tree.*;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Name;
-import io.typefox.lsapi.*;
-import io.typefox.lsapi.impl.*;
+import org.eclipse.lsp4j.*;
 
 /**
  * Global index of exported symbol declarations and references.
@@ -251,7 +250,7 @@ public class SymbolIndex {
         private void addDeclaration(JCTree tree, Symbol symbol) {
             if (symbol != null && onSourcePath(symbol) && shouldIndex(symbol)) {
                 String key = uniqueName(symbol);
-                SymbolInformationImpl info = symbolInformation(tree, symbol, compilationUnit);
+                SymbolInformation info = symbolInformation(tree, symbol, compilationUnit);
                 Map<String, SymbolInformation> withKind = index.declarations.computeIfAbsent(symbol.getKind(), newKind -> new HashMap<>());
 
                 withKind.put(key, info);
@@ -263,7 +262,7 @@ public class SymbolIndex {
                 String key = uniqueName(symbol);
                 Map<String, Set<Location>> withKind = index.references.computeIfAbsent(symbol.getKind(), newKind -> new HashMap<>());
                 Set<Location> locations = withKind.computeIfAbsent(key, newName -> new HashSet<>());
-                LocationImpl location = location(tree, compilationUnit);
+                Location location = location(tree, compilationUnit);
 
                 locations.add(location);
             }
@@ -291,9 +290,9 @@ public class SymbolIndex {
         }
     }
 
-    private static SymbolInformationImpl symbolInformation(JCTree tree, Symbol symbol, JCTree.JCCompilationUnit compilationUnit) {
-        LocationImpl location = location(tree, compilationUnit);
-        SymbolInformationImpl info = new SymbolInformationImpl();
+    private static SymbolInformation symbolInformation(JCTree tree, Symbol symbol, JCTree.JCCompilationUnit compilationUnit) {
+        Location location = location(tree, compilationUnit);
+        SymbolInformation info = new SymbolInformation();
 
         info.setContainerName(symbol.getEnclosingElement().getQualifiedName().toString());
         info.setKind(symbolInformationKind(symbol.getKind()));
@@ -309,7 +308,7 @@ public class SymbolIndex {
         return info;
     }
 
-    public static LocationImpl location(JCTree tree, JCTree.JCCompilationUnit compilationUnit) {
+    public static Location location(JCTree tree, JCTree.JCCompilationUnit compilationUnit) {
         try {
             // Declaration should include offset
             int offset = tree.pos;
@@ -333,10 +332,10 @@ public class SymbolIndex {
                 end = offset + symbol.name.length();
             }
 
-            RangeImpl position = JavaLanguageServer.findPosition(compilationUnit.getSourceFile(),
+            Range position = JavaLanguageServer.findPosition(compilationUnit.getSourceFile(),
                                                                  offset,
                                                                  end);
-            LocationImpl location = new LocationImpl();
+            Location location = new Location();
 
             location.setUri(compilationUnit.getSourceFile().toUri().toString());
             location.setRange(position);

@@ -8,4 +8,4 @@ mvn package
 vsce package -o build.vsix
 
 # Install vsix
-code build.vsix
+code --install-extension build.vsix

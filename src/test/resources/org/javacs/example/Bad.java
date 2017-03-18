@@ -1,8 +1,8 @@
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeScanner;
-import io.typefox.lsapi.Location;
-import io.typefox.lsapi.LocationImpl;
+import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.LocationImpl;
 
 import java.net.URI;
 import java.util.ArrayList;

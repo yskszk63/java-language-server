@@ -1,6 +1,6 @@
 package org.javacs;
 
-import io.typefox.lsapi.impl.InitializeParamsImpl;
+import org.eclipse.lsp4j.InitializeParams;
 import org.junit.BeforeClass;
 
 import java.io.IOException;
@@ -10,13 +10,6 @@ import java.util.Collections;
 import java.util.Set;
 
 public class Fixtures {
-    static {
-        try {
-            LoggingFormat.startLogging();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     public static void init() { }
 
@@ -27,7 +20,7 @@ public class Fixtures {
         JavacHolder javac = new JavacHolder(classPath, sourcePath, outputDirectory);
         JavaLanguageServer server = new JavaLanguageServer(javac);
 
-        InitializeParamsImpl init = new InitializeParamsImpl();
+        InitializeParams init = new InitializeParams();
         String workspaceRoot = Paths.get(".").toAbsolutePath().toString();
 
         init.setRootPath(workspaceRoot);

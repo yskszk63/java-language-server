@@ -12,9 +12,8 @@ import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.*;
 import com.sun.tools.javac.util.Name;
-import io.typefox.lsapi.CompletionItem;
-import io.typefox.lsapi.CompletionItemKind;
-import io.typefox.lsapi.impl.CompletionItemImpl;
+import org.eclipse.lsp4j.CompletionItem;
+import org.eclipse.lsp4j.CompletionItemKind;
 
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
@@ -26,7 +25,7 @@ import java.util.logging.Logger;
 
 public class AutocompleteVisitor extends CursorScanner {
     private static final Logger LOG = Logger.getLogger("main");
-    public final List<CompletionItemImpl> suggestions = new ArrayList<>();
+    public final List<CompletionItem> suggestions = new ArrayList<>();
 
     public AutocompleteVisitor(JavaFileObject file, long cursor, Context context) {
         super(file, cursor, context);
@@ -48,7 +47,7 @@ public class AutocompleteVisitor extends CursorScanner {
             if (type == null)
                 LOG.warning("No type for " + expression);
             else if (isClassReference(expression)) {
-                CompletionItemImpl item = new CompletionItemImpl();
+                CompletionItem item = new CompletionItem();
 
                 item.setKind(CompletionItemKind.Property);
                 item.setLabel("class");
@@ -73,7 +72,7 @@ public class AutocompleteVisitor extends CursorScanner {
                     if (p.owner != null && p.owner.getQualifiedName().equals(prefix)) {
                         Name end = p.getSimpleName();
 
-                        CompletionItemImpl item = new CompletionItemImpl();
+                        CompletionItem item = new CompletionItem();
 
                         item.setKind(CompletionItemKind.Module);
                         item.setLabel(end.toString());
@@ -88,7 +87,7 @@ public class AutocompleteVisitor extends CursorScanner {
                     if (c.owner != null && c.owner.getQualifiedName().equals(prefix)) {
                         Name end = c.getSimpleName();
 
-                        CompletionItemImpl item = new CompletionItemImpl();
+                        CompletionItem item = new CompletionItem();
 
                         item.setKind(CompletionItemKind.Class);
                         item.setLabel(end.toString());
@@ -117,7 +116,7 @@ public class AutocompleteVisitor extends CursorScanner {
         if (containsCursor(expression))
             super.visitReference(node);
         else if (isClassReference(expression)) {
-            CompletionItemImpl item = new CompletionItemImpl();
+            CompletionItem item = new CompletionItem();
 
             item.setKind(CompletionItemKind.Method);
             item.setLabel("new");
@@ -232,7 +231,7 @@ public class AutocompleteVisitor extends CursorScanner {
                     Name name = symbol.getSimpleName();
                     String insertText = name.toString();
 
-                    CompletionItemImpl item = new CompletionItemImpl();
+                    CompletionItem item = new CompletionItem();
 
                     item.setKind(CompletionItemKind.Constructor);
                     item.setLabel(name.toString());
@@ -409,7 +408,7 @@ public class AutocompleteVisitor extends CursorScanner {
                 case ANNOTATION_TYPE:
                 case INTERFACE:
                 case TYPE_PARAMETER: {
-                    CompletionItemImpl item = new CompletionItemImpl();
+                    CompletionItem item = new CompletionItem();
 
                     // TODO more kinds
                     item.setKind(CompletionItemKind.Class);
@@ -422,7 +421,7 @@ public class AutocompleteVisitor extends CursorScanner {
                     break;
                 }
                 case ENUM_CONSTANT: {
-                    CompletionItemImpl item = new CompletionItemImpl();
+                    CompletionItem item = new CompletionItem();
 
                     item.setKind(CompletionItemKind.Enum);
                     item.setLabel(name);
@@ -441,7 +440,7 @@ public class AutocompleteVisitor extends CursorScanner {
                 case PARAMETER:
                 case LOCAL_VARIABLE:
                 case EXCEPTION_PARAMETER: {
-                    CompletionItemImpl item = new CompletionItemImpl();
+                    CompletionItem item = new CompletionItem();
 
                     item.setKind(CompletionItemKind.Variable);
                     item.setLabel(name);
@@ -479,7 +478,7 @@ public class AutocompleteVisitor extends CursorScanner {
 
     private void addEnumConstant(Symbol.VarSymbol e, int superRemoved) {
         String label = e.getSimpleName().toString();
-        CompletionItemImpl item = new CompletionItemImpl();
+        CompletionItem item = new CompletionItem();
 
         item.setKind(CompletionItemKind.Enum);
         item.setLabel(label);
@@ -494,7 +493,7 @@ public class AutocompleteVisitor extends CursorScanner {
 
     private void addClass(Symbol.ClassSymbol e, int superRemoved) {
         String label = e.getSimpleName().toString();
-        CompletionItemImpl item = new CompletionItemImpl();
+        CompletionItem item = new CompletionItem();
 
         item.setKind(CompletionItemKind.Class);
         item.setLabel(label);
@@ -509,7 +508,7 @@ public class AutocompleteVisitor extends CursorScanner {
 
     private void addMethod(Symbol.MethodSymbol e, int superRemoved) {
         String label = methodSignature(e);
-        CompletionItemImpl item = new CompletionItemImpl();
+        CompletionItem item = new CompletionItem();
 
         item.setKind(CompletionItemKind.Method);
         item.setLabel(label);
@@ -587,7 +586,7 @@ public class AutocompleteVisitor extends CursorScanner {
     private void addField(Symbol.VarSymbol e, int sortOrder) {
         String name = e.getSimpleName().toString();
 
-        CompletionItemImpl item = new CompletionItemImpl();
+        CompletionItem item = new CompletionItem();
 
         item.setKind(CompletionItemKind.Property);
         item.setLabel(name);
@@ -614,7 +613,7 @@ public class AutocompleteVisitor extends CursorScanner {
         public void visitArray(ArrayType t) {
             if (!isStatic) {
                 // Array types just have 'length'
-                CompletionItemImpl item = new CompletionItemImpl();
+                CompletionItem item = new CompletionItem();
 
                 item.setLabel("length");
                 item.setInsertText("length");

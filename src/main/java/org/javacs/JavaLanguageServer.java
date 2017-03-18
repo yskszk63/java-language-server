@@ -4,9 +4,9 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.tree.TreeInfo;
 import com.sun.tools.javac.tree.TreeScanner;
-import io.typefox.lsapi.services.*;
-import io.typefox.lsapi.*;
-import io.typefox.lsapi.impl.*;
+import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.services.*;
+import org.eclipse.lsp4j.*;
 
 import javax.tools.*;
 import java.io.*;
@@ -16,8 +16,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
+import java.util.logging.Handler;
 import java.util.logging.Level;
+import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -31,9 +32,8 @@ import static org.javacs.Main.JSON;
 class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
     private Path workspaceRoot;
-    private Consumer<PublishDiagnosticsParams> publishDiagnostics = p -> {};
-    private Consumer<MessageParams> showMessage = m -> {};
     private Map<Path, String> activeDocuments = new HashMap<>();
+    private LanguageClient client;
 
     public JavaLanguageServer() {
         this.testJavac = Optional.empty();
@@ -45,7 +45,7 @@ class JavaLanguageServer implements LanguageServer {
 
     public void onError(String message, Throwable error) {
         if (error instanceof ShowMessageException)
-            showMessage.accept(((ShowMessageException) error).message);
+            client.showMessage(((ShowMessageException) error).message);
         else if (error instanceof NoJavaConfigException) {
             // Swallow error
             // If you want to show a message for no-java-config, 
@@ -55,12 +55,12 @@ class JavaLanguageServer implements LanguageServer {
         else {
             LOG.log(Level.SEVERE, message, error);
             
-            MessageParamsImpl m = new MessageParamsImpl();
+            MessageParams m = new MessageParams();
 
             m.setMessage(message);
             m.setType(MessageType.Error);
 
-            showMessage.accept(m);
+            client.showMessage(m);
         }
     }
 
@@ -68,13 +68,13 @@ class JavaLanguageServer implements LanguageServer {
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
         workspaceRoot = Paths.get(params.getRootPath()).toAbsolutePath().normalize();
 
-        InitializeResultImpl result = new InitializeResultImpl();
+        InitializeResult result = new InitializeResult();
 
-        ServerCapabilitiesImpl c = new ServerCapabilitiesImpl();
+        ServerCapabilities c = new ServerCapabilities();
 
         c.setTextDocumentSync(TextDocumentSyncKind.Incremental);
         c.setDefinitionProvider(true);
-        c.setCompletionProvider(new CompletionOptionsImpl());
+        c.setCompletionProvider(new CompletionOptions());
         c.setHoverProvider(true);
         c.setWorkspaceSymbolProvider(true);
         c.setReferencesProvider(true);
@@ -86,18 +86,13 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     @Override
-    public void shutdown() {
-
+    public CompletableFuture<Object> shutdown() {
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public void exit() {
 
-    }
-
-    @Override
-    public void onTelemetryEvent(Consumer<Object> consumer) {
-        // Nothing to do
     }
 
     @Override
@@ -246,11 +241,6 @@ class JavaLanguageServer implements LanguageServer {
                 if (maybePath.isPresent()) 
                     doLint(activeDocuments.keySet());
             }
-
-            @Override
-            public void onPublishDiagnostics(Consumer<PublishDiagnosticsParams> callback) {
-                publishDiagnostics = callback;
-            }
         };
     }
 
@@ -387,39 +377,19 @@ class JavaLanguageServer implements LanguageServer {
             }
         };
     }
-
-    @Override
-    public WindowService getWindowService() {
-        return new WindowService() {
-            @Override
-            public void onShowMessage(Consumer<MessageParams> callback) {
-                showMessage = callback;
-            }
-
-            @Override
-            public void onShowMessageRequest(Consumer<ShowMessageRequestParams> callback) {
-
-            }
-
-            @Override
-            public void onLogMessage(Consumer<MessageParams> callback) {
-
-            }
-        };
-    }
     
     private void publishDiagnostics(Collection<Path> paths, DiagnosticCollector<JavaFileObject> errors) {
-        Map<URI, PublishDiagnosticsParamsImpl> files = new HashMap<>();
+        Map<URI, PublishDiagnosticsParams> files = new HashMap<>();
         
         paths.forEach(p -> files.put(p.toUri(), newPublishDiagnostics(p.toUri())));
         
         errors.getDiagnostics().forEach(error -> {
             if (error.getStartPosition() != javax.tools.Diagnostic.NOPOS) {
                 URI uri = error.getSource().toUri();
-                PublishDiagnosticsParamsImpl publish = files.computeIfAbsent(uri, this::newPublishDiagnostics);
+                PublishDiagnosticsParams publish = files.computeIfAbsent(uri, this::newPublishDiagnostics);
 
-                RangeImpl range = position(error);
-                DiagnosticImpl diagnostic = new DiagnosticImpl();
+                Range range = position(error);
+                Diagnostic diagnostic = new Diagnostic();
                 DiagnosticSeverity severity = severity(error.getKind());
 
                 diagnostic.setSeverity(severity);
@@ -431,7 +401,7 @@ class JavaLanguageServer implements LanguageServer {
             }
         });
 
-        files.values().forEach(publishDiagnostics::accept);
+        files.values().forEach(d -> client.publishDiagnostics(d));
     }
 
     private DiagnosticSeverity severity(javax.tools.Diagnostic.Kind kind) {
@@ -448,8 +418,8 @@ class JavaLanguageServer implements LanguageServer {
         }
     }
 
-    private PublishDiagnosticsParamsImpl newPublishDiagnostics(URI newUri) {
-        PublishDiagnosticsParamsImpl p = new PublishDiagnosticsParamsImpl();
+    private PublishDiagnosticsParams newPublishDiagnostics(URI newUri) {
+        PublishDiagnosticsParams p = new PublishDiagnosticsParams();
 
         p.setDiagnostics(new ArrayList<>());
         p.setUri(newUri.toString());
@@ -658,7 +628,7 @@ class JavaLanguageServer implements LanguageServer {
         try {
             return JSON.readValue(configFile.toFile(), JavaConfigJson.class);
         } catch (IOException e) {
-            MessageParamsImpl message = new MessageParamsImpl();
+            MessageParams message = new MessageParams();
 
             message.setMessage("Error reading " + configFile);
             message.setType(MessageType.Error);
@@ -679,7 +649,7 @@ class JavaLanguageServer implements LanguageServer {
                          .map(dir::resolve)
                          .collect(Collectors.toSet());
         } catch (IOException e) {
-            MessageParamsImpl message = new MessageParamsImpl();
+            MessageParams message = new MessageParams();
 
             message.setMessage("Error reading " + classPathFilePath);
             message.setType(MessageType.Error);
@@ -695,18 +665,18 @@ class JavaLanguageServer implements LanguageServer {
             return compiler.fileManager.getRegularFile(path.toFile());
     }
 
-    private RangeImpl position(javax.tools.Diagnostic<? extends JavaFileObject> error) {
+    private Range position(javax.tools.Diagnostic<? extends JavaFileObject> error) {
         // Compute start position
-        PositionImpl start = new PositionImpl();
+        Position start = new Position();
 
         start.setLine((int) (error.getLineNumber() - 1));
         start.setCharacter((int) (error.getColumnNumber() - 1));
 
         // Compute end position
-        PositionImpl end = endPosition(error);
+        Position end = endPosition(error);
 
         // Combine into Range
-        RangeImpl range = new RangeImpl();
+        Range range = new Range();
 
         range.setStart(start);
         range.setEnd(end);
@@ -714,7 +684,7 @@ class JavaLanguageServer implements LanguageServer {
         return range;
     }
 
-    private PositionImpl endPosition(javax.tools.Diagnostic<? extends JavaFileObject> error) {
+    private Position endPosition(javax.tools.Diagnostic<? extends JavaFileObject> error) {
         try (Reader reader = error.getSource().openReader(true)) {
             long startOffset = error.getStartPosition();
             long endOffset = error.getEndPosition();
@@ -735,7 +705,7 @@ class JavaLanguageServer implements LanguageServer {
                     column++;
             }
 
-            PositionImpl end = new PositionImpl();
+            Position end = new Position();
 
             end.setLine(line);
             end.setCharacter(column);
@@ -866,9 +836,9 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     /**
-     * Convert on offset-based range to a {@link io.typefox.lsapi.Range}
+     * Convert on offset-based range to a {@link Range}
      */
-    public static RangeImpl findPosition(JavaFileObject file, long startOffset, long endOffset) {
+    public static Range findPosition(JavaFileObject file, long startOffset, long endOffset) {
         try (Reader in = file.openReader(true)) {
             long offset = 0;
             int line = 0;
@@ -891,7 +861,7 @@ class JavaLanguageServer implements LanguageServer {
                 }
             }
 
-            PositionImpl start = createPosition(line, character);
+            Position start = createPosition(line, character);
 
             // Find the end position
             while (offset < endOffset) {
@@ -910,10 +880,10 @@ class JavaLanguageServer implements LanguageServer {
                 }
             }
 
-            PositionImpl end = createPosition(line, character);
+            Position end = createPosition(line, character);
 
             // Combine into range
-            RangeImpl range = new RangeImpl();
+            Range range = new Range();
 
             range.setStart(start);
             range.setEnd(end);
@@ -924,8 +894,8 @@ class JavaLanguageServer implements LanguageServer {
         }
     }
 
-    private static PositionImpl createPosition(int line, int character) {
-        PositionImpl p = new PositionImpl();
+    private static Position createPosition(int line, int character) {
+        Position p = new Position();
 
         p.setLine(line);
         p.setCharacter(character);
@@ -969,9 +939,9 @@ class JavaLanguageServer implements LanguageServer {
         }
     }
     
-    private HoverImpl doHover(TextDocumentPositionParams position) {
-        HoverImpl result = new HoverImpl();
-        List<MarkedStringImpl> contents = new ArrayList<>();
+    private Hover doHover(TextDocumentPositionParams position) {
+        Hover result = new Hover();
+        List<String> contents = new ArrayList<>();
 
         result.setContents(contents);
 
@@ -985,23 +955,23 @@ class JavaLanguageServer implements LanguageServer {
             findSymbol(compilationUnit, line, character).ifPresent(symbol -> {
                 switch (symbol.getKind()) {
                     case PACKAGE:
-                        contents.add(markedString("package " + symbol.getQualifiedName()));
+                        contents.add("package " + symbol.getQualifiedName());
 
                         break;
                     case ENUM:
-                        contents.add(markedString("enum " + symbol.getQualifiedName()));
+                        contents.add("enum " + symbol.getQualifiedName());
 
                         break;
                     case CLASS:
-                        contents.add(markedString("class " + symbol.getQualifiedName()));
+                        contents.add("class " + symbol.getQualifiedName());
 
                         break;
                     case ANNOTATION_TYPE:
-                        contents.add(markedString("@interface " + symbol.getQualifiedName()));
+                        contents.add("@interface " + symbol.getQualifiedName());
 
                         break;
                     case INTERFACE:
-                        contents.add(markedString("interface " + symbol.getQualifiedName()));
+                        contents.add("interface " + symbol.getQualifiedName());
 
                         break;
                     case METHOD:
@@ -1012,7 +982,7 @@ class JavaLanguageServer implements LanguageServer {
                         String signature = AutocompleteVisitor.methodSignature(method);
                         String returnType = ShortTypePrinter.print(method.getReturnType());
 
-                        contents.add(markedString(returnType + " " + signature));
+                        contents.add(returnType + " " + signature);
 
                         break;
                     case PARAMETER:
@@ -1020,7 +990,7 @@ class JavaLanguageServer implements LanguageServer {
                     case EXCEPTION_PARAMETER:
                     case ENUM_CONSTANT:
                     case FIELD:
-                        contents.add(markedString(ShortTypePrinter.print(symbol.type)));
+                        contents.add(ShortTypePrinter.print(symbol.type));
 
                         break;
                     case TYPE_PARAMETER:
@@ -1034,17 +1004,8 @@ class JavaLanguageServer implements LanguageServer {
         return result;
     }
 
-    private MarkedStringImpl markedString(String value) {
-        MarkedStringImpl result = new MarkedStringImpl();
-
-        result.setLanguage("java");
-        result.setValue(value);
-
-        return result;
-    }
-
     public CompletionList autocomplete(TextDocumentPositionParams position) {
-        CompletionListImpl result = new CompletionListImpl();
+        CompletionList result = new CompletionList();
 
         result.setIsIncomplete(false);
         result.setItems(new ArrayList<>());
@@ -1104,5 +1065,40 @@ class JavaLanguageServer implements LanguageServer {
         } catch (IOException e) {
             throw ShowMessageException.error("Error reading " + file, e);
         }
+    }
+
+    public void installClient(LanguageClient client) {
+        this.client = client;
+
+        Logger.getLogger("").addHandler(new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                client.logMessage(new MessageParams(
+                        messageType(record.getLevel().intValue()),
+                        record.getMessage()
+                ));
+            }
+
+            private MessageType messageType(int level) {
+                if (level >= Level.SEVERE.intValue())
+                    return MessageType.Error;
+                else if (level >= Level.WARNING.intValue())
+                    return MessageType.Warning;
+                else if (level >= Level.INFO.intValue())
+                    return MessageType.Info;
+                else
+                    return MessageType.Log;
+            }
+
+            @Override
+            public void flush() {
+
+            }
+
+            @Override
+            public void close() throws SecurityException {
+
+            }
+        });
     }
 }

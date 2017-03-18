@@ -9,8 +9,6 @@ import * as Net from 'net';
 import * as ChildProcess from 'child_process';
 import {LanguageClient, LanguageClientOptions, SettingMonitor, ServerOptions, StreamInfo} from 'vscode-languageclient';
 
-PortFinder.basePort = 55282;
-
 /** Called when extension is activated */
 export function activate(context: VSCode.ExtensionContext) {
     let javaExecutablePath = findJavaExecutable('java');
@@ -41,12 +39,16 @@ export function activate(context: VSCode.ExtensionContext) {
                     VSCode.workspace.createFileSystemWatcher('**/javaconfig.json'),
                     VSCode.workspace.createFileSystemWatcher('**/*.java')
                 ]
-            }
+            },
+            outputChannelName: 'Java',
+            revealOutputChannelOn: 3
         }
         
         function createServer(): Promise<StreamInfo> {
             return new Promise((resolve, reject) => {
-                PortFinder.getPort((err, port) => {
+                PortFinder.getPort({port: 55282}, (err, port) => {
+                    port = 55282;
+
                     let fatJar = Path.resolve(context.extensionPath, "out", "fat-jar.jar");
                     
                     let args = [

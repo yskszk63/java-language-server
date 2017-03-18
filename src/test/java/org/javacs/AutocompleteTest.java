@@ -1,7 +1,6 @@
 package org.javacs;
 
-import io.typefox.lsapi.*;
-import io.typefox.lsapi.impl.*;
+import org.eclipse.lsp4j.*;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -419,12 +418,12 @@ public class AutocompleteTest extends Fixtures {
     }
 
     private List<? extends CompletionItem> items(String file, int row, int column) {
-        TextDocumentPositionParamsImpl position = new TextDocumentPositionParamsImpl();
+        TextDocumentPositionParams position = new TextDocumentPositionParams();
 
-        position.setPosition(new PositionImpl());
+        position.setPosition(new Position());
         position.getPosition().setLine(row);
         position.getPosition().setCharacter(column);
-        position.setTextDocument(new TextDocumentIdentifierImpl());
+        position.setTextDocument(new TextDocumentIdentifier());
         position.getTextDocument().setUri(uri(file).toString());
 
         JavaLanguageServer server = getJavaLanguageServer();

@@ -1,7 +1,6 @@
 package org.javacs;
 
-import io.typefox.lsapi.*;
-import io.typefox.lsapi.impl.*;
+import org.eclipse.lsp4j.*;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -101,23 +100,23 @@ public class GotoTest extends Fixtures {
         assertThat(suggestions, contains(location(uri, 2, 18, 2, 23)));
     }
 
-    private LocationImpl location(URI uri, int startRow, int startColumn, int endRow, int endColumn) {
-        PositionImpl start = new PositionImpl();
+    private Location location(URI uri, int startRow, int startColumn, int endRow, int endColumn) {
+        Position start = new Position();
 
         start.setLine(startRow);
         start.setCharacter(startColumn);
 
-        PositionImpl end = new PositionImpl();
+        Position end = new Position();
 
         end.setLine(startRow);
         end.setCharacter(endColumn);
 
-        RangeImpl range = new RangeImpl();
+        Range range = new Range();
 
         range.setStart(start);
         range.setEnd(end);
 
-        LocationImpl location = new LocationImpl();
+        Location location = new Location();
 
         location.setUri(uri.toString());
         location.setRange(range);
@@ -126,16 +125,16 @@ public class GotoTest extends Fixtures {
     }
 
     private List<? extends Location> doGoto(String file, int row, int column) throws IOException {
-        TextDocumentIdentifierImpl document = new TextDocumentIdentifierImpl();
+        TextDocumentIdentifier document = new TextDocumentIdentifier();
 
         document.setUri(uri(file).toString());
 
-        PositionImpl position = new PositionImpl();
+        Position position = new Position();
 
         position.setLine(row);
         position.setCharacter(column);
 
-        TextDocumentPositionParamsImpl p = new TextDocumentPositionParamsImpl();
+        TextDocumentPositionParams p = new TextDocumentPositionParams();
 
         p.setTextDocument(document);
         p.setPosition(position);
