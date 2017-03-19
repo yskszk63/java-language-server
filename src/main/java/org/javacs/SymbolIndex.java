@@ -1,23 +1,21 @@
 package org.javacs;
 
-import java.net.URI;
-import java.util.*;
-import java.io.*;
-import java.nio.file.*;
-import java.util.logging.*;
-import java.util.concurrent.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import javax.lang.model.element.ElementKind;
-import javax.tools.*;
-
-import javax.tools.JavaFileObject;
-
-import com.sun.tools.javac.tree.*;
-import com.sun.tools.javac.code.*;
+import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.TreeScanner;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Name;
-import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.SymbolInformation;
+import org.eclipse.lsp4j.SymbolKind;
+
+import javax.lang.model.element.ElementKind;
+import java.io.IOException;
+import java.net.URI;
+import java.util.*;
+import java.util.logging.Logger;
+import java.util.stream.Stream;
 
 /**
  * Global index of exported symbol declarations and references.
@@ -27,11 +25,6 @@ public class SymbolIndex {
     private static final Logger LOG = Logger.getLogger("main");
 
     /**
-     * Completes when initial index is done. Useful for testing.
-     */
-    public final CompletableFuture<Void> initialIndexComplete = new CompletableFuture<>();
-
-    /**
      * Contains all symbol declarations and referencs in a single source file 
      */
     private static class SourceFileIndex {
@@ -39,66 +32,24 @@ public class SymbolIndex {
         private final EnumMap<ElementKind, Map<String, Set<Location>>> references = new EnumMap<>(ElementKind.class);
     }
 
+    public SymbolIndex(JavacHolder parent) {
+        this.parent = parent;
+    }
+
+    /**
+     * Each index has one compiler as its parent
+     */
+    private final JavacHolder parent;
+
     /**
      * Source path files, for which we support methods and classes
      */
     private Map<URI, SourceFileIndex> sourcePath = new HashMap<>();
-    
-    public SymbolIndex(Set<Path> classPath, 
-                       Set<Path> sourcePath, 
-                       Path outputDirectory) {
-        JavacHolder compiler = new JavacHolder(classPath, sourcePath, outputDirectory);
-        Indexer indexer = new Indexer(compiler.context);
 
-        // Index exported declarations and references for all files on the source path
-        // This may take a while, so we'll do it on an extra thread
-        Thread worker = new Thread("InitialIndex") {
-            List<JCTree.JCCompilationUnit> parsed = new ArrayList<>();
-            List<Path> paths = new ArrayList<>();
+    public void update(JCTree.JCCompilationUnit compiled) {
+        Indexer indexer = new Indexer(parent.context);
 
-            @Override
-            public void run() {
-                // Parse each file
-                sourcePath.forEach(s -> parseAll(s, parsed, paths));
-
-                // Compile all parsed files
-                compiler.compile(parsed);
-
-                parsed.forEach(p -> p.accept(indexer));
-                
-                // TODO minimize memory use during this process
-                // Instead of doing parse-all / compile-all, 
-                // queue all files, then do parse / compile on each
-                // If invoked correctly, javac should avoid reparsing the same file twice
-                // Then, use the same mechanism as the desugar / generate phases to remove method bodies, 
-                // to reclaim memory as we go
-
-                initialIndexComplete.complete(null);
-                
-                // TODO verify that compiler and all its resources get destroyed
-            }
-
-            /**
-             * Look for .java files and invalidate them
-             */
-            private void parseAll(Path path, List<JCTree.JCCompilationUnit> trees, List<Path> paths) {
-                if (Files.isDirectory(path)) try {
-                    Files.list(path).forEach(p -> parseAll(p, trees, paths));
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-                else if (path.getFileName().toString().endsWith(".java")) {
-                    LOG.info("Index " + path);
-
-                    JavaFileObject file = compiler.fileManager.getRegularFile(path.toFile());
-
-                    trees.add(compiler.parse(file));
-                    paths.add(path);
-                }
-            }
-        };
-
-        worker.start();
+        compiled.accept(indexer);
     }
 
     /**
@@ -344,6 +295,41 @@ public class SymbolIndex {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * All references to symbol in compilationUnit, including things like local variables that aren't indexe
+     */
+    public static List<Location> nonIndexedReferences(final Symbol symbol, final JCTree.JCCompilationUnit compilationUnit) {
+        List<Location> result = new ArrayList<>();
+
+        compilationUnit.accept(new TreeScanner() {
+            @Override
+            public void visitSelect(JCTree.JCFieldAccess tree) {
+                super.visitSelect(tree);
+
+                if (tree.sym != null && tree.sym.equals(symbol))
+                    result.add(SymbolIndex.location(tree, compilationUnit));
+            }
+
+            @Override
+            public void visitReference(JCTree.JCMemberReference tree) {
+                super.visitReference(tree);
+
+                if (tree.sym != null && tree.sym.equals(symbol))
+                    result.add(SymbolIndex.location(tree, compilationUnit));
+            }
+
+            @Override
+            public void visitIdent(JCTree.JCIdent tree) {
+                super.visitIdent(tree);
+
+                if (tree.sym != null && tree.sym.equals(symbol))
+                    result.add(SymbolIndex.location(tree, compilationUnit));
+            }
+        });
+
+        return result;
     }
 
     private static int offset(JCTree.JCCompilationUnit compilationUnit,

@@ -2,14 +2,14 @@ package org.javacs;
 
 import javax.tools.SimpleJavaFileObject;
 import java.io.IOException;
-import java.nio.file.Path;
+import java.net.URI;
 
 public class StringFileObject extends SimpleJavaFileObject {
     public final String content;
-    public final Path path;
+    public final URI path; // TODO rename
 
-    public StringFileObject(String content, Path path) {
-        super(path.toUri(), Kind.SOURCE);
+    public StringFileObject(String content, URI path) {
+        super(path, Kind.SOURCE);
 
         this.content = content;
         this.path = path;
