@@ -1,13 +1,13 @@
 'use strict';
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
-import * as VSCode from 'vscode';
-import * as Path from 'path';
-import * as FS from 'fs';
-import * as PortFinder from 'portfinder';
-import * as Net from 'net';
-import * as ChildProcess from 'child_process';
-import {LanguageClient, LanguageClientOptions, SettingMonitor, ServerOptions, StreamInfo} from 'vscode-languageclient';
+import * as VSCode from "vscode";
+import * as Path from "path";
+import * as FS from "fs";
+import * as PortFinder from "portfinder";
+import * as Net from "net";
+import * as ChildProcess from "child_process";
+import {LanguageClient, LanguageClientOptions, StreamInfo} from "vscode-languageclient";
 
 /** Called when extension is activated */
 export function activate(context: VSCode.ExtensionContext) {
@@ -47,8 +47,6 @@ export function activate(context: VSCode.ExtensionContext) {
         function createServer(): Promise<StreamInfo> {
             return new Promise((resolve, reject) => {
                 PortFinder.getPort({port: 55282}, (err, port) => {
-                    port = 55282;
-
                     let fatJar = Path.resolve(context.extensionPath, "out", "fat-jar.jar");
                     
                     let args = [
