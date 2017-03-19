@@ -538,6 +538,11 @@ public class JavacHolder {
 
             return containsClass(env, enclosed.values());
         });
+
+        // Remove cached source files
+        Set<JavaFileObject> compilerInputFiles = getCompilerInputFiles(compiler);
+
+        compilerInputFiles.removeIf(file -> file.getName().equals(source.getName()));
     }
 
     private boolean containsClass(Env<AttrContext> env, Collection<? extends Symbol> symbols) {
@@ -550,6 +555,18 @@ public class JavacHolder {
         }
 
         return containsClass(env.outer, symbols);
+    }
+
+    private Set<JavaFileObject> getCompilerInputFiles(JavaCompiler compiler) {
+        try {
+            Field field = JavaCompiler.class.getDeclaredField("inputFiles");
+
+            field.setAccessible(true);
+
+            return (Set<JavaFileObject>) field.get(compiler);
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
