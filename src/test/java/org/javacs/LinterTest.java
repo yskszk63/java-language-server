@@ -11,6 +11,7 @@ import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.logging.Logger;
@@ -18,133 +19,90 @@ import java.util.logging.Logger;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
-public class LinterTest extends Fixtures {
+public class LinterTest {
     private static final Logger LOG = Logger.getLogger("main");
 
     @Test
     public void compile() throws IOException {
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/HelloWorld.java");
-        JavacHolder compiler = newCompiler();
-        compiler.onError(errors);
-        compiler.compile(Collections.singleton(compiler.parse(file)));
+        URI file = FindResource.uri("/org/javacs/example/HelloWorld.java");
+        DiagnosticCollector<JavaFileObject> errors = newCompiler().compile(Collections.singletonMap(file, Optional.empty())).errors;
 
         assertThat(errors.getDiagnostics(), empty());
     }
 
     @Test
     public void inspectTree() throws IOException {
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/HelloWorld.java");
+        URI file = FindResource.uri("/org/javacs/example/HelloWorld.java");
         JavacHolder compiler = newCompiler();
         CollectMethods scanner = new CollectMethods(compiler.context);
 
-        compiler.onError(errors);
-
-        JCTree.JCCompilationUnit tree = compiler.parse(file);
-
-        compiler.compile(Collections.singleton(tree));
-
-        tree.accept(scanner);
+        compiler.compile(Collections.singletonMap(file, Optional.empty())).trees.forEach(tree -> tree.accept(scanner));
 
         assertThat(scanner.methodNames, hasItem("main"));
     }
 
     @Test
     public void missingMethodBody() throws IOException {
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/MissingMethodBody.java");
+        URI file = FindResource.uri("/org/javacs/example/MissingMethodBody.java");
         JavacHolder compiler = newCompiler();
         CollectMethods scanner = new CollectMethods(compiler.context);
+        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
 
-        compiler.onError(errors);
-
-        JCTree.JCCompilationUnit tree = compiler.parse(file);
-
-        compiler.compile(Collections.singleton(tree));
-
-        tree.accept(scanner);
+        compile.trees.forEach(tree -> tree.accept(scanner));
 
         assertThat(scanner.methodNames, hasItem("test"));
-        assertThat(errors.getDiagnostics(), not(empty()));
+        assertThat(compile.errors.getDiagnostics(), not(empty()));
 
         // Lint again
-        errors = new DiagnosticCollector<>();
+        compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
 
-        compiler.onError(errors);
-
-        tree = compiler.parse(file);
-
-        compiler.compile(Collections.singleton(tree));
-
-        assertThat(errors.getDiagnostics(), not(empty()));
+        assertThat(compile.errors.getDiagnostics(), not(empty()));
     }
 
     @Test
     public void incompleteAssignment() throws IOException {
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/IncompleteAssignment.java");
+        URI file = FindResource.uri("/org/javacs/example/IncompleteAssignment.java");
         JavacHolder compiler = newCompiler();
-        CollectMethods parsed = new CollectMethods(compiler.context);
         CollectMethods compiled = new CollectMethods(compiler.context);
+        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
 
-        compiler.onError(errors);
+        compile.trees.forEach(tree -> tree.accept(compiled));
 
-        JCTree.JCCompilationUnit tree = compiler.parse(file);
-
-        tree.accept(parsed);
-
-        compiler.compile(Collections.singleton(tree));
-
-        tree.accept(compiled);
-
-        assertThat(parsed.methodNames, hasItem("test")); // Error recovery should have worked
         assertThat(compiled.methodNames, hasItem("test")); // Type error recovery should have worked
-        assertThat(errors.getDiagnostics(), not(empty()));
+        assertThat(compile.errors.getDiagnostics(), not(empty()));
     }
 
     @Test
     public void undefinedSymbol() throws IOException {
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/UndefinedSymbol.java");
+        URI file = FindResource.uri("/org/javacs/example/UndefinedSymbol.java");
         JavacHolder compiler = newCompiler();
         CollectMethods scanner = new CollectMethods(compiler.context);
+        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
 
-        compiler.onError(errors);
-
-        JCTree.JCCompilationUnit tree = compiler.parse(file);
-
-        compiler.compile(Collections.singleton(tree));
-
-        tree.accept(scanner);
+        compile.trees.forEach(tree -> tree.accept(scanner));
 
         assertThat(scanner.methodNames, hasItem("test")); // Type error, so parse tree is present
 
-        Diagnostic<? extends JavaFileObject> d = errors.getDiagnostics().get(0);
+        assertThat(compile.errors.getDiagnostics(), not(empty()));
+
+        Diagnostic<? extends JavaFileObject> d = compile.errors.getDiagnostics().get(0);
 
         // Error position should span entire 'foo' symbol
         assertThat(d.getLineNumber(), greaterThan(0L));
         assertThat(d.getStartPosition(), greaterThan(0L));
         assertThat(d.getEndPosition(), greaterThan(d.getStartPosition() + 1));
-        assertThat(errors.getDiagnostics(), not(empty()));
     }
 
     @Test
     public void getType() {
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/FooString.java");
+        URI file = FindResource.uri("/org/javacs/example/FooString.java");
         JavacHolder compiler = newCompiler();
         MethodTypes scanner = new MethodTypes(compiler.context);
+        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
 
-        compiler.onError(errors);
+        compile.trees.forEach(tree -> tree.accept(scanner));
 
-        JCTree.JCCompilationUnit tree = compiler.parse(file);
-
-        compiler.compile(Collections.singleton(tree));
-
-        tree.accept(scanner);
-
-        assertThat(errors.getDiagnostics(), empty());
+        assertThat(compile.errors.getDiagnostics(), empty());
         assertThat(scanner.methodTypes, hasKey("test"));
 
         Type.MethodType type = scanner.methodTypes.get("test");
@@ -156,35 +114,29 @@ public class LinterTest extends Fixtures {
 
     @Test
     public void notJava() {
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/NotJava.java.txt");
+        URI file = FindResource.uri("/org/javacs/example/NotJava.java.txt");
         JavacHolder compiler = newCompiler();
-        compiler.onError(errors);
-        compiler.compile(Collections.singleton(compiler.parse(file)));
+        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
 
-        assertThat(errors.getDiagnostics(), not(empty()));
+        assertThat(compile.errors.getDiagnostics(), not(empty()));
     }
 
     @Test
     public void errorInDependency() {
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/ErrorInDependency.java");
+        URI file = FindResource.uri("/org/javacs/example/ErrorInDependency.java");
         JavacHolder compiler = newCompiler();
-        compiler.onError(errors);
-        compiler.compile(Collections.singleton(compiler.parse(file)));
+        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
 
-        assertThat(errors.getDiagnostics(), not(empty()));
+        assertThat(compile.errors.getDiagnostics(), not(empty()));
     }
     
     @Test
     public void deprecationWarning() {
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        GetResourceFileObject file = new GetResourceFileObject("/org/javacs/example/DeprecationWarning.java");
+        URI file = FindResource.uri("/org/javacs/example/DeprecationWarning.java");
         JavacHolder compiler = newCompiler();
-        compiler.onError(errors);
-        compiler.compile(Collections.singleton(compiler.parse(file)));
+        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
 
-        assertThat(errors.getDiagnostics(), not(empty()));
+        assertThat(compile.errors.getDiagnostics(), not(empty()));
     }
 
     public static class MethodTypes extends BaseScanner {
@@ -222,8 +174,11 @@ public class LinterTest extends Fixtures {
     }
 
     private static JavacHolder newCompiler() {
-        return new JavacHolder(Collections.emptySet(),
-                               Collections.singleton(Paths.get("src/test/resources")),
-                               Paths.get("out"));
+        return new JavacHolder(
+                Collections.emptySet(),
+                Collections.singleton(Paths.get("src/test/resources")),
+                Paths.get("out"),
+                false
+        );
     }
 }

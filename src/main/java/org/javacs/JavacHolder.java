@@ -106,7 +106,7 @@ public class JavacHolder {
         log.multipleErrors = true;
     }
 
-    public final JavacFileManager fileManager = new JavacFileManager(context, true, null);
+    private final JavacFileManager fileManager = new JavacFileManager(context, true, null);
     private final ForgivingAttr attr = ForgivingAttr.instance(context);
     private final Check check = Check.instance(context);
     private final FuzzyParserFactory parserFactory = FuzzyParserFactory.instance(context);
@@ -129,7 +129,7 @@ public class JavacHolder {
     // Set up SymbolIndex
 
     /**
-     * Index of symbols that gets updated every time you call update
+     * Index of symbols that gets updated every time you call compile
      */
     public final SymbolIndex index = new SymbolIndex(this);
 
@@ -139,6 +139,10 @@ public class JavacHolder {
     public final CompletableFuture<Void> initialIndexComplete;
 
     public JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
+        this(classPath, sourcePath, outputDirectory, true);
+    }
+
+    public JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory, boolean index) {
         this.classPath = Collections.unmodifiableSet(classPath);
         this.sourcePath = Collections.unmodifiableSet(sourcePath);
         this.outputDirectory = outputDirectory;
@@ -151,7 +155,10 @@ public class JavacHolder {
         ensureOutputDirectory(outputDirectory);
         clearOutputDirectory(outputDirectory);
 
-        initialIndexComplete = startIndexingSourcePath();
+        if (index)
+            initialIndexComplete = startIndexingSourcePath();
+        else
+            initialIndexComplete = CompletableFuture.completedFuture(null);
     }
 
     private void logStartStopEvents() {
@@ -179,22 +186,22 @@ public class JavacHolder {
     private CompletableFuture<Void> startIndexingSourcePath() {
         CompletableFuture<Void> done = new CompletableFuture<>();
         Thread worker = new Thread("InitialIndex") {
-            List<JCTree.JCCompilationUnit> parsed = new ArrayList<>();
-            List<Path> paths = new ArrayList<>();
-
             @Override
             public void run() {
+                List<URI> objects = new ArrayList<>();
+
                 // Parse each file
-                sourcePath.forEach(s -> parseAll(s, parsed, paths));
+                sourcePath.forEach(s -> findAllFiles(s, objects));
 
                 // Compile all parsed files
-                compile(parsed);
+                Map<URI, Optional<String>> files = objects.stream().collect(Collectors.toMap(key -> key, key -> Optional.empty()));
+                CompilationResult result = doCompile(files);
 
-                parsed.forEach(index::update);
+                result.trees.forEach(index::update);
 
                 // TODO minimize memory use during this process
-                // Instead of doing parse-all / compile-all,
-                // queue all files, then do parse / compile on each
+                // Instead of doing parse-all / compileFileObjects-all,
+                // queue all files, then do parse / compileFileObjects on each
                 // If invoked correctly, javac should avoid reparsing the same file twice
                 // Then, use the same mechanism as the desugar / generate phases to remove method bodies,
                 // to reclaim memory as we go
@@ -207,19 +214,16 @@ public class JavacHolder {
             /**
              * Look for .java files and invalidate them
              */
-            private void parseAll(Path path, List<JCTree.JCCompilationUnit> trees, List<Path> paths) {
+            private void findAllFiles(Path path, List<URI> uris) {
                 if (Files.isDirectory(path)) try {
-                    Files.list(path).forEach(p -> parseAll(p, trees, paths));
+                    Files.list(path).forEach(p -> findAllFiles(p, uris));
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
                 else if (path.getFileName().toString().endsWith(".java")) {
                     LOG.info("Index " + path);
 
-                    JavaFileObject file = fileManager.getRegularFile(path.toFile());
-
-                    trees.add(parse(file));
-                    paths.add(path);
+                    uris.add(path.toUri());
                 }
             }
         };
@@ -269,19 +273,18 @@ public class JavacHolder {
      * @param cursor Offset in file where the cursor is
      */
     public List<CompletionItem> autocomplete(URI file, Optional<String> textContent, long cursor) {
+        initialIndexComplete.join();
+
         JavaFileObject object = findFile(file, textContent);
 
         object = TreePruner.putSemicolonAfterCursor(object, file, cursor);
 
-        JCTree.JCCompilationUnit tree = parse(object);
+        JCTree.JCCompilationUnit compiled = compileSimple(
+                object,
+                tree -> new TreePruner(tree, context).removeStatementsAfterCursor(cursor)
+        );
 
-        // Remove all statements after the cursor
-        // There are often parse errors after the cursor, which can generate unrecoverable type errors
-        new TreePruner(tree, context).removeStatementsAfterCursor(cursor);
-
-        compile(Collections.singleton(tree));
-
-        return doAutocomplete(object, tree, cursor);
+        return doAutocomplete(object, compiled, cursor);
     }
 
     private List<CompletionItem> doAutocomplete(JavaFileObject object, JCTree.JCCompilationUnit pruned, long cursor) {
@@ -300,6 +303,8 @@ public class JavacHolder {
      * @param cursor Offset in file where the cursor is
      */
     public List<Location> findReferences(URI file, Optional<String> textContent, long cursor) {
+        initialIndexComplete.join();
+
         JCTree.JCCompilationUnit tree = findTree(file, textContent);
 
         return findSymbol(tree, cursor)
@@ -316,6 +321,8 @@ public class JavacHolder {
     }
 
     public Optional<Location> gotoDefinition(URI file, Optional<String> textContent, long cursor) {
+        initialIndexComplete.join();
+
         JCTree.JCCompilationUnit tree = findTree(file, textContent);
 
         return findSymbol(tree, cursor)
@@ -334,13 +341,7 @@ public class JavacHolder {
     }
 
     private JCTree.JCCompilationUnit findTree(URI file, Optional<String> textContent) {
-        JCTree.JCCompilationUnit tree = parse(findFile(file, textContent));
-
-        compile(Collections.singleton(tree));
-
-        index.update(tree, context);
-
-        return tree;
+        return compileSimple(findFile(file, textContent), parsed -> {});
     }
 
     private Optional<Symbol> findSymbol(JCTree.JCCompilationUnit tree, long cursor) {
@@ -353,48 +354,27 @@ public class JavacHolder {
     }
 
     public Optional<Symbol> symbolAt(URI file, Optional<String> textContent, long cursor) {
+        initialIndexComplete.join();
+
         JCTree.JCCompilationUnit tree = findTree(file, textContent);
 
         return findSymbol(tree, cursor);
     }
 
     /**
-     * Clear files and all their dependents, recompile, update the index, and report any errors.
-     */
-    public DiagnosticCollector<JavaFileObject> update(Map<URI, Optional<String>> files) {
-        List<JavaFileObject> objects = files
-                .entrySet()
-                .stream()
-                .map(e -> findFile(e.getKey(), e.getValue()))
-                .collect(Collectors.toList());
-
-        return doUpdate(objects);
-    }
-
-    /**
-     * Exposed for testing only!
-     */
-    public DiagnosticCollector<JavaFileObject> doUpdate(Collection<JavaFileObject> objects) {
-        List<JCTree.JCCompilationUnit> parsed = objects
-                .stream()
-                .map(f -> {
-                    clear(f);
-
-                    return f;
-                })
-                .map(this::parse)
-                .collect(Collectors.toList());
-
-        // TODO add all dependents
-
-        return compile(parsed);
-    }
-
-    /**
      * File has been deleted
      */
-    public void delete(URI uri) {
-        // TODO
+    public CompilationResult delete(URI uri) {
+        initialIndexComplete.join();
+
+        JavaFileObject object = findFile(uri, Optional.empty());
+        Map<URI, Optional<String>> deps = dependencies(Collections.singleton(object))
+                .stream()
+                .collect(Collectors.toMap(o -> o.toUri(), o -> Optional.empty()));
+
+        clear(object);
+
+        return compile(deps);
     }
 
     private JavaFileObject findFile(URI file, Optional<String> text) {
@@ -403,58 +383,113 @@ public class JavacHolder {
                 .orElse(fileManager.getRegularFile(new File(file)));
     }
 
-    /**
-     * Parse the indicated source file, and its dependencies if they have been modified.
-     */
-    public JCTree.JCCompilationUnit parse(JavaFileObject source) {
-        clear(source);
+    private DiagnosticCollector<JavaFileObject> startCollectingErrors() {
+        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
 
-        JCTree.JCCompilationUnit result = compiler.parse(source);
+        onErrorDelegate = error -> {
+            if (error.getStartPosition() != Diagnostic.NOPOS)
+                errors.report(error);
+            else
+                LOG.warning("Skipped " + error.getMessage(null));
+        };
+        return errors;
+    }
 
-        return result;
+    private void stopCollectingErrors() {
+        onErrorDelegate = error -> {};
     }
 
     /**
-     * Compile a set of parsed files.
-     * 
-     * If these files reference un-parsed dependencies, those dependencies will also be parsed and compiled.
+     * Clear files and all their dependents, recompile, compile the index, and report any errors.
+     *
+     * If these files reference un-compiled dependencies, those dependencies will also be parsed and compiled.
      */
-    public DiagnosticCollector<JavaFileObject> compile(Collection<JCTree.JCCompilationUnit> parsed) {
+    public CompilationResult compile(Map<URI, Optional<String>> files) {
+        initialIndexComplete.join();
+
+        return doCompile(files);
+    }
+
+    private CompilationResult doCompile(Map<URI, Optional<String>> files) {
+        List<JavaFileObject> objects = files
+                .entrySet()
+                .stream()
+                .map(e -> findFile(e.getKey(), e.getValue()))
+                .collect(Collectors.toList());
+
+        objects.addAll(dependencies(objects));
+
+        // Clear javac caches
+        objects.forEach(this::clear);
+
         try {
-            DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
+            DiagnosticCollector<JavaFileObject> errors = startCollectingErrors();
 
-            onErrorDelegate = error -> {
-                if (error.getStartPosition() != Diagnostic.NOPOS)
-                    errors.report(error);
-            };
+            List<JCTree.JCCompilationUnit> parsed = objects.stream()
+                    .map(compiler::parse)
+                    .collect(Collectors.toList());
 
-            compiler.processAnnotations(compiler.enterTrees(com.sun.tools.javac.util.List.from(parsed)));
+            compileTrees(parsed);
 
-            while (!todo.isEmpty()) {
-                Env<AttrContext> next = todo.remove();
+            parsed.forEach(index::update);
 
-                try {
-                    // We don't do the desugar or generate phases, because they remove method bodies and methods
-                    Env<AttrContext> attributedTree = compiler.attribute(next);
-                    Queue<Env<AttrContext>> analyzedTree = compiler.flow(attributedTree);
-                } catch (Exception e) {
-                    LOG.log(Level.SEVERE, "Error compiling " + next.toplevel.sourcefile.getName(), e);
-
-                    // Keep going
-                }
-            }
-
-            return errors;
+            return new CompilationResult(parsed, errors);
         } finally {
-            onErrorDelegate = error -> {};
+            stopCollectingErrors();
         }
+    }
+
+    private void compileTrees(Collection<JCTree.JCCompilationUnit> parsed) {
+        compiler.processAnnotations(compiler.enterTrees(com.sun.tools.javac.util.List.from(parsed)));
+
+        while (!todo.isEmpty()) {
+            Env<AttrContext> next = todo.remove();
+
+            try {
+                // We don't do the desugar or generate phases, because they remove method bodies and methods
+                Env<AttrContext> attributedTree = compiler.attribute(next);
+                Queue<Env<AttrContext>> analyzedTree = compiler.flow(attributedTree);
+            } catch (Exception e) {
+                LOG.log(Level.SEVERE, "Error compiling " + next.toplevel.sourcefile.getName(), e);
+
+                // Keep going
+            }
+        }
+    }
+
+    /**
+     * Compile without updating dependencies, index, collecting errors.
+     * Useful for operations like autocomplete.
+     */
+    private JCTree.JCCompilationUnit compileSimple(JavaFileObject read, Consumer<JCTree.JCCompilationUnit> afterParse) {
+        clear(read);
+
+        JCTree.JCCompilationUnit parse = compiler.parse(read);
+
+        afterParse.accept(parse);
+        compileTrees(Collections.singleton(parse));
+
+        return parse;
+    }
+
+    private Collection<JavaFileObject> dependencies(Collection<JavaFileObject> files) {
+        // TODO
+        return Collections.emptyList();
+    }
+
+    /**
+     * Clear file from javac's caches.
+     * This is automatically invoked by other methods of this class; it's exposed only for testing.
+     */
+    public void clear(URI file) {
+        clear(findFile(file, Optional.empty()));
     }
 
     /**
      * Clear a file from javac's internal caches
      */
     private void clear(JavaFileObject source) {
-        // TODO clear dependencies as well (dependencies should get stored in SymbolIndex)
+        index.clear(source.toUri());
 
         // Forget about this file
         Consumer<JavaFileObject> removeFromLog = logRemover(log);
@@ -471,14 +506,13 @@ public class JavacHolder {
         Consumer<Type> removeFromClosureCache = closureCacheRemover(types);
 
         check.compiled.forEach((name, symbol) -> {
-            if (symbol.sourcefile.getName().equals(source.getName()))
+            if (symbol.sourcefile.getName().equals(source.getName())) {
+                removeFromClosureCache.accept(symbol.type);
                 remove.add(name);
-
-            removeFromClosureCache.accept(symbol.type);
+            }
         });
 
         remove.forEach(check.compiled::remove);
-
     }
 
     /** 

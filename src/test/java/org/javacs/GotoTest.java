@@ -6,20 +6,16 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.logging.Logger;
 
 import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.hasItems;
-import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 
-public class GotoTest extends Fixtures {
+public class GotoTest {
     private static final Logger LOG = Logger.getLogger("main");
     private static final String file = "/org/javacs/example/Goto.java";
-    private static final URI uri = uri(file);
+    private static final URI uri = FindResource.uri(file);
 
     @Test
     public void localVariable() throws IOException {
@@ -67,6 +63,8 @@ public class GotoTest extends Fixtures {
     @Test
     public void staticMethod() throws IOException {
         List<? extends Location> suggestions = doGoto(file, 15, 13);
+
+        System.out.println(suggestions.size());
 
         assertThat(suggestions, contains(location(uri, 37, 25, 37, 37)));
     }
@@ -124,10 +122,12 @@ public class GotoTest extends Fixtures {
         return location;
     }
 
+    private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
+
     private List<? extends Location> doGoto(String file, int row, int column) throws IOException {
         TextDocumentIdentifier document = new TextDocumentIdentifier();
 
-        document.setUri(uri(file).toString());
+        document.setUri(FindResource.uri(file).toString());
 
         Position position = new Position();
 
@@ -139,16 +139,7 @@ public class GotoTest extends Fixtures {
         p.setTextDocument(document);
         p.setPosition(position);
 
-        JavaLanguageServer server = Fixtures.getJavaLanguageServer();
-
         return server.gotoDefinition(p);
     }
 
-    private static URI uri(String file) {
-        try {
-            return GotoTest.class.getResource(file).toURI();
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-    }
 }

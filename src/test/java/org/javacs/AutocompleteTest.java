@@ -1,12 +1,13 @@
 package org.javacs;
 
-import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.CompletionItem;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.eclipse.lsp4j.TextDocumentPositionParams;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -16,7 +17,7 @@ import java.util.stream.Stream;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
-public class AutocompleteTest extends Fixtures {
+public class AutocompleteTest {
     private static final Logger LOG = Logger.getLogger("main");
 
     @Test
@@ -417,6 +418,8 @@ public class AutocompleteTest extends Fixtures {
                 .collect(Collectors.toSet());
     }
 
+    private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
+
     private List<? extends CompletionItem> items(String file, int row, int column) {
         TextDocumentPositionParams position = new TextDocumentPositionParams();
 
@@ -424,18 +427,8 @@ public class AutocompleteTest extends Fixtures {
         position.getPosition().setLine(row);
         position.getPosition().setCharacter(column);
         position.setTextDocument(new TextDocumentIdentifier());
-        position.getTextDocument().setUri(uri(file).toString());
-
-        JavaLanguageServer server = getJavaLanguageServer();
+        position.getTextDocument().setUri(FindResource.uri(file).toString());
 
         return server.autocomplete(position).getItems();
-    }
-
-    private URI uri(String file) {
-        try {
-            return AutocompleteTest.class.getResource(file).toURI();
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
     }
 }

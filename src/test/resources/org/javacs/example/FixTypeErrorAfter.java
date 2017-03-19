@@ -1,0 +1,1 @@
+public class FixTypeErrorAfter { public String foo() { return "foo"; } }

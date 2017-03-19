@@ -443,15 +443,6 @@ public class SymbolIndex {
     }
 
     /**
-     * Update the index when a files changes
-     */
-    public void update(JCTree.JCCompilationUnit tree, Context context) {
-        Indexer indexer = new Indexer(context);
-
-        tree.accept(indexer);
-    }
-
-    /**
      * Clear a file from the index when it is deleted
      */
     public void clear(URI sourceFile) {

@@ -1,0 +1,1 @@
+public class FixParseErrorBefore { public String foo() { return "foo"; }

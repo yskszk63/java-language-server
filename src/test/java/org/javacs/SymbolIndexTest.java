@@ -1,14 +1,16 @@
 package org.javacs;
 
 import com.sun.tools.javac.code.Symbol;
-
-import javax.tools.*;
-import com.sun.tools.javac.tree.*;
+import com.sun.tools.javac.tree.JCTree;
 import org.junit.Test;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -62,7 +64,7 @@ public class SymbolIndexTest {
 
         compile(path);
 
-        List<String> all = index.allInFile(new GetResourceFileObject(path).toUri())
+        List<String> all = index.allInFile(FindResource.uri(path))
                                 .map(s -> s.getName())
                                 .collect(Collectors.toList());
 
@@ -82,7 +84,7 @@ public class SymbolIndexTest {
 
         compile(path);
 
-        List<String> all = index.allInFile(new GetResourceFileObject(path).toUri())
+        List<String> all = index.allInFile(FindResource.uri(path))
                                 .map(s -> s.getName())
                                 .collect(Collectors.toList());
 
@@ -90,17 +92,14 @@ public class SymbolIndexTest {
     }
 
     private Symbol symbol(String path, int line, int character) {
-        return new JavaLanguageServer(compiler).findSymbol(compile(path), line, character).orElse(null);
+        return new JavaLanguageServer(compiler)
+                .findSymbol(FindResource.uri(path), line, character).orElse(null);
     }
 
     private JCTree.JCCompilationUnit compile(String path) {
-        JavaFileObject file = new GetResourceFileObject(path);
-        JCTree.JCCompilationUnit tree = compiler.parse(file);
+        URI file = FindResource.uri(path);
 
-        compiler.compile(Collections.singleton(tree));
-        index.update(tree, compiler.context);
-
-        return tree;
+        return compiler.compile(Collections.singletonMap(file, Optional.empty())).trees.stream().findFirst().get();
     }
 
     private Set<String> search(String query) {
@@ -111,20 +110,19 @@ public class SymbolIndexTest {
     private SymbolIndex index = getIndex();
     
     private static SymbolIndex getIndex() {
-        Set<Path> sourcePath = Collections.singleton(Paths.get("src/main/java").toAbsolutePath());
-        Path outputDirectory = Paths.get("out").toAbsolutePath();
-        SymbolIndex index = new SymbolIndex(classPath, sourcePath, outputDirectory);
+        compiler.initialIndexComplete.join();
 
-        index.initialIndexComplete.join();
-
-        return index;
+        return compiler.index;
     }
 
     private static JavacHolder compiler = newCompiler();
 
     private static JavacHolder newCompiler() {
-        return new JavacHolder(Collections.emptySet(),
-                               Collections.singleton(Paths.get("src/test/resources")),
-                               Paths.get("out"));
+        return new JavacHolder(
+                Collections.emptySet(),
+                Collections.singleton(Paths.get("src/test/resources")),
+                Paths.get("out"),
+                true
+        );
     }
 }

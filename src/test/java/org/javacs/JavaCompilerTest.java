@@ -4,18 +4,21 @@ import com.google.common.collect.ImmutableList;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.api.JavacTool;
-import com.sun.tools.javac.tree.JCTree;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import javax.lang.model.element.Element;
-import javax.tools.*;
+import javax.tools.Diagnostic;
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardJavaFileManager;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.logging.Logger;
 
 // TODO java compiler can fail badly, handle somehow
@@ -41,13 +44,9 @@ public class JavaCompilerTest {
 
     @Test
     public void javacHolder() {
-        JavacHolder javac = new JavacHolder(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target"));
+        JavacHolder javac = new JavacHolder(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target"), false);
         File file = Paths.get("src/test/resources/org/javacs/example/Bad.java").toFile();
-        JCTree.JCCompilationUnit parsed = javac.parse(javac.fileManager.getRegularFile(file));
-
-        javac.compile(Collections.singleton(parsed));
-
-        LOG.info(parsed.toString());
+        CompilationResult compile = javac.compile(Collections.singletonMap(file.toURI(), Optional.empty()));
     }
 
     private void reportError(Diagnostic<? extends JavaFileObject> error) {

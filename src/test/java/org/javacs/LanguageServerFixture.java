@@ -1,23 +1,19 @@
 package org.javacs;
 
 import org.eclipse.lsp4j.InitializeParams;
-import org.junit.BeforeClass;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Set;
 
-public class Fixtures {
+public class LanguageServerFixture {
 
-    public static void init() { }
-
-    static JavaLanguageServer getJavaLanguageServer() {
+    public static JavaLanguageServer getJavaLanguageServer() {
         Set<Path> classPath = Collections.emptySet();
         Set<Path> sourcePath = Collections.singleton(Paths.get("src/test/resources").toAbsolutePath());
         Path outputDirectory = Paths.get("out").toAbsolutePath();
-        JavacHolder javac = new JavacHolder(classPath, sourcePath, outputDirectory);
+        JavacHolder javac = new JavacHolder(classPath, sourcePath, outputDirectory, true);
         JavaLanguageServer server = new JavaLanguageServer(javac);
 
         InitializeParams init = new InitializeParams();

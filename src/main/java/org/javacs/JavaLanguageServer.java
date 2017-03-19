@@ -9,7 +9,6 @@ import org.eclipse.lsp4j.services.WorkspaceService;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
-import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -283,7 +282,9 @@ class JavaLanguageServer implements LanguageServer {
         }
 
         files.forEach((config, configFiles) -> {
-            publishDiagnostics(paths, findCompilerForConfig(config).update(configFiles));
+            CompilationResult compile = findCompilerForConfig(config).compile(configFiles);
+
+            publishDiagnostics(compile);
         });
     }
 
@@ -324,7 +325,9 @@ class JavaLanguageServer implements LanguageServer {
                             activeDocuments.remove(uri);
 
                             findCompiler(uri).ifPresent(compiler -> {
-                                compiler.delete(uri);
+                                CompilationResult result = compiler.delete(uri);
+
+                                publishDiagnostics(result);
                             });
                         }
                     }
@@ -336,12 +339,16 @@ class JavaLanguageServer implements LanguageServer {
         };
     }
     
-    private void publishDiagnostics(Collection<URI> paths, DiagnosticCollector<JavaFileObject> errors) {
+    private void publishDiagnostics(CompilationResult result) {
+        List<URI> touched = result.trees
+                .stream()
+                .map(tree -> tree.getSourceFile().toUri())
+                .collect(Collectors.toList());
         Map<URI, PublishDiagnosticsParams> files = new HashMap<>();
+
+        touched.forEach(p -> files.put(p, newPublishDiagnostics(p)));
         
-        paths.forEach(p -> files.put(p, newPublishDiagnostics(p)));
-        
-        errors.getDiagnostics().forEach(error -> {
+        result.errors.getDiagnostics().forEach(error -> {
             if (error.getStartPosition() != javax.tools.Diagnostic.NOPOS) {
                 URI uri = error.getSource().toUri();
                 PublishDiagnosticsParams publish = files.computeIfAbsent(uri, this::newPublishDiagnostics);
@@ -668,6 +675,13 @@ class JavaLanguageServer implements LanguageServer {
         return findCompiler(uri)
                 .map(compiler -> compiler.findReferences(uri, content, cursor))
                 .orElse(Collections.emptyList());
+    }
+
+    public Optional<Symbol> findSymbol(URI file, int line, int character) {
+        Optional<String> content = activeContent(file);
+        long cursor = findOffset(file, line, character);
+
+        return findCompiler(file).flatMap(compiler -> compiler.symbolAt(file, content, cursor));
     }
 
     private List<? extends SymbolInformation> findDocumentSymbols(DocumentSymbolParams params) {

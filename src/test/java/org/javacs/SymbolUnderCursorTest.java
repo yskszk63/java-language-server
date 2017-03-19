@@ -1,18 +1,16 @@
 package org.javacs;
 
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.tree.JCTree;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import javax.tools.JavaFileObject;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Optional;
 
 import static org.junit.Assert.assertEquals;
 
-public class SymbolUnderCursorTest extends Fixtures {
+public class SymbolUnderCursorTest {
 
     @Test
     public void classDeclaration() {
@@ -81,25 +79,19 @@ public class SymbolUnderCursorTest extends Fixtures {
     }
 
     private String symbolAt(String file, int line, int character) {
-        Optional<Symbol> symbol = new JavaLanguageServer(compiler).findSymbol(compile(file), line, character);
+        Optional<Symbol> symbol = new JavaLanguageServer(compiler).findSymbol(FindResource.uri(file), line, character);
 
         return symbol.map(s -> s.getSimpleName().toString()).orElse(null);
-    }
-
-    private JCTree.JCCompilationUnit compile(String path) {
-        JavaFileObject file = new GetResourceFileObject(path);
-        JCTree.JCCompilationUnit tree = compiler.parse(file);
-
-        compiler.compile(Collections.singleton(tree));
-
-        return tree;
     }
 
     private static JavacHolder compiler = newCompiler();
 
     private static JavacHolder newCompiler() {
-        return new JavacHolder(Collections.emptySet(),
-                               Collections.singleton(Paths.get("src/test/resources")),
-                               Paths.get("out"));
+        return new JavacHolder(
+                Collections.emptySet(),
+                Collections.singleton(Paths.get("src/test/resources")),
+                Paths.get("out"),
+                false
+        );
     }
 }

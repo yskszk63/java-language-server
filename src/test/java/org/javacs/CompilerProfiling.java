@@ -6,26 +6,24 @@ import com.sun.tools.javac.util.Context;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import javax.tools.DiagnosticCollector;
-import javax.tools.JavaFileObject;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.logging.Logger;
 
 import static org.junit.Assert.assertNotNull;
 
 @Ignore
-public class CompilerProfiling extends Fixtures {
+public class CompilerProfiling {
     private static final Logger LOG = Logger.getLogger("main");
 
     @Test
     public void parsingSpeed() throws IOException, URISyntaxException {
-        StringFileObject file = fromResource("/org/javacs/example/LargeFile.java");
+        URI file = FindResource.uri("/org/javacs/example/LargeFile.java");
 
         for (int i = 0; i < 10; i++) {
             Duration duration = compileLargeFile(file);
@@ -34,19 +32,14 @@ public class CompilerProfiling extends Fixtures {
         }
     }
 
-    private Duration compileLargeFile(StringFileObject file) {
+    private Duration compileLargeFile(URI file) {
         long start = System.nanoTime();
 
-        DiagnosticCollector<JavaFileObject> errors = new DiagnosticCollector<>();
-        JavacHolder compiler = new JavacHolder(Collections.emptySet(), Collections.emptySet(), Paths.get("out"));
+        JavacHolder compiler = new JavacHolder(Collections.emptySet(), Collections.emptySet(), Paths.get("out"), false);
         GetCompilationUnit compilationUnit = new GetCompilationUnit(compiler.context);
 
-        compiler.onError(errors);
-
         try {
-            JCTree.JCCompilationUnit tree = compiler.parse(file);
-
-            tree.accept(compilationUnit);
+            compiler.compile(Collections.singletonMap(file, Optional.empty())).trees.forEach(tree -> tree.accept(compilationUnit));
         } catch (RuntimeException e) {
             if (e.getCause() instanceof AbortCompilation)
                 LOG.info("Aborted further stages");
@@ -59,12 +52,6 @@ public class CompilerProfiling extends Fixtures {
         assertNotNull(compilationUnit.result);
 
         return Duration.ofNanos(finish - start);
-    }
-
-    private StringFileObject fromResource(String file) throws URISyntaxException, IOException {
-        Path path = Paths.get(LinterTest.class.getResource(file).toURI());
-        String content = new String(Files.readAllBytes(path));
-        return new StringFileObject(content, path);
     }
 
     private static class GetCompilationUnit extends BaseScanner {
