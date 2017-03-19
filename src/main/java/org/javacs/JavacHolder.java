@@ -186,8 +186,7 @@ public class JavacHolder {
      * This may take a while, so we'll do it on an extra thread
      */
     private CompletableFuture<Void> startIndexingSourcePath() {
-        CompletableFuture<Void> done = new CompletableFuture<>();
-        Thread worker = new Thread("InitialIndex") {
+        return CompletableFuture.runAsync(new Runnable() {
             @Override
             public void run() {
                 List<URI> objects = new ArrayList<>();
@@ -208,8 +207,6 @@ public class JavacHolder {
                 // Then, use the same mechanism as the desugar / generate phases to remove method bodies,
                 // to reclaim memory as we go
 
-                done.complete(null);
-
                 // TODO verify that compiler and all its resources get destroyed
             }
 
@@ -228,11 +225,7 @@ public class JavacHolder {
                     uris.add(path.toUri());
                 }
             }
-        };
-
-        worker.start();
-
-        return done;
+        }, command -> new Thread(command, "InitialIndex").start());
     }
 
     /** 
