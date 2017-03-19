@@ -23,6 +23,8 @@ public class JavacHolderTest {
 
         javac.clear(file);
 
+        tree = ContextPrinter.tree(javac.context, 3);
+
         System.out.println(tree.toString());
 
         assertThat(tree.toString(), not(containsString("FooString")));

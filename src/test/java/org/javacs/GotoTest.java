@@ -64,8 +64,6 @@ public class GotoTest {
     public void staticMethod() throws IOException {
         List<? extends Location> suggestions = doGoto(file, 15, 13);
 
-        System.out.println(suggestions.size());
-
         assertThat(suggestions, contains(location(uri, 37, 25, 37, 37)));
     }
 

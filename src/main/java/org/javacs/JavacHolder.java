@@ -1,11 +1,13 @@
 package org.javacs;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.Maps;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.api.MultiTaskListener;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.comp.*;
@@ -500,23 +502,75 @@ public class JavacHolder {
         log.nerrors = 0;
         log.nwarnings = 0;
 
-        // Remove all cached classes that came from this files
-        List<Name> remove = new ArrayList<>();
+        // Identify all classes that are in this file
+        Map<Name, Symbol.ClassSymbol> enclosed = new HashMap<>(Maps.filterValues(
+                check.compiled,
+                symbol -> symbol != null && symbol.sourcefile.getName().equals(source.getName())
+        ));
 
+        // Clear javac caches
         Consumer<Type> removeFromClosureCache = closureCacheRemover(types);
+        Symtab symtab = Symtab.instance(context);
+        Enter enter = Enter.instance(context);
+        Consumer<Symbol> removeFromTypeEnvs = typeEnvsRemover(enter);
 
-        check.compiled.forEach((name, symbol) -> {
-            if (symbol.sourcefile.getName().equals(source.getName())) {
-                removeFromClosureCache.accept(symbol.type);
-                remove.add(name);
-            }
+        for (Name name : enclosed.keySet()) {
+            // Remove from class-name => class-symbol map
+            check.compiled.remove(name);
+            // Remove from class-name => package-symbol map
+            symtab.packages.remove(name);
+            // Remove from class-name => class-symbol map
+            symtab.classes.remove(name);
+
+        }
+
+        for (Symbol.ClassSymbol symbol : enclosed.values()) {
+            // Remove from type => supertypes map
+            removeFromClosureCache.accept(symbol.type);
+            // Remove from type-symbol -> Env map
+            removeFromTypeEnvs.accept(symbol);
+        }
+
+        CompileStates compileStates = CompileStates.instance(context);
+
+        compileStates.entrySet().removeIf(entry -> {
+            Env<AttrContext> env = entry.getKey();
+
+            return containsClass(env, enclosed.values());
         });
-
-        remove.forEach(check.compiled::remove);
     }
 
-    /** 
-     * Reflectively invokes Types.closureCache.remove(Type) 
+    private boolean containsClass(Env<AttrContext> env, Collection<? extends Symbol> symbols) {
+        if (env == null)
+            return false;
+
+        for (Symbol symbol : env.info.getLocalElements()) {
+            if (symbols.contains(symbol))
+                return true;
+        }
+
+        return containsClass(env.outer, symbols);
+    }
+
+    /**
+     * Reflectively invokes Enter.typeEnvs.remove(Symbol)
+     */
+    private static Consumer<Symbol> typeEnvsRemover(Enter enter) {
+        try {
+            Field typeEnvs = Enter.class.getDeclaredField("typeEnvs");
+
+            typeEnvs.setAccessible(true);
+
+            Map<Symbol.TypeSymbol,Env<AttrContext>> value = (Map<Symbol.TypeSymbol,Env<AttrContext>>) typeEnvs.get(enter);
+
+            return value::remove;
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Reflectively invokes Types.closureCache.remove(Type)
      */
     private static Consumer<Type> closureCacheRemover(Types types) {
         try {
