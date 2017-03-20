@@ -29,16 +29,16 @@ public class SymbolIndexTest {
 
     @Test
     public void searchClasses() {
-        Set<String> all = search("JLanguageServer");
+        Set<String> all = search("ABetweenLines");
 
-        assertThat(all, hasItem("JavaLanguageServer"));
+        assertThat(all, hasItem("AutocompleteBetweenLines"));
     }
 
     @Test
     public void searchMethods() {
-        Set<String> all = search("gTextDocumentService");
+        Set<String> all = search("mStatic");
 
-        assertThat(all, hasItem("getTextDocumentService"));
+        assertThat(all, hasItem("methodStatic"));
     }
 
     @Test

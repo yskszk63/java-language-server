@@ -454,7 +454,7 @@ public class JavacHolder {
      * Useful for operations like autocomplete.
      */
     private JCTree.JCCompilationUnit compileSimple(JavaFileObject read, Consumer<JCTree.JCCompilationUnit> afterParse) {
-        clear(read);
+        clearCompilerOnly(read);
 
         JCTree.JCCompilationUnit parse = compiler.parse(read);
 
@@ -483,6 +483,10 @@ public class JavacHolder {
     private void clear(JavaFileObject source) {
         index.clear(source.toUri());
 
+        clearCompilerOnly(source);
+    }
+
+    private void clearCompilerOnly(JavaFileObject source) {
         // Forget about this file
         Consumer<JavaFileObject> removeFromLog = logRemover(log);
 
