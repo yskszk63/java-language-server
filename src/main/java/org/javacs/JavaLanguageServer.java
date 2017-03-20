@@ -1,15 +1,15 @@
 package org.javacs;
 
+import com.google.common.base.Joiner;
 import com.sun.tools.javac.code.Symbol;
 import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.eclipse.lsp4j.services.TextDocumentService;
 import org.eclipse.lsp4j.services.WorkspaceService;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
-
-import com.google.common.base.Joiner;
 
 import javax.tools.JavaFileObject;
 import javax.xml.parsers.DocumentBuilder;
@@ -103,8 +103,8 @@ class JavaLanguageServer implements LanguageServer {
     public TextDocumentService getTextDocumentService() {
         return new TextDocumentService() {
             @Override
-            public CompletableFuture<CompletionList> completion(TextDocumentPositionParams position) {
-                return CompletableFuture.completedFuture(autocomplete(position));
+            public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(TextDocumentPositionParams position) {
+                return CompletableFuture.completedFuture(Either.forRight(autocomplete(position)));
             }
 
             @Override
@@ -300,6 +300,11 @@ class JavaLanguageServer implements LanguageServer {
     @Override
     public WorkspaceService getWorkspaceService() {
         return new WorkspaceService() {
+            @Override
+            public CompletableFuture<Object> executeCommand(ExecuteCommandParams params) {
+                throw new UnsupportedOperationException(); // TODO
+            }
+
             @Override
             public CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
                 List<SymbolInformation> infos = compilerCache
@@ -824,7 +829,7 @@ class JavaLanguageServer implements LanguageServer {
         return findCompiler(uri)
                 .flatMap(compiler -> compiler.symbolAt(uri, content, cursor))
                 .flatMap(JavaLanguageServer::hoverText)
-                .map(text -> new Hover(Collections.singletonList(text), null))
+                .map(text -> new Hover(Collections.singletonList(Either.forLeft(text)), null))
                 .orElse(new Hover());
     }
 
