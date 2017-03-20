@@ -118,11 +118,10 @@ public class SymbolIndexTest {
     private static JavacHolder compiler = newCompiler();
 
     private static JavacHolder newCompiler() {
-        return new JavacHolder(
+        return JavacHolder.create(
                 Collections.emptySet(),
                 Collections.singleton(Paths.get("src/test/resources")),
-                Paths.get("out"),
-                true
+                Paths.get("out")
         );
     }
 }

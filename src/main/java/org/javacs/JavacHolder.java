@@ -1,37 +1,34 @@
 package org.javacs;
 
 import com.google.common.base.Joiner;
-import com.google.common.collect.Maps;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.api.MultiTaskListener;
-import com.sun.tools.javac.code.*;
+import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.comp.*;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.parser.FuzzyParserFactory;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeInfo;
-import com.sun.tools.javac.util.*;
+import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Log;
+import com.sun.tools.javac.util.Options;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Location;
 
-import javax.tools.Diagnostic;
-import javax.tools.DiagnosticCollector;
-import javax.tools.DiagnosticListener;
-import javax.tools.JavaFileObject;
+import javax.tools.*;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Field;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.*;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -62,7 +59,7 @@ public class JavacHolder {
      * javac places all of its internal state into this Context object,
      * which is basically a Map<String, Object>
      */
-    public final Context context = new Context();
+    public Context context;
     /**
      * Error reporting initially goes nowhere.
      * We will replace this with a function that collects errors so we can report all the errors associated with a file at once.
@@ -75,16 +72,35 @@ public class JavacHolder {
     private final DiagnosticListener<JavaFileObject> onError = diagnostic -> {
         onErrorDelegate.report(diagnostic);
     };
-    
-    {
+
+    // Set up SymbolIndex
+
+    /**
+     * Index of symbols that gets updated every time you call compile
+     */
+    public final SymbolIndex index;
+
+    /**
+     * Completes when initial index is done. Useful for testing.
+     */
+    public final CompletableFuture<Void> initialIndexComplete;
+
+    private static Context reset(Set<Path> classPath,
+                                 Set<Path> sourcePath,
+                                 Path outputDirectory,
+                                 Context existing,
+                                 DiagnosticListener<JavaFileObject> onError,
+                                 Collection<JavaFileObject> invalidatedSources) {
+        Context context = new Context();
         context.put(DiagnosticListener.class, onError);
-    }
-    
-    // Sets command-line options
-    private final Options options = Options.instance(context);
-    
-    {
-        // You would think we could do -Xlint:all, 
+
+        // Sets command-line options
+        Options options = Options.instance(context);
+
+        options.put("-classpath", Joiner.on(File.pathSeparator).join(classPath));
+        options.put("-sourcepath", Joiner.on(File.pathSeparator).join(sourcePath));
+        options.put("-d", outputDirectory.toString());
+        // You would think we could do -Xlint:all,
         // but some lints trigger fatal errors in the presence of parse errors
         options.put("-Xlint:cast", "");
         options.put("-Xlint:deprecation", "");
@@ -95,69 +111,52 @@ public class JavacHolder {
         options.put("-Xlint:unchecked", "");
         options.put("-Xlint:varargs", "");
         options.put("-Xlint:static", "");
-    }
 
-    // Pre-register some custom components before javac initializes
-    
-    private final Log log = Log.instance(context);
+        // Pre-register some custom components before javac initializes
+        Log.instance(context).multipleErrors = true;
 
-    {
-        log.multipleErrors = true;
-    }
+        JavacFileManager fileManager = (JavacFileManager) context.get(JavaFileManager.class);
 
-    private final JavacFileManager fileManager = new JavacFileManager(context, true, null);
-    private final ForgivingAttr attr = ForgivingAttr.instance(context);
-    private final Check check = Check.instance(context);
-    private final FuzzyParserFactory parserFactory = FuzzyParserFactory.instance(context);
-    
-    // Initialize javac
+        if (fileManager == null)
+            fileManager = new JavacFileManager(context, true, null);
 
-    public final JavaCompiler compiler = JavaCompiler.instance(context);
+        ForgivingAttr.instance(context);
+        Check.instance(context);
+        FuzzyParserFactory.instance(context);
 
-    {
+        // Initialize javac
+        JavaCompiler compiler = JavaCompiler.instance(context);
+
         // We're going to use the javadoc comments
         compiler.keepComments = true;
+
+        // This may not be necessary
+        Todo.instance(context);
+        JavacTrees.instance(context);
+        Types.instance(context);
+
+        return context;
     }
 
-    // javac has already been initialized, fetch a few components for easy access
-
-    private final Todo todo = Todo.instance(context);
-    private final JavacTrees trees = JavacTrees.instance(context);
-    private final Types types = Types.instance(context);
-
-    // Set up SymbolIndex
-
-    /**
-     * Index of symbols that gets updated every time you call compile
-     */
-    public final SymbolIndex index = new SymbolIndex(this);
-
-    /**
-     * Completes when initial index is done. Useful for testing.
-     */
-    public final CompletableFuture<Void> initialIndexComplete;
-
-    public JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
-        this(classPath, sourcePath, outputDirectory, true);
-    }
-
-    public JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory, boolean index) {
+    private JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory, Optional<SymbolIndex> index) {
         this.classPath = Collections.unmodifiableSet(classPath);
         this.sourcePath = Collections.unmodifiableSet(sourcePath);
         this.outputDirectory = outputDirectory;
-
-        options.put("-classpath", Joiner.on(File.pathSeparator).join(classPath));
-        options.put("-sourcepath", Joiner.on(File.pathSeparator).join(sourcePath));
-        options.put("-d", outputDirectory.toString());
+        this.context = reset(classPath, sourcePath, outputDirectory, new Context(), onError, Collections.emptyList());
+        this.index = index.orElse(new SymbolIndex());
+        this.initialIndexComplete = index.isPresent() ? CompletableFuture.completedFuture(null) : startIndexingSourcePath();
 
         logStartStopEvents();
         ensureOutputDirectory(outputDirectory);
         clearOutputDirectory(outputDirectory);
+    }
 
-        if (index)
-            initialIndexComplete = startIndexingSourcePath();
-        else
-            initialIndexComplete = CompletableFuture.completedFuture(null);
+    public static JavacHolder create(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
+        return new JavacHolder(classPath, sourcePath, outputDirectory, Optional.empty());
+    }
+
+    public static JavacHolder createWithoutIndex(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
+        return new JavacHolder(classPath, sourcePath, outputDirectory, Optional.of(new SymbolIndex()));
     }
 
     private void logStartStopEvents() {
@@ -195,7 +194,11 @@ public class JavacHolder {
                 Map<URI, Optional<String>> files = objects.stream().collect(Collectors.toMap(key -> key, key -> Optional.empty()));
                 CompilationResult result = doCompile(files);
 
-                result.trees.forEach(index::update);
+                result.trees.forEach(compiled -> {
+                    Indexer indexer = new Indexer(index, context);
+
+                    compiled.accept(indexer);
+                });
 
                 // TODO minimize memory use during this process
                 // Instead of doing parse-all / compileFileObjects-all,
@@ -255,6 +258,14 @@ public class JavacHolder {
         } catch (IOException e) {
             LOG.log(Level.SEVERE, e.getMessage(), e);
         }
+    }
+
+    private JavaCompiler compiler() {
+        return JavaCompiler.instance(context);
+    }
+
+    private JavacFileManager fileManager() {
+        return (JavacFileManager) context.get(JavaFileManager.class);
     }
 
     /**
@@ -356,6 +367,7 @@ public class JavacHolder {
     /**
      * File has been deleted
      */
+    // TODO delete multiple objects at the same time for performance if user does that
     public CompilationResult delete(URI uri) {
         initialIndexComplete.join();
 
@@ -364,7 +376,7 @@ public class JavacHolder {
                 .stream()
                 .collect(Collectors.toMap(o -> o.toUri(), o -> Optional.empty()));
 
-        clear(object);
+        clearObjects(Collections.singleton(object));
 
         return compile(deps);
     }
@@ -372,7 +384,7 @@ public class JavacHolder {
     private JavaFileObject findFile(URI file, Optional<String> text) {
         return text
                 .map(content -> (JavaFileObject) new StringFileObject(content, file))
-                .orElse(fileManager.getRegularFile(new File(file)));
+                .orElse(fileManager().getRegularFile(new File(file)));
     }
 
     private DiagnosticCollector<JavaFileObject> startCollectingErrors() {
@@ -412,18 +424,22 @@ public class JavacHolder {
         objects.addAll(dependencies(objects));
 
         // Clear javac caches
-        objects.forEach(this::clear);
+        clearObjects(objects);
 
         try {
             DiagnosticCollector<JavaFileObject> errors = startCollectingErrors();
 
             List<JCTree.JCCompilationUnit> parsed = objects.stream()
-                    .map(compiler::parse)
+                    .map(compiler()::parse)
                     .collect(Collectors.toList());
 
             compileTrees(parsed);
 
-            parsed.forEach(index::update);
+            parsed.forEach(compiled -> {
+                Indexer indexer = new Indexer(index, context);
+
+                compiled.accept(indexer);
+            });
 
             return new CompilationResult(parsed, errors);
         } finally {
@@ -432,15 +448,17 @@ public class JavacHolder {
     }
 
     private void compileTrees(Collection<JCTree.JCCompilationUnit> parsed) {
-        compiler.processAnnotations(compiler.enterTrees(com.sun.tools.javac.util.List.from(parsed)));
+        Todo todo = Todo.instance(context);
+
+        compiler().processAnnotations(compiler().enterTrees(com.sun.tools.javac.util.List.from(parsed)));
 
         while (!todo.isEmpty()) {
             Env<AttrContext> next = todo.remove();
 
             try {
                 // We don't do the desugar or generate phases, because they remove method bodies and methods
-                Env<AttrContext> attributedTree = compiler.attribute(next);
-                Queue<Env<AttrContext>> analyzedTree = compiler.flow(attributedTree);
+                Env<AttrContext> attributedTree = compiler().attribute(next);
+                Queue<Env<AttrContext>> analyzedTree = compiler().flow(attributedTree);
             } catch (Exception e) {
                 LOG.log(Level.SEVERE, "Error compiling " + next.toplevel.sourcefile.getName(), e);
 
@@ -454,9 +472,9 @@ public class JavacHolder {
      * Useful for operations like autocomplete.
      */
     private JCTree.JCCompilationUnit compileSimple(JavaFileObject read, Consumer<JCTree.JCCompilationUnit> afterParse) {
-        clearCompilerOnly(read);
+        clearCompilerOnly(Collections.singleton(read));
 
-        JCTree.JCCompilationUnit parse = compiler.parse(read);
+        JCTree.JCCompilationUnit parse = compiler().parse(read);
 
         afterParse.accept(parse);
         compileTrees(Collections.singleton(parse));
@@ -469,174 +487,30 @@ public class JavacHolder {
         return Collections.emptyList();
     }
 
+
     /**
      * Clear file from javac's caches.
      * This is automatically invoked by other methods of this class; it's exposed only for testing.
      */
-    public void clear(URI file) {
-        clear(findFile(file, Optional.empty()));
+    public void clearFiles(Collection<URI> files) {
+        List<JavaFileObject> objects = files
+                .stream()
+                .map(f -> findFile(f, Optional.empty()))
+                .collect(Collectors.toList());
+
+        clearObjects(objects);
     }
 
     /**
      * Clear a file from javac's internal caches
      */
-    private void clear(JavaFileObject source) {
-        index.clear(source.toUri());
+    private void clearObjects(Collection<JavaFileObject> sources) {
+        sources.forEach(s -> index.clear(s.toUri()));
 
-        clearCompilerOnly(source);
+        clearCompilerOnly(sources);
     }
 
-    private void clearCompilerOnly(JavaFileObject source) {
-        // Forget about this file
-        Consumer<JavaFileObject> removeFromLog = logRemover(log);
-
-        removeFromLog.accept(source);
-
-        // javac's flow stage will stop early if there are errors
-        log.nerrors = 0;
-        log.nwarnings = 0;
-
-        // Identify all classes that are in this file
-        Map<Name, Symbol.ClassSymbol> enclosed = new HashMap<>(Maps.filterValues(
-                check.compiled,
-                symbol -> symbol != null && symbol.sourcefile.getName().equals(source.getName())
-        ));
-
-        // Clear javac caches
-        Consumer<Type> removeFromClosureCache = closureCacheRemover(types);
-        Map<Symbol.TypeSymbol, Scope.CompoundScope> membersClosureCache = membersClosureCache(types);
-        Symtab symtab = Symtab.instance(context);
-        Map<Symbol.TypeSymbol, Env<AttrContext>> typeEnvsMap = typeEnvsMap();
-
-        for (Name name : enclosed.keySet()) {
-            // Remove from class-name => class-symbol map
-            check.compiled.remove(name);
-            // Remove from class-name => package-symbol map
-            symtab.packages.remove(name);
-            // Remove from class-name => class-symbol map
-            symtab.classes.remove(name);
-
-        }
-
-        for (Symbol.ClassSymbol symbol : enclosed.values()) {
-            // Remove from type => supertypes map
-            removeFromClosureCache.accept(symbol.type);
-            // Remove from type-symbol => scope map
-            membersClosureCache.remove(symbol);
-            // Remove from type-symbol -> Env map
-            typeEnvsMap.remove(symbol);
-        }
-
-        CompileStates compileStates = CompileStates.instance(context);
-
-        compileStates.entrySet().removeIf(entry -> {
-            Env<AttrContext> env = entry.getKey();
-
-            return containsClass(env, enclosed.values());
-        });
-
-        // Remove cached source files
-        Set<JavaFileObject> compilerInputFiles = getCompilerInputFiles(compiler);
-
-        compilerInputFiles.removeIf(file -> file.getName().equals(source.getName()));
-    }
-
-    private boolean containsClass(Env<AttrContext> env, Collection<? extends Symbol> symbols) {
-        if (env == null)
-            return false;
-
-        for (Symbol symbol : env.info.getLocalElements()) {
-            if (symbols.contains(symbol))
-                return true;
-        }
-
-        return containsClass(env.outer, symbols);
-    }
-
-    private Set<JavaFileObject> getCompilerInputFiles(JavaCompiler compiler) {
-        try {
-            Field field = JavaCompiler.class.getDeclaredField("inputFiles");
-
-            field.setAccessible(true);
-
-            return (Set<JavaFileObject>) field.get(compiler);
-        } catch (IllegalAccessException | NoSuchFieldException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Reflectively gets TypeEnvs.map
-     */
-    private Map<Symbol.TypeSymbol,Env<AttrContext>> typeEnvsMap() {
-        try {
-            Class<?> klass = Class.forName("com.sun.tools.javac.comp.TypeEnvs");
-            Field contextKeyField = klass.getDeclaredField("typeEnvsKey");
-
-            contextKeyField.setAccessible(true);
-
-            Context.Key<?> contextKey = (Context.Key<?>) contextKeyField.get(null);
-
-            Object typeEnvs = context.get(contextKey);
-            Field mapField = klass.getDeclaredField("map");
-
-            mapField.setAccessible(true);
-
-            return (Map<Symbol.TypeSymbol,Env<AttrContext>>) mapField.get(typeEnvs);
-        } catch (ClassNotFoundException | IllegalAccessException | NoSuchFieldException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static Map<Symbol.TypeSymbol, Scope.CompoundScope> membersClosureCache(Types types) {
-        try {
-            Field membersCacheField = Types.class.getDeclaredField("membersCache");
-
-            membersCacheField.setAccessible(true);
-
-            Object membersCache = membersCacheField.get(types);
-
-            Field mapField = membersCache.getClass().getDeclaredField("_map");
-
-            mapField.setAccessible(true);
-
-            return (Map<Symbol.TypeSymbol, Scope.CompoundScope>) mapField.get(membersCache);
-        } catch (IllegalAccessException | NoSuchFieldException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Reflectively invokes Types.closureCache.remove(Type)
-     */
-    private static Consumer<Type> closureCacheRemover(Types types) {
-        try {
-            Field field = Types.class.getDeclaredField("closureCache");
-
-            field.setAccessible(true);
-
-            Map<Type, com.sun.tools.javac.util.List<Type>> value = (Map<Type, com.sun.tools.javac.util.List<Type>>) field.get(types);
-
-            return value::remove;
-        } catch (IllegalAccessException | NoSuchFieldException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /** 
-     * Reflectively invokes Log.sourceMap.remove(JavaFileObject) 
-     */
-    private static Consumer<JavaFileObject> logRemover(Log log) {
-        try {
-            Field sourceMap = AbstractLog.class.getDeclaredField("sourceMap");
-
-            sourceMap.setAccessible(true);
-
-            Map<JavaFileObject, DiagnosticSource> value = (Map<JavaFileObject, DiagnosticSource>) sourceMap.get(log);
-
-            return value::remove;
-        } catch (IllegalAccessException | NoSuchFieldException e) {
-            throw new RuntimeException(e);
-        }
+    private void clearCompilerOnly(Collection<JavaFileObject> sources) {
+        context = reset(classPath, sourcePath, outputDirectory, context, onError, sources);
     }
 }

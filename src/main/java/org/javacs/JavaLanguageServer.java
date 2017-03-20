@@ -431,7 +431,7 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private JavacHolder newJavac(JavacConfig c) {
-        return new JavacHolder(c.classPath,
+        return JavacHolder.create(c.classPath,
                                c.sourcePath,
                                c.outputDirectory);
     }

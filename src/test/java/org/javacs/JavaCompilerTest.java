@@ -44,7 +44,7 @@ public class JavaCompilerTest {
 
     @Test
     public void javacHolder() {
-        JavacHolder javac = new JavacHolder(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target"), false);
+        JavacHolder javac = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target"));
         File file = Paths.get("src/test/resources/org/javacs/example/Bad.java").toFile();
         CompilationResult compile = javac.compile(Collections.singletonMap(file.toURI(), Optional.empty()));
     }

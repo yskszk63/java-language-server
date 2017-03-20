@@ -21,7 +21,7 @@ public class JavacHolderTest {
 
         assertThat(tree.toString(), containsString("FooString"));
 
-        javac.clear(file);
+        javac.clearFiles(Collections.singleton(file));
 
         tree = ContextPrinter.tree(javac.context, 3);
 
@@ -39,7 +39,7 @@ public class JavacHolderTest {
 
         assertThat(tree.toString(), containsString("GotoOther"));
 
-        javac.clear(file);
+        javac.clearFiles(Collections.singleton(file));
 
         tree = ContextPrinter.tree(javac.context, 3);
 
@@ -49,6 +49,6 @@ public class JavacHolderTest {
     }
 
     private JavacHolder newJavac() {
-        return new JavacHolder(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target"), false);
+        return JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target"));
     }
 }

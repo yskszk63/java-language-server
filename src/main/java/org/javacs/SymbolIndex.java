@@ -3,12 +3,10 @@ package org.javacs;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeScanner;
-import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Name;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.SymbolInformation;
-import org.eclipse.lsp4j.SymbolKind;
 
 import javax.lang.model.element.ElementKind;
 import java.io.IOException;
@@ -25,32 +23,9 @@ public class SymbolIndex {
     private static final Logger LOG = Logger.getLogger("main");
 
     /**
-     * Contains all symbol declarations and referencs in a single source file 
-     */
-    private static class SourceFileIndex {
-        private final EnumMap<ElementKind, Map<String, SymbolInformation>> declarations = new EnumMap<>(ElementKind.class);
-        private final EnumMap<ElementKind, Map<String, Set<Location>>> references = new EnumMap<>(ElementKind.class);
-    }
-
-    public SymbolIndex(JavacHolder parent) {
-        this.parent = parent;
-    }
-
-    /**
-     * Each index has one compiler as its parent
-     */
-    private final JavacHolder parent;
-
-    /**
      * Source path files, for which we support methods and classes
      */
     private Map<URI, SourceFileIndex> sourcePath = new HashMap<>();
-
-    public void update(JCTree.JCCompilationUnit compiled) {
-        Indexer indexer = new Indexer(parent.context);
-
-        compiled.accept(indexer);
-    }
 
     /**
      * Search all indexed symbols
@@ -110,6 +85,14 @@ public class SymbolIndex {
         return Optional.empty();
     }
 
+    public static String uniqueName(Symbol s) {
+        StringJoiner acc = new StringJoiner(".");
+
+        createUniqueName(s, acc);
+
+        return acc.toString();
+    }
+
     /**
      * Check if name contains all the characters of query in order.
      * For example, name 'FooBar' contains query 'FB', but not 'BF'
@@ -133,93 +116,6 @@ public class SymbolIndex {
         return iQuery == query.length();
     }
 
-    private class Indexer extends BaseScanner {
-        private SourceFileIndex index;
-
-        public Indexer(Context context) {
-            super(context);
-        }
-
-        @Override
-        public void visitTopLevel(JCTree.JCCompilationUnit tree) {
-            URI uri = tree.getSourceFile().toUri();
-
-            index = new SourceFileIndex();
-            sourcePath.put(uri, index);
-
-            super.visitTopLevel(tree);
-
-        }
-
-        @Override
-        public void visitClassDef(JCTree.JCClassDecl tree) {
-            super.visitClassDef(tree);
-
-            addDeclaration(tree, tree.sym);
-        }
-
-        @Override
-        public void visitMethodDef(JCTree.JCMethodDecl tree) {
-            super.visitMethodDef(tree);
-
-            addDeclaration(tree, tree.sym);
-        }
-
-        @Override
-        public void visitVarDef(JCTree.JCVariableDecl tree) {
-            super.visitVarDef(tree);
-
-            addDeclaration(tree, tree.sym);
-        }
-
-        @Override
-        public void visitSelect(JCTree.JCFieldAccess tree) {
-            super.visitSelect(tree);
-
-            addReference(tree, tree.sym);
-        }
-
-        @Override
-        public void visitReference(JCTree.JCMemberReference tree) {
-            super.visitReference(tree);
-
-            addReference(tree, tree.sym);
-        }
-
-        @Override
-        public void visitIdent(JCTree.JCIdent tree) {
-            addReference(tree, tree.sym);
-        }
-
-        @Override
-        public void visitNewClass(JCTree.JCNewClass tree) {
-            super.visitNewClass(tree);
-
-            addReference(tree, tree.constructor);
-        }
-
-        private void addDeclaration(JCTree tree, Symbol symbol) {
-            if (symbol != null && onSourcePath(symbol) && shouldIndex(symbol)) {
-                String key = uniqueName(symbol);
-                SymbolInformation info = symbolInformation(tree, symbol, compilationUnit);
-                Map<String, SymbolInformation> withKind = index.declarations.computeIfAbsent(symbol.getKind(), newKind -> new HashMap<>());
-
-                withKind.put(key, info);
-            }
-        }
-
-        private void addReference(JCTree tree, Symbol symbol) {
-            if (symbol != null && onSourcePath(symbol) && shouldIndex(symbol)) {
-                String key = uniqueName(symbol);
-                Map<String, Set<Location>> withKind = index.references.computeIfAbsent(symbol.getKind(), newKind -> new HashMap<>());
-                Set<Location> locations = withKind.computeIfAbsent(key, newName -> new HashSet<>());
-                Location location = location(tree, compilationUnit);
-
-                locations.add(location);
-            }
-        }
-    }
-
     public static boolean shouldIndex(Symbol symbol) {
         ElementKind kind = symbol.getKind();
 
@@ -239,24 +135,6 @@ public class SymbolIndex {
             default:
                 return false;
         }
-    }
-
-    private static SymbolInformation symbolInformation(JCTree tree, Symbol symbol, JCTree.JCCompilationUnit compilationUnit) {
-        Location location = location(tree, compilationUnit);
-        SymbolInformation info = new SymbolInformation();
-
-        info.setContainerName(symbol.getEnclosingElement().getQualifiedName().toString());
-        info.setKind(symbolInformationKind(symbol.getKind()));
-        
-        // Constructors have name <init>, use class name instead
-        if (symbol.getKind() == ElementKind.CONSTRUCTOR)
-            info.setName(symbol.getEnclosingElement().getSimpleName().toString());            
-        else
-            info.setName(symbol.getSimpleName().toString());
-
-        info.setLocation(location);
-
-        return info;
     }
 
     public static Location location(JCTree tree, JCTree.JCCompilationUnit compilationUnit) {
@@ -389,18 +267,6 @@ public class SymbolIndex {
         return -1;
     }
 
-    private static boolean onSourcePath(Symbol symbol) {
-        return true; // TODO
-    }
-
-    private static String uniqueName(Symbol s) {
-        StringJoiner acc = new StringJoiner(".");
-
-        createUniqueName(s, acc);
-
-        return acc.toString();
-    }
-
     private static void createUniqueName(Symbol s, StringJoiner acc) {
         if (s != null) {
             createUniqueName(s.owner, acc);
@@ -410,36 +276,8 @@ public class SymbolIndex {
         }
     }
 
-    private static SymbolKind symbolInformationKind(ElementKind kind) {
-        switch (kind) {
-            case PACKAGE:
-                return SymbolKind.Package;
-            case ENUM:
-            case ENUM_CONSTANT:
-                return SymbolKind.Enum;
-            case CLASS:
-                return SymbolKind.Class;
-            case ANNOTATION_TYPE:
-            case INTERFACE:
-                return SymbolKind.Interface;
-            case FIELD:
-                return SymbolKind.Property;
-            case PARAMETER:
-            case LOCAL_VARIABLE:
-            case EXCEPTION_PARAMETER:
-            case TYPE_PARAMETER:
-                return SymbolKind.Variable;
-            case METHOD:
-            case STATIC_INIT:
-            case INSTANCE_INIT:
-                return SymbolKind.Method;
-            case CONSTRUCTOR:
-                return SymbolKind.Constructor;
-            case OTHER:
-            case RESOURCE_VARIABLE:
-            default:
-                return SymbolKind.String;
-        }
+    public void put(URI uri, SourceFileIndex index) {
+        sourcePath.put(uri, index);
     }
 
     /**

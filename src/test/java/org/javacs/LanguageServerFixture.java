@@ -13,7 +13,7 @@ public class LanguageServerFixture {
         Set<Path> classPath = Collections.emptySet();
         Set<Path> sourcePath = Collections.singleton(Paths.get("src/test/resources").toAbsolutePath());
         Path outputDirectory = Paths.get("out").toAbsolutePath();
-        JavacHolder javac = new JavacHolder(classPath, sourcePath, outputDirectory, true);
+        JavacHolder javac = JavacHolder.create(classPath, sourcePath, outputDirectory);
         JavaLanguageServer server = new JavaLanguageServer(javac);
 
         InitializeParams init = new InitializeParams();

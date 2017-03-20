@@ -35,7 +35,7 @@ public class CompilerProfiling {
     private Duration compileLargeFile(URI file) {
         long start = System.nanoTime();
 
-        JavacHolder compiler = new JavacHolder(Collections.emptySet(), Collections.emptySet(), Paths.get("out"), false);
+        JavacHolder compiler = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.emptySet(), Paths.get("out"));
         GetCompilationUnit compilationUnit = new GetCompilationUnit(compiler.context);
 
         try {

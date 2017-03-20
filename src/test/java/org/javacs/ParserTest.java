@@ -35,11 +35,10 @@ public class ParserTest {
     }
 
     private JavacHolder newCompiler() {
-        return new JavacHolder(
+        return JavacHolder.createWithoutIndex(
                 Collections.emptySet(),
                 Collections.singleton(Paths.get("src/test/resources")),
-                Paths.get("out"),
-                false
+                Paths.get("out")
         );
     }
 }
