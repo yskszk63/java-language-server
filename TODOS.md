@@ -15,11 +15,18 @@
 ## Features 
 * Go-to-subclasses
 * Signature help
+* javaconfig.json sourcePath / sourcePathFile
 
 ### Refactoring
 * Inline method, variable
 * Extract method, variable
 * Replace for comprehension with loop
+
+### Snippets
+* Collections
+  * Map => Map<$key, $value> $name = new HashMap<>();
+  * List => List<$value> $name = new ArrayList<>();
+  * ...
 
 ### Code generation
 * New .java file class boilerplate
