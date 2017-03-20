@@ -11,12 +11,22 @@ public class ContextPrinter {
 
         ht.setAccessible(true);
 
-        Object value = ht.get(context);
+        Map<Context.Key<?>,Object> map = (Map<Context.Key<?>, Object>) ht.get(context);
+        Node root = Node.anonymous();
         TreeConverter treeConverter = new TreeConverter();
 
         treeConverter.seen.add(context);
+        map.values().forEach(treeConverter.seen::add);
 
-        return treeConverter.convert(value, depth);
+        for (Context.Key<?> key : map.keySet()) {
+            Object value = map.get(key);
+
+            treeConverter.seen.remove(value);
+
+            root.children.put(value.getClass().getSimpleName(), treeConverter.convert(value, depth));
+        }
+
+        return root;
     }
 }
 
