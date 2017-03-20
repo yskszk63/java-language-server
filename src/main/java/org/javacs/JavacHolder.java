@@ -6,10 +6,7 @@ import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.api.JavacTrees;
 import com.sun.tools.javac.api.MultiTaskListener;
-import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.code.Symtab;
-import com.sun.tools.javac.code.Type;
-import com.sun.tools.javac.code.Types;
+import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.comp.*;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
@@ -503,8 +500,8 @@ public class JavacHolder {
 
         // Clear javac caches
         Consumer<Type> removeFromClosureCache = closureCacheRemover(types);
+        Map<Symbol.TypeSymbol, Scope.CompoundScope> membersClosureCache = membersClosureCache(types);
         Symtab symtab = Symtab.instance(context);
-        Enter enter = Enter.instance(context);
         Map<Symbol.TypeSymbol, Env<AttrContext>> typeEnvsMap = typeEnvsMap();
 
         for (Name name : enclosed.keySet()) {
@@ -520,6 +517,8 @@ public class JavacHolder {
         for (Symbol.ClassSymbol symbol : enclosed.values()) {
             // Remove from type => supertypes map
             removeFromClosureCache.accept(symbol.type);
+            // Remove from type-symbol => scope map
+            membersClosureCache.remove(symbol);
             // Remove from type-symbol -> Env map
             typeEnvsMap.remove(symbol);
         }
@@ -585,16 +584,34 @@ public class JavacHolder {
         }
     }
 
+    private static Map<Symbol.TypeSymbol, Scope.CompoundScope> membersClosureCache(Types types) {
+        try {
+            Field membersCacheField = Types.class.getDeclaredField("membersCache");
+
+            membersCacheField.setAccessible(true);
+
+            Object membersCache = membersCacheField.get(types);
+
+            Field mapField = membersCache.getClass().getDeclaredField("_map");
+
+            mapField.setAccessible(true);
+
+            return (Map<Symbol.TypeSymbol, Scope.CompoundScope>) mapField.get(membersCache);
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     /**
      * Reflectively invokes Types.closureCache.remove(Type)
      */
     private static Consumer<Type> closureCacheRemover(Types types) {
         try {
-            Field closureCache = Types.class.getDeclaredField("closureCache");
+            Field field = Types.class.getDeclaredField("closureCache");
 
-            closureCache.setAccessible(true);
+            field.setAccessible(true);
 
-            Map<Type, com.sun.tools.javac.util.List<Type>> value = (Map<Type, com.sun.tools.javac.util.List<Type>>) closureCache.get(types);
+            Map<Type, com.sun.tools.javac.util.List<Type>> value = (Map<Type, com.sun.tools.javac.util.List<Type>>) field.get(types);
 
             return value::remove;
         } catch (IllegalAccessException | NoSuchFieldException e) {
