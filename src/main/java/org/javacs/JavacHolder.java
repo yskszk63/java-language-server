@@ -505,7 +505,7 @@ public class JavacHolder {
         Consumer<Type> removeFromClosureCache = closureCacheRemover(types);
         Symtab symtab = Symtab.instance(context);
         Enter enter = Enter.instance(context);
-        Consumer<Symbol> removeFromTypeEnvs = typeEnvsRemover(enter);
+        Map<Symbol.TypeSymbol, Env<AttrContext>> typeEnvsMap = typeEnvsMap();
 
         for (Name name : enclosed.keySet()) {
             // Remove from class-name => class-symbol map
@@ -521,7 +521,7 @@ public class JavacHolder {
             // Remove from type => supertypes map
             removeFromClosureCache.accept(symbol.type);
             // Remove from type-symbol -> Env map
-            removeFromTypeEnvs.accept(symbol);
+            typeEnvsMap.remove(symbol);
         }
 
         CompileStates compileStates = CompileStates.instance(context);
@@ -563,18 +563,24 @@ public class JavacHolder {
     }
 
     /**
-     * Reflectively invokes Enter.typeEnvs.remove(Symbol)
+     * Reflectively gets TypeEnvs.map
      */
-    private static Consumer<Symbol> typeEnvsRemover(Enter enter) {
+    private Map<Symbol.TypeSymbol,Env<AttrContext>> typeEnvsMap() {
         try {
-            Field typeEnvs = Enter.class.getDeclaredField("typeEnvs");
+            Class<?> klass = Class.forName("com.sun.tools.javac.comp.TypeEnvs");
+            Field contextKeyField = klass.getDeclaredField("typeEnvsKey");
 
-            typeEnvs.setAccessible(true);
+            contextKeyField.setAccessible(true);
 
-            Map<Symbol.TypeSymbol,Env<AttrContext>> value = (Map<Symbol.TypeSymbol,Env<AttrContext>>) typeEnvs.get(enter);
+            Context.Key<?> contextKey = (Context.Key<?>) contextKeyField.get(null);
 
-            return value::remove;
-        } catch (IllegalAccessException | NoSuchFieldException e) {
+            Object typeEnvs = context.get(contextKey);
+            Field mapField = klass.getDeclaredField("map");
+
+            mapField.setAccessible(true);
+
+            return (Map<Symbol.TypeSymbol,Env<AttrContext>>) mapField.get(typeEnvs);
+        } catch (ClassNotFoundException | IllegalAccessException | NoSuchFieldException e) {
             throw new RuntimeException(e);
         }
     }

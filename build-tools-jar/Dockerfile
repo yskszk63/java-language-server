@@ -40,7 +40,7 @@ RUN apt-get update \
 
 # Clone JDK8
 RUN mkdir -p /openjdk/jdk8u
-RUN hg clone http://hg.openjdk.java.net/jdk8/jdk8 /openjdk/jdk8u
+RUN hg clone http://hg.openjdk.java.net/jdk8u/jdk8u /openjdk/jdk8u
 
 WORKDIR /openjdk/jdk8u
 RUN sh ./get_source.sh
