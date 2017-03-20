@@ -11,6 +11,7 @@
 * Hover show FQ types if not imported
 * Javadoc path for hover, autocomplete
 * Autocomplete @Override into method def
+* Status bar info during indexing
 
 ## Features 
 * Go-to-subclasses
