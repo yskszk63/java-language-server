@@ -9,6 +9,8 @@ import org.eclipse.lsp4j.services.WorkspaceService;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
+import com.google.common.base.Joiner;
+
 import javax.tools.JavaFileObject;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -271,7 +273,7 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private void doLint(Collection<URI> paths) {
-        LOG.info("Lint " + paths);
+        LOG.info("Lint " + Joiner.on(", ").join(paths));
 
         Map<JavacConfig, Map<URI, Optional<String>>> files = new HashMap<>();
 
