@@ -161,7 +161,7 @@ public class SymbolIndex {
                 end = offset + symbol.name.length();
             }
 
-            Range position = JavaLanguageServer.findPosition(compilationUnit.getSourceFile(),
+            Range position = JavaLanguageServer.findRange(compilationUnit.getSourceFile(),
                                                                  offset,
                                                                  end);
             Location location = new Location();

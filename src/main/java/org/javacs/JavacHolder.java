@@ -384,7 +384,7 @@ public class JavacHolder {
     private JavaFileObject findFile(URI file, Optional<String> text) {
         return text
                 .map(content -> (JavaFileObject) new StringFileObject(content, file))
-                .orElse(fileManager().getRegularFile(new File(file)));
+                .orElseGet(() -> fileManager().getRegularFile(new File(file)));
     }
 
     private DiagnosticCollector<JavaFileObject> startCollectingErrors() {
@@ -401,6 +401,17 @@ public class JavacHolder {
 
     private void stopCollectingErrors() {
         onErrorDelegate = error -> {};
+    }
+
+    public ParseResult parse(URI uri, Optional<String> textContent) {
+        try {
+            DiagnosticCollector<JavaFileObject> errors = startCollectingErrors();
+            JCTree.JCCompilationUnit parsed = compiler().parse(findFile(uri, textContent));
+
+            return new ParseResult(parsed, errors);
+        } finally {
+            stopCollectingErrors();
+        }
     }
 
     /**

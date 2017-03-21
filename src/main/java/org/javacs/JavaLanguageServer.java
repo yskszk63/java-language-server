@@ -677,7 +677,7 @@ class JavaLanguageServer implements LanguageServer {
         Optional<String> content = activeContent(uri);
         int line = params.getPosition().getLine();
         int character = params.getPosition().getCharacter();
-        long cursor = findOffset(uri, line, character);
+        long cursor = findOffset(uri, content, line, character);
 
         return findCompiler(uri)
                 .map(compiler -> compiler.findReferences(uri, content, cursor))
@@ -686,7 +686,7 @@ class JavaLanguageServer implements LanguageServer {
 
     public Optional<Symbol> findSymbol(URI file, int line, int character) {
         Optional<String> content = activeContent(file);
-        long cursor = findOffset(file, line, character);
+        long cursor = findOffset(file, content, line, character);
 
         return findCompiler(file).flatMap(compiler -> compiler.symbolAt(file, content, cursor));
     }
@@ -705,7 +705,7 @@ class JavaLanguageServer implements LanguageServer {
         Optional<String> content = activeContent(uri);
         int line = position.getPosition().getLine();
         int character = position.getPosition().getCharacter();
-        long cursor = findOffset(uri, line, character);
+        long cursor = findOffset(uri, content, line, character);
 
         return findCompiler(uri)
                 .flatMap(compiler -> compiler.gotoDefinition(uri, content, cursor))
@@ -714,9 +714,87 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     /**
+     * Convert on offset-based position to a {@link Position}
+     */
+    public static Position findPosition(JavaFileObject file, long findOffset) {
+        try (Reader in = file.openReader(true)) {
+            long offset = 0;
+            int line = 0;
+            int character = 0;
+
+            // Find the start position
+            while (offset < findOffset) {
+                int next = in.read();
+
+                if (next < 0)
+                    break;
+                else {
+                    offset++;
+                    character++;
+
+                    if (next == '\n') {
+                        line++;
+                        character = 0;
+                    }
+                }
+            }
+
+            return createPosition(line, character);
+        } catch (IOException e) {
+            throw ShowMessageException.error(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Convert on offset-based position to a {@link Position}
+     */
+    public static Position findEndOfLine(JavaFileObject file, long findOffset) {
+        try (Reader in = file.openReader(true)) {
+            long offset = 0;
+            int line = 0;
+            int character = 0;
+
+            // Find the start position
+            while (offset < findOffset) {
+                int next = in.read();
+
+                if (next < 0)
+                    break;
+                else {
+                    offset++;
+                    character++;
+
+                    if (next == '\n') {
+                        line++;
+                        character = 0;
+                    }
+                }
+            }
+
+            while (true) {
+                int next = in.read();
+
+                if (next < 0)
+                    break;
+                else {
+                    offset++;
+                    character++;
+
+                    if (next == '\n')
+                        break;
+                }
+            }
+
+            return createPosition(line, character);
+        } catch (IOException e) {
+            throw ShowMessageException.error(e.getMessage(), e);
+        }
+    }
+
+    /**
      * Convert on offset-based range to a {@link Range}
      */
-    public static Range findPosition(JavaFileObject file, long startOffset, long endOffset) {
+    public static Range findRange(JavaFileObject file, long startOffset, long endOffset) {
         try (Reader in = file.openReader(true)) {
             long offset = 0;
             int line = 0;
@@ -781,50 +859,62 @@ class JavaLanguageServer implements LanguageServer {
         return p;
     }
 
-    private static long findOffset(URI file, int targetLine, int targetCharacter) {
-        return file(file).map(path -> {
-            try (Reader in = Files.newBufferedReader(path)) {
-                long offset = 0;
-                int line = 0;
-                int character = 0;
+    public static long findOffset(URI uri, Optional<String> content, int targetLine, int targetCharacter) {
+        try(Reader in = reader(uri, content)) {
+            long offset = 0;
+            int line = 0;
+            int character = 0;
 
-                while (line < targetLine) {
-                    int next = in.read();
+            while (line < targetLine) {
+                int next = in.read();
 
-                    if (next < 0)
-                        return offset;
-                    else {
-                        offset++;
+                if (next < 0)
+                    return offset;
+                else {
+                    offset++;
 
-                        if (next == '\n')
-                            line++;
-                    }
+                    if (next == '\n')
+                        line++;
                 }
-
-                while (character < targetCharacter) {
-                    int next = in.read();
-
-                    if (next < 0)
-                        return offset;
-                    else {
-                        offset++;
-                        character++;
-                    }
-                }
-
-                return offset;
-            } catch (IOException e) {
-                throw ShowMessageException.error(e.getMessage(), e);
             }
-        }).orElseThrow(() -> ShowMessageException.error("Can't find " + targetLine + ":" + targetCharacter + " in " + file, null));
+
+            while (character < targetCharacter) {
+                int next = in.read();
+
+                if (next < 0)
+                    return offset;
+                else {
+                    offset++;
+                    character++;
+                }
+            }
+
+            return offset;
+        } catch (IOException e) {
+            throw ShowMessageException.error(e.getMessage(), e);
+        }
     }
-    
+
+    private static Reader reader(URI uri, Optional<String> content) {
+        return content
+                .map(text -> (Reader) new StringReader(text))
+                .orElseGet(() -> read(uri));
+    }
+
+    private static BufferedReader read(URI uri) {
+        try {
+            return Files.newBufferedReader(file(uri).orElseThrow(() -> new RuntimeException("Couldn't open " + uri)));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private Hover doHover(TextDocumentPositionParams position) {
         URI uri = URI.create(position.getTextDocument().getUri());
         Optional<String> content = activeContent(uri);
         int line = position.getPosition().getLine();
         int character = position.getPosition().getCharacter();
-        long cursor = findOffset(uri, line, character);
+        long cursor = findOffset(uri, content, line, character);
 
         return findCompiler(uri)
                 .flatMap(compiler -> compiler.symbolAt(uri, content, cursor))
@@ -873,7 +963,7 @@ class JavaLanguageServer implements LanguageServer {
         Optional<String> content = activeContent(uri);
         int line = position.getPosition().getLine();
         int character = position.getPosition().getCharacter();
-        long cursor = findOffset(uri, line, character);
+        long cursor = findOffset(uri, content, line, character);
         List<CompletionItem> items = findCompiler(uri)
                 .map(compiler -> compiler.autocomplete(uri, content, cursor))
                 .orElse(Collections.emptyList());
