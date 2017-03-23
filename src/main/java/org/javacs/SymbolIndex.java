@@ -47,7 +47,10 @@ public class SymbolIndex {
         return index.declarations.values().stream().flatMap(map -> map.values().stream());
     }
 
-    private Stream<SymbolInformation> allSymbols(ElementKind kind) {
+    /**
+     * All indexed symbols of a kind
+     */
+    public Stream<SymbolInformation> allSymbols(ElementKind kind) {
         return sourcePath.values().stream().flatMap(f -> allSymbolsInFile(f, kind));
     }
 

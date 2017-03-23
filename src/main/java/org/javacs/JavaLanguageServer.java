@@ -144,7 +144,12 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<List<? extends Command>> codeAction(CodeActionParams params) {
-                return null;
+                URI file = URI.create(params.getTextDocument().getUri());
+                List<? extends Command> commands = findCompiler(file)
+                        .map(compiler -> new CodeActions(compiler, file, activeContent(file)).find(params))
+                        .orElse(Collections.emptyList());
+
+                return CompletableFuture.completedFuture(commands);
             }
 
             @Override
@@ -278,7 +283,7 @@ class JavaLanguageServer implements LanguageServer {
         Map<JavacConfig, Map<URI, Optional<String>>> files = new HashMap<>();
 
         for (URI each : paths) {
-            dir(each).flatMap(this::findConfig).ifPresent(config -> {
+            file(each).flatMap(this::findConfig).ifPresent(config -> {
                 files.computeIfAbsent(config, newConfig -> new HashMap<>()).put(each, activeContent(each));
             });
         }
@@ -446,8 +451,14 @@ class JavaLanguageServer implements LanguageServer {
     // TODO invalidate cache when VSCode notifies us config file has changed
     private Map<Path, Optional<JavacConfig>> configCache = new HashMap<>();
 
-    private Optional<JavacConfig> findConfig(Path dir) {
-        return configCache.computeIfAbsent(dir, this::doFindConfig);
+    private Optional<JavacConfig> findConfig(Path file) {
+        if (!file.toFile().isDirectory())
+            file = file.getParent();
+
+        if (file == null)
+            return Optional.empty();
+
+        return configCache.computeIfAbsent(file, this::doFindConfig);
     }
 
     private Optional<JavacConfig> doFindConfig(Path dir) {
