@@ -64,12 +64,13 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
      */
     private Stream<CompletionItem> completeMembers(TreePath expression, Scope from) {
         Element element = trees.getElement(expression);
+        TypeMirror type = trees.getTypeMirror(expression);
 
-        if (element == null)
+        if (element == null || type == null)
             return Stream.empty();
 
-        boolean isStatic = isTypeSymbol(element.getKind());
-        List<? extends Element> all = members(element);
+        boolean isStatic = isTypeSymbol(element);
+        List<? extends Element> all = members(type);
 
         Stream<CompletionItem> filter = all.stream()
                 .filter(e -> isAccessible(e, from))
@@ -97,8 +98,9 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
      * Is element an enclosing class of scope, meaning element.this is accessible?
      */
     private boolean isEnclosingClass(Element element, Scope scope) {
-        if (scope == null)
+        if (scope == null || element == null)
             return false;
+
         // If this is the scope of a static method, for example
         //
         //   class Foo {
@@ -128,11 +130,9 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     /**
      * All members of element, if it is TypeElement
      */
-    private List<? extends Element> members(Element element) {
-        if (element == null)
+    private List<? extends Element> members(TypeMirror expressionType) {
+        if (expressionType == null)
             return Collections.emptyList();
-
-        TypeMirror expressionType = element.asType();
 
         return typeElement(expressionType)
                 .map(e -> elements.getAllMembers(e))
@@ -153,8 +153,11 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return item;
     }
 
-    private boolean isTypeSymbol(ElementKind kind) {
-        switch (kind) {
+    private boolean isTypeSymbol(Element element) {
+        if (element == null)
+            return false;
+
+        switch (element.getKind()) {
             case CLASS:
             case INTERFACE:
             case ENUM:
