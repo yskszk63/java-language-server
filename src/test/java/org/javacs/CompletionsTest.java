@@ -51,7 +51,7 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteMember.java";
 
         // Static method
-        Set<String> suggestions = items(file, 4, 13).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
+        Set<String> suggestions = items(file, 5, 14).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
 
         assertThat(suggestions, hasItems("method() throws Exception"));
     }

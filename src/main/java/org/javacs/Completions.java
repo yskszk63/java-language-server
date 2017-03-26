@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.google.common.collect.Lists;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
@@ -60,6 +59,9 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         else return Stream.empty();
     }
 
+    /**
+     * Suggest all accessible members of expression
+     */
     private Stream<CompletionItem> completeMembers(TreePath expression, Scope from) {
         Element element = trees.getElement(expression);
 
@@ -71,7 +73,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
         Stream<CompletionItem> filter = all.stream()
                 .filter(e -> isAccessible(e, from))
-                .filter(e -> isStatic(e) == isStatic)
+                .filter(e -> e.getModifiers().contains(Modifier.STATIC) == isStatic)
                 .flatMap(e -> completionItem(e, distance(e, from)));
 
         if (isStatic) {
@@ -123,6 +125,9 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
             return isEnclosingClass(element, scope.getEnclosingScope());
     }
 
+    /**
+     * All members of element, if it is TypeElement
+     */
     private List<? extends Element> members(Element element) {
         if (element == null)
             return Collections.emptyList();
@@ -134,6 +139,9 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 .orElseGet(Collections::emptyList);
     }
 
+    /**
+     * Suggest a simple completion 'name'
+     */
     private static CompletionItem namedProperty(String name) {
         CompletionItem item = new CompletionItem();
 
@@ -156,10 +164,6 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         }
     }
 
-    private boolean isStatic(Element e) {
-        return e.getModifiers().contains(Modifier.STATIC);
-    }
-
     private Optional<TypeElement> typeElement(TypeMirror type) {
         if (type instanceof DeclaredType) {
             DeclaredType declared = (DeclaredType) type;
@@ -172,8 +176,10 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return Optional.empty();
     }
 
+    /**
+     * Suggest all completions that are visible from scope
+     */
     private Stream<CompletionItem> membersOfScope(Scope scope) {
-        List<PrintScope> print = printScopes(scope);
         Set<Element> all = new LinkedHashSet<>();
 
         // Add 'this' and 'super' once
@@ -186,32 +192,12 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 .flatMap(e -> completionItem(e, distance(e, scope)));
     }
 
-    private List<PrintScope> printScopes(Scope scope) {
-        List<PrintScope> acc = new ArrayList<>();
-
-        while (scope != null) {
-            acc.add(new PrintScope(scope));
-            scope = scope.getEnclosingScope();
-        }
-
-        return acc;
-    }
-
-    static class PrintScope {
-        final Scope scope;
-        final List<Element> elements;
-
-        PrintScope(Scope s) {
-            scope = s;
-            elements = Lists.newArrayList(s.getLocalElements());
-        }
-
-        @Override
-        public String toString() {
-            return scope.toString();
-        }
-    }
-
+    /**
+     * Recursively check each enclosing scope for members that are visible from the starting scope.
+     *
+     * Visibility takes into consideration static / virtual, but not accessibility modifiers.
+     * We'll deal with those later.
+     */
     private void findScopeMembers(Scope scope, boolean isStatic, Set<Element> acc) {
         if (scope == null)
             return;
