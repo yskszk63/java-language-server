@@ -16,27 +16,28 @@ public class GotoTest {
     private static final Logger LOG = Logger.getLogger("main");
     private static final String file = "/org/javacs/example/Goto.java";
     private static final URI uri = FindResource.uri(file);
+    private static final String defaultConstructorFile = "/org/javacs/example/GotoDefaultConstructor.java";
+    private static final URI defaultConstructorUri = FindResource.uri(defaultConstructorFile);
 
     @Test
     public void localVariable() throws IOException {
         List<? extends Location> suggestions = doGoto(file, 9, 8);
 
-        assertThat(suggestions, contains(location(uri, 4, 15, 4, 20)));
+        assertThat(suggestions, contains(location(uri, 4, 8, 4, 21)));
     }
 
     @Test
     public void defaultConstructor() throws IOException {
-        List<? extends Location> suggestions = doGoto(file, 9, 20);
+        List<? extends Location> suggestions = doGoto(defaultConstructorFile, 4, 45);
 
-        assertThat(suggestions, contains(location(uri, 2, 13, 2, 17)));
+        assertThat(suggestions, contains(location(defaultConstructorUri, 2, 13, 2, 35)));
     }
 
     @Test
-    @Ignore // TODO
     public void constructor() throws IOException {
         List<? extends Location> suggestions = doGoto(file, 10, 20);
 
-        assertThat(suggestions, contains(location(uri, 29, 11, 29, 15)));
+        assertThat(suggestions, contains(location(uri, 43, 11, 43, 15)));
     }
 
     @Test

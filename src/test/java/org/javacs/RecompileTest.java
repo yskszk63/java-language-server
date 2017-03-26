@@ -1,7 +1,9 @@
 package org.javacs;
 
-import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.util.Context;
+import com.sun.source.tree.ClassTree;
+import com.sun.source.util.JavacTask;
+import com.sun.source.util.TreePathScanner;
+import com.sun.source.util.Trees;
 import org.junit.Test;
 
 import javax.tools.DiagnosticCollector;
@@ -23,10 +25,10 @@ public class RecompileTest {
         URI file = FindResource.uri("/org/javacs/example/CompileTwice.java");
         JavacHolder compiler = newCompiler();
         List<String> visits = new ArrayList<>();
-        GetClass getClass = new GetClass(compiler.context, visits);
         CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        GetClass getClass = new GetClass(compile.task, visits);
 
-        compile.trees.forEach(tree -> tree.accept(getClass));
+        compile.trees.forEach(tree -> getClass.scan(tree, null));
 
         assertThat(compile.errors.getDiagnostics(), empty());
         assertThat(visits, hasItems("CompileTwice", "NestedStaticClass", "NestedClass"));
@@ -34,7 +36,7 @@ public class RecompileTest {
         // Compile again
         compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
 
-        compile.trees.forEach(tree -> tree.accept(getClass));
+        compile.trees.forEach(tree -> getClass.scan(tree, null));
 
         assertThat(compile.errors.getDiagnostics(), empty());
         assertThat(visits, hasItems("CompileTwice", "NestedStaticClass", "NestedClass",
@@ -54,9 +56,9 @@ public class RecompileTest {
         CompilationResult goodCompile = compiler.compile(Collections.singletonMap(good, Optional.empty()));
         DiagnosticCollector<JavaFileObject> goodErrors = goodCompile.errors;
         List<String> parsedClassNames = new ArrayList<>();
-        GetClass getClass = new GetClass(compiler.context, parsedClassNames);
+        GetClass getClass = new GetClass(goodCompile.task, parsedClassNames);
 
-        goodCompile.trees.forEach(tree -> tree.accept(getClass));
+        goodCompile.trees.forEach(tree -> getClass.scan(tree, null));
 
         assertThat(goodErrors.getDiagnostics(), empty());
         assertThat(parsedClassNames, contains("FixParseErrorAfter"));
@@ -75,9 +77,9 @@ public class RecompileTest {
         CompilationResult goodCompile = compiler.compile(Collections.singletonMap(good, Optional.empty()));
         DiagnosticCollector<JavaFileObject> goodErrors = goodCompile.errors;
         List<String> parsedClassNames = new ArrayList<>();
-        GetClass getClass = new GetClass(compiler.context, parsedClassNames);
+        GetClass getClass = new GetClass(goodCompile.task, parsedClassNames);
 
-        goodCompile.trees.forEach(tree -> tree.accept(getClass));
+        goodCompile.trees.forEach(tree -> getClass.scan(tree, null));
 
         assertThat(goodErrors.getDiagnostics(), empty());
         assertThat(parsedClassNames, contains("FixTypeErrorAfter"));
@@ -106,20 +108,20 @@ public class RecompileTest {
         assertThat(errors.getDiagnostics(), not(empty()));
     }
 
-    private static class GetClass extends BaseScanner {
+    private static class GetClass extends TreePathScanner<Void, Void> {
         private final List<String> visits;
+        private final Trees trees;
 
-        public GetClass(Context context, List<String> visits) {
-            super(context);
-
+        public GetClass(JavacTask context, List<String> visits) {
             this.visits = visits;
+            this.trees = Trees.instance(context);
         }
 
         @Override
-        public void visitClassDef(JCTree.JCClassDecl tree) {
-            super.visitClassDef(tree);
+        public Void visitClass(ClassTree node, Void aVoid) {
+            visits.add(node.getSimpleName().toString());
 
-            visits.add(tree.getSimpleName().toString());
+            return super.visitClass(node, aVoid);
         }
     }
 }

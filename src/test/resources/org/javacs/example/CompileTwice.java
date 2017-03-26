@@ -1,4 +1,4 @@
-package org.javacs.example
+package org.javacs.example;
 
 import java.util.Collections;
 import java.util.List;

@@ -1,12 +1,12 @@
 package org.javacs;
 
-import com.sun.source.util.TreePath;
-import com.sun.tools.javac.api.JavacTrees;
-import com.sun.tools.javac.code.Type;
-import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.util.Context;
+import com.sun.source.tree.MethodTree;
+import com.sun.source.util.JavacTask;
+import com.sun.source.util.TreePathScanner;
+import com.sun.source.util.Trees;
 import org.junit.Test;
 
+import javax.lang.model.type.ExecutableType;
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
@@ -22,10 +22,16 @@ import static org.junit.Assert.assertThat;
 public class LinterTest {
     private static final Logger LOG = Logger.getLogger("main");
 
+    private static final JavacHolder compiler = JavacHolder.createWithoutIndex(
+            Collections.emptySet(),
+            Collections.singleton(Paths.get("src/test/resources")),
+            Paths.get("out")
+    );
+
     @Test
     public void compile() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/HelloWorld.java");
-        DiagnosticCollector<JavaFileObject> errors = newCompiler().compile(Collections.singletonMap(file, Optional.empty())).errors;
+        DiagnosticCollector<JavaFileObject> errors = compiler.compile(Collections.singletonMap(file, Optional.empty())).errors;
 
         assertThat(errors.getDiagnostics(), empty());
     }
@@ -33,10 +39,10 @@ public class LinterTest {
     @Test
     public void inspectTree() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/HelloWorld.java");
-        JavacHolder compiler = newCompiler();
-        CollectMethods scanner = new CollectMethods(compiler.context);
+        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        CollectMethods scanner = new CollectMethods(compile.task);
 
-        compiler.compile(Collections.singletonMap(file, Optional.empty())).trees.forEach(tree -> tree.accept(scanner));
+        compile.trees.forEach(tree -> scanner.scan(tree, null));
 
         assertThat(scanner.methodNames, hasItem("main"));
     }
@@ -44,11 +50,10 @@ public class LinterTest {
     @Test
     public void missingMethodBody() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/MissingMethodBody.java");
-        JavacHolder compiler = newCompiler();
-        CollectMethods scanner = new CollectMethods(compiler.context);
         CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        CollectMethods scanner = new CollectMethods(compile.task);
 
-        compile.trees.forEach(tree -> tree.accept(scanner));
+        compile.trees.forEach(tree -> scanner.scan(tree, null));
 
         assertThat(scanner.methodNames, hasItem("test"));
         assertThat(compile.errors.getDiagnostics(), not(empty()));
@@ -62,24 +67,22 @@ public class LinterTest {
     @Test
     public void incompleteAssignment() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/IncompleteAssignment.java");
-        JavacHolder compiler = newCompiler();
-        CollectMethods compiled = new CollectMethods(compiler.context);
         CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        CollectMethods scanner = new CollectMethods(compile.task);
 
-        compile.trees.forEach(tree -> tree.accept(compiled));
+        compile.trees.forEach(tree -> scanner.scan(tree, null));
 
-        assertThat(compiled.methodNames, hasItem("test")); // Type error recovery should have worked
+        assertThat(scanner.methodNames, hasItem("test")); // Type error recovery should have worked
         assertThat(compile.errors.getDiagnostics(), not(empty()));
     }
 
     @Test
     public void undefinedSymbol() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/UndefinedSymbol.java");
-        JavacHolder compiler = newCompiler();
-        CollectMethods scanner = new CollectMethods(compiler.context);
         CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        CollectMethods scanner = new CollectMethods(compile.task);
 
-        compile.trees.forEach(tree -> tree.accept(scanner));
+        compile.trees.forEach(tree -> scanner.scan(tree, null));
 
         assertThat(scanner.methodNames, hasItem("test")); // Type error, so parse tree is present
 
@@ -96,35 +99,30 @@ public class LinterTest {
     @Test
     public void getType() {
         URI file = FindResource.uri("/org/javacs/example/FooString.java");
-        JavacHolder compiler = newCompiler();
-        MethodTypes scanner = new MethodTypes(compiler.context);
         CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        MethodTypes scanner = new MethodTypes(compile.task);
 
-        compile.trees.forEach(tree -> tree.accept(scanner));
+        compile.trees.forEach(tree -> scanner.scan(tree, null));
 
         assertThat(compile.errors.getDiagnostics(), empty());
         assertThat(scanner.methodTypes, hasKey("test"));
 
-        Type.MethodType type = scanner.methodTypes.get("test");
+        ExecutableType type = scanner.methodTypes.get("test");
 
         assertThat(type.getReturnType().toString(), equalTo("java.lang.String"));
         assertThat(type.getParameterTypes(), hasSize(1));
         assertThat(type.getParameterTypes().get(0).toString(), equalTo("java.lang.String"));
     }
 
-    @Test
+    @Test(expected = IllegalArgumentException.class)
     public void notJava() {
         URI file = FindResource.uri("/org/javacs/example/NotJava.java.txt");
-        JavacHolder compiler = newCompiler();
         CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
-
-        assertThat(compile.errors.getDiagnostics(), not(empty()));
     }
 
     @Test
     public void errorInDependency() {
         URI file = FindResource.uri("/org/javacs/example/ErrorInDependency.java");
-        JavacHolder compiler = newCompiler();
         CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
 
         assertThat(compile.errors.getDiagnostics(), not(empty()));
@@ -133,51 +131,43 @@ public class LinterTest {
     @Test
     public void deprecationWarning() {
         URI file = FindResource.uri("/org/javacs/example/DeprecationWarning.java");
-        JavacHolder compiler = newCompiler();
         CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
 
         assertThat(compile.errors.getDiagnostics(), not(empty()));
     }
 
-    public static class MethodTypes extends BaseScanner {
-        public final Map<String, Type.MethodType> methodTypes = new HashMap<>();
+    public static class MethodTypes extends TreePathScanner<Void, Void> {
+        public final Map<String, ExecutableType> methodTypes = new HashMap<>();
 
-        public MethodTypes(Context context) {
-            super(context);
+        private final Trees trees;
+
+        public MethodTypes(JavacTask task) {
+            trees = Trees.instance(task);
         }
 
         @Override
-        public void visitMethodDef(JCTree.JCMethodDecl node) {
-            super.visitMethodDef(node);
+        public Void visitMethod(MethodTree node, Void aVoid) {
+            methodTypes.put(node.getName().toString(), (ExecutableType) trees.getTypeMirror(getCurrentPath()));
 
-            JavacTrees trees = JavacTrees.instance(super.context);
-            TreePath path = trees.getPath(compilationUnit, node);
-            Type.MethodType typeMirror = (Type.MethodType) trees.getTypeMirror(path);
-
-            methodTypes.put(node.getName().toString(), typeMirror);
+            return super.visitMethod(node, aVoid);
         }
     }
 
-    public static class CollectMethods extends BaseScanner {
+    public static class CollectMethods extends TreePathScanner<Void, Void> {
         public final Set<String> methodNames = new HashSet<>();
 
-        public CollectMethods(Context context) {
-            super(context);
+        private final Trees trees;
+
+        public CollectMethods(JavacTask task) {
+            trees = Trees.instance(task);
         }
 
         @Override
-        public void visitMethodDef(JCTree.JCMethodDecl tree) {
-            super.visitMethodDef(tree);
+        public Void visitMethod(MethodTree node, Void aVoid) {
+            methodNames.add(node.getName().toString());
 
-            methodNames.add(tree.getName().toString());
+            return super.visitMethod(node, aVoid);
         }
     }
 
-    private static JavacHolder newCompiler() {
-        return JavacHolder.createWithoutIndex(
-                Collections.emptySet(),
-                Collections.singleton(Paths.get("src/test/resources")),
-                Paths.get("out")
-        );
-    }
 }

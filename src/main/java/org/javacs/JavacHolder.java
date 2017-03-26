@@ -1,39 +1,42 @@
 package org.javacs;
 
 import com.google.common.base.Joiner;
-import com.sun.source.util.TaskEvent;
-import com.sun.source.util.TaskListener;
-import com.sun.tools.javac.api.JavacTrees;
-import com.sun.tools.javac.api.MultiTaskListener;
-import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.code.Types;
-import com.sun.tools.javac.comp.*;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.util.JavacTask;
+import com.sun.source.util.TreePath;
+import com.sun.source.util.Trees;
+import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
-import com.sun.tools.javac.main.JavaCompiler;
-import com.sun.tools.javac.parser.FuzzyParserFactory;
-import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.TreeInfo;
-import com.sun.tools.javac.util.Context;
-import com.sun.tools.javac.util.Log;
-import com.sun.tools.javac.util.Options;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.SymbolInformation;
 
-import javax.tools.*;
+import javax.lang.model.element.Element;
+import javax.tools.Diagnostic;
+import javax.tools.DiagnosticCollector;
+import javax.tools.DiagnosticListener;
+import javax.tools.JavaFileObject;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * Maintains a reference to a Java compiler, 
@@ -55,126 +58,83 @@ public class JavacHolder {
      * Where this javac places generated .class files
      */
     public final Path outputDirectory;
+
     /**
-     * javac places all of its internal state into this Context object,
-     * which is basically a Map<String, Object>
+     * Javac tool creates a new Context every time we do createTask(...), so maintaining a reference to it doesn't really do anything
      */
-    public Context context;
+    private final JavacTool javac = JavacTool.create();
+
+    /**
+     * Keep the file manager around because it hangs onto all our .class files
+     */
+    private final JavacFileManager fileManager = javac.getStandardFileManager(this::onError, null, Charset.defaultCharset());
+
+    /**
+     * javac isn't friendly to swapping out the error-reporting DiagnosticListener,
+     * so we install this intermediate DiagnosticListener, which forwards to errorsDelegate
+     */
+    private void onError(Diagnostic<? extends JavaFileObject> diagnostic) {
+        onErrorDelegate.report(diagnostic);
+    }
+
     /**
      * Error reporting initially goes nowhere.
      * We will replace this with a function that collects errors so we can report all the errors associated with a file at once.
      */
     private DiagnosticListener<JavaFileObject> onErrorDelegate = diagnostic -> {};
-    /**
-     * javac isn't friendly to swapping out the error-reporting DiagnosticListener,
-     * so we install this intermediate DiagnosticListener, which forwards to errorsDelegate
-     */
-    private final DiagnosticListener<JavaFileObject> onError = diagnostic -> {
-        onErrorDelegate.report(diagnostic);
-    };
 
     // Set up SymbolIndex
 
     /**
      * Index of symbols that gets updated every time you call compile
      */
-    public final SymbolIndex index;
+    private final SymbolIndex index;
 
+    // TODO pause indexing rather than waiting for it to finish
     /**
      * Completes when initial index is done. Useful for testing.
      */
-    public final CompletableFuture<Void> initialIndexComplete;
+    private final CompletableFuture<Void> initialIndexComplete;
 
-    private static Context reset(Set<Path> classPath,
-                                 Set<Path> sourcePath,
-                                 Path outputDirectory,
-                                 Context existing,
-                                 DiagnosticListener<JavaFileObject> onError,
-                                 Collection<JavaFileObject> invalidatedSources) {
-        Context context = new Context();
-        context.put(DiagnosticListener.class, onError);
+    private final List<String> options;
 
-        // Sets command-line options
-        Options options = Options.instance(context);
-
-        options.put("-classpath", Joiner.on(File.pathSeparator).join(classPath));
-        options.put("-sourcepath", Joiner.on(File.pathSeparator).join(sourcePath));
-        options.put("-d", outputDirectory.toString());
-        // You would think we could do -Xlint:all,
-        // but some lints trigger fatal errors in the presence of parse errors
-        options.put("-Xlint:cast", "");
-        options.put("-Xlint:deprecation", "");
-        options.put("-Xlint:empty", "");
-        options.put("-Xlint:fallthrough", "");
-        options.put("-Xlint:finally", "");
-        options.put("-Xlint:path", "");
-        options.put("-Xlint:unchecked", "");
-        options.put("-Xlint:varargs", "");
-        options.put("-Xlint:static", "");
-
-        // Pre-register some custom components before javac initializes
-        Log.instance(context).multipleErrors = true;
-
-        JavacFileManager fileManager = (JavacFileManager) context.get(JavaFileManager.class);
-
-        if (fileManager == null)
-            fileManager = new JavacFileManager(context, true, null);
-
-        ForgivingAttr.instance(context);
-        Check.instance(context);
-        FuzzyParserFactory.instance(context);
-
-        // Initialize javac
-        JavaCompiler compiler = JavaCompiler.instance(context);
-
-        // We're going to use the javadoc comments
-        compiler.keepComments = true;
-
-        // This may not be necessary
-        Todo.instance(context);
-        JavacTrees.instance(context);
-        Types.instance(context);
-
-        return context;
-    }
-
-    private JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory, Optional<SymbolIndex> index) {
+    private JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory, boolean index) {
         this.classPath = Collections.unmodifiableSet(classPath);
         this.sourcePath = Collections.unmodifiableSet(sourcePath);
         this.outputDirectory = outputDirectory;
-        this.context = reset(classPath, sourcePath, outputDirectory, new Context(), onError, Collections.emptyList());
-        this.index = index.orElse(new SymbolIndex());
-        this.initialIndexComplete = index.isPresent() ? CompletableFuture.completedFuture(null) : startIndexingSourcePath();
+        this.options = ImmutableList.of(
+                "-classpath", Joiner.on(File.pathSeparator).join(classPath),
+                "-sourcepath", Joiner.on(File.pathSeparator).join(sourcePath),
+                "-d", outputDirectory.toString(),
+                // You would think we could do -Xlint:all,
+                // but some lints trigger fatal errors in the presence of parse errors
+                "-Xlint:cast",
+                "-Xlint:deprecation",
+                "-Xlint:empty",
+                "-Xlint:fallthrough",
+                "-Xlint:finally",
+                "-Xlint:path",
+                "-Xlint:unchecked",
+                "-Xlint:varargs",
+                "-Xlint:static"
+        );
+        this.index = new SymbolIndex();
+        this.initialIndexComplete = index ? startIndexingSourcePath() : CompletableFuture.completedFuture(null);
 
-        logStartStopEvents();
         ensureOutputDirectory(outputDirectory);
         clearOutputDirectory(outputDirectory);
     }
 
+    private JavacTask createTask(Collection<JavaFileObject> files) {
+        return javac.getTask(null, fileManager, this::onError, options, null, files);
+    }
+
     public static JavacHolder create(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
-        return new JavacHolder(classPath, sourcePath, outputDirectory, Optional.empty());
+        return new JavacHolder(classPath, sourcePath, outputDirectory, true);
     }
 
     public static JavacHolder createWithoutIndex(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
-        return new JavacHolder(classPath, sourcePath, outputDirectory, Optional.of(new SymbolIndex()));
-    }
-
-    private void logStartStopEvents() {
-        MultiTaskListener.instance(context).add(new TaskListener() {
-            @Override
-            public void started(TaskEvent e) {
-                LOG.fine("Started " + e);
-
-                JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
-            }
-
-            @Override
-            public void finished(TaskEvent e) {
-                LOG.fine("Finished " + e);
-
-                JCTree.JCCompilationUnit unit = (JCTree.JCCompilationUnit) e.getCompilationUnit();
-            }
-        });
+        return new JavacHolder(classPath, sourcePath, outputDirectory, false);
     }
 
     /**
@@ -194,11 +154,7 @@ public class JavacHolder {
                 Map<URI, Optional<String>> files = objects.stream().collect(Collectors.toMap(key -> key, key -> Optional.empty()));
                 CompilationResult result = doCompile(files);
 
-                result.trees.forEach(compiled -> {
-                    Indexer indexer = new Indexer(index, context);
-
-                    compiled.accept(indexer);
-                });
+                result.trees.forEach(compiled -> index.update(compiled, result.task));
 
                 // TODO minimize memory use during this process
                 // Instead of doing parse-all / compileFileObjects-all,
@@ -260,42 +216,75 @@ public class JavacHolder {
         }
     }
 
-    private JavaCompiler compiler() {
-        return JavaCompiler.instance(context);
-    }
-
-    private JavacFileManager fileManager() {
-        return (JavacFileManager) context.get(JavaFileManager.class);
-    }
-
     /**
      * Suggest possible completions
      *
      * @param file Path to file
      * @param textContent Current text of file, if available
-     * @param cursor Offset in file where the cursor is
+     * @param line 1-based line number where the cursor is
+     * @param column 1-based column number where the cursor is
      */
-    public List<CompletionItem> autocomplete(URI file, Optional<String> textContent, long cursor) {
+    public Stream<CompletionItem> autocomplete(URI file, Optional<String> textContent, int line, int column) {
         initialIndexComplete.join();
 
-        JavaFileObject object = findFile(file, textContent);
+        Compiled compiled = compileFocused(file, textContent, line, column);
+        Completions completions = new Completions(compiled.task());
 
-        object = TreePruner.putSemicolonAfterCursor(object, file, cursor);
-
-        JCTree.JCCompilationUnit compiled = compileSimple(
-                object,
-                tree -> new TreePruner(tree, context).removeStatementsAfterCursor(cursor)
-        );
-
-        return doAutocomplete(object, compiled, cursor);
+        return compiled
+                .findScope()
+                .map(completions::at)
+                .orElseGet(Stream::empty);
     }
 
-    private List<CompletionItem> doAutocomplete(JavaFileObject object, JCTree.JCCompilationUnit pruned, long cursor) {
-        AutocompleteVisitor autocompleter = new AutocompleteVisitor(object, cursor, context);
+    interface Compiled {
+        Optional<TreePath> findScope();
+        Optional<Element> findSymbol();
+        JavacTask task();
+    }
 
-        pruned.accept(autocompleter);
+    private Compiled compileFocused(URI file, Optional<String> textContent, int line, int column) {
+        JavaFileObject object = findFile(file, textContent);
+        JavacTask task = createTask(Collections.singleton(object));
 
-        return autocompleter.suggestions;
+        try {
+            Iterable<? extends CompilationUnitTree> parse = task.parse();
+            Iterable<? extends Element> analyze = task.analyze();
+            Trees trees = Trees.instance(task);
+            Function<CompilationUnitTree, Stream<TreePath>> findPath = PathAtCursor.create(task, line, column).andThen(JavacHolder::stream);
+            Supplier<Stream<? extends CompilationUnitTree>> compilationUnits = () -> StreamSupport.stream(parse.spliterator(), false);
+
+            // You can use Trees to access each Element, so no reason
+            return new Compiled() {
+                @Override
+                public Optional<TreePath> findScope() {
+
+                    return compilationUnits.get()
+                            .flatMap(findPath)
+                            .findAny();
+                }
+
+                @Override
+                public Optional<Element> findSymbol() {
+                    Function<TreePath, Optional<Element>> findElement = path -> Optional.ofNullable(trees.getElement(path));
+
+                    return compilationUnits.get()
+                            .flatMap(findPath)
+                            .flatMap(findElement.andThen(JavacHolder::stream))
+                            .findAny();
+                }
+
+                @Override
+                public JavacTask task() {
+                    return task;
+                }
+            };
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static <T> Stream<T> stream(Optional<T> option) {
+        return option.map(Stream::of).orElseGet(Stream::empty);
     }
 
     /**
@@ -303,65 +292,60 @@ public class JavacHolder {
      *
      * @param file Path to file
      * @param textContent Current text of file, if available
-     * @param cursor Offset in file where the cursor is
+     * @param line 1-based line number where the cursor is
+     * @param column 1-based column number where the cursor is
      */
-    public List<Location> findReferences(URI file, Optional<String> textContent, long cursor) {
+    public Stream<Location> findReferences(URI file, Optional<String> textContent, int line, int column) {
         initialIndexComplete.join();
 
-        JCTree.JCCompilationUnit tree = findTree(file, textContent);
+        Compiled compiled = compileFocused(file, textContent, line, column);
 
-        return findSymbol(tree, cursor)
-                .map(s -> doFindReferences(s, tree))
-                .orElse(Collections.emptyList());
+        return compiled.findSymbol()
+                .map(symbol -> {
+                    if (SymbolIndex.shouldIndex(symbol))
+                        return index.references(symbol);
+                    else
+                        return SymbolIndex.nonIndexedReferences(symbol, Trees.instance(compiled.task())).stream();
+                })
+                .orElseGet(Stream::empty);
     }
 
-    private List<Location> doFindReferences(Symbol symbol, JCTree.JCCompilationUnit compilationUnit) {
-        if (SymbolIndex.shouldIndex(symbol))
-            return index.references(symbol).collect(Collectors.toList());
-        else {
-            return SymbolIndex.nonIndexedReferences(symbol, compilationUnit);
-        }
-    }
-
-    public Optional<Location> gotoDefinition(URI file, Optional<String> textContent, long cursor) {
+    public Optional<Location> gotoDefinition(URI file, Optional<String> textContent, int line, int column) {
         initialIndexComplete.join();
 
-        JCTree.JCCompilationUnit tree = findTree(file, textContent);
+        Compiled compiled = compileFocused(file, textContent, line, column);
 
-        return findSymbol(tree, cursor)
-                .flatMap(s -> doGotoDefinition(s, tree));
+        return compiled.findSymbol()
+                .flatMap(symbol -> {
+                    if (SymbolIndex.shouldIndex(symbol))
+                        return index.find(symbol).map(info -> info.getLocation());
+                    else {
+                        Trees trees = Trees.instance(compiled.task());
+                        TreePath path = trees.getPath(symbol);
+
+                        return SymbolIndex.findTree(path, trees);
+                    }
+                });
     }
 
-    private Optional<Location> doGotoDefinition(Symbol symbol, JCTree.JCCompilationUnit compilationUnit) {
-        if (SymbolIndex.shouldIndex(symbol))
-            return index.findSymbol(symbol).map(info -> info.getLocation());
-        else {
-            // TODO isn't this ever empty?
-            JCTree symbolTree = TreeInfo.declarationFor(symbol, compilationUnit);
-
-            return Optional.of(SymbolIndex.location(symbolTree, compilationUnit));
-        }
-    }
-
-    private JCTree.JCCompilationUnit findTree(URI file, Optional<String> textContent) {
-        return compileSimple(findFile(file, textContent), parsed -> {});
-    }
-
-    private Optional<Symbol> findSymbol(JCTree.JCCompilationUnit tree, long cursor) {
-        JavaFileObject file = tree.getSourceFile();
-        SymbolUnderCursorVisitor visitor = new SymbolUnderCursorVisitor(file, cursor, context);
-
-        tree.accept(visitor);
-
-        return visitor.found;
-    }
-
-    public Optional<Symbol> symbolAt(URI file, Optional<String> textContent, long cursor) {
+    public Optional<Element> symbolAt(URI file, Optional<String> textContent, int line, int column) {
         initialIndexComplete.join();
 
-        JCTree.JCCompilationUnit tree = findTree(file, textContent);
+        Compiled compiled = compileFocused(file, textContent, line, column);
 
-        return findSymbol(tree, cursor);
+        return compiled.findSymbol();
+    }
+
+    public Stream<SymbolInformation> searchWorkspace(String query) {
+        initialIndexComplete.join();
+
+        return index.search(query);
+    }
+
+    public Stream<SymbolInformation> searchFile(URI file) {
+        initialIndexComplete.join();
+
+        return index.allInFile(file);
     }
 
     /**
@@ -376,15 +360,16 @@ public class JavacHolder {
                 .stream()
                 .collect(Collectors.toMap(o -> o.toUri(), o -> Optional.empty()));
 
-        clearObjects(Collections.singleton(object));
+        index.clear(uri);
 
         return compile(deps);
     }
 
+    // TODO this should return Optional.empty() file URI is not file: and text is empty
     private JavaFileObject findFile(URI file, Optional<String> text) {
         return text
                 .map(content -> (JavaFileObject) new StringFileObject(content, file))
-                .orElseGet(() -> fileManager().getRegularFile(new File(file)));
+                .orElseGet(() -> fileManager.getRegularFile(Paths.get(file).toFile()));
     }
 
     private DiagnosticCollector<JavaFileObject> startCollectingErrors() {
@@ -403,14 +388,24 @@ public class JavacHolder {
         onErrorDelegate = error -> {};
     }
 
-    public ParseResult parse(URI uri, Optional<String> textContent) {
-        try {
-            DiagnosticCollector<JavaFileObject> errors = startCollectingErrors();
-            JCTree.JCCompilationUnit parsed = compiler().parse(findFile(uri, textContent));
+    public CompilationUnitTree parse(URI file, Optional<String> textContent, DiagnosticListener<JavaFileObject> onError) {
+        JavaFileObject object = findFile(file, textContent);
+        JavacTask task = createTask(Collections.singleton(object));
+        onErrorDelegate = onError;
 
-            return new ParseResult(parsed, errors);
+        try {
+            List<CompilationUnitTree> trees = Lists.newArrayList(task.parse());
+
+            if (trees.isEmpty())
+                throw new RuntimeException("Compiling " + file + " produced 0 results");
+            else if (trees.size() == 1)
+                return trees.get(0);
+            else
+                throw new RuntimeException("Compiling " + file + " produced " + trees.size() + " results");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         } finally {
-            stopCollectingErrors();
+            onErrorDelegate = error -> {};
         }
     }
 
@@ -434,94 +429,25 @@ public class JavacHolder {
 
         objects.addAll(dependencies(objects));
 
-        // Clear javac caches
-        clearObjects(objects);
+        JavacTask task = createTask(objects);
 
         try {
             DiagnosticCollector<JavaFileObject> errors = startCollectingErrors();
+            Iterable<? extends CompilationUnitTree> parse = task.parse();
+            Iterable<? extends Element> analyze = task.analyze();
 
-            List<JCTree.JCCompilationUnit> parsed = objects.stream()
-                    .map(compiler()::parse)
-                    .collect(Collectors.toList());
+            parse.forEach(tree -> index.update(tree, task));
 
-            compileTrees(parsed);
-
-            parsed.forEach(compiled -> {
-                Indexer indexer = new Indexer(index, context);
-
-                compiled.accept(indexer);
-            });
-
-            return new CompilationResult(parsed, errors);
+            return new CompilationResult(Lists.newArrayList(parse), errors, task);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         } finally {
             stopCollectingErrors();
         }
     }
 
-    private void compileTrees(Collection<JCTree.JCCompilationUnit> parsed) {
-        Todo todo = Todo.instance(context);
-
-        compiler().processAnnotations(compiler().enterTrees(com.sun.tools.javac.util.List.from(parsed)));
-
-        while (!todo.isEmpty()) {
-            Env<AttrContext> next = todo.remove();
-
-            try {
-                // We don't do the desugar or generate phases, because they remove method bodies and methods
-                Env<AttrContext> attributedTree = compiler().attribute(next);
-                Queue<Env<AttrContext>> analyzedTree = compiler().flow(attributedTree);
-            } catch (Exception e) {
-                LOG.log(Level.SEVERE, "Error compiling " + next.toplevel.sourcefile.getName(), e);
-
-                // Keep going
-            }
-        }
-    }
-
-    /**
-     * Compile without updating dependencies, index, collecting errors.
-     * Useful for operations like autocomplete.
-     */
-    private JCTree.JCCompilationUnit compileSimple(JavaFileObject read, Consumer<JCTree.JCCompilationUnit> afterParse) {
-        clearCompilerOnly(Collections.singleton(read));
-
-        JCTree.JCCompilationUnit parse = compiler().parse(read);
-
-        afterParse.accept(parse);
-        compileTrees(Collections.singleton(parse));
-
-        return parse;
-    }
-
     private Collection<JavaFileObject> dependencies(Collection<JavaFileObject> files) {
-        // TODO
+        // TODO use index to find dependencies
         return Collections.emptyList();
-    }
-
-
-    /**
-     * Clear file from javac's caches.
-     * This is automatically invoked by other methods of this class; it's exposed only for testing.
-     */
-    public void clearFiles(Collection<URI> files) {
-        List<JavaFileObject> objects = files
-                .stream()
-                .map(f -> findFile(f, Optional.empty()))
-                .collect(Collectors.toList());
-
-        clearObjects(objects);
-    }
-
-    /**
-     * Clear a file from javac's internal caches
-     */
-    private void clearObjects(Collection<JavaFileObject> sources) {
-        sources.forEach(s -> index.clear(s.toUri()));
-
-        clearCompilerOnly(sources);
-    }
-
-    private void clearCompilerOnly(Collection<JavaFileObject> sources) {
-        context = reset(classPath, sourcePath, outputDirectory, context, onError, sources);
     }
 }

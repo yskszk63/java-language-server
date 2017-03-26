@@ -1,8 +1,8 @@
 package org.javacs.example;
 
-public class AutocompleteMember {
+public class AutocompleteMemberFixed {
     public void test() {
-        this.
+        this.field;
     }
 
     public static String fieldStatic;

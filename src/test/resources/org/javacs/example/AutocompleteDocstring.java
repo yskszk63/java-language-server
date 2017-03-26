@@ -1,4 +1,4 @@
-package org.javacs.example
+package org.javacs.example;
 
 /**
  * A class

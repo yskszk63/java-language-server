@@ -1,7 +1,10 @@
 package org.javacs;
 
 import com.google.common.base.Joiner;
+import com.sun.source.util.TreePath;
+import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Type;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -11,6 +14,8 @@ import org.eclipse.lsp4j.services.WorkspaceService;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
+import javax.lang.model.element.Element;
+import javax.lang.model.type.TypeMirror;
 import javax.tools.JavaFileObject;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -144,12 +149,16 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<List<? extends Command>> codeAction(CodeActionParams params) {
+                /*
                 URI file = URI.create(params.getTextDocument().getUri());
                 List<? extends Command> commands = findCompiler(file)
                         .map(compiler -> new CodeActions(compiler, file, activeContent(file)).find(params))
                         .orElse(Collections.emptyList());
 
                 return CompletableFuture.completedFuture(commands);
+                */
+                // TODO
+                return null;
             }
 
             @Override
@@ -312,10 +321,11 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
-                List<SymbolInformation> infos = compilerCache
-                        .values()
-                        .stream()
-                        .flatMap(compiler -> compiler.index.search(params.getQuery()))
+                Collection<JavacHolder> compilers = testJavac
+                        .map(javac -> (Collection<JavacHolder>) Collections.singleton(javac))
+                        .orElseGet(compilerCache::values);
+                List<SymbolInformation> infos = compilers.stream()
+                        .flatMap(compiler -> compiler.searchWorkspace(params.getQuery()))
                         .limit(100)
                         .collect(Collectors.toList());
 
@@ -686,27 +696,26 @@ class JavaLanguageServer implements LanguageServer {
     private List<? extends Location> findReferences(ReferenceParams params) {
         URI uri = URI.create(params.getTextDocument().getUri());
         Optional<String> content = activeContent(uri);
-        int line = params.getPosition().getLine();
-        int character = params.getPosition().getCharacter();
-        long cursor = findOffset(uri, content, line, character);
+        int line = params.getPosition().getLine() + 1;
+        int character = params.getPosition().getCharacter() + 1;
 
         return findCompiler(uri)
-                .map(compiler -> compiler.findReferences(uri, content, cursor))
-                .orElse(Collections.emptyList());
+                .map(compiler -> compiler.findReferences(uri, content, line, character))
+                .orElseGet(Stream::empty)
+                .collect(Collectors.toList());
     }
 
-    public Optional<Symbol> findSymbol(URI file, int line, int character) {
+    public Optional<Element> findSymbol(URI file, int line, int character) {
         Optional<String> content = activeContent(file);
-        long cursor = findOffset(file, content, line, character);
 
-        return findCompiler(file).flatMap(compiler -> compiler.symbolAt(file, content, cursor));
+        return findCompiler(file).flatMap(compiler -> compiler.symbolAt(file, content, line, character));
     }
 
     private List<? extends SymbolInformation> findDocumentSymbols(DocumentSymbolParams params) {
         URI uri = URI.create(params.getTextDocument().getUri());
 
         return findCompiler(uri)
-                .map(compiler -> compiler.index.allInFile(uri))
+                .map(compiler -> compiler.searchFile(uri))
                 .orElse(Stream.empty())
                 .collect(Collectors.toList());
     }
@@ -714,253 +723,137 @@ class JavaLanguageServer implements LanguageServer {
     public List<? extends Location> gotoDefinition(TextDocumentPositionParams position) {
         URI uri = URI.create(position.getTextDocument().getUri());
         Optional<String> content = activeContent(uri);
-        int line = position.getPosition().getLine();
-        int character = position.getPosition().getCharacter();
-        long cursor = findOffset(uri, content, line, character);
+        int line = position.getPosition().getLine() + 1;
+        int character = position.getPosition().getCharacter() + 1;
 
         return findCompiler(uri)
-                .flatMap(compiler -> compiler.gotoDefinition(uri, content, cursor))
+                .flatMap(compiler -> compiler.gotoDefinition(uri, content, line, character))
                 .map(Collections::singletonList)
                 .orElse(Collections.emptyList());
-    }
-
-    /**
-     * Convert on offset-based position to a {@link Position}
-     */
-    public static Position findPosition(JavaFileObject file, long findOffset) {
-        try (Reader in = file.openReader(true)) {
-            long offset = 0;
-            int line = 0;
-            int character = 0;
-
-            // Find the start position
-            while (offset < findOffset) {
-                int next = in.read();
-
-                if (next < 0)
-                    break;
-                else {
-                    offset++;
-                    character++;
-
-                    if (next == '\n') {
-                        line++;
-                        character = 0;
-                    }
-                }
-            }
-
-            return createPosition(line, character);
-        } catch (IOException e) {
-            throw ShowMessageException.error(e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Convert on offset-based position to a {@link Position}
-     */
-    public static Position findEndOfLine(JavaFileObject file, long findOffset) {
-        try (Reader in = file.openReader(true)) {
-            long offset = 0;
-            int line = 0;
-            int character = 0;
-
-            // Find the start position
-            while (offset < findOffset) {
-                int next = in.read();
-
-                if (next < 0)
-                    break;
-                else {
-                    offset++;
-                    character++;
-
-                    if (next == '\n') {
-                        line++;
-                        character = 0;
-                    }
-                }
-            }
-
-            while (true) {
-                int next = in.read();
-
-                if (next < 0)
-                    break;
-                else {
-                    offset++;
-                    character++;
-
-                    if (next == '\n')
-                        break;
-                }
-            }
-
-            return createPosition(line, character);
-        } catch (IOException e) {
-            throw ShowMessageException.error(e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Convert on offset-based range to a {@link Range}
-     */
-    public static Range findRange(JavaFileObject file, long startOffset, long endOffset) {
-        try (Reader in = file.openReader(true)) {
-            long offset = 0;
-            int line = 0;
-            int character = 0;
-
-            // Find the start position
-            while (offset < startOffset) {
-                int next = in.read();
-
-                if (next < 0)
-                    break;
-                else {
-                    offset++;
-                    character++;
-
-                    if (next == '\n') {
-                        line++;
-                        character = 0;
-                    }
-                }
-            }
-
-            Position start = createPosition(line, character);
-
-            // Find the end position
-            while (offset < endOffset) {
-                int next = in.read();
-
-                if (next < 0)
-                    break;
-                else {
-                    offset++;
-                    character++;
-
-                    if (next == '\n') {
-                        line++;
-                        character = 0;
-                    }
-                }
-            }
-
-            Position end = createPosition(line, character);
-
-            // Combine into range
-            Range range = new Range();
-
-            range.setStart(start);
-            range.setEnd(end);
-
-            return range;
-        } catch (IOException e) {
-            throw ShowMessageException.error(e.getMessage(), e);
-        }
-    }
-
-    private static Position createPosition(int line, int character) {
-        Position p = new Position();
-
-        p.setLine(line);
-        p.setCharacter(character);
-
-        return p;
-    }
-
-    public static long findOffset(URI uri, Optional<String> content, int targetLine, int targetCharacter) {
-        try(Reader in = reader(uri, content)) {
-            long offset = 0;
-            int line = 0;
-            int character = 0;
-
-            while (line < targetLine) {
-                int next = in.read();
-
-                if (next < 0)
-                    return offset;
-                else {
-                    offset++;
-
-                    if (next == '\n')
-                        line++;
-                }
-            }
-
-            while (character < targetCharacter) {
-                int next = in.read();
-
-                if (next < 0)
-                    return offset;
-                else {
-                    offset++;
-                    character++;
-                }
-            }
-
-            return offset;
-        } catch (IOException e) {
-            throw ShowMessageException.error(e.getMessage(), e);
-        }
-    }
-
-    private static Reader reader(URI uri, Optional<String> content) {
-        return content
-                .map(text -> (Reader) new StringReader(text))
-                .orElseGet(() -> read(uri));
-    }
-
-    private static BufferedReader read(URI uri) {
-        try {
-            return Files.newBufferedReader(file(uri).orElseThrow(() -> new RuntimeException("Couldn't open " + uri)));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private Hover doHover(TextDocumentPositionParams position) {
         URI uri = URI.create(position.getTextDocument().getUri());
         Optional<String> content = activeContent(uri);
-        int line = position.getPosition().getLine();
-        int character = position.getPosition().getCharacter();
-        long cursor = findOffset(uri, content, line, character);
+        int line = position.getPosition().getLine() + 1;
+        int character = position.getPosition().getCharacter() + 1;
 
         return findCompiler(uri)
-                .flatMap(compiler -> compiler.symbolAt(uri, content, cursor))
+                .flatMap(compiler -> compiler.symbolAt(uri, content, line, character))
                 .flatMap(JavaLanguageServer::hoverText)
                 .map(text -> new Hover(Collections.singletonList(Either.forLeft(text)), null))
                 .orElse(new Hover());
     }
 
-    private static Optional<String> hoverText(Symbol symbol) {
+    private static Optional<String> hoverText(TreePath path, Trees trees) {
+        Element element = trees.getElement(path);
+        TypeMirror type = trees.getTypeMirror(trees.getPath(element));
+
+        switch (type.getKind()) {
+            case BOOLEAN:
+            case BYTE:
+            case SHORT:
+            case INT:
+            case LONG:
+            case CHAR:
+            case FLOAT:
+            case DOUBLE:
+            case VOID:
+            case TYPEVAR:
+            case WILDCARD:
+                return Optional.of(ShortTypePrinter.print(type));
+            case DECLARED: {
+                switch (element.getKind()) {
+                    case CLASS:
+                    case INTERFACE:
+                }
+            }
+            case PACKAGE: {
+                return Optional.ofNullable(path.getCompilationUnit().getPackageName())
+                        .map(name -> "package " + name);
+            }
+            case EXECUTABLE:
+                return Optional.of(methodSignature((Symbol.MethodSymbol) element));
+            default:
+                return Optional.empty();
+        }
+    }
+
+    // TODO this uses non-public APIs
+    public static String methodSignature(Symbol.MethodSymbol e) {
+        String name = e.getSimpleName().toString();
+        boolean varargs = e.isVarArgs();
+        StringJoiner params = new StringJoiner(", ");
+
+        com.sun.tools.javac.util.List<Symbol.VarSymbol> parameters = e.getParameters();
+        for (int i = 0; i < parameters.size(); i++) {
+            Symbol.VarSymbol p = parameters.get(i);
+            String pName = shortName(p, varargs && i == parameters.size() - 1);
+
+            params.add(pName);
+        }
+
+        String signature = name + "(" + params + ")";
+
+        if (!e.getThrownTypes().isEmpty()) {
+            StringJoiner thrown = new StringJoiner(", ");
+
+            for (Type t : e.getThrownTypes())
+                thrown.add(ShortTypePrinter.print(t));
+
+            signature += " throws " + thrown;
+        }
+
+        return signature;
+    }
+
+    private static String shortName(Symbol.VarSymbol p, boolean varargs) {
+        Type type = p.type;
+
+        if (varargs) {
+            Type.ArrayType array = (Type.ArrayType) type;
+
+            type = array.getComponentType();
+        }
+
+        String acc = shortTypeName(type);
+        String name = p.name.toString();
+
+        if (varargs)
+            acc += "...";
+
+        if (!name.matches("arg\\d+"))
+            acc += " " + name;
+
+        return acc;
+    }
+
+    private static String shortTypeName(Type type) {
+        return ShortTypePrinter.print(type);
+    }
+
+    private static Optional<String> hoverText(Element symbol) {
         switch (symbol.getKind()) {
             case PACKAGE:
-                return Optional.of("package " + symbol.getQualifiedName());
+                return Optional.of("package " + symbol.getSimpleName());
             case ENUM:
-                return Optional.of("enum " + symbol.getQualifiedName());
+                return Optional.of("enum " + symbol.getSimpleName());
             case CLASS:
-                return Optional.of("class " + symbol.getQualifiedName());
+                return Optional.of("class " + symbol.getSimpleName());
             case ANNOTATION_TYPE:
-                return Optional.of("@interface " + symbol.getQualifiedName());
+                return Optional.of("@interface " + symbol.getSimpleName());
             case INTERFACE:
-                return Optional.of("interface " + symbol.getQualifiedName());
+                return Optional.of("interface " + symbol.getSimpleName());
             case METHOD:
             case CONSTRUCTOR:
             case STATIC_INIT:
             case INSTANCE_INIT:
-                Symbol.MethodSymbol method = (Symbol.MethodSymbol) symbol;
-                String signature = AutocompleteVisitor.methodSignature(method);
-                String returnType = ShortTypePrinter.print(method.getReturnType());
-
-                return Optional.of(returnType + " " + signature);
             case PARAMETER:
             case LOCAL_VARIABLE:
             case EXCEPTION_PARAMETER:
             case ENUM_CONSTANT:
             case FIELD:
-                return Optional.of(ShortTypePrinter.print(symbol.type));
+                return Optional.of(ShortTypePrinter.print(((Symbol)symbol).type)); // TODO don't do this
             case TYPE_PARAMETER:
             case OTHER:
             case RESOURCE_VARIABLE:
@@ -972,12 +865,12 @@ class JavaLanguageServer implements LanguageServer {
     public CompletionList autocomplete(TextDocumentPositionParams position) {
         URI uri = URI.create(position.getTextDocument().getUri());
         Optional<String> content = activeContent(uri);
-        int line = position.getPosition().getLine();
-        int character = position.getPosition().getCharacter();
-        long cursor = findOffset(uri, content, line, character);
+        int line = position.getPosition().getLine() + 1;
+        int character = position.getPosition().getCharacter() + 1;
         List<CompletionItem> items = findCompiler(uri)
-                .map(compiler -> compiler.autocomplete(uri, content, cursor))
-                .orElse(Collections.emptyList());
+                .map(compiler -> compiler.autocomplete(uri, content, line, character))
+                .orElse(Stream.empty())
+                .collect(Collectors.toList());
 
         return new CompletionList(false, items);
     }

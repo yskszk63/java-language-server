@@ -1,6 +1,7 @@
 package org.javacs;
 
 import com.google.common.collect.Lists;
+import com.sun.source.tree.CompilationUnitTree;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.Pretty;
@@ -11,7 +12,9 @@ import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
 
+import javax.tools.JavaFileObject;
 import java.io.IOException;
+import java.io.Reader;
 import java.io.StringWriter;
 import java.util.Collections;
 import java.util.List;
@@ -19,7 +22,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 class RefactorFile {
-    public static List<TextEdit> addImport(JCTree.JCCompilationUnit source, String packageName, String className) {
+    public static List<TextEdit> addImport(CompilationUnitTree sourceTree, String packageName, String className) {
+        // TODO switch to public APIs
+        JCTree.JCCompilationUnit source = (JCTree.JCCompilationUnit) sourceTree;
+
         Objects.requireNonNull(packageName, "Package name is null");
         Objects.requireNonNull(className, "Class name is null");
 
@@ -39,14 +45,60 @@ class RefactorFile {
     private static Position endOfImports(JCTree.JCCompilationUnit source) {
         Position zero = new Position(0, 0);
         Position endOfPackage = Optional.ofNullable(source.pid)
-                .map(p -> JavaLanguageServer.findEndOfLine(source.getSourceFile(), p.getStartPosition()))
+                .map(p -> findEndOfLine(source.getSourceFile(), p.getStartPosition()))
                 .orElse(zero);
         return source.defs.stream()
                 .filter(RefactorFile::isImportSection)
                 .max(RefactorFile::comparePosition)
                 .map(def -> def.getStartPosition())
-                .map(offset -> JavaLanguageServer.findEndOfLine(source.getSourceFile(), offset))
+                .map(offset -> findEndOfLine(source.getSourceFile(), offset))
                 .orElse(endOfPackage);
+    }
+
+    /**
+     * Convert on offset-based position to a {@link Position}
+     */
+    public static Position findEndOfLine(JavaFileObject file, long findOffset) {
+        try (Reader in = file.openReader(true)) {
+            long offset = 0;
+            int line = 0;
+            int character = 0;
+
+            // Find the start position
+            while (offset < findOffset) {
+                int next = in.read();
+
+                if (next < 0)
+                    break;
+                else {
+                    offset++;
+                    character++;
+
+                    if (next == '\n') {
+                        line++;
+                        character = 0;
+                    }
+                }
+            }
+
+            while (true) {
+                int next = in.read();
+
+                if (next < 0)
+                    break;
+                else {
+                    offset++;
+                    character++;
+
+                    if (next == '\n')
+                        break;
+                }
+            }
+
+            return new Position(line, character);
+        } catch (IOException e) {
+            throw ShowMessageException.error(e.getMessage(), e);
+        }
     }
 
     private static boolean alreadyImported(JCTree.JCCompilationUnit source, String packageName, String className) {

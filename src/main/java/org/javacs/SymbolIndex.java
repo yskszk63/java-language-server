@@ -1,14 +1,14 @@
 package org.javacs;
 
-import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.TreeScanner;
-import com.sun.tools.javac.util.Name;
-import org.eclipse.lsp4j.Location;
-import org.eclipse.lsp4j.Range;
-import org.eclipse.lsp4j.SymbolInformation;
+import com.sun.source.tree.*;
+import com.sun.source.util.*;
+import org.eclipse.lsp4j.*;
 
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.Name;
+import javax.lang.model.element.PackageElement;
+import javax.tools.Diagnostic;
 import java.io.IOException;
 import java.net.URI;
 import java.util.*;
@@ -30,7 +30,7 @@ public class SymbolIndex {
     /**
      * Search all indexed symbols
      */
-    public Stream<? extends SymbolInformation> search(String query) {
+    public Stream<SymbolInformation> search(String query) {
         Stream<SymbolInformation> classes = allSymbols(ElementKind.CLASS);
         Stream<SymbolInformation> methods = allSymbols(ElementKind.METHOD);
 
@@ -41,9 +41,9 @@ public class SymbolIndex {
     /**
      * Get all symbols in an open file
      */
-    public Stream<? extends SymbolInformation> allInFile(URI source) { 
+    public Stream<SymbolInformation> allInFile(URI source) {
         SourceFileIndex index = sourcePath.getOrDefault(source, new SourceFileIndex());
-        
+
         return index.declarations.values().stream().flatMap(map -> map.values().stream());
     }
 
@@ -63,8 +63,8 @@ public class SymbolIndex {
     /**
      * Find all references to a symbol
      */
-    public Stream<? extends Location> references(Symbol symbol) {
-        String key = uniqueName(symbol);
+    public Stream<Location> references(Element symbol) {
+        String key = qualifiedName(symbol);
 
         return sourcePath.values().stream().flatMap(f -> {
             Map<String, Set<Location>> bySymbol = f.references.getOrDefault(symbol.getKind(), Collections.emptyMap());
@@ -74,9 +74,9 @@ public class SymbolIndex {
         });
     }
 
-    public Optional<SymbolInformation> findSymbol(Symbol symbol) {
+    public Optional<SymbolInformation> find(Element symbol) {
         ElementKind kind = symbol.getKind();
-        String key = uniqueName(symbol);
+        String key = qualifiedName(symbol);
 
         for (SourceFileIndex f : sourcePath.values()) {
             Map<String, SymbolInformation> withKind = f.declarations.getOrDefault(kind, Collections.emptyMap());
@@ -88,12 +88,23 @@ public class SymbolIndex {
         return Optional.empty();
     }
 
-    public static String uniqueName(Symbol s) {
+    private static String qualifiedName(Element s) {
         StringJoiner acc = new StringJoiner(".");
 
-        createUniqueName(s, acc);
+        createQualifiedName(s, acc);
 
         return acc.toString();
+    }
+
+    private static void createQualifiedName(Element s, StringJoiner acc) {
+        if (s != null) {
+            createQualifiedName(s.getEnclosingElement(), acc);
+
+            if (s instanceof PackageElement)
+                acc.add(((PackageElement) s).getQualifiedName().toString());
+            else if (s.getSimpleName().length() != 0)
+                acc.add(s.getSimpleName().toString());
+        }
     }
 
     /**
@@ -119,7 +130,7 @@ public class SymbolIndex {
         return iQuery == query.length();
     }
 
-    public static boolean shouldIndex(Symbol symbol) {
+    public static boolean shouldIndex(Element symbol) {
         ElementKind kind = symbol.getKind();
 
         switch (kind) {
@@ -131,96 +142,199 @@ public class SymbolIndex {
             case METHOD:
                 return true;
             case CLASS:
-                return !symbol.isAnonymous();
+                return !isAnonymous(symbol);
             case CONSTRUCTOR:
                 // TODO also skip generated constructors
-                return !symbol.getEnclosingElement().isAnonymous();
+                return !isAnonymous(symbol.getEnclosingElement());
             default:
                 return false;
         }
     }
 
-    public static Location location(JCTree tree, JCTree.JCCompilationUnit compilationUnit) {
-        try {
-            // Declaration should include offset
-            int offset = tree.pos;
-            int end = tree.getEndPosition(null);
-
-            // If symbol is a class, offset points to 'class' keyword, not name
-            // Find the name by searching the text of the source, starting at the 'class' keyword
-            if (tree instanceof JCTree.JCClassDecl) {
-                Symbol.ClassSymbol symbol = ((JCTree.JCClassDecl) tree).sym;
-                offset = offset(compilationUnit, symbol, offset);
-                end = offset + symbol.name.length();
-            }
-            else if (tree instanceof JCTree.JCMethodDecl) {
-                Symbol.MethodSymbol symbol = ((JCTree.JCMethodDecl) tree).sym;
-                offset = offset(compilationUnit, symbol, offset);
-                end = offset + symbol.name.length();
-            }
-            else if (tree instanceof JCTree.JCVariableDecl) {
-                Symbol.VarSymbol symbol = ((JCTree.JCVariableDecl) tree).sym;
-                offset = offset(compilationUnit, symbol, offset);
-                end = offset + symbol.name.length();
-            }
-
-            Range position = JavaLanguageServer.findRange(compilationUnit.getSourceFile(),
-                                                                 offset,
-                                                                 end);
-            Location location = new Location();
-
-            location.setUri(compilationUnit.getSourceFile().toUri().toString());
-            location.setRange(position);
-
-            return location;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    private static boolean isAnonymous(Element symbol) {
+        return symbol.getSimpleName().toString().isEmpty();
     }
 
     /**
-     * All references to symbol in compilationUnit, including things like local variables that aren't indexe
+     * References to things where shouldIndex(symbol) is false
      */
-    public static List<Location> nonIndexedReferences(final Symbol symbol, final JCTree.JCCompilationUnit compilationUnit) {
+    public static List<Location> nonIndexedReferences(final Element symbol, final Trees trees) {
         List<Location> result = new ArrayList<>();
 
-        compilationUnit.accept(new TreeScanner() {
+        new TreePathScanner<Void, Void>() {
             @Override
-            public void visitSelect(JCTree.JCFieldAccess tree) {
-                super.visitSelect(tree);
+            public Void visitIdentifier(IdentifierTree node, Void aVoid) {
+                checkForReference();
 
-                if (tree.sym != null && tree.sym.equals(symbol))
-                    result.add(SymbolIndex.location(tree, compilationUnit));
+                return super.visitIdentifier(node, aVoid);
             }
 
-            @Override
-            public void visitReference(JCTree.JCMemberReference tree) {
-                super.visitReference(tree);
+            private void checkForReference() {
+                Element element = trees.getElement(getCurrentPath());
 
-                if (tree.sym != null && tree.sym.equals(symbol))
-                    result.add(SymbolIndex.location(tree, compilationUnit));
+                if (element.equals(symbol))
+                    findTree(getCurrentPath(), trees).ifPresent(result::add);
             }
-
-            @Override
-            public void visitIdent(JCTree.JCIdent tree) {
-                super.visitIdent(tree);
-
-                if (tree.sym != null && tree.sym.equals(symbol))
-                    result.add(SymbolIndex.location(tree, compilationUnit));
-            }
-        });
+        }.scan(trees.getTree(symbol), null);
 
         return result;
     }
 
-    private static int offset(JCTree.JCCompilationUnit compilationUnit,
-                              Symbol symbol,
-                              int estimate) throws IOException {
-        CharSequence content = compilationUnit.sourcefile.getCharContent(false);
-        Name name = symbol.getSimpleName();
+    /**
+     * Update a file in the index
+     */
+    public void update(CompilationUnitTree compilationUnit, JavacTask task) {
+        Trees trees = Trees.instance(task);
+        URI file = compilationUnit.getSourceFile().toUri();
+        SourceFileIndex index = new SourceFileIndex();
 
-        estimate = indexOf(content, name, estimate);
-        return estimate;
+        new TreePathScanner<Void, Void>() {
+
+            @Override
+            public Void visitClass(ClassTree node, Void aVoid) {
+                addDeclaration();
+
+                return super.visitClass(node, aVoid);
+            }
+
+            @Override
+            public Void visitMethod(MethodTree node, Void aVoid) {
+                addDeclaration();
+
+                return super.visitMethod(node, aVoid);
+            }
+
+            @Override
+            public Void visitVariable(VariableTree node, Void aVoid) {
+                addDeclaration();
+
+                return super.visitVariable(node, aVoid);
+            }
+
+            @Override
+            public Void visitMemberSelect(MemberSelectTree node, Void aVoid) {
+                addReference();
+
+                return super.visitMemberSelect(node, aVoid);
+            }
+
+            @Override
+            public Void visitMemberReference(MemberReferenceTree node, Void aVoid) {
+                addReference();
+
+                return super.visitMemberReference(node, aVoid);
+            }
+
+            @Override
+            public Void visitNewClass(NewClassTree node, Void aVoid) {
+                addReference();
+
+                return super.visitNewClass(node, aVoid);
+            }
+
+            @Override
+            public Void visitIdentifier(IdentifierTree node, Void aVoid) {
+                addReference();
+
+                return super.visitIdentifier(node, aVoid);
+            }
+
+            private void addDeclaration() {
+                Element symbol = trees.getElement(getCurrentPath());
+
+                if (symbol != null && onSourcePath(symbol) && shouldIndex(symbol)) {
+                    symbolInformation(symbol).ifPresent(info -> {
+                        String key = qualifiedName(symbol);
+                        Map<String, SymbolInformation> withKind = index.declarations.computeIfAbsent(symbol.getKind(), newKind -> new HashMap<>());
+
+                        withKind.put(key, info);
+                    });
+                }
+            }
+
+            private void addReference() {
+                Element symbol = trees.getElement(getCurrentPath());
+
+                if (symbol != null && onSourcePath(symbol) && shouldIndex(symbol)) {
+                    String key = qualifiedName(symbol);
+                    Map<String, Set<Location>> withKind = index.references.computeIfAbsent(symbol.getKind(), newKind -> new HashMap<>());
+                    Set<Location> locations = withKind.computeIfAbsent(key, newName -> new HashSet<>());
+
+                    findElementName(symbol, trees).ifPresent(locations::add);
+                }
+            }
+
+            private Optional<SymbolInformation> symbolInformation(Element symbol) {
+                return findElementName(symbol, trees).map(location -> {
+                    SymbolInformation info = new SymbolInformation();
+
+                    info.setContainerName(qualifiedName(symbol.getEnclosingElement()));
+                    info.setKind(symbolInformationKind(symbol.getKind()));
+
+                    // Constructors have name <init>, use class name instead
+                    if (symbol.getKind() == ElementKind.CONSTRUCTOR)
+                        info.setName(symbol.getEnclosingElement().getSimpleName().toString());
+                    else
+                        info.setName(symbol.getSimpleName().toString());
+
+                    info.setLocation(location);
+
+                    return info;
+                });
+            }
+
+            private boolean onSourcePath(Element symbol) {
+                return true; // TODO
+            }
+        }.scan(compilationUnit, null);
+
+        sourcePath.put(file, index);
+    }
+
+    private static Optional<Location> findElementName(Element symbol, Trees trees) {
+        try {
+            TreePath path = trees.getPath(symbol);
+
+            if (path == null)
+                return Optional.empty();
+
+            SourcePositions sourcePositions = trees.getSourcePositions();
+            CompilationUnitTree compilationUnit = path.getCompilationUnit();
+            Tree tree = path.getLeaf();
+            Name name = symbol.getSimpleName();
+            long startExpr = sourcePositions.getStartPosition(compilationUnit, tree);
+
+            if (startExpr == Diagnostic.NOPOS) {
+                // If default constructor, find class symbol instead
+                if (symbol.getKind() == ElementKind.CONSTRUCTOR)
+                    return findElementName(symbol.getEnclosingElement(), trees);
+                else
+                    return Optional.empty();
+            }
+
+            // If normal constructor, search for class name instead of <init>
+            if (symbol.getKind() == ElementKind.CONSTRUCTOR)
+                name = symbol.getEnclosingElement().getSimpleName();
+
+            CharSequence content = compilationUnit.getSourceFile().getCharContent(false);
+            int startSymbol = indexOf(content, name, (int) startExpr);
+
+            if (startSymbol == -1)
+                return Optional.empty();
+
+            int line = (int) compilationUnit.getLineMap().getLineNumber(startSymbol);
+            int column = (int) compilationUnit.getLineMap().getColumnNumber(startSymbol);
+
+            return Optional.of(new Location(
+                    compilationUnit.getSourceFile().toUri().toString(),
+                    new Range(
+                            new Position(line - 1, column - 1),
+                            new Position(line - 1, column + name.length() - 1)
+                    )
+            ));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -270,23 +384,69 @@ public class SymbolIndex {
         return -1;
     }
 
-    private static void createUniqueName(Symbol s, StringJoiner acc) {
-        if (s != null) {
-            createUniqueName(s.owner, acc);
+    /**
+     * Find the location of the tree pointed to by path.
+     */
+    public static Optional<Location> findTree(TreePath path, Trees trees) {
+        if (path == null)
+            return Optional.empty();
 
-            if (!s.getSimpleName().isEmpty())
-                acc.add(s.getSimpleName().toString());
+        CompilationUnitTree compilationUnit = path.getCompilationUnit();
+        Tree leaf = path.getLeaf();
+        long start = trees.getSourcePositions().getStartPosition(compilationUnit, leaf);
+        long end = trees.getSourcePositions().getEndPosition(compilationUnit, leaf);
+
+        if (start != Diagnostic.NOPOS && end != Diagnostic.NOPOS) {
+            LineMap lineMap = compilationUnit.getLineMap();
+
+            return Optional.of(new Location(
+                    compilationUnit.getSourceFile().toUri().toString(),
+                    new Range(
+                            new Position((int) lineMap.getLineNumber(start) - 1, (int) lineMap.getColumnNumber(start) - 1),
+                            new Position((int) lineMap.getLineNumber(end) - 1, (int) lineMap.getColumnNumber(end) - 1)
+                    )
+            ));
+        }
+
+        return Optional.empty();
+    }
+
+    private static SymbolKind symbolInformationKind(ElementKind kind) {
+        switch (kind) {
+            case PACKAGE:
+                return SymbolKind.Package;
+            case ENUM:
+            case ENUM_CONSTANT:
+                return SymbolKind.Enum;
+            case CLASS:
+                return SymbolKind.Class;
+            case ANNOTATION_TYPE:
+            case INTERFACE:
+                return SymbolKind.Interface;
+            case FIELD:
+                return SymbolKind.Property;
+            case PARAMETER:
+            case LOCAL_VARIABLE:
+            case EXCEPTION_PARAMETER:
+            case TYPE_PARAMETER:
+                return SymbolKind.Variable;
+            case METHOD:
+            case STATIC_INIT:
+            case INSTANCE_INIT:
+                return SymbolKind.Method;
+            case CONSTRUCTOR:
+                return SymbolKind.Constructor;
+            case OTHER:
+            case RESOURCE_VARIABLE:
+            default:
+                return SymbolKind.String;
         }
     }
 
-    public void put(URI uri, SourceFileIndex index) {
-        sourcePath.put(uri, index);
-    }
-
     /**
-     * Clear a file from the index when it is deleted
+     * Clear a file from the index when it is deleted or is about to be re-indexed
      */
-    public void clear(URI sourceFile) {
-        sourcePath.remove(sourceFile);
+    public void clear(URI file) {
+        sourcePath.remove(file);
     }
 }

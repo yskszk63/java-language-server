@@ -1,4 +1,4 @@
-package org.javacs.example
+package org.javacs.example;
 
 public class Goto<Param> {
     public static void test() {
@@ -7,7 +7,7 @@ public class Goto<Param> {
         GotoOther other;
 
         // References to this class
-        local = new Goto();
+        local = new Goto(); // this is an error
         local = new Goto("Foo");
 
         local = Goto.fieldStatic;

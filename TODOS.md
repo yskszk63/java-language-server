@@ -1,17 +1,22 @@
 # Todo
 
 ## Polish
-* Autocomplete constructor signatures instead of just class name
 * Add import code action
 * Resolve methods with badly typed arguments
-* Autocomplete is using the entire method signature
-* Autocomplete annotation fields
-* Autocomplete enum options in switch statement
 * Hover shows javadoc if available
 * Hover show FQ types if not imported
 * Javadoc path for hover, autocomplete
-* Autocomplete @Override into method def
 * Status bar info during indexing
+
+## Autocomplete
+* Autocomplete constructor signatures instead of just class name
+* Autocomplete is using the entire method signature
+* Autocomplete annotation fields
+* Autocomplete enum options in switch statement
+* Autocomplete types in method args
+* Class names not imported
+  * Order by imported, name, use in sourcepath
+
 
 ## Features 
 * Go-to-subclasses

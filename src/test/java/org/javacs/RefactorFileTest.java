@@ -1,10 +1,13 @@
 package org.javacs;
 
-import com.sun.tools.javac.tree.JCTree;
+import com.sun.source.tree.CompilationUnitTree;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextEdit;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.io.StringReader;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -135,15 +138,48 @@ public class RefactorFileTest {
     }
 
     private int offset(Position pos, StringBuffer buffer) {
-        return (int) JavaLanguageServer.findOffset(FAKE_FILE, Optional.of(buffer.toString()), pos.getLine(), pos.getCharacter());
+        return (int) findOffset(buffer.toString(), pos.getLine(), pos.getCharacter());
     }
 
-    private JCTree.JCCompilationUnit file(String content) {
+    public static long findOffset(String content, int targetLine, int targetCharacter) {
+        try(Reader in = new StringReader(content)) {
+            long offset = 0;
+            int line = 0;
+            int character = 0;
+
+            while (line < targetLine) {
+                int next = in.read();
+
+                if (next < 0)
+                    return offset;
+                else {
+                    offset++;
+
+                    if (next == '\n')
+                        line++;
+                }
+            }
+
+            while (character < targetCharacter) {
+                int next = in.read();
+
+                if (next < 0)
+                    return offset;
+                else {
+                    offset++;
+                    character++;
+                }
+            }
+
+            return offset;
+        } catch (IOException e) {
+            throw ShowMessageException.error(e.getMessage(), e);
+        }
+    }
+
+    private CompilationUnitTree file(String content) {
         JavacHolder compiler = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.emptySet(), Paths.get("test-output"));
-        ParseResult parsed = compiler.parse(FAKE_FILE, Optional.of(content));
 
-        parsed.errors.getDiagnostics().forEach(err -> LOG.warning(err.toString()));
-
-        return parsed.tree;
+        return compiler.parse(FAKE_FILE, Optional.of(content), error -> LOG.warning(error.toString()));
     }
 }

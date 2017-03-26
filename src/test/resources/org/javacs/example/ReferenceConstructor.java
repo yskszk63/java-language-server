@@ -6,6 +6,6 @@ public class ReferenceConstructor {
     public ReferenceConstructor() { }
 
     {
-        new ReferenceConstructor()
+        new ReferenceConstructor();
     }
 }

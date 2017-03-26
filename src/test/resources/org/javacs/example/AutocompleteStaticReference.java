@@ -1,4 +1,4 @@
-package org.javacs.example
+package org.javacs.example;
 
 public class AutocompleteStaticReference {
     public static void test() {
