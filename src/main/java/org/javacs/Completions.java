@@ -14,6 +14,7 @@ import javax.lang.model.util.Elements;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
@@ -53,8 +54,11 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
             return completeMembers(expressionPath, scope);
         }
+        else if (leaf instanceof NewClassTree) {
+            return constructors(scope);
+        }
         else if (leaf instanceof IdentifierTree) {
-            return membersOfScope(scope);
+            return allSymbols(scope);
         }
         else return Stream.empty();
     }
@@ -179,16 +183,55 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return Optional.empty();
     }
 
+    private Stream<CompletionItem> constructors(Scope start) {
+        // TODO autocomplete classes that *arent* imported and sort them second
+
+        return scopes(start).stream()
+                .flatMap(this::typeSymbols)
+                .flatMap(this::explodeConstructors)
+                .flatMap(constructor -> completionItem(constructor, 0));
+    }
+
+    private Stream<ExecutableElement> explodeConstructors(Element element) {
+        List<? extends Element> all = members(element.asType());
+
+        return all.stream().flatMap(this::asConstructor);
+    }
+
+    private Stream<ExecutableElement> asConstructor(Element element) {
+        if (element.getKind() == ElementKind.CONSTRUCTOR)
+            return Stream.of((ExecutableElement) element);
+        else
+            return Stream.empty();
+    }
+
+    private List<Scope> scopes(Scope start) {
+        List<Scope> acc = new ArrayList<>();
+
+        while (start != null) {
+            acc.add(start);
+
+            start = start.getEnclosingScope();
+        }
+
+        return acc;
+    }
+
+    private Stream<? extends Element> typeSymbols(Scope scope) {
+        return StreamSupport.stream(scope.getLocalElements().spliterator(), false)
+                .filter(this::isTypeSymbol);
+    }
+
     /**
      * Suggest all completions that are visible from scope
      */
-    private Stream<CompletionItem> membersOfScope(Scope scope) {
+    private Stream<CompletionItem> allSymbols(Scope scope) {
         Set<Element> all = new LinkedHashSet<>();
 
         // Add 'this' and 'super' once
         scope.getLocalElements().forEach(all::add);
 
-        findScopeMembers(scope, false, all);
+        doAllSymbols(scope, false, all);
 
         return all.stream()
                 .filter(e -> isAccessible(e, scope))
@@ -201,13 +244,13 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
      * Visibility takes into consideration static / virtual, but not accessibility modifiers.
      * We'll deal with those later.
      */
-    private void findScopeMembers(Scope scope, boolean isStatic, Set<Element> acc) {
+    private void doAllSymbols(Scope scope, boolean isStatic, Set<Element> acc) {
         if (scope == null)
             return;
 
         for (Element each : scope.getLocalElements()) {
             // Don't include 'this' or 'super'
-            // It will be done ONCE by membersOfScope
+            // It will be done ONCE by symbolsInScope
             if (!isThisOrSuper(each))
                 acc.add(each);
         }
@@ -230,7 +273,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         if (isStaticClassScope(scope))
             isStatic = true;
 
-        findScopeMembers(scope.getEnclosingScope(), isStatic, acc);
+        doAllSymbols(scope.getEnclosingScope(), isStatic, acc);
     }
 
     private boolean isStaticClassScope(Scope scope) {
@@ -253,7 +296,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> completionItem(Element e, int distance) {
-        String name = e.getSimpleName().toString();
+        String name = e.getKind() == ElementKind.CONSTRUCTOR ? Hovers.constructorName((ExecutableElement) e) : e.getSimpleName().toString();
         String sortText = distance + "/" + name;
         
         switch (e.getKind()) {
@@ -331,11 +374,17 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 return Stream.of(item);
             }
             case CONSTRUCTOR: {
+                ExecutableElement method = (ExecutableElement) e;
                 CompletionItem item = new CompletionItem();
+                String insertText = name;
+
+                if (!method.getTypeParameters().isEmpty())
+                    insertText += "<>";
 
                 item.setKind(CompletionItemKind.Constructor);
-                item.setLabel(name);
-                item.setInsertText(name);
+                item.setLabel(Hovers.methodSignature(method));
+                docstring(method).ifPresent(item::setDocumentation);
+                item.setInsertText(insertText);
                 item.setSortText(sortText);
                 item.setFilterText(name);
 

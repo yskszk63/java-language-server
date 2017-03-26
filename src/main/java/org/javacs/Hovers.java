@@ -9,6 +9,7 @@ import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
@@ -82,7 +83,7 @@ public class Hovers implements Function<TreePath, Optional<String>> {
     }
 
     public static String methodSignature(ExecutableElement e) {
-        String name = e.getSimpleName().toString();
+        String name = e.getKind() == ElementKind.CONSTRUCTOR ? constructorName(e) : e.getSimpleName().toString();
         boolean varargs = e.isVarArgs();
         StringJoiner params = new StringJoiner(", ");
 
@@ -133,4 +134,7 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         return ShortTypePrinter.print(type);
     }
 
+    public static String constructorName(ExecutableElement e) {
+        return e.getEnclosingElement().getSimpleName().toString();
+    }
 }
