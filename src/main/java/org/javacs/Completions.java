@@ -227,6 +227,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 .ifPresent(all::addAll);
 
         doAllSymbols(scope, false, all);
+
         return all;
     }
 

@@ -358,7 +358,7 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteRest.java";
 
         // Static method
-        Set<String> suggestions = items(file, 4, 17).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
+        Set<String> suggestions = items(file, 5, 18).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
 
         assertThat(suggestions, hasItems("restMethod(String... params)"));
     }
@@ -380,7 +380,8 @@ public class CompletionsTest extends CompletionsBase {
         // Static method
         Set<String> suggestions = insertText(file, 3, 12);
 
-        assertThat(suggestions, hasItems("javacs"));
+        assertThat("Has next package", suggestions, hasItems("javacs"));
+        assertThat("Has deeply nested class", suggestions, hasItems("javacs.example.AutocompleteMember"));
     }
 
     @Test
@@ -390,7 +391,7 @@ public class CompletionsTest extends CompletionsBase {
         // Static method
         Set<String> suggestions = insertText(file, 4, 27);
 
-        assertThat(suggestions, hasItems("AutocompletePackage"));
+        assertThat(suggestions, hasItems("AutocompleteMember"));
     }
 
     @Test
