@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -448,6 +449,10 @@ public class AutocompleteTest {
                 new Position(row - 1, column - 1)
         );
 
-        return server.autocomplete(position).getItems();
+        try {
+            return server.getTextDocumentService().completion(position).get().getRight().getItems();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

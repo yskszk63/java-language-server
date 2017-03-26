@@ -7,6 +7,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 
 import static org.hamcrest.Matchers.contains;
@@ -138,7 +139,11 @@ public class GotoTest {
         p.setTextDocument(document);
         p.setPosition(position);
 
-        return server.gotoDefinition(p);
+        try {
+            return server.getTextDocumentService().definition(p).get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }

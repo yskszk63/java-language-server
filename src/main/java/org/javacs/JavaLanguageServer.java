@@ -51,27 +51,6 @@ class JavaLanguageServer implements LanguageServer {
         this.testJavac = Optional.of(testJavac);
     }
 
-    public void onError(String message, Throwable error) {
-        if (error instanceof ShowMessageException)
-            client.showMessage(((ShowMessageException) error).message);
-        else if (error instanceof NoJavaConfigException) {
-            // Swallow error
-            // If you want to show a message for no-java-config, 
-            // you have to specifically catch the error lower down and re-throw it
-            LOG.warning(error.getMessage());
-        }
-        else {
-            LOG.log(Level.SEVERE, message, error);
-            
-            MessageParams m = new MessageParams();
-
-            m.setMessage(message);
-            m.setType(MessageType.Error);
-
-            client.showMessage(m);
-        }
-    }
-
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
         workspaceRoot = Paths.get(params.getRootPath()).toAbsolutePath().normalize();
@@ -108,7 +87,18 @@ class JavaLanguageServer implements LanguageServer {
         return new TextDocumentService() {
             @Override
             public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(TextDocumentPositionParams position) {
-                return CompletableFuture.completedFuture(Either.forRight(autocomplete(position)));
+                URI uri = URI.create(position.getTextDocument().getUri());
+                Optional<String> content = activeContent(uri);
+                int line = position.getPosition().getLine() + 1;
+                int character = position.getPosition().getCharacter() + 1;
+                List<CompletionItem> items = findCompiler(uri)
+                        .map(compiler -> compiler.compileFocused(uri, content, line, character))
+                        .map(Completions::at)
+                        .orElseGet(Stream::empty)
+                        .collect(Collectors.toList());
+                CompletionList result = new CompletionList(false, items);
+
+                return CompletableFuture.completedFuture(Either.forRight(result));
             }
 
             @Override
@@ -118,7 +108,16 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<Hover> hover(TextDocumentPositionParams position) {
-                return CompletableFuture.completedFuture(doHover(position));
+                URI uri = URI.create(position.getTextDocument().getUri());
+                Optional<String> content = activeContent(uri);
+                int line = position.getPosition().getLine() + 1;
+                int character = position.getPosition().getCharacter() + 1;
+                Hover hover = findCompiler(uri)
+                        .map(compiler -> compiler.compileFocused(uri, content, line, character))
+                        .flatMap(Hovers::hoverText)
+                        .orElseGet(Hover::new);
+
+                return CompletableFuture.completedFuture(hover);
             }
 
             @Override
@@ -128,12 +127,38 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<List<? extends Location>> definition(TextDocumentPositionParams position) {
-                return CompletableFuture.completedFuture(gotoDefinition(position));
+                URI uri = URI.create(position.getTextDocument().getUri());
+                Optional<String> content = activeContent(uri);
+                int line = position.getPosition().getLine() + 1;
+                int character = position.getPosition().getCharacter() + 1;
+                List<Location> locations = findCompiler(uri)
+                        .flatMap(compiler -> {
+                            FocusedResult result = compiler.compileFocused(uri, content, line, character);
+
+                            return References.gotoDefinition(result, compiler.index);
+                        })
+                        .map(Collections::singletonList)
+
+                        .orElseGet(Collections::emptyList);
+                return CompletableFuture.completedFuture(locations);
             }
 
             @Override
             public CompletableFuture<List<? extends Location>> references(ReferenceParams params) {
-                return CompletableFuture.completedFuture(findReferences(params));
+                URI uri = URI.create(params.getTextDocument().getUri());
+                Optional<String> content = activeContent(uri);
+                int line = params.getPosition().getLine() + 1;
+                int character = params.getPosition().getCharacter() + 1;
+                List<Location> locations = findCompiler(uri)
+                        .map(compiler -> {
+                            FocusedResult result = compiler.compileFocused(uri, content, line, character);
+
+                            return References.findReferences(result, compiler.index);
+                        })
+                        .orElseGet(Stream::empty)
+                        .collect(Collectors.toList());
+
+                return CompletableFuture.completedFuture(locations);
             }
 
             @Override
@@ -143,7 +168,13 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<List<? extends SymbolInformation>> documentSymbol(DocumentSymbolParams params) {
-                return CompletableFuture.completedFuture(findDocumentSymbols(params));
+                URI uri = URI.create(params.getTextDocument().getUri());
+                List<SymbolInformation> symbols = findCompiler(uri)
+                        .map(compiler -> compiler.searchFile(uri))
+                        .orElse(Stream.empty())
+                        .collect(Collectors.toList());
+
+                return CompletableFuture.completedFuture(symbols);
             }
 
             @Override
@@ -691,38 +722,6 @@ class JavaLanguageServer implements LanguageServer {
         }
     }
 
-    private List<? extends Location> findReferences(ReferenceParams params) {
-        URI uri = URI.create(params.getTextDocument().getUri());
-        Optional<String> content = activeContent(uri);
-        int line = params.getPosition().getLine() + 1;
-        int character = params.getPosition().getCharacter() + 1;
-
-        return findCompiler(uri)
-                .map(compiler -> {
-                    FocusedResult result = compiler.compileFocused(uri, content, line, character);
-
-                    return References.findReferences(result, compiler.index);
-                })
-                .orElseGet(Stream::empty)
-                .collect(Collectors.toList());
-    }
-
-    public List<? extends Location> gotoDefinition(TextDocumentPositionParams position) {
-        URI uri = URI.create(position.getTextDocument().getUri());
-        Optional<String> content = activeContent(uri);
-        int line = position.getPosition().getLine() + 1;
-        int character = position.getPosition().getCharacter() + 1;
-
-        return findCompiler(uri)
-                .flatMap(compiler -> {
-                    FocusedResult result = compiler.compileFocused(uri, content, line, character);
-
-                    return References.gotoDefinition(result, compiler.index);
-                })
-                .map(Collections::singletonList)
-                .orElseGet(Collections::emptyList);
-    }
-
     public Optional<Element> findSymbol(URI file, int line, int character) {
         Optional<String> content = activeContent(file);
 
@@ -734,41 +733,6 @@ class JavaLanguageServer implements LanguageServer {
 
                     return result.cursor.flatMap(findSymbol);
                 });
-    }
-
-    private List<? extends SymbolInformation> findDocumentSymbols(DocumentSymbolParams params) {
-        URI uri = URI.create(params.getTextDocument().getUri());
-
-        return findCompiler(uri)
-                .map(compiler -> compiler.searchFile(uri))
-                .orElse(Stream.empty())
-                .collect(Collectors.toList());
-    }
-
-    private Hover doHover(TextDocumentPositionParams position) {
-        URI uri = URI.create(position.getTextDocument().getUri());
-        Optional<String> content = activeContent(uri);
-        int line = position.getPosition().getLine() + 1;
-        int character = position.getPosition().getCharacter() + 1;
-
-        return findCompiler(uri)
-                .map(compiler -> compiler.compileFocused(uri, content, line, character))
-                .flatMap(Hovers::hoverText)
-                .orElseGet(Hover::new);
-    }
-
-    public CompletionList autocomplete(TextDocumentPositionParams position) {
-        URI uri = URI.create(position.getTextDocument().getUri());
-        Optional<String> content = activeContent(uri);
-        int line = position.getPosition().getLine() + 1;
-        int character = position.getPosition().getCharacter() + 1;
-        List<CompletionItem> items = findCompiler(uri)
-                .map(compiler -> compiler.compileFocused(uri, content, line, character))
-                .map(Completions::at)
-                .orElseGet(Stream::empty)
-                .collect(Collectors.toList());
-
-        return new CompletionList(false, items);
     }
 
     public void installClient(LanguageClient client) {
