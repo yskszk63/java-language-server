@@ -342,7 +342,8 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
                 item.setKind(CompletionItemKind.Property);
                 item.setLabel(name);
-                Optional.of(ShortTypePrinter.print(e.asType())).map(CharSequence::toString).ifPresent(item::setDetail);
+                item.setDetail(ShortTypePrinter.print(e.asType()));
+                docstring(e).ifPresent(item::setDocumentation);
                 item.setInsertText(name);
                 item.setSortText(sortText);
 
@@ -367,7 +368,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 item.setKind(CompletionItemKind.Method);
                 item.setLabel(Hovers.methodSignature(method));
                 item.setDetail(ShortTypePrinter.print(method.getReturnType()));
-                docstring(method).ifPresent(item::setDocumentation);
+                docstring(e).ifPresent(item::setDocumentation);
                 item.setInsertText(name); // TODO
                 item.setSortText(sortText);
                 item.setFilterText(name);
@@ -384,7 +385,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
                 item.setKind(CompletionItemKind.Constructor);
                 item.setLabel(Hovers.methodSignature(method));
-                docstring(method).ifPresent(item::setDocumentation);
+                docstring(e).ifPresent(item::setDocumentation);
                 item.setInsertText(insertText);
                 item.setSortText(sortText);
                 item.setFilterText(name);
@@ -412,11 +413,6 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Optional<String> docstring(Element e) {
-        TreePath path = trees.getPath(e);
-
-        if (path == null)
-            return Optional.empty();
-        else
-            return Optional.ofNullable(trees.getDocComment(path));
+        return Optional.ofNullable(elements.getDocComment(e));
     }
 }

@@ -5,11 +5,11 @@ package org.javacs.example;
  */
 public class AutocompleteDocstring {
     public void members() {
-        this.
+        this.;
     }
 
     public void statics() {
-        AutocompleteDocstring.
+        AutocompleteDocstring.;
     }
 
     /**

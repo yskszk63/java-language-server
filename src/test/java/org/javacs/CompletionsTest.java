@@ -324,11 +324,11 @@ public class CompletionsTest extends CompletionsBase {
     public void docstring() throws IOException {
         String file = "/org/javacs/example/AutocompleteDocstring.java";
 
-        Set<String> docstrings = documentation(file, 7, 14);
+        Set<String> docstrings = documentation(file, 8, 14);
 
         assertThat(docstrings, hasItems("A method", "A field"));
 
-        docstrings = documentation(file, 11, 31);
+        docstrings = documentation(file, 12, 31);
 
         assertThat(docstrings, hasItems("A fieldStatic", "A methodStatic"));
     }
