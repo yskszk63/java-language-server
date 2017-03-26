@@ -9,8 +9,11 @@ import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.function.Function;
@@ -78,15 +81,14 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         return Optional.ofNullable(trees.getTypeMirror(path));
     }
 
-    // TODO this uses non-public APIs
-    private static String methodSignature(Symbol.MethodSymbol e) {
+    public static String methodSignature(ExecutableElement e) {
         String name = e.getSimpleName().toString();
         boolean varargs = e.isVarArgs();
         StringJoiner params = new StringJoiner(", ");
 
-        com.sun.tools.javac.util.List<Symbol.VarSymbol> parameters = e.getParameters();
+        List<? extends VariableElement> parameters = e.getParameters();
         for (int i = 0; i < parameters.size(); i++) {
-            Symbol.VarSymbol p = parameters.get(i);
+            VariableElement p = parameters.get(i);
             String pName = shortName(p, varargs && i == parameters.size() - 1);
 
             params.add(pName);
@@ -97,7 +99,7 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         if (!e.getThrownTypes().isEmpty()) {
             StringJoiner thrown = new StringJoiner(", ");
 
-            for (Type t : e.getThrownTypes())
+            for (TypeMirror t : e.getThrownTypes())
                 thrown.add(ShortTypePrinter.print(t));
 
             signature += " throws " + thrown;
@@ -106,8 +108,8 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         return signature;
     }
 
-    private static String shortName(Symbol.VarSymbol p, boolean varargs) {
-        Type type = p.type;
+    private static String shortName(VariableElement p, boolean varargs) {
+        TypeMirror type = p.asType();
 
         if (varargs) {
             Type.ArrayType array = (Type.ArrayType) type;
@@ -116,7 +118,7 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         }
 
         String acc = shortTypeName(type);
-        String name = p.name.toString();
+        String name = p.getSimpleName().toString();
 
         if (varargs)
             acc += "...";
@@ -127,7 +129,7 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         return acc;
     }
 
-    private static String shortTypeName(Type type) {
+    private static String shortTypeName(TypeMirror type) {
         return ShortTypePrinter.print(type);
     }
 

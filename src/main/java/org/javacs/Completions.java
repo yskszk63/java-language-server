@@ -318,7 +318,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 CompletionItem item = new CompletionItem();
 
                 item.setKind(CompletionItemKind.Method);
-                item.setLabel(name);
+                item.setLabel(Hovers.methodSignature(method));
                 item.setDetail(ShortTypePrinter.print(method.getReturnType()));
                 docstring(method).ifPresent(item::setDocumentation);
                 item.setInsertText(name); // TODO
