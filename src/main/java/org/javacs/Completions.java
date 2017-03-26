@@ -184,8 +184,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> constructors(Scope start) {
-        // TODO autocomplete classes that *arent* imported and sort them second
-
+        // TODO autocomplete classes that are imported *anywhere* on the source path and sort them second
         return scopes(start).stream()
                 .flatMap(this::typeSymbols)
                 .flatMap(this::explodeConstructors)
@@ -231,11 +230,25 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         // Add 'this' and 'super' once
         scope.getLocalElements().forEach(all::add);
 
+        // Add all members of this package
+        packageOf(scope.getEnclosingClass())
+                .map(PackageElement::getEnclosedElements)
+                .ifPresent(all::addAll);
+
         doAllSymbols(scope, false, all);
 
         return all.stream()
                 .filter(e -> isAccessible(e, scope))
                 .flatMap(e -> completionItem(e, distance(e, scope)));
+    }
+
+    private Optional<PackageElement> packageOf(Element enclosing) {
+        if (enclosing == null)
+            return Optional.empty();
+        else if (enclosing instanceof PackageElement)
+            return Optional.of((PackageElement) enclosing);
+        else
+            return packageOf(enclosing.getEnclosingElement());
     }
 
     /**
