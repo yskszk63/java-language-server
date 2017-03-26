@@ -67,22 +67,32 @@ public class AutocompleteTest {
     }
 
     @Test
-    public void initBlock() throws IOException {
+    public void fieldFromInitBlock() throws IOException {
         String file = "/org/javacs/example/AutocompleteMembers.java";
 
         // f
         Set<String> suggestions = insertText(file, 8, 10);
 
         assertThat(suggestions, hasItems("field", "fieldStatic", "method", "methodStatic"));
+    }
+
+    @Test
+    public void thisDotFieldFromInitBlock() throws IOException {
+        String file = "/org/javacs/example/AutocompleteMembers.java";
         
         // this.f
-        suggestions = insertText(file, 9, 15);
+        Set<String> suggestions = insertText(file, 9, 15);
 
         assertThat(suggestions, hasItems("field", "method"));
         assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic")));
+    }
+
+    @Test
+    public void classDotFieldFromInitBlock() throws IOException {
+        String file = "/org/javacs/example/AutocompleteMembers.java";
         
         // AutocompleteMembers.f
-        suggestions = insertText(file, 10, 30);
+        Set<String> suggestions = insertText(file, 10, 30);
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
         assertThat(suggestions, not(hasItems("field", "method")));
@@ -156,7 +166,7 @@ public class AutocompleteTest {
     }
 
     @Test
-    public void staticInitBlock() throws IOException {
+    public void fieldFromStaticInitBlock() throws IOException {
         String file = "/org/javacs/example/AutocompleteMembers.java";
 
         // f
@@ -164,23 +174,32 @@ public class AutocompleteTest {
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
         assertThat(suggestions, not(hasItems("field", "method")));
-        
-        // AutocompleteMembers.f
-        suggestions = insertText(file, 17, 30);
-
-        assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
-        assertThat(suggestions, not(hasItems("field", "method")));
-
-        // TODO
-//        // AutocompleteMembers::m
-//        suggestions = insertText(file, 17, 30);
-//
-//        assertThat(suggestions, hasItems("methodStatic"));
-//        assertThat(suggestions, not(hasItems("field", "fieldStatic", "method")));
     }
 
     @Test
-    public void staticMethod() throws IOException {
+    public void classDotFieldFromStaticInitBlock() throws IOException {
+        String file = "/org/javacs/example/AutocompleteMembers.java";
+
+        // AutocompleteMembers.f
+        Set<String> suggestions = insertText(file, 17, 30);
+
+        assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
+        assertThat(suggestions, not(hasItems("field", "method")));
+    }
+
+    @Test
+    public void classRefFieldFromStaticInitBlock() throws IOException {
+        String file = "/org/javacs/example/AutocompleteMembers.java";
+
+        // AutocompleteMembers::m
+        Set<String> suggestions = insertText(file, 17, 30);
+
+        assertThat(suggestions, hasItems("methodStatic"));
+        assertThat(suggestions, not(hasItems("field", "fieldStatic", "method")));
+    }
+
+    @Test
+    public void fieldFromStaticMethod() throws IOException {
         String file = "/org/javacs/example/AutocompleteMembers.java";
 
         // f
@@ -188,19 +207,29 @@ public class AutocompleteTest {
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic", "argument"));
         assertThat(suggestions, not(hasItems("field", "method")));
+    }
+
+    @Test
+    public void classDotFieldFromStaticMethod() throws IOException {
+        String file = "/org/javacs/example/AutocompleteMembers.java";
         
         // AutocompleteMembers.f
-        suggestions = insertText(file, 31, 30);
+        Set<String> suggestions = insertText(file, 31, 30);
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
         assertThat(suggestions, not(hasItems("field", "method", "argument")));
+    }
+
+    @Test
+    public void classRefFieldFromStaticMethod() throws IOException {
+        String file = "/org/javacs/example/AutocompleteMembers.java";
 
         // TODO
-//        // AutocompleteMembers::m
-//        suggestions = insertText(file, 17, 30);
-//
-//        assertThat(suggestions, hasItems("methodStatic"));
-//        assertThat(suggestions, not(hasItems("field", "fieldStatic", "method")));
+        // AutocompleteMembers::m
+        Set<String> suggestions = insertText(file, 17, 30);
+
+        assertThat(suggestions, hasItems("methodStatic"));
+        assertThat(suggestions, not(hasItems("field", "fieldStatic", "method")));
     }
     
     @Test
@@ -235,13 +264,27 @@ public class AutocompleteTest {
     public void otherStatic() throws IOException {
         String file = "/org/javacs/example/AutocompleteOther.java";
 
-        // new AutocompleteMember().
+        // AutocompleteMember.
         Set<String> suggestions = insertText(file, 7, 28);
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic", "class"));
         assertThat(suggestions, not(hasItems("fieldStaticPrivate", "methodStaticPrivate")));
         assertThat(suggestions, not(hasItems("fieldPrivate", "methodPrivate")));
         assertThat(suggestions, not(hasItems("field", "method", "getClass")));
+    }
+
+    @Test
+    public void otherDotClassDot() throws IOException {
+        String file = "/org/javacs/example/AutocompleteOther.java";
+
+        // AutocompleteMember.class.
+        Set<String> suggestions = insertText(file, 8, 33);
+
+        assertThat(suggestions, hasItems("getName", "getClass"));
+        assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "class")));
+        assertThat(suggestions, not(hasItems("fieldStaticPrivate", "methodStaticPrivate")));
+        assertThat(suggestions, not(hasItems("fieldPrivate", "methodPrivate")));
+        assertThat(suggestions, not(hasItems("field", "method")));
     }
 
     @Test
@@ -361,7 +404,7 @@ public class AutocompleteTest {
     }
 
     @Test
-    public void outerClass() throws IOException {
+    public void fieldFromStaticInner() throws IOException {
         String file = "/org/javacs/example/AutocompleteOuter.java";
 
         // Initializer of static inner class
@@ -369,39 +412,58 @@ public class AutocompleteTest {
 
         assertThat(suggestions, hasItems("methodStatic", "fieldStatic"));
         assertThat(suggestions, not(hasItems("method", "field")));
+    }
+
+    @Test
+    public void fieldFromInner() throws IOException {
+        String file = "/org/javacs/example/AutocompleteOuter.java";
 
         // Initializer of inner class
-        suggestions = insertText(file, 18, 14);
+        Set<String> suggestions = insertText(file, 18, 14);
 
         assertThat(suggestions, hasItems("methodStatic", "fieldStatic"));
         assertThat(suggestions, hasItems("method", "field"));
     }
 
     @Test
-    public void innerDeclaration() throws IOException {
+    public void classDotClassFromMethod() throws IOException {
         String file = "/org/javacs/example/AutocompleteInners.java";
 
+        // AutocompleteInners.I
         Set<String> suggestions = insertText(file, 5, 29);
 
         assertThat("suggests qualified inner class declaration", suggestions, hasItem("InnerClass"));
         assertThat("suggests qualified inner enum declaration", suggestions, hasItem("InnerEnum"));
+    }
 
-        suggestions = insertText(file, 6, 10);
+    @Test
+    public void innerClassFromMethod() throws IOException {
+        String file = "/org/javacs/example/AutocompleteInners.java";
+
+        // I
+        Set<String> suggestions = insertText(file, 6, 10);
 
         assertThat("suggests unqualified inner class declaration", suggestions, hasItem("InnerClass"));
         assertThat("suggests unqualified inner enum declaration", suggestions, hasItem("InnerEnum"));
     }
 
     @Test
-    public void innerNew() throws IOException {
+    public void newClassDotInnerClassFromMethod() throws IOException {
         String file = "/org/javacs/example/AutocompleteInners.java";
 
+        // new AutocompleteInners.I
         Set<String> suggestions = insertText(file, 10, 33);
 
         assertThat("suggests qualified inner class declaration", suggestions, hasItem("InnerClass"));
         assertThat("suggests qualified inner enum declaration", suggestions, not(hasItem("InnerEnum")));
+    }
 
-        suggestions = insertText(file, 11, 14);
+    @Test
+    public void newInnerClassFromMethod() throws IOException {
+        String file = "/org/javacs/example/AutocompleteInners.java";
+
+        // new I
+        Set<String> suggestions = insertText(file, 11, 14);
 
         assertThat("suggests unqualified inner class declaration", suggestions, hasItem("InnerClass"));
         assertThat("suggests unqualified inner enum declaration", suggestions, hasItem("InnerEnum"));

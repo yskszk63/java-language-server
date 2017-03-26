@@ -7,9 +7,7 @@ import com.sun.source.util.Trees;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
@@ -59,22 +57,51 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> completeMembers(TreePath expression, Scope from) {
-        return membersOfExpression(expression, from)
-                .flatMap(e -> completionItem(e, from));
-    }
+        Element element = trees.getElement(expression);
 
-    private Stream<? extends Element> membersOfExpression(TreePath expression, Scope from) {
+        if (element == null)
+            return Stream.empty();
+
+        boolean isStatic = isTypeSymbol(element.getKind());
         TypeMirror expressionType = trees.getTypeMirror(expression);
+        List<? extends Element> all = typeElement(expressionType)
+                .map(e -> elements.getAllMembers(e))
+                .orElseGet(Collections::emptyList);
+        Stream<CompletionItem> filter = all.stream()
+                .filter(e -> isAccessible(e, from))
+                .filter(e -> isStatic(e) == isStatic)
+                .flatMap(e -> completionItem(e, distance(e, from)));
 
-        return typeElement(expressionType)
-                .map(element -> membersOfType(element, from))
-                .orElseGet(Stream::empty);
+        if (isStatic)
+            filter = Stream.concat(Stream.of(dotClass()), filter);
+
+        return filter;
     }
 
-    private Stream<? extends Element> membersOfType(TypeElement of, Scope from) {
-        List<? extends Element> found = elements.getAllMembers(of);
+    private static CompletionItem dotClass() {
+        CompletionItem item = new CompletionItem();
 
-        return found.stream().filter(e -> isAccessible(e, from));
+        item.setKind(CompletionItemKind.Class);
+        item.setLabel("class");
+        item.setInsertText("class");
+        item.setSortText("0/class");
+
+        return item;
+    }
+
+    private boolean isTypeSymbol(ElementKind kind) {
+        switch (kind) {
+            case CLASS:
+            case INTERFACE:
+            case ENUM:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private boolean isStatic(Element e) {
+        return e.getModifiers().contains(Modifier.STATIC);
     }
 
     private Optional<TypeElement> typeElement(TypeMirror type) {
@@ -92,8 +119,46 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     private Stream<CompletionItem> membersOfScope(Scope scope) {
         return scopes(scope)
                 .flatMap(this::elements)
-                .flatMap(e -> completionItem(e, scope));
+                .filter(e -> isAccessible(e, scope))
+                .flatMap(e -> completionItem(e, distance(e, scope)));
     }
+
+    private int distance(Element e, Scope scope) {
+        // TODO
+        return 0;
+    }
+
+    /*
+
+
+    private Stream<Scope> scopes(Scope start) {
+        Map<Scope, Boolean> scopes = new LinkedHashMap<>();
+
+        findScopes(start, false, scopes);
+
+        return scopes.stream();
+    }
+
+    private void findScopes(Scope scope, boolean isStatic, Map<Scope, Boolean> scopes) {
+        if (scope == null || scopes.containsKey(scope))
+            return;
+
+        isStatic = isStatic || isStaticScope(scope);
+
+        scopes.put(scope, isStatic);
+
+        findScopes(scope.getEnclosingScope(), isStatic, scopes);
+    }
+
+    private boolean isStaticScope(Scope scope) {
+        if (scope.getEnclosingMethod() != null && scope.getEnclosingMethod().getModifiers().contains(Modifier.STATIC))
+            return true;
+        else if (scope.getEnclosingClass() != null && scope.getEnclosingClass().getModifiers().contains(Modifier.STATIC))
+            return true;
+        else
+            return false;
+    }
+     */
 
     private Stream<Scope> scopes(Scope start) {
         Set<Scope> scopes = new LinkedHashSet<>();
@@ -134,12 +199,9 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         findElements(scope.getEnclosingScope(), elements);
     }
 
-    private Stream<CompletionItem> completionItem(Element e, Scope scope) {
-        if (!isAccessible(e, scope))
-            return Stream.empty();
-
+    private Stream<CompletionItem> completionItem(Element e, int distance) {
         String name = e.getSimpleName().toString();
-        String sortText = distance(e, scope) + "/" + name;
+        String sortText = distance + "/" + name;
         
         switch (e.getKind()) {
             case PACKAGE:
@@ -238,12 +300,12 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private boolean isAccessible(Element e, Scope scope) {
-        return !(e instanceof TypeElement && !trees.isAccessible(scope, (TypeElement) e));
-    }
+        TypeMirror enclosing = e.getEnclosingElement().asType();
 
-    private int distance(Element e, Scope scope) {
-        // TODO
-        return 0;
+        if (enclosing instanceof DeclaredType)
+            return trees.isAccessible(scope, e, (DeclaredType) enclosing);
+        else
+            return true;
     }
 
     private Optional<String> docstring(Element e) {

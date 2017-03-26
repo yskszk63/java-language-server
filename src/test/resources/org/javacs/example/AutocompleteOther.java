@@ -5,5 +5,6 @@ public class AutocompleteOther {
         new AutocompleteMember().;
         Autocomplete;
         AutocompleteMember.;
+        AutocompleteOther.class.;
     }
 }
