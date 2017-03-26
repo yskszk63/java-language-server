@@ -14,20 +14,29 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
-public class Completions {
+public class Completions implements Function<TreePath, Stream<CompletionItem>> {
+
+    public static Stream<CompletionItem> at(FocusedResult compiled) {
+        return compiled.cursor
+                .map(new Completions(compiled.task))
+                .orElseGet(Stream::empty);
+    }
+
     private final JavacTask task;
     private final Trees trees;
     private final Elements elements;
 
-    public Completions(JavacTask task) {
+    private Completions(JavacTask task) {
         this.task = task;
         this.trees = Trees.instance(task);
         this.elements = task.getElements();
     }
 
-    public Stream<CompletionItem> at(TreePath path) {
+    @Override
+    public Stream<CompletionItem> apply(TreePath path) {
         Tree leaf = path.getLeaf();
         Scope scope = trees.getScope(path);
 

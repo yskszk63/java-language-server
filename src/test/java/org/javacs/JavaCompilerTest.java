@@ -46,7 +46,7 @@ public class JavaCompilerTest {
     public void javacHolder() {
         JavacHolder javac = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target"));
         File file = Paths.get("src/test/resources/org/javacs/example/Bad.java").toFile();
-        CompilationResult compile = javac.compile(Collections.singletonMap(file.toURI(), Optional.empty()));
+        BatchResult compile = javac.compileBatch(Collections.singletonMap(file.toURI(), Optional.empty()));
     }
 
     private void reportError(Diagnostic<? extends JavaFileObject> error) {

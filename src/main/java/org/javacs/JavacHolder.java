@@ -6,11 +6,8 @@ import com.google.common.collect.Lists;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
-import com.sun.source.util.Trees;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
-import org.eclipse.lsp4j.CompletionItem;
-import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.SymbolInformation;
 
 import javax.lang.model.element.Element;
@@ -45,6 +42,52 @@ import java.util.stream.StreamSupport;
  * and extract the diagnostic information we want.
  */
 public class JavacHolder {
+
+    public static JavacHolder create(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
+        return new JavacHolder(classPath, sourcePath, outputDirectory, true);
+    }
+
+    public static JavacHolder createWithoutIndex(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
+        return new JavacHolder(classPath, sourcePath, outputDirectory, false);
+    }
+
+    /**
+     * Compile a single file, without updating the index.
+     *
+     * As an optimization, this function may ignore code not accessible to the cursor.
+     */
+    public FocusedResult compileFocused(URI file, Optional<String> textContent, int line, int column) {
+        initialIndexComplete.join();
+
+        JavaFileObject object = findFile(file, textContent);
+        JavacTask task = createTask(Collections.singleton(object));
+
+        try {
+            Iterable<? extends CompilationUnitTree> parse = task.parse();
+            Iterable<? extends Element> analyze = task.analyze();
+            Function<CompilationUnitTree, Stream<TreePath>> findPath = PathAtCursor.create(task, line, column).andThen(JavacHolder::stream);
+            Supplier<Stream<? extends CompilationUnitTree>> compilationUnits = () -> StreamSupport.stream(parse.spliterator(), false);
+            Optional<TreePath> cursor = compilationUnits.get()
+                    .flatMap(findPath)
+                    .findAny();
+
+            return new FocusedResult(cursor, task);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Clear files and all their dependents, recompile, compileBatch the index, and report any errors.
+     *
+     * If these files reference un-compiled dependencies, those dependencies will also be parsed and compiled.
+     */
+    public BatchResult compileBatch(Map<URI, Optional<String>> files) {
+        initialIndexComplete.join();
+
+        return doCompile(files);
+    }
+
     private static final Logger LOG = Logger.getLogger("main");
     /**
      * Where this javac looks for library .class files
@@ -79,16 +122,16 @@ public class JavacHolder {
 
     /**
      * Error reporting initially goes nowhere.
-     * We will replace this with a function that collects errors so we can report all the errors associated with a file at once.
+     * We will replace this with a function that collects errors so we can report all the errors associated with a file apply once.
      */
     private DiagnosticListener<JavaFileObject> onErrorDelegate = diagnostic -> {};
 
     // Set up SymbolIndex
 
     /**
-     * Index of symbols that gets updated every time you call compile
+     * Index of symbols that gets updated every time you call compileBatch
      */
-    private final SymbolIndex index;
+    public final SymbolIndex index;
 
     // TODO pause indexing rather than waiting for it to finish
     /**
@@ -129,14 +172,6 @@ public class JavacHolder {
         return javac.getTask(null, fileManager, this::onError, options, null, files);
     }
 
-    public static JavacHolder create(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
-        return new JavacHolder(classPath, sourcePath, outputDirectory, true);
-    }
-
-    public static JavacHolder createWithoutIndex(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
-        return new JavacHolder(classPath, sourcePath, outputDirectory, false);
-    }
-
     /**
      * Index exported declarations and references for all files on the source path
      * This may take a while, so we'll do it on an extra thread
@@ -152,7 +187,7 @@ public class JavacHolder {
 
                 // Compile all parsed files
                 Map<URI, Optional<String>> files = objects.stream().collect(Collectors.toMap(key -> key, key -> Optional.empty()));
-                CompilationResult result = doCompile(files);
+                BatchResult result = doCompile(files);
 
                 result.trees.forEach(compiled -> index.update(compiled, result.task));
 
@@ -200,7 +235,7 @@ public class JavacHolder {
     }
 
     /** 
-     * Set all .class files to modified-at 1970 so javac won't skip them when we invoke it 
+     * Set all .class files to modified-apply 1970 so javac won't skip them when we invoke it
      */
     private static void clearOutputDirectory(Path file) {
         try {
@@ -216,124 +251,8 @@ public class JavacHolder {
         }
     }
 
-    /**
-     * Suggest possible completions
-     *
-     * @param file Path to file
-     * @param textContent Current text of file, if available
-     * @param line 1-based line number where the cursor is
-     * @param column 1-based column number where the cursor is
-     */
-    public Stream<CompletionItem> autocomplete(URI file, Optional<String> textContent, int line, int column) {
-        initialIndexComplete.join();
-
-        Compiled compiled = compileFocused(file, textContent, line, column);
-        Completions completions = new Completions(compiled.task());
-
-        return compiled
-                .findScope()
-                .map(completions::at)
-                .orElseGet(Stream::empty);
-    }
-
-    interface Compiled {
-        Optional<TreePath> findScope();
-        Optional<Element> findSymbol();
-        JavacTask task();
-    }
-
-    private Compiled compileFocused(URI file, Optional<String> textContent, int line, int column) {
-        JavaFileObject object = findFile(file, textContent);
-        JavacTask task = createTask(Collections.singleton(object));
-
-        try {
-            Iterable<? extends CompilationUnitTree> parse = task.parse();
-            Iterable<? extends Element> analyze = task.analyze();
-            Trees trees = Trees.instance(task);
-            Function<CompilationUnitTree, Stream<TreePath>> findPath = PathAtCursor.create(task, line, column).andThen(JavacHolder::stream);
-            Supplier<Stream<? extends CompilationUnitTree>> compilationUnits = () -> StreamSupport.stream(parse.spliterator(), false);
-
-            // You can use Trees to access each Element, so no reason
-            return new Compiled() {
-                @Override
-                public Optional<TreePath> findScope() {
-
-                    return compilationUnits.get()
-                            .flatMap(findPath)
-                            .findAny();
-                }
-
-                @Override
-                public Optional<Element> findSymbol() {
-                    Function<TreePath, Optional<Element>> findElement = path -> Optional.ofNullable(trees.getElement(path));
-
-                    return compilationUnits.get()
-                            .flatMap(findPath)
-                            .flatMap(findElement.andThen(JavacHolder::stream))
-                            .findAny();
-                }
-
-                @Override
-                public JavacTask task() {
-                    return task;
-                }
-            };
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     private static <T> Stream<T> stream(Optional<T> option) {
         return option.map(Stream::of).orElseGet(Stream::empty);
-    }
-
-    /**
-     * Find references to the symbol at the cursor, if there is a symbol at the cursor
-     *
-     * @param file Path to file
-     * @param textContent Current text of file, if available
-     * @param line 1-based line number where the cursor is
-     * @param column 1-based column number where the cursor is
-     */
-    public Stream<Location> findReferences(URI file, Optional<String> textContent, int line, int column) {
-        initialIndexComplete.join();
-
-        Compiled compiled = compileFocused(file, textContent, line, column);
-
-        return compiled.findSymbol()
-                .map(symbol -> {
-                    if (SymbolIndex.shouldIndex(symbol))
-                        return index.references(symbol);
-                    else
-                        return SymbolIndex.nonIndexedReferences(symbol, Trees.instance(compiled.task())).stream();
-                })
-                .orElseGet(Stream::empty);
-    }
-
-    public Optional<Location> gotoDefinition(URI file, Optional<String> textContent, int line, int column) {
-        initialIndexComplete.join();
-
-        Compiled compiled = compileFocused(file, textContent, line, column);
-
-        return compiled.findSymbol()
-                .flatMap(symbol -> {
-                    if (SymbolIndex.shouldIndex(symbol))
-                        return index.find(symbol).map(info -> info.getLocation());
-                    else {
-                        Trees trees = Trees.instance(compiled.task());
-                        TreePath path = trees.getPath(symbol);
-
-                        return SymbolIndex.findTree(path, trees);
-                    }
-                });
-    }
-
-    public Optional<Element> symbolAt(URI file, Optional<String> textContent, int line, int column) {
-        initialIndexComplete.join();
-
-        Compiled compiled = compileFocused(file, textContent, line, column);
-
-        return compiled.findSymbol();
     }
 
     public Stream<SymbolInformation> searchWorkspace(String query) {
@@ -351,8 +270,8 @@ public class JavacHolder {
     /**
      * File has been deleted
      */
-    // TODO delete multiple objects at the same time for performance if user does that
-    public CompilationResult delete(URI uri) {
+    // TODO delete multiple objects apply the same time for performance if user does that
+    public BatchResult delete(URI uri) {
         initialIndexComplete.join();
 
         JavaFileObject object = findFile(uri, Optional.empty());
@@ -362,7 +281,7 @@ public class JavacHolder {
 
         index.clear(uri);
 
-        return compile(deps);
+        return compileBatch(deps);
     }
 
     // TODO this should return Optional.empty() file URI is not file: and text is empty
@@ -409,18 +328,7 @@ public class JavacHolder {
         }
     }
 
-    /**
-     * Clear files and all their dependents, recompile, compile the index, and report any errors.
-     *
-     * If these files reference un-compiled dependencies, those dependencies will also be parsed and compiled.
-     */
-    public CompilationResult compile(Map<URI, Optional<String>> files) {
-        initialIndexComplete.join();
-
-        return doCompile(files);
-    }
-
-    private CompilationResult doCompile(Map<URI, Optional<String>> files) {
+    private BatchResult doCompile(Map<URI, Optional<String>> files) {
         List<JavaFileObject> objects = files
                 .entrySet()
                 .stream()
@@ -438,7 +346,7 @@ public class JavacHolder {
 
             parse.forEach(tree -> index.update(tree, task));
 
-            return new CompilationResult(Lists.newArrayList(parse), errors, task);
+            return new BatchResult(task, parse, errors);
         } catch (IOException e) {
             throw new RuntimeException(e);
         } finally {

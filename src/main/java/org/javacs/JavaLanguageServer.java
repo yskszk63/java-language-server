@@ -3,8 +3,6 @@ package org.javacs;
 import com.google.common.base.Joiner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
-import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.code.Type;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -15,7 +13,6 @@ import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
 import javax.lang.model.element.Element;
-import javax.lang.model.type.TypeMirror;
 import javax.tools.JavaFileObject;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -29,12 +26,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static org.javacs.Main.JSON;
 
@@ -298,7 +297,7 @@ class JavaLanguageServer implements LanguageServer {
         }
 
         files.forEach((config, configFiles) -> {
-            CompilationResult compile = findCompilerForConfig(config).compile(configFiles);
+            BatchResult compile = findCompilerForConfig(config).compileBatch(configFiles);
 
             publishDiagnostics(compile);
         });
@@ -347,7 +346,7 @@ class JavaLanguageServer implements LanguageServer {
                             activeDocuments.remove(uri);
 
                             findCompiler(uri).ifPresent(compiler -> {
-                                CompilationResult result = compiler.delete(uri);
+                                BatchResult result = compiler.delete(uri);
 
                                 publishDiagnostics(result);
                             });
@@ -361,9 +360,8 @@ class JavaLanguageServer implements LanguageServer {
         };
     }
     
-    private void publishDiagnostics(CompilationResult result) {
-        List<URI> touched = result.trees
-                .stream()
+    private void publishDiagnostics(BatchResult result) {
+        List<URI> touched = StreamSupport.stream(result.trees.spliterator(), false)
                 .map(tree -> tree.getSourceFile().toUri())
                 .collect(Collectors.toList());
         Map<URI, PublishDiagnosticsParams> files = new HashMap<>();
@@ -700,15 +698,42 @@ class JavaLanguageServer implements LanguageServer {
         int character = params.getPosition().getCharacter() + 1;
 
         return findCompiler(uri)
-                .map(compiler -> compiler.findReferences(uri, content, line, character))
+                .map(compiler -> {
+                    FocusedResult result = compiler.compileFocused(uri, content, line, character);
+
+                    return References.findReferences(result, compiler.index);
+                })
                 .orElseGet(Stream::empty)
                 .collect(Collectors.toList());
+    }
+
+    public List<? extends Location> gotoDefinition(TextDocumentPositionParams position) {
+        URI uri = URI.create(position.getTextDocument().getUri());
+        Optional<String> content = activeContent(uri);
+        int line = position.getPosition().getLine() + 1;
+        int character = position.getPosition().getCharacter() + 1;
+
+        return findCompiler(uri)
+                .flatMap(compiler -> {
+                    FocusedResult result = compiler.compileFocused(uri, content, line, character);
+
+                    return References.gotoDefinition(result, compiler.index);
+                })
+                .map(Collections::singletonList)
+                .orElseGet(Collections::emptyList);
     }
 
     public Optional<Element> findSymbol(URI file, int line, int character) {
         Optional<String> content = activeContent(file);
 
-        return findCompiler(file).flatMap(compiler -> compiler.symbolAt(file, content, line, character));
+        return findCompiler(file)
+                .flatMap(compiler -> {
+                    FocusedResult result = compiler.compileFocused(file, content, line, character);
+                    Trees trees = Trees.instance(result.task);
+                    Function<TreePath, Optional<Element>> findSymbol = cursor -> Optional.ofNullable(trees.getElement(cursor));
+
+                    return result.cursor.flatMap(findSymbol);
+                });
     }
 
     private List<? extends SymbolInformation> findDocumentSymbols(DocumentSymbolParams params) {
@@ -720,18 +745,6 @@ class JavaLanguageServer implements LanguageServer {
                 .collect(Collectors.toList());
     }
 
-    public List<? extends Location> gotoDefinition(TextDocumentPositionParams position) {
-        URI uri = URI.create(position.getTextDocument().getUri());
-        Optional<String> content = activeContent(uri);
-        int line = position.getPosition().getLine() + 1;
-        int character = position.getPosition().getCharacter() + 1;
-
-        return findCompiler(uri)
-                .flatMap(compiler -> compiler.gotoDefinition(uri, content, line, character))
-                .map(Collections::singletonList)
-                .orElse(Collections.emptyList());
-    }
-
     private Hover doHover(TextDocumentPositionParams position) {
         URI uri = URI.create(position.getTextDocument().getUri());
         Optional<String> content = activeContent(uri);
@@ -739,127 +752,9 @@ class JavaLanguageServer implements LanguageServer {
         int character = position.getPosition().getCharacter() + 1;
 
         return findCompiler(uri)
-                .flatMap(compiler -> compiler.symbolAt(uri, content, line, character))
-                .flatMap(JavaLanguageServer::hoverText)
-                .map(text -> new Hover(Collections.singletonList(Either.forLeft(text)), null))
-                .orElse(new Hover());
-    }
-
-    private static Optional<String> hoverText(TreePath path, Trees trees) {
-        Element element = trees.getElement(path);
-        TypeMirror type = trees.getTypeMirror(trees.getPath(element));
-
-        switch (type.getKind()) {
-            case BOOLEAN:
-            case BYTE:
-            case SHORT:
-            case INT:
-            case LONG:
-            case CHAR:
-            case FLOAT:
-            case DOUBLE:
-            case VOID:
-            case TYPEVAR:
-            case WILDCARD:
-                return Optional.of(ShortTypePrinter.print(type));
-            case DECLARED: {
-                switch (element.getKind()) {
-                    case CLASS:
-                    case INTERFACE:
-                }
-            }
-            case PACKAGE: {
-                return Optional.ofNullable(path.getCompilationUnit().getPackageName())
-                        .map(name -> "package " + name);
-            }
-            case EXECUTABLE:
-                return Optional.of(methodSignature((Symbol.MethodSymbol) element));
-            default:
-                return Optional.empty();
-        }
-    }
-
-    // TODO this uses non-public APIs
-    public static String methodSignature(Symbol.MethodSymbol e) {
-        String name = e.getSimpleName().toString();
-        boolean varargs = e.isVarArgs();
-        StringJoiner params = new StringJoiner(", ");
-
-        com.sun.tools.javac.util.List<Symbol.VarSymbol> parameters = e.getParameters();
-        for (int i = 0; i < parameters.size(); i++) {
-            Symbol.VarSymbol p = parameters.get(i);
-            String pName = shortName(p, varargs && i == parameters.size() - 1);
-
-            params.add(pName);
-        }
-
-        String signature = name + "(" + params + ")";
-
-        if (!e.getThrownTypes().isEmpty()) {
-            StringJoiner thrown = new StringJoiner(", ");
-
-            for (Type t : e.getThrownTypes())
-                thrown.add(ShortTypePrinter.print(t));
-
-            signature += " throws " + thrown;
-        }
-
-        return signature;
-    }
-
-    private static String shortName(Symbol.VarSymbol p, boolean varargs) {
-        Type type = p.type;
-
-        if (varargs) {
-            Type.ArrayType array = (Type.ArrayType) type;
-
-            type = array.getComponentType();
-        }
-
-        String acc = shortTypeName(type);
-        String name = p.name.toString();
-
-        if (varargs)
-            acc += "...";
-
-        if (!name.matches("arg\\d+"))
-            acc += " " + name;
-
-        return acc;
-    }
-
-    private static String shortTypeName(Type type) {
-        return ShortTypePrinter.print(type);
-    }
-
-    private static Optional<String> hoverText(Element symbol) {
-        switch (symbol.getKind()) {
-            case PACKAGE:
-                return Optional.of("package " + symbol.getSimpleName());
-            case ENUM:
-                return Optional.of("enum " + symbol.getSimpleName());
-            case CLASS:
-                return Optional.of("class " + symbol.getSimpleName());
-            case ANNOTATION_TYPE:
-                return Optional.of("@interface " + symbol.getSimpleName());
-            case INTERFACE:
-                return Optional.of("interface " + symbol.getSimpleName());
-            case METHOD:
-            case CONSTRUCTOR:
-            case STATIC_INIT:
-            case INSTANCE_INIT:
-            case PARAMETER:
-            case LOCAL_VARIABLE:
-            case EXCEPTION_PARAMETER:
-            case ENUM_CONSTANT:
-            case FIELD:
-                return Optional.of(ShortTypePrinter.print(((Symbol)symbol).type)); // TODO don't do this
-            case TYPE_PARAMETER:
-            case OTHER:
-            case RESOURCE_VARIABLE:
-            default:
-                return Optional.empty();
-        }
+                .map(compiler -> compiler.compileFocused(uri, content, line, character))
+                .flatMap(Hovers::hoverText)
+                .orElseGet(Hover::new);
     }
 
     public CompletionList autocomplete(TextDocumentPositionParams position) {
@@ -868,8 +763,9 @@ class JavaLanguageServer implements LanguageServer {
         int line = position.getPosition().getLine() + 1;
         int character = position.getPosition().getCharacter() + 1;
         List<CompletionItem> items = findCompiler(uri)
-                .map(compiler -> compiler.autocomplete(uri, content, line, character))
-                .orElse(Stream.empty())
+                .map(compiler -> compiler.compileFocused(uri, content, line, character))
+                .map(Completions::at)
+                .orElseGet(Stream::empty)
                 .collect(Collectors.toList());
 
         return new CompletionList(false, items);

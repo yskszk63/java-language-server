@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.google.common.collect.Lists;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -34,10 +35,10 @@ public class CompilerProfiling {
     private Duration compileLargeFile(URI file) {
         long start = System.nanoTime();
         JavacHolder compiler = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.emptySet(), Paths.get("out"));
-        CompilationResult result = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        BatchResult result = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
         long finish = System.nanoTime();
 
-        assertThat(result.trees, not(empty()));
+        assertThat(Lists.newArrayList(result.trees), not(empty()));
 
         return Duration.ofNanos(finish - start);
     }

@@ -25,7 +25,7 @@ public class RecompileTest {
         URI file = FindResource.uri("/org/javacs/example/CompileTwice.java");
         JavacHolder compiler = newCompiler();
         List<String> visits = new ArrayList<>();
-        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
         GetClass getClass = new GetClass(compile.task, visits);
 
         compile.trees.forEach(tree -> getClass.scan(tree, null));
@@ -34,7 +34,7 @@ public class RecompileTest {
         assertThat(visits, hasItems("CompileTwice", "NestedStaticClass", "NestedClass"));
 
         // Compile again
-        compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
 
         compile.trees.forEach(tree -> getClass.scan(tree, null));
 
@@ -48,12 +48,12 @@ public class RecompileTest {
         URI bad = FindResource.uri("/org/javacs/example/FixParseErrorBefore.java");
         URI good = FindResource.uri("/org/javacs/example/FixParseErrorAfter.java");
         JavacHolder compiler = newCompiler();
-        DiagnosticCollector<JavaFileObject> badErrors = compiler.compile(Collections.singletonMap(bad, Optional.empty())).errors;
+        DiagnosticCollector<JavaFileObject> badErrors = compiler.compileBatch(Collections.singletonMap(bad, Optional.empty())).errors;
 
         assertThat(badErrors.getDiagnostics(), not(empty()));
 
         // Parse again
-        CompilationResult goodCompile = compiler.compile(Collections.singletonMap(good, Optional.empty()));
+        BatchResult goodCompile = compiler.compileBatch(Collections.singletonMap(good, Optional.empty()));
         DiagnosticCollector<JavaFileObject> goodErrors = goodCompile.errors;
         List<String> parsedClassNames = new ArrayList<>();
         GetClass getClass = new GetClass(goodCompile.task, parsedClassNames);
@@ -69,12 +69,12 @@ public class RecompileTest {
         URI bad = FindResource.uri("/org/javacs/example/FixTypeErrorBefore.java");
         URI good = FindResource.uri("/org/javacs/example/FixTypeErrorAfter.java");
         JavacHolder compiler = newCompiler();
-        DiagnosticCollector<JavaFileObject> badErrors = compiler.compile(Collections.singletonMap(bad, Optional.empty())).errors;
+        DiagnosticCollector<JavaFileObject> badErrors = compiler.compileBatch(Collections.singletonMap(bad, Optional.empty())).errors;
 
         assertThat(badErrors.getDiagnostics(), not(empty()));
 
         // Parse again
-        CompilationResult goodCompile = compiler.compile(Collections.singletonMap(good, Optional.empty()));
+        BatchResult goodCompile = compiler.compileBatch(Collections.singletonMap(good, Optional.empty()));
         DiagnosticCollector<JavaFileObject> goodErrors = goodCompile.errors;
         List<String> parsedClassNames = new ArrayList<>();
         GetClass getClass = new GetClass(goodCompile.task, parsedClassNames);
@@ -99,11 +99,11 @@ public class RecompileTest {
         JavacHolder compiler = newCompiler();
 
         // Compile once
-        DiagnosticCollector<JavaFileObject> errors = compiler.compile(Collections.singletonMap(file, Optional.empty())).errors;
+        DiagnosticCollector<JavaFileObject> errors = compiler.compileBatch(Collections.singletonMap(file, Optional.empty())).errors;
         assertThat(errors.getDiagnostics(), not(empty()));
 
         // Compile twice
-        errors = compiler.compile(Collections.singletonMap(file, Optional.empty())).errors;
+        errors = compiler.compileBatch(Collections.singletonMap(file, Optional.empty())).errors;
 
         assertThat(errors.getDiagnostics(), not(empty()));
     }

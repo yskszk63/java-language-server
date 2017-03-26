@@ -4,13 +4,13 @@ package org.javacs;
 //    private final JavacHolder compiler;
 //    private final URI file;
 //    private final Optional<String> textContent;
-//    private final CompilationResult compiled;
+//    private final FocusedResult compiled;
 //
 //    public CodeActions(JavacHolder compiler, URI file, Optional<String> textContent) {
 //        this.compiler = compiler;
 //        this.file = file;
 //        this.textContent = textContent;
-//        this.compiled = compiler.compile(Collections.singletonMap(file, textContent));
+//        this.compiled = compiler.compileBatch(Collections.singletonMap(file, textContent));
 //    }
 //
 //    public List<Command> find(CodeActionParams params) {
@@ -20,15 +20,15 @@ package org.javacs;
 //    }
 //
 //    private Stream<Command> findCodeActionsForDiagnostic(Diagnostic diagnostic) {
-//        CompilationResult compile = compiler.compile(Collections.singletonMap(file, textContent));
+//        FocusedResult compileBatch = compiler.compileBatch(Collections.singletonMap(file, textContent));
 //
-//        return compile.errors.getDiagnostics().stream()
+//        return compileBatch.errors.getDiagnostics().stream()
 //                .filter(error -> matches(diagnostic, error))
-//                .flatMap(error -> findCodeActionsForCompilerDiagnostic(compile, error));
+//                .flatMap(error -> findCodeActionsForCompilerDiagnostic(compileBatch, error));
 //    }
 //
-//    private Stream<Command> findCodeActionsForCompilerDiagnostic(CompilationResult compile, javax.tools.Diagnostic<? extends JavaFileObject> error) {
-//        return expressionIn(compile.trees, error.getStartPosition(), error.getEndPosition())
+//    private Stream<Command> findCodeActionsForCompilerDiagnostic(FocusedResult compileBatch, javax.tools.Diagnostic<? extends JavaFileObject> error) {
+//        return expressionIn(compileBatch.trees, error.getStartPosition(), error.getEndPosition())
 //                .map(x -> codeActionsFor(error, x))
 //                .orElse(Stream.empty());
 //    }

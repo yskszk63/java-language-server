@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * Find the Tree that the cursor is pointing at
+ * Find the Tree that the cursor is pointing apply
  */
 public class PathAtCursor extends CursorScanner<TreePath> {
 

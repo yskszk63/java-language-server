@@ -156,31 +156,6 @@ public class SymbolIndex {
     }
 
     /**
-     * References to things where shouldIndex(symbol) is false
-     */
-    public static List<Location> nonIndexedReferences(final Element symbol, final Trees trees) {
-        List<Location> result = new ArrayList<>();
-
-        new TreePathScanner<Void, Void>() {
-            @Override
-            public Void visitIdentifier(IdentifierTree node, Void aVoid) {
-                checkForReference();
-
-                return super.visitIdentifier(node, aVoid);
-            }
-
-            private void checkForReference() {
-                Element element = trees.getElement(getCurrentPath());
-
-                if (element.equals(symbol))
-                    findTree(getCurrentPath(), trees).ifPresent(result::add);
-            }
-        }.scan(trees.getTree(symbol), null);
-
-        return result;
-    }
-
-    /**
      * Update a file in the index
      */
     public void update(CompilationUnitTree compilationUnit, JavacTask task) {
@@ -369,7 +344,7 @@ public class SymbolIndex {
                 while (++i <= max && source.charAt(i) != first);
             }
 
-            /* Found first character, now look at the rest of v2 */
+            /* Found first character, now look apply the rest of v2 */
             if (i <= max) {
                 int j = i + 1;
                 int end = j + targetCount - 1;
@@ -382,33 +357,6 @@ public class SymbolIndex {
             }
         }
         return -1;
-    }
-
-    /**
-     * Find the location of the tree pointed to by path.
-     */
-    public static Optional<Location> findTree(TreePath path, Trees trees) {
-        if (path == null)
-            return Optional.empty();
-
-        CompilationUnitTree compilationUnit = path.getCompilationUnit();
-        Tree leaf = path.getLeaf();
-        long start = trees.getSourcePositions().getStartPosition(compilationUnit, leaf);
-        long end = trees.getSourcePositions().getEndPosition(compilationUnit, leaf);
-
-        if (start != Diagnostic.NOPOS && end != Diagnostic.NOPOS) {
-            LineMap lineMap = compilationUnit.getLineMap();
-
-            return Optional.of(new Location(
-                    compilationUnit.getSourceFile().toUri().toString(),
-                    new Range(
-                            new Position((int) lineMap.getLineNumber(start) - 1, (int) lineMap.getColumnNumber(start) - 1),
-                            new Position((int) lineMap.getLineNumber(end) - 1, (int) lineMap.getColumnNumber(end) - 1)
-                    )
-            ));
-        }
-
-        return Optional.empty();
     }
 
     private static SymbolKind symbolInformationKind(ElementKind kind) {

@@ -31,7 +31,7 @@ public class LinterTest {
     @Test
     public void compile() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/HelloWorld.java");
-        DiagnosticCollector<JavaFileObject> errors = compiler.compile(Collections.singletonMap(file, Optional.empty())).errors;
+        DiagnosticCollector<JavaFileObject> errors = compiler.compileBatch(Collections.singletonMap(file, Optional.empty())).errors;
 
         assertThat(errors.getDiagnostics(), empty());
     }
@@ -39,7 +39,7 @@ public class LinterTest {
     @Test
     public void inspectTree() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/HelloWorld.java");
-        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
         CollectMethods scanner = new CollectMethods(compile.task);
 
         compile.trees.forEach(tree -> scanner.scan(tree, null));
@@ -50,7 +50,7 @@ public class LinterTest {
     @Test
     public void missingMethodBody() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/MissingMethodBody.java");
-        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
         CollectMethods scanner = new CollectMethods(compile.task);
 
         compile.trees.forEach(tree -> scanner.scan(tree, null));
@@ -59,7 +59,7 @@ public class LinterTest {
         assertThat(compile.errors.getDiagnostics(), not(empty()));
 
         // Lint again
-        compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
 
         assertThat(compile.errors.getDiagnostics(), not(empty()));
     }
@@ -67,7 +67,7 @@ public class LinterTest {
     @Test
     public void incompleteAssignment() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/IncompleteAssignment.java");
-        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
         CollectMethods scanner = new CollectMethods(compile.task);
 
         compile.trees.forEach(tree -> scanner.scan(tree, null));
@@ -79,7 +79,7 @@ public class LinterTest {
     @Test
     public void undefinedSymbol() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/UndefinedSymbol.java");
-        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
         CollectMethods scanner = new CollectMethods(compile.task);
 
         compile.trees.forEach(tree -> scanner.scan(tree, null));
@@ -99,7 +99,7 @@ public class LinterTest {
     @Test
     public void getType() {
         URI file = FindResource.uri("/org/javacs/example/FooString.java");
-        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
         MethodTypes scanner = new MethodTypes(compile.task);
 
         compile.trees.forEach(tree -> scanner.scan(tree, null));
@@ -117,13 +117,13 @@ public class LinterTest {
     @Test(expected = IllegalArgumentException.class)
     public void notJava() {
         URI file = FindResource.uri("/org/javacs/example/NotJava.java.txt");
-        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
     }
 
     @Test
     public void errorInDependency() {
         URI file = FindResource.uri("/org/javacs/example/ErrorInDependency.java");
-        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
 
         assertThat(compile.errors.getDiagnostics(), not(empty()));
     }
@@ -131,7 +131,7 @@ public class LinterTest {
     @Test
     public void deprecationWarning() {
         URI file = FindResource.uri("/org/javacs/example/DeprecationWarning.java");
-        CompilationResult compile = compiler.compile(Collections.singletonMap(file, Optional.empty()));
+        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
 
         assertThat(compile.errors.getDiagnostics(), not(empty()));
     }
