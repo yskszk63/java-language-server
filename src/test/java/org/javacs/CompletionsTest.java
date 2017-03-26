@@ -1,26 +1,16 @@
 package org.javacs;
 
-import org.eclipse.lsp4j.CompletionItem;
-import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.TextDocumentIdentifier;
-import org.eclipse.lsp4j.TextDocumentPositionParams;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.URI;
-import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
-public class AutocompleteTest {
-    private static final Logger LOG = Logger.getLogger("main");
+public class CompletionsTest extends CompletionsBase {
 
     @Test
     public void staticMember() throws IOException {
@@ -476,45 +466,5 @@ public class AutocompleteTest {
         Set<String> suggestions = insertText(file, 15, 310);
 
         assertThat("suggests enum constants", suggestions, hasItems("Foo", "Bar"));
-    }
-
-    private Set<String> insertText(String file, int row, int column) throws IOException {
-        List<? extends CompletionItem> items = items(file, row, column);
-
-        return items
-                .stream()
-                .map(CompletionItem::getInsertText)
-                .collect(Collectors.toSet());
-    }
-
-    private Set<String> documentation(String file, int row, int column) throws IOException {
-        List<? extends CompletionItem> items = items(file, row, column);
-
-        return items
-                .stream()
-                .flatMap(i -> {
-                    if (i.getDocumentation() != null)
-                        return Stream.of(i.getDocumentation().trim());
-                    else
-                        return Stream.empty();
-                })
-                .collect(Collectors.toSet());
-    }
-
-    private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
-
-    private List<? extends CompletionItem> items(String file, int row, int column) {
-        URI uri = FindResource.uri(file);
-        TextDocumentPositionParams position = new TextDocumentPositionParams(
-                new TextDocumentIdentifier(uri.toString()),
-                uri.toString(),
-                new Position(row - 1, column - 1)
-        );
-
-        try {
-            return server.getTextDocumentService().completion(position).get().getRight().getItems();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
     }
 }

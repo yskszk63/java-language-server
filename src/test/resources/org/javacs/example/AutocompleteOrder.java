@@ -14,8 +14,14 @@ public class AutocompleteOrder {
     }
     
     public static class SubClass extends SuperClass {
-        public void getMethod() {
-            
+        public void getMethod(String argument) { int localVar;
+            get;
         }
     }
+
+    public static void outerStaticMethod() { }
+
+    public static int outerStaticField;
+
+    public int outerField;
 }

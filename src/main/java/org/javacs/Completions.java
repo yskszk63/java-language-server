@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.google.common.collect.Lists;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
@@ -26,11 +27,14 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     private final JavacTask task;
     private final Trees trees;
     private final Elements elements;
+    private final Name thisName, superName;
 
     private Completions(JavacTask task) {
         this.task = task;
         this.trees = Trees.instance(task);
         this.elements = task.getElements();
+        this.thisName = task.getElements().getName("this");
+        this.superName = task.getElements().getName("super");
     }
 
     @Override
@@ -63,28 +67,80 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
             return Stream.empty();
 
         boolean isStatic = isTypeSymbol(element.getKind());
-        TypeMirror expressionType = trees.getTypeMirror(expression);
-        List<? extends Element> all = typeElement(expressionType)
-                .map(e -> elements.getAllMembers(e))
-                .orElseGet(Collections::emptyList);
+        List<? extends Element> all = members(element);
+
         Stream<CompletionItem> filter = all.stream()
                 .filter(e -> isAccessible(e, from))
                 .filter(e -> isStatic(e) == isStatic)
                 .flatMap(e -> completionItem(e, distance(e, from)));
 
-        if (isStatic)
-            filter = Stream.concat(Stream.of(dotClass()), filter);
+        if (isStatic) {
+            filter = Stream.concat(
+                    Stream.of(namedProperty("class")),
+                    filter
+            );
+        }
+
+        if (isEnclosingClass(element, from)) {
+            filter = Stream.concat(
+                    Stream.of(namedProperty("this"), namedProperty("super")),
+                    filter
+            );
+        }
 
         return filter;
     }
 
-    private static CompletionItem dotClass() {
+    /**
+     * Is element an enclosing class of scope, meaning element.this is accessible?
+     */
+    private boolean isEnclosingClass(Element element, Scope scope) {
+        if (scope == null)
+            return false;
+        // If this is the scope of a static method, for example
+        //
+        //   class Foo {
+        //     static void test() { [scope] }
+        //   }
+        //
+        // then Foo.this is not accessible
+        else if (isStaticMethodScope(scope))
+            return false;
+        else if (element.equals(scope.getEnclosingClass()))
+            return true;
+        // If this is the scope of a static class, for example
+        //
+        //    class Outer {
+        //      static class Inner {
+        //        void test() { [scope] }
+        //      }
+        //    }
+        //
+        // then Outer.this is not accessible
+        else if (isStaticClassScope(scope))
+            return false;
+        else
+            return isEnclosingClass(element, scope.getEnclosingScope());
+    }
+
+    private List<? extends Element> members(Element element) {
+        if (element == null)
+            return Collections.emptyList();
+
+        TypeMirror expressionType = element.asType();
+
+        return typeElement(expressionType)
+                .map(e -> elements.getAllMembers(e))
+                .orElseGet(Collections::emptyList);
+    }
+
+    private static CompletionItem namedProperty(String name) {
         CompletionItem item = new CompletionItem();
 
-        item.setKind(CompletionItemKind.Class);
-        item.setLabel("class");
-        item.setInsertText("class");
-        item.setSortText("0/class");
+        item.setKind(CompletionItemKind.Property);
+        item.setLabel(name);
+        item.setInsertText(name);
+        item.setSortText("0/" + name);
 
         return item;
     }
@@ -117,86 +173,94 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> membersOfScope(Scope scope) {
-        return scopes(scope)
-                .flatMap(this::elements)
+        List<PrintScope> print = printScopes(scope);
+        Set<Element> all = new LinkedHashSet<>();
+
+        // Add 'this' and 'super' once
+        scope.getLocalElements().forEach(all::add);
+
+        findScopeMembers(scope, false, all);
+
+        return all.stream()
                 .filter(e -> isAccessible(e, scope))
                 .flatMap(e -> completionItem(e, distance(e, scope)));
+    }
+
+    private List<PrintScope> printScopes(Scope scope) {
+        List<PrintScope> acc = new ArrayList<>();
+
+        while (scope != null) {
+            acc.add(new PrintScope(scope));
+            scope = scope.getEnclosingScope();
+        }
+
+        return acc;
+    }
+
+    static class PrintScope {
+        final Scope scope;
+        final List<Element> elements;
+
+        PrintScope(Scope s) {
+            scope = s;
+            elements = Lists.newArrayList(s.getLocalElements());
+        }
+
+        @Override
+        public String toString() {
+            return scope.toString();
+        }
+    }
+
+    private void findScopeMembers(Scope scope, boolean isStatic, Set<Element> acc) {
+        if (scope == null)
+            return;
+
+        for (Element each : scope.getLocalElements()) {
+            // Don't include 'this' or 'super'
+            // It will be done ONCE by membersOfScope
+            if (!isThisOrSuper(each))
+                acc.add(each);
+        }
+
+        // If this is the scope of a static method, it won't have access to virtual members of any enclosing scopes
+        if (isStaticMethodScope(scope))
+            isStatic = true;
+
+        // If this is the scope of a class, add all accessible members of the class
+        if (scope.getEnclosingClass() != null) {
+            for (Element each : elements.getAllMembers(scope.getEnclosingClass())) {
+                // If this is a virtual scope, we have access to all members
+                // If this is a static scope, we only have access to static members
+                if (!isStatic || each.getModifiers().contains(Modifier.STATIC))
+                    acc.add(each);
+            }
+        }
+
+        // If this is the scope of a static class, it won't have access to virtual members of any enclosing scopes
+        if (isStaticClassScope(scope))
+            isStatic = true;
+
+        findScopeMembers(scope.getEnclosingScope(), isStatic, acc);
+    }
+
+    private boolean isStaticClassScope(Scope scope) {
+        return scope.getEnclosingClass() != null && scope.getEnclosingClass().getModifiers().contains(Modifier.STATIC);
+    }
+
+    private boolean isStaticMethodScope(Scope scope) {
+        return scope.getEnclosingMethod() != null && scope.getEnclosingMethod().getModifiers().contains(Modifier.STATIC);
+    }
+
+    private boolean isThisOrSuper(Element each) {
+        Name name = each.getSimpleName();
+
+        return name.equals(thisName) || name.equals(superName);
     }
 
     private int distance(Element e, Scope scope) {
         // TODO
         return 0;
-    }
-
-    /*
-
-
-    private Stream<Scope> scopes(Scope start) {
-        Map<Scope, Boolean> scopes = new LinkedHashMap<>();
-
-        findScopes(start, false, scopes);
-
-        return scopes.stream();
-    }
-
-    private void findScopes(Scope scope, boolean isStatic, Map<Scope, Boolean> scopes) {
-        if (scope == null || scopes.containsKey(scope))
-            return;
-
-        isStatic = isStatic || isStaticScope(scope);
-
-        scopes.put(scope, isStatic);
-
-        findScopes(scope.getEnclosingScope(), isStatic, scopes);
-    }
-
-    private boolean isStaticScope(Scope scope) {
-        if (scope.getEnclosingMethod() != null && scope.getEnclosingMethod().getModifiers().contains(Modifier.STATIC))
-            return true;
-        else if (scope.getEnclosingClass() != null && scope.getEnclosingClass().getModifiers().contains(Modifier.STATIC))
-            return true;
-        else
-            return false;
-    }
-     */
-
-    private Stream<Scope> scopes(Scope start) {
-        Set<Scope> scopes = new LinkedHashSet<>();
-
-        findScopes(start, scopes);
-
-        return scopes.stream();
-    }
-
-    private void findScopes(Scope scope, Set<Scope> scopes) {
-        if (scope == null || scopes.contains(scope))
-            return;
-
-        scopes.add(scope);
-
-        findScopes(scope.getEnclosingScope(), scopes);
-    }
-
-    private Stream<Element> elements(Scope scope) {
-        Set<Element> elements = new HashSet<>();
-
-        findElements(scope, elements);
-
-        return elements.stream();
-    }
-
-    private void findElements(Scope scope, Set<Element> elements) {
-        if (scope == null)
-            return;
-
-        scope.getLocalElements().forEach(elements::add);
-
-        TypeElement enclosingClass = scope.getEnclosingClass();
-
-        if (enclosingClass != null)
-            enclosingClass.getEnclosedElements().forEach(elements::add);
-
-        findElements(scope.getEnclosingScope(), elements);
     }
 
     private Stream<CompletionItem> completionItem(Element e, int distance) {

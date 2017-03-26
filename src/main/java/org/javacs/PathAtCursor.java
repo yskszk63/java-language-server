@@ -38,7 +38,7 @@ public class PathAtCursor extends CursorScanner<TreePath> {
 
     @Override
     public TreePath visitNewClass(NewClassTree node, Void aVoid) {
-        if (containsCursor(node))
+        if (containsCursor(node) && node.getClassBody() == null)
             return getCurrentPath();
         else
             return super.visitNewClass(node, aVoid);
