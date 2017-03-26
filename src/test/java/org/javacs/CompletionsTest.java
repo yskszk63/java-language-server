@@ -370,7 +370,7 @@ public class CompletionsTest extends CompletionsBase {
         // Static method
         Set<String> suggestions = insertText(file, 5, 17);
 
-        assertThat(suggestions, hasItems("AutocompleteConstructor", "String"));
+        assertThat(suggestions, hasItems("AutocompleteConstructor", "AutocompleteMember", "String"));
     }
 
     @Test
