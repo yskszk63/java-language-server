@@ -217,12 +217,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Optional<PackageElement> packageOf(Element enclosing) {
-        if (enclosing == null)
-            return Optional.empty();
-        else if (enclosing instanceof PackageElement)
-            return Optional.of((PackageElement) enclosing);
-        else
-            return packageOf(enclosing.getEnclosingElement());
+        return Optional.ofNullable(elements.getPackageOf(enclosing));
     }
 
     /**
