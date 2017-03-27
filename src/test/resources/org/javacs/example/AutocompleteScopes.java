@@ -95,7 +95,7 @@ public class AutocompleteScopes {
             // NO: inheritedMethod
             //
             // this/super in enclosing scopes
-            // YES: this, super
+            // NO: this, super
             // NO: StaticSub.this, StaticSub.super
             StaticSub.m;
             // NO: AutocompleteScopes.this, AutocompleteScopes.super

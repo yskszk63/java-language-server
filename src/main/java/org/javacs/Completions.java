@@ -1,9 +1,12 @@
 package org.javacs;
 
+import com.google.common.collect.ImmutableList;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
+import com.sun.tools.javac.api.JavacScope;
+import com.sun.tools.javac.comp.GetStaticLevel;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 
@@ -87,47 +90,34 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
             );
         }
 
-        if (isEnclosingClass(element, from)) {
-            filter = Stream.concat(
-                    Stream.of(namedProperty("this"), namedProperty("super")),
-                    filter
-            );
-        }
+        List<CompletionItem> parentClassThis = parentClassScope(from, element)
+                .filter(classScope -> !isStaticScope(classScope, from) && !isStaticMethod(from))
+                .map(this::thisAndSuper)
+                .orElseGet(Collections::emptyList);
+
+        filter = Stream.concat(parentClassThis.stream(), filter);
 
         return filter;
     }
 
     /**
-     * Is element an enclosing class of scope, meaning element.this is accessible?
+     * If element is the TypeElement of a parent class of from, return its scope
      */
-    private boolean isEnclosingClass(Element element, Scope scope) {
-        if (scope == null || element == null)
-            return false;
+    private Optional<Scope> parentClassScope(Scope scope, Element element) {
+        Scope foundClassScope = null;
 
-        // If this is the scope of a static method, for example
-        //
-        //   class Foo {
-        //     static void test() { [scope] }
-        //   }
-        //
-        // then Foo.this is not accessible
-        else if (isStaticMethodScope(scope))
-            return false;
-        else if (element.equals(scope.getEnclosingClass()))
-            return true;
-        // If this is the scope of a static class, for example
-        //
-        //    class Outer {
-        //      static class Inner {
-        //        void test() { [scope] }
-        //      }
-        //    }
-        //
-        // then Outer.this is not accessible
-        else if (isStaticClassScope(scope))
-            return false;
-        else
-            return isEnclosingClass(element, scope.getEnclosingScope());
+        while (scope != null) {
+            if (element.equals(scope.getEnclosingClass()))
+                foundClassScope = scope;
+
+            scope = scope.getEnclosingScope();
+        }
+
+        return Optional.ofNullable(foundClassScope);
+    }
+
+    private List<CompletionItem> thisAndSuper(Scope classScope) {
+        return ImmutableList.of(namedProperty("this"), namedProperty("super"));
     }
 
     /**
@@ -138,7 +128,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
             return Collections.emptyList();
 
         return typeElement(expressionType)
-                .map(e -> elements.getAllMembers(e))
+                .map(elements::getAllMembers)
                 .orElseGet(Collections::emptyList);
     }
 
@@ -216,17 +206,12 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Set<Element> findAllSymbols(Scope scope) {
-        Set<Element> all = new LinkedHashSet<>();
-
-        // Add 'this' and 'super' once
-        scope.getLocalElements().forEach(all::add);
+        Set<Element> all = doAllSymbols(scope);
 
         // Add all members of this package
         packageOf(scope.getEnclosingClass())
                 .map(PackageElement::getEnclosedElements)
                 .ifPresent(all::addAll);
-
-        doAllSymbols(scope, false, all);
 
         return all;
     }
@@ -246,44 +231,98 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
      * Visibility takes into consideration static / virtual, but not accessibility modifiers.
      * We'll deal with those later.
      */
-    private void doAllSymbols(Scope scope, boolean isStatic, Set<Element> acc) {
-        if (scope == null)
-            return;
+    private Set<Element> doAllSymbols(final Scope start) {
+        Set<Element> acc = new LinkedHashSet<>();
+        Scope scope = start;
 
-        for (Element each : scope.getLocalElements()) {
-            // Don't include 'this' or 'super'
-            // It will be done ONCE by symbolsInScope
-            if (!isThisOrSuper(each))
+        while (scope != null) {
+            for (Element each : scope.getLocalElements()) {
+                // Don't include 'this' or 'super' except in the closest scope
+                boolean skipThis = scope != start || isStaticMethod(scope);
+
+                if (skipThis && isThisOrSuper(each))
+                    continue;
+
                 acc.add(each);
-        }
-
-        // If this is the scope of a static method, it won't have access to virtual members of any enclosing scopes
-        if (isStaticMethodScope(scope))
-            isStatic = true;
-
-        // If this is the scope of a class, add all accessible members of the class
-        if (scope.getEnclosingClass() != null) {
-            for (Element each : elements.getAllMembers(scope.getEnclosingClass())) {
-                // If this is a virtual scope, we have access to all members
-                // If this is a static scope, we only have access to static members
-                if (!isStatic || each.getModifiers().contains(Modifier.STATIC))
-                    acc.add(each);
             }
+
+            // If this is the scope of a class, add all accessible members of the class
+            if (scope.getEnclosingClass() != null) {
+                boolean isStatic = isStaticScope(scope, start) || isStaticMethod(scope);
+
+                for (Element each : elements.getAllMembers(scope.getEnclosingClass())) {
+                    // If this is a virtual scope, we have access to all members
+                    // If this is a static scope, we only have access to static members
+                    if (!isStatic || each.getModifiers().contains(Modifier.STATIC))
+                        acc.add(each);
+                }
+            }
+
+            scope = scope.getEnclosingScope();
         }
 
-        // If this is the scope of a static class, it won't have access to virtual members of any enclosing scopes
-        if (isStaticClassScope(scope))
-            isStatic = true;
-
-        doAllSymbols(scope.getEnclosingScope(), isStatic, acc);
+        return acc;
     }
 
-    private boolean isStaticClassScope(Scope scope) {
-        return scope.getEnclosingClass() != null && scope.getEnclosingClass().getModifiers().contains(Modifier.STATIC);
-    }
-
-    private boolean isStaticMethodScope(Scope scope) {
+    private boolean isStaticMethod(Scope scope) {
         return scope.getEnclosingMethod() != null && scope.getEnclosingMethod().getModifiers().contains(Modifier.STATIC);
+    }
+
+    private Optional<Scope> classScope(TypeElement classElement) {
+        if (classElement == null)
+            return Optional.empty();
+
+        TreePath classPath = trees.getPath(classElement);
+
+        if (classPath == null)
+            return Optional.empty();
+
+        return Optional.ofNullable(trees.getScope(classPath));
+    }
+
+    private boolean isStaticScope(Scope toOuter, Scope fromInner) {
+        if (!isParentScope(toOuter, fromInner))
+            return true;
+
+        // It sucks that we have to break through the public API but I can't find any other way to get this info
+        JavacScope inner = (JavacScope) fromInner;
+        JavacScope outer = (JavacScope) toOuter;
+
+        if (outer == null)
+            return false;
+
+        // TODO is countStaticClasses enough?
+        int outerStaticLevel = GetStaticLevel.getStaticLevel(outer.getEnv().info) + countStatics(outer);
+        int innerStaticLevel = GetStaticLevel.getStaticLevel(inner.getEnv().info) + countStatics(inner);
+
+        return outerStaticLevel < innerStaticLevel;
+    }
+
+    private int countStatics(Scope scope) {
+        int count = 0;
+        Element c = scope.getEnclosingMethod() != null ? scope.getEnclosingMethod() : scope.getEnclosingClass();
+
+        while (c != null) {
+            if (c.getModifiers().contains(Modifier.STATIC))
+                count++;
+
+            c = c.getEnclosingElement();
+        }
+
+        return count;
+    }
+
+    private boolean isParentScope(final Scope toOuter, final Scope fromInner) {
+        Scope next = fromInner;
+
+        while (next != null) {
+            if (next.equals(toOuter))
+                return true;
+            else
+                next = next.getEnclosingScope();
+        }
+
+        return false;
     }
 
     private boolean isThisOrSuper(Element each) {

@@ -103,7 +103,7 @@ public class CompletionsScopesTest extends CompletionsBase {
         // Inherited virtual methods
         assertThat(suggestions, not(hasItems("inheritedMethod")));
         // this/super in enclosing scopes
-        assertThat(suggestions, hasItems("this", "super"));
+        assertThat(suggestions, not(hasItems("this", "super")));
     }
 
     @Test
