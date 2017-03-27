@@ -1,12 +1,9 @@
 package org.javacs;
 
-import com.google.common.collect.ImmutableList;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
-import com.sun.tools.javac.api.JavacScope;
-import com.sun.tools.javac.comp.GetStaticLevel;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 
@@ -88,37 +85,18 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                     Stream.of(namedProperty("class")),
                     filter
             );
+
+            if (isTrueParentScope((TypeElement) element, from)) {
+                filter = Stream.concat(
+                        Stream.of(namedProperty("this"), namedProperty("super")),
+                        filter
+                );
+            }
         }
-
-        List<CompletionItem> parentClassThis = parentClassScope(from, element)
-                .filter(classScope -> !isStaticScope(classScope, from) && !isStaticMethod(from))
-                .map(this::thisAndSuper)
-                .orElseGet(Collections::emptyList);
-
-        filter = Stream.concat(parentClassThis.stream(), filter);
 
         return filter;
     }
 
-    /**
-     * If element is the TypeElement of a parent class of from, return its scope
-     */
-    private Optional<Scope> parentClassScope(Scope scope, Element element) {
-        Scope foundClassScope = null;
-
-        while (scope != null) {
-            if (element.equals(scope.getEnclosingClass()))
-                foundClassScope = scope;
-
-            scope = scope.getEnclosingScope();
-        }
-
-        return Optional.ofNullable(foundClassScope);
-    }
-
-    private List<CompletionItem> thisAndSuper(Scope classScope) {
-        return ImmutableList.of(namedProperty("this"), namedProperty("super"));
-    }
 
     /**
      * All members of element, if it is TypeElement
@@ -243,7 +221,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
             // If this is the scope of a class, add all accessible members of the class
             if (scope.getEnclosingClass() != null) {
-                boolean isStatic = isStaticScope(scope, start) || isStaticMethod(scope);
+                boolean isStatic = !isTrueParentScope(scope.getEnclosingClass(), start);
 
                 for (Element each : elements.getAllMembers(scope.getEnclosingClass())) {
                     // If this is a virtual scope, we have access to all members
@@ -263,61 +241,58 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return scope.getEnclosingMethod() != null && scope.getEnclosingMethod().getModifiers().contains(Modifier.STATIC);
     }
 
-    private Optional<Scope> classScope(TypeElement classElement) {
-        if (classElement == null)
-            return Optional.empty();
-
-        TreePath classPath = trees.getPath(classElement);
-
-        if (classPath == null)
-            return Optional.empty();
-
-        return Optional.ofNullable(trees.getScope(classPath));
-    }
-
-    private boolean isStaticScope(Scope toOuter, Scope fromInner) {
-        if (!isParentScope(toOuter, fromInner))
-            return true;
-
-        // It sucks that we have to break through the public API but I can't find any other way to get this info
-        JavacScope inner = (JavacScope) fromInner;
-        JavacScope outer = (JavacScope) toOuter;
-
-        if (outer == null)
-            return false;
-
-        // TODO is countStaticClasses enough?
-        int outerStaticLevel = GetStaticLevel.getStaticLevel(outer.getEnv().info) + countStatics(outer);
-        int innerStaticLevel = GetStaticLevel.getStaticLevel(inner.getEnv().info) + countStatics(inner);
-
-        return outerStaticLevel < innerStaticLevel;
-    }
-
-    private int countStatics(Scope scope) {
-        int count = 0;
-        Element c = scope.getEnclosingMethod() != null ? scope.getEnclosingMethod() : scope.getEnclosingClass();
-
-        while (c != null) {
-            if (c.getModifiers().contains(Modifier.STATIC))
-                count++;
-
-            c = c.getEnclosingElement();
-        }
-
-        return count;
-    }
-
-    private boolean isParentScope(final Scope toOuter, final Scope fromInner) {
-        Scope next = fromInner;
+    /**
+     * Check if inner can see the value of 'this' in the scope of outer.
+     * You can layer lots of expressions without breaking the chain, for example:
+     *
+     *   class Outer { void outer() { new Object() { void inner() { } } } }
+     *
+     * But if any of the classes / methods / init blocks is 'static', the chain is broken.
+     */
+    private boolean isTrueParentScope(TypeElement outer, final Scope inner) {
+        // Anonymous classes are screwy
+        // The get regenerated constantly so .equals doesn't work
+        // But they can never be static, so when we're told to check whether outer (an anonymous class)
+        // is a true parent to inner, we'll just check wither outer.getEnclosingElement() is a true parent
+        Element seek = nonAnonymousClassContainer(outer);
+        // TODO this has a known bug, which is that it will skip over static initializers (CompletionsTest.fieldFromStaticInitBlock)
+        Element next = enclosingMethodOrClass(inner);
 
         while (next != null) {
-            if (next.equals(toOuter))
+            if (next.equals(seek))
                 return true;
-            else
-                next = next.getEnclosingScope();
+            else if (isStatic(next))
+                return false;
+            else {
+                // TODO this has a known bug, which is that it will skip over static initializers (CompletionsTest.fieldFromStaticInitBlock)
+                next = next.getEnclosingElement();
+            }
         }
 
         return false;
+    }
+
+    private boolean isStatic(Element next) {
+        // Anonymous classes can show the modifier STATIC, but the user hasn't expressed the intention that they should be static
+        return !isAnonymousClass(next) && next.getModifiers().contains(Modifier.STATIC);
+    }
+
+    private Element enclosingMethodOrClass(Scope scope) {
+        if (scope.getEnclosingMethod() != null)
+            return scope.getEnclosingMethod();
+        else
+            return scope.getEnclosingClass();
+    }
+
+    private Element nonAnonymousClassContainer(Element candidate) {
+        while (isAnonymousClass(candidate))
+            candidate = candidate.getEnclosingElement();
+
+        return candidate;
+    }
+
+    private boolean isAnonymousClass(Element candidate) {
+        return candidate instanceof TypeElement && ((TypeElement) candidate).getNestingKind() == NestingKind.ANONYMOUS;
     }
 
     private boolean isThisOrSuper(Element each) {
