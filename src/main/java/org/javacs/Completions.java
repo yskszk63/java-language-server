@@ -14,6 +14,7 @@ import javax.lang.model.util.Elements;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
@@ -86,7 +87,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                     filter
             );
 
-            if (isTrueParentScope((TypeElement) element, from)) {
+            if (thisScopes(from).contains(element)) {
                 filter = Stream.concat(
                         Stream.of(namedProperty("this"), namedProperty("super")),
                         filter
@@ -150,11 +151,17 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return Optional.empty();
     }
 
-    private Stream<CompletionItem> constructors(Scope start) {
+    private Stream<CompletionItem> constructors(Scope scope) {
         // TODO autocomplete classes that are imported *anywhere* on the source path and sort them second
-        return findAllSymbols(start).stream()
+        Collection<TypeElement> staticScopes = classScopes(scope);
+        Stream<? extends Element> elements = Stream.empty();
+
+        elements = Stream.concat(elements, staticScopes.stream().flatMap(this::staticMembers));
+        elements = Stream.concat(elements, packageMembers(scope.getEnclosingClass()));
+
+        return elements
                 .filter(this::isTypeSymbol)
-                .filter(e -> isAccessible(e, start))
+                .filter(e -> isAccessible(e, scope))
                 .flatMap(this::explodeConstructors)
                 .flatMap(constructor -> completionItem(constructor, 0));
     }
@@ -176,60 +183,59 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
      * Suggest all completions that are visible from scope
      */
     private Stream<CompletionItem> allSymbols(Scope scope) {
-        Set<Element> all = findAllSymbols(scope);
+        Collection<TypeElement> thisScopes = thisScopes(scope);
+        Collection<TypeElement> classScopes = classScopes(scope);
+        List<Scope> methodScopes = methodScopes(scope);
+        Stream<? extends Element> elements = Stream.empty();
 
-        return all.stream()
+        if (!isStaticMethod(scope))
+            elements = Stream.concat(elements, thisAndSuper(scope));
+
+        elements = Stream.concat(elements, methodScopes.stream().flatMap(this::locals));
+        elements = Stream.concat(elements, thisScopes.stream().flatMap(this::instanceMembers));
+        elements = Stream.concat(elements, classScopes.stream().flatMap(this::staticMembers));
+        elements = Stream.concat(elements, packageMembers(scope.getEnclosingClass()));
+
+        return elements
                 .filter(e -> isAccessible(e, scope))
                 .flatMap(e -> completionItem(e, distance(e, scope)));
     }
 
-    private Set<Element> findAllSymbols(Scope scope) {
-        Set<Element> all = doAllSymbols(scope);
+    private Collection<TypeElement> thisScopes(Scope scope) {
+        Map<Name, TypeElement> acc = new LinkedHashMap<>();
 
-        // Add all members of this package
-        packageOf(scope.getEnclosingClass())
-                .map(PackageElement::getEnclosedElements)
-                .ifPresent(all::addAll);
+        while (scope != null && scope.getEnclosingClass() != null) {
+            TypeElement each = scope.getEnclosingClass();
+            boolean staticMethod = isStaticMethod(scope);
+            boolean staticClass = each.getModifiers().contains(Modifier.STATIC);
+            boolean anonymousClass = isAnonymousClass(each);
 
-        return all;
+            // If this scope is a static method, terminate
+            if (staticMethod)
+                break;
+            // If the user has indicated this is a static class, it's the last scope in the chain
+            else if (staticClass && !anonymousClass) {
+                acc.put(each.getQualifiedName(), each);
+
+                break;
+            }
+            // If this is an inner class, add it to the chain and keep going
+            else {
+                acc.put(each.getQualifiedName(), each);
+
+                scope = scope.getEnclosingScope();
+            }
+        }
+
+        return acc.values();
     }
 
-    private Optional<PackageElement> packageOf(Element enclosing) {
-        return Optional.ofNullable(elements.getPackageOf(enclosing));
-    }
+    private List<Scope> methodScopes(Scope scope) {
+        List<Scope> acc = new ArrayList<>();
 
-    /**
-     * Recursively check each enclosing scope for members that are visible from the starting scope.
-     *
-     * Visibility takes into consideration static / virtual, but not accessibility modifiers.
-     * We'll deal with those later.
-     */
-    private Set<Element> doAllSymbols(final Scope start) {
-        Set<Element> acc = new LinkedHashSet<>();
-        Scope scope = start;
-
-        while (scope != null) {
-            for (Element each : scope.getLocalElements()) {
-                // Don't include 'this' or 'super' except in the closest scope
-                boolean skipThis = scope != start || isStaticMethod(scope);
-
-                if (skipThis && isThisOrSuper(each))
-                    continue;
-
-                acc.add(each);
-            }
-
-            // If this is the scope of a class, add all accessible members of the class
-            if (scope.getEnclosingClass() != null) {
-                boolean isStatic = !isTrueParentScope(scope.getEnclosingClass(), start);
-
-                for (Element each : elements.getAllMembers(scope.getEnclosingClass())) {
-                    // If this is a virtual scope, we have access to all members
-                    // If this is a static scope, we only have access to static members
-                    if (!isStatic || each.getModifiers().contains(Modifier.STATIC))
-                        acc.add(each);
-                }
-            }
+        while (scope != null && scope.getEnclosingClass() != null) {
+            if (scope.getEnclosingMethod() != null)
+                acc.add(scope);
 
             scope = scope.getEnclosingScope();
         }
@@ -237,62 +243,57 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return acc;
     }
 
+    private Collection<TypeElement> classScopes(Scope scope) {
+        Map<Name, TypeElement> acc = new LinkedHashMap<>();
+
+        while (scope != null && scope.getEnclosingClass() != null) {
+            TypeElement each = scope.getEnclosingClass();
+
+            acc.putIfAbsent(each.getQualifiedName(), each);
+
+            scope = scope.getEnclosingScope();
+        }
+
+        return acc.values();
+    }
+
+    private Stream<? extends Element> instanceMembers(TypeElement enclosingClass) {
+        return elements.getAllMembers(enclosingClass).stream()
+                .filter(each -> !each.getModifiers().contains(Modifier.STATIC));
+    }
+
+    private Stream<? extends Element> staticMembers(TypeElement enclosingClass) {
+        return elements.getAllMembers(enclosingClass).stream()
+                .filter(each -> each.getModifiers().contains(Modifier.STATIC));
+    }
+
+    private Stream<? extends Element> locals(Scope scope) {
+        return StreamSupport.stream(scope.getLocalElements().spliterator(), false)
+                .filter(e -> !isThisOrSuper(e));
+    }
+
+    private Stream<? extends Element> thisAndSuper(Scope scope) {
+        return StreamSupport.stream(scope.getLocalElements().spliterator(), false)
+                .filter(e -> isThisOrSuper(e));
+    }
+
+    private Stream<? extends Element> packageMembers(TypeElement enclosingClass) {
+        return packageOf(enclosingClass)
+                .map(PackageElement::getEnclosedElements)
+                .map(List::stream)
+                .orElseGet(Stream::empty);
+    }
+
+    private Optional<PackageElement> packageOf(Element enclosing) {
+        return Optional.ofNullable(elements.getPackageOf(enclosing));
+    }
+
     private boolean isStaticMethod(Scope scope) {
         return scope.getEnclosingMethod() != null && scope.getEnclosingMethod().getModifiers().contains(Modifier.STATIC);
     }
 
-    /**
-     * Check if inner can see the value of 'this' in the scope of outer.
-     * You can layer lots of expressions without breaking the chain, for example:
-     *
-     *   class Outer { void outer() { new Object() { void inner() { } } } }
-     *
-     * But if any of the classes / methods / init blocks is 'static', the chain is broken.
-     */
-    private boolean isTrueParentScope(TypeElement outer, final Scope inner) {
-        // Anonymous classes are screwy
-        // The get regenerated constantly so .equals doesn't work
-        // But they can never be static, so when we're told to check whether outer (an anonymous class)
-        // is a true parent to inner, we'll just check wither outer.getEnclosingElement() is a true parent
-        Element seek = nonAnonymousClassContainer(outer);
-        // TODO this has a known bug, which is that it will skip over static initializers (CompletionsTest.fieldFromStaticInitBlock)
-        Element next = enclosingMethodOrClass(inner);
-
-        while (next != null) {
-            if (next.equals(seek))
-                return true;
-            else if (isStatic(next))
-                return false;
-            else {
-                // TODO this has a known bug, which is that it will skip over static initializers (CompletionsTest.fieldFromStaticInitBlock)
-                next = next.getEnclosingElement();
-            }
-        }
-
-        return false;
-    }
-
-    private boolean isStatic(Element next) {
-        // Anonymous classes can show the modifier STATIC, but the user hasn't expressed the intention that they should be static
-        return !isAnonymousClass(next) && next.getModifiers().contains(Modifier.STATIC);
-    }
-
-    private Element enclosingMethodOrClass(Scope scope) {
-        if (scope.getEnclosingMethod() != null)
-            return scope.getEnclosingMethod();
-        else
-            return scope.getEnclosingClass();
-    }
-
-    private Element nonAnonymousClassContainer(Element candidate) {
-        while (isAnonymousClass(candidate))
-            candidate = candidate.getEnclosingElement();
-
-        return candidate;
-    }
-
     private boolean isAnonymousClass(Element candidate) {
-        return candidate instanceof TypeElement && ((TypeElement) candidate).getNestingKind() == NestingKind.ANONYMOUS;
+        return candidate != null && candidate instanceof TypeElement && ((TypeElement) candidate).getNestingKind() == NestingKind.ANONYMOUS;
     }
 
     private boolean isThisOrSuper(Element each) {
