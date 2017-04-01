@@ -79,7 +79,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         Stream<CompletionItem> filter = all.stream()
                 .filter(e -> isAccessible(e, from))
                 .filter(e -> e.getModifiers().contains(Modifier.STATIC) == isStatic)
-                .flatMap(e -> completionItem(e, distance(e, from)));
+                .flatMap(this::completionItem);
 
         if (isStatic) {
             filter = Stream.concat(
@@ -119,8 +119,6 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
         item.setKind(CompletionItemKind.Property);
         item.setLabel(name);
-        item.setInsertText(name);
-        item.setSortText("0/" + name);
 
         return item;
     }
@@ -163,7 +161,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 .filter(this::isTypeSymbol)
                 .filter(e -> isAccessible(e, scope))
                 .flatMap(this::explodeConstructors)
-                .flatMap(constructor -> completionItem(constructor, 0));
+                .flatMap(this::completionItem);
     }
 
     private Stream<ExecutableElement> explodeConstructors(Element element) {
@@ -198,7 +196,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
         return elements
                 .filter(e -> isAccessible(e, scope))
-                .flatMap(e -> completionItem(e, distance(e, scope)));
+                .flatMap(this::completionItem);
     }
 
     private Collection<TypeElement> thisScopes(Scope scope) {
@@ -302,15 +300,9 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return name.equals(thisName) || name.equals(superName);
     }
 
-    private int distance(Element e, Scope scope) {
-        // TODO
-        return 0;
-    }
-
-    private Stream<CompletionItem> completionItem(Element e, int distance) {
+    private Stream<CompletionItem> completionItem(Element e) {
         String name = e.getKind() == ElementKind.CONSTRUCTOR ? Hovers.constructorName((ExecutableElement) e) : e.getSimpleName().toString();
-        String sortText = distance + "/" + name;
-        
+
         switch (e.getKind()) {
             case PACKAGE:
                 return Stream.empty();
@@ -321,7 +313,6 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 item.setKind(CompletionItemKind.Class);
                 item.setLabel(name);
                 item.setInsertText(name);
-                item.setSortText(sortText);
 
                 return Stream.of(item);
             }
@@ -332,8 +323,6 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
                 item.setKind(CompletionItemKind.Reference);
                 item.setLabel(name);
-                item.setInsertText(name);
-                item.setSortText(sortText);
 
                 return Stream.of(item);
             }
@@ -343,8 +332,6 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 item.setKind(CompletionItemKind.Enum);
                 item.setLabel(name);
                 item.setDetail(e.getEnclosingElement().getSimpleName().toString());
-                item.setInsertText(name);
-                item.setSortText(sortText);
 
                 return Stream.of(item);
             }
@@ -355,8 +342,6 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 item.setLabel(name);
                 item.setDetail(ShortTypePrinter.print(e.asType()));
                 docstring(e).ifPresent(item::setDocumentation);
-                item.setInsertText(name);
-                item.setSortText(sortText);
 
                 return Stream.of(item);
             }
@@ -367,8 +352,6 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
                 item.setKind(CompletionItemKind.Variable);
                 item.setLabel(name);
-                item.setInsertText(name);
-                item.setSortText(sortText);
 
                 return Stream.of(item);
             }
@@ -381,7 +364,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 item.setDetail(ShortTypePrinter.print(method.getReturnType()));
                 docstring(e).ifPresent(item::setDocumentation);
                 item.setInsertText(name); // TODO
-                item.setSortText(sortText);
+                item.setSortText(name);
                 item.setFilterText(name);
 
                 return Stream.of(item);
@@ -398,7 +381,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 item.setLabel(Hovers.methodSignature(method));
                 docstring(e).ifPresent(item::setDocumentation);
                 item.setInsertText(insertText);
-                item.setSortText(sortText);
+                item.setSortText(name);
                 item.setFilterText(name);
 
                 return Stream.of(item);

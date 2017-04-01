@@ -1,5 +1,6 @@
 package org.javacs;
 
+import org.eclipse.lsp4j.CompletionItem;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -228,14 +229,21 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteOrder.java";
 
         // this.
-        Set<String> suggestions = items(file, 4, 26).stream().map(i -> i.getSortText()).collect(Collectors.toSet());
+        Set<String> suggestions = items(file, 5, 27).stream().map(CompletionsTest::sortText).collect(Collectors.toSet());
 
-        assertThat(suggestions, hasItems("0/getMethod()", "1/getInheritedMethod()", "2/getClass()"));
+        assertThat(suggestions, hasItems("getMethod", "getInheritedMethod", "getClass"));
         
         // identifier
-        suggestions = items(file, 6, 9).stream().map(i -> i.getSortText()).collect(Collectors.toSet());
+        suggestions = items(file, 7, 10).stream().map(CompletionsTest::sortText).collect(Collectors.toSet());
 
-        assertThat(suggestions, hasItems("0/localVariable", "0/parameter", "1/test(String parameter)", "2/AutocompleteOrder"));
+        assertThat(suggestions, hasItems("localVariable", "parameter", "test", "AutocompleteOrder"));
+    }
+
+    private static String sortText(CompletionItem i) {
+        if (i.getSortText() != null)
+            return i.getSortText();
+        else
+            return i.getLabel();
     }
 
     @Test
@@ -310,7 +318,6 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    @Ignore
     public void reference() throws IOException {
         String file = "/org/javacs/example/AutocompleteReference.java";
 

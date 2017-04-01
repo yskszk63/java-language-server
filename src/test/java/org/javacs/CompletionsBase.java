@@ -22,8 +22,15 @@ public class CompletionsBase {
 
         return items
                 .stream()
-                .map(CompletionItem::getInsertText)
+                .map(CompletionsBase::itemInsertText)
                 .collect(Collectors.toSet());
+    }
+
+    private static String itemInsertText(CompletionItem i) {
+        if (i.getInsertText() != null)
+            return i.getInsertText();
+        else
+            return i.getLabel();
     }
 
     protected Set<String> documentation(String file, int row, int column) throws IOException {
