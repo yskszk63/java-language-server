@@ -193,6 +193,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         elements = Stream.concat(elements, thisScopes.stream().flatMap(this::instanceMembers));
         elements = Stream.concat(elements, classScopes.stream().flatMap(this::staticMembers));
         elements = Stream.concat(elements, packageMembers(scope.getEnclosingClass()));
+        elements = Stream.concat(elements, defaultImports());
 
         return elements
                 .filter(e -> isAccessible(e, scope))
@@ -280,6 +281,10 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 .map(PackageElement::getEnclosedElements)
                 .map(List::stream)
                 .orElseGet(Stream::empty);
+    }
+
+    private Stream<? extends Element> defaultImports() {
+        return elements.getPackageElement("java.lang").getEnclosedElements().stream();
     }
 
     private Optional<PackageElement> packageOf(Element enclosing) {
