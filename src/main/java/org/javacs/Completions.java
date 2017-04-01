@@ -68,6 +68,10 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
      */
     private Stream<CompletionItem> completeMembers(TreePath expression, Scope from) {
         Element element = trees.getElement(expression);
+
+        if (element instanceof PackageElement)
+            return packageElementMembers((PackageElement) element, from);
+
         TypeMirror type = trees.getTypeMirror(expression);
 
         if (element == null || type == null)
@@ -96,6 +100,12 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         }
 
         return filter;
+    }
+
+    private Stream<CompletionItem> packageElementMembers(PackageElement element, Scope from) {
+        return element.getEnclosedElements().stream()
+                .filter(e -> isAccessible(e, from))
+                .flatMap(this::completionItem);
     }
 
 
