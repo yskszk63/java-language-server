@@ -232,11 +232,21 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         elements = Stream.concat(elements, defaultImports());
 
         return elements
-                .filter(e -> e.getKind() == ElementKind.CLASS)
-                .flatMap(e -> members(e.asType()).stream())
-                .filter(e -> e.getKind() == ElementKind.CONSTRUCTOR)
+                .flatMap(this::explodeConstructors)
                 .filter(e -> isAccessible(e, scope))
                 .flatMap(this::completionItem);
+    }
+
+    private Stream<? extends Element> explodeConstructors(Element element) {
+        switch (element.getKind()) {
+            case CLASS:
+                return members(element.asType()).stream()
+                        .filter(e -> e.getKind() == ElementKind.CONSTRUCTOR);
+            case CONSTRUCTOR:
+                return Stream.of(element);
+            default:
+                return Stream.empty();
+        }
     }
 
     /**

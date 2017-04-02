@@ -463,7 +463,7 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 11, 14);
 
         assertThat("suggests unqualified inner class declaration", suggestions, hasItem("InnerClass"));
-        assertThat("suggests unqualified inner enum declaration", suggestions, hasItem("InnerEnum"));
+        assertThat("suggests unqualified inner enum declaration", suggestions, not(hasItem("InnerEnum")));
     }
 
     @Test
