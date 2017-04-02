@@ -20,8 +20,6 @@ import java.util.stream.Stream;
  * such as classes, methods, and fields.
  */
 public class SymbolIndex {
-    private static final Logger LOG = Logger.getLogger("main");
-
     /**
      * Source path files, for which we support methods and classes
      */
@@ -397,4 +395,7 @@ public class SymbolIndex {
     public void clear(URI file) {
         sourcePath.remove(file);
     }
+
+    private static final Logger LOG = Logger.getLogger("main");
+
 }
