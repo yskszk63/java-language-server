@@ -7,6 +7,7 @@ import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
+import org.eclipse.lsp4j.SymbolInformation;
 
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
@@ -14,6 +15,7 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import java.util.*;
 import java.util.function.Function;
+import java.util.logging.Logger;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -110,84 +112,92 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return filter;
     }
 
-    private Optional<String> parentPackageName(Element enclosingElement) {
-        if (enclosingElement instanceof PackageElement) {
-            PackageElement enclosingPackage = (PackageElement) enclosingElement;
-
-            return Optional.of(enclosingPackage.getQualifiedName().toString());
-        }
-        else return Optional.empty();
-    }
-
     private Stream<CompletionItem> completeImport(String parentPackage, Scope from) {
-        return allTopLevelClasses(parentPackage)
-                .filter(info -> isAccessible(classElement(info.packageName, info.className), from))
-                .filter(info -> !isAlreadyImported(info.packageName, info.className))
-                .map(info -> completeFullyQualifiedClassName(info.packageName, info.className, parentPackage));
+        Stream<String> sourcePathCompletions = sourcePath.allSymbols(ElementKind.CLASS)
+                .flatMap(this::topLevelClassElement)
+                .filter(el -> trees.isAccessible(from, el))
+                .map(el -> el.getQualifiedName().toString());
+        Stream<String> classPathCompletions = classPath.getTopLevelClasses().stream()
+                .filter(info -> info.getPackageName().startsWith(parentPackage)) // filter early to speed things up
+                .filter(info -> isTopLevelClassAccessible(info, from))
+                .map(info -> info.getName());
+
+        return Stream.concat(sourcePathCompletions, classPathCompletions)
+                .filter(name -> !isAlreadyImported(name))
+                .filter(name -> name.startsWith(parentPackage))
+                .map(name -> completeImport(name, parentPackage));
     }
 
-    private Stream<ClassName> allTopLevelClasses(String parentPackage) {
-        return Stream.concat(
-                classPath.getTopLevelClasses().stream()
-                        .filter(info -> info.getPackageName().startsWith(parentPackage))
-                        .map(info -> new ClassName(info.getPackageName(), info.getSimpleName())),
-                sourcePath.allSymbols(ElementKind.CLASS)
-                        .filter(info -> info.getContainerName().startsWith(parentPackage))
-                        .filter(info -> isTopLevelClass(info.getContainerName(), info.getName()))
-                        .map(info -> new ClassName(info.getContainerName(), info.getName()))
-        );
+    private Stream<TypeElement> topLevelClassElement(SymbolInformation info) {
+        String qualifiedName = info.getContainerName().isEmpty() ? info.getName() : info.getContainerName() + "." + info.getName();
+        TypeElement candidate = elements.getTypeElement(qualifiedName);
+
+        if (candidate == null || candidate.getKind() != ElementKind.CLASS)
+            return Stream.empty();
+
+        Element parent = candidate.getEnclosingElement();
+
+        if (parent == null || parent.getKind() == ElementKind.PACKAGE)
+            return Stream.of(candidate);
+
+        return Stream.empty();
     }
 
-    private static class ClassName {
-        final String packageName, className;
+    /**
+     * Is class `info` accessible from scope `from`?
+     *
+     * Avoid using elements.getTypeElement, which is a costly operation.
+     */
+    private boolean isTopLevelClassAccessible(ClassPath.ClassInfo info, Scope from) {
+        assert !info.getName().contains("$") : info.getName() + " is an inner class";
 
-        ClassName(String packageName, String className) {
-            this.packageName = packageName;
-            this.className = className;
+        try {
+            Class<?> c = info.load();
+            boolean isPublic = java.lang.reflect.Modifier.isPublic(c.getModifiers());
+            boolean isPrivate = java.lang.reflect.Modifier.isPrivate(c.getModifiers());
+            boolean isProtected = java.lang.reflect.Modifier.isProtected(c.getModifiers());
+
+            return isPublic || (samePackage(info, from) && !isPrivate && !isProtected);
+        } catch (LinkageError e) {
+            LOG.warning(e.getMessage());
+
+            return false;
         }
-
-        String fullyQualifiedName() {
-            if (packageName.isEmpty())
-                return className;
-            else
-                return packageName + "." + className;
-        }
     }
 
-    private boolean isAlreadyImported(String packageName, String className) {
+    private boolean samePackage(ClassPath.ClassInfo info, Scope from) {
+        TypeElement enclosingClass = from.getEnclosingClass();
+
+        if (enclosingClass == null)
+            return false;
+
+        return elements.getPackageOf(enclosingClass).getQualifiedName().contentEquals(info.getPackageName());
+    }
+
+    private boolean isAlreadyImported(String fullyQualifiedName) {
         return false; // TODO
     }
 
-    private boolean isTopLevelClass(String packageName, String className) {
-        return true; // TODO
-    }
-
-    private Element classElement(String containerName, String name) {
-        return elements.getTypeElement(containerName + "." + name);
-    }
-
-    private CompletionItem completeFullyQualifiedClassName(String packageName, String className, String parentPackage) {
-        assert packageName.startsWith(parentPackage);
+    private CompletionItem completeImport(String qualifiedName, String parentPackage) {
+        assert qualifiedName.startsWith(parentPackage);
 
         CompletionItem item = new CompletionItem();
 
         item.setKind(CompletionItemKind.Class);
-        item.setLabel(packageName + "." + className);
-        item.setInsertText(importInsertText(packageName, className, parentPackage));
+        item.setLabel(qualifiedName);
+        item.setInsertText(importInsertText(qualifiedName, parentPackage));
 
         return item;
     }
 
-    private String importInsertText(String packageName, String className, String parentPackage) {
+    private String importInsertText(String qualifiedName, String parentPackage) {
         StringJoiner insertText = new StringJoiner(".");
-        String[] packages = packageName.substring(parentPackage.length()).split("\\.");
+        String[] parts = qualifiedName.substring(parentPackage.length()).split("\\.");
 
-        for (String each : packages) {
+        for (String each : parts) {
             if (!each.isEmpty())
                 insertText.add(each);
         }
-
-        insertText.add(className);
 
         return insertText.toString();
     }
@@ -247,8 +257,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         Stream<? extends Element> elements = Stream.empty();
 
         elements = Stream.concat(elements, staticScopes.stream().flatMap(this::staticMembers));
-        elements = Stream.concat(elements, packageMembers(scope.getEnclosingClass()));
-        elements = Stream.concat(elements, defaultImports());
+        // TODO elements on classpath
 
         return elements
                 .flatMap(this::explodeConstructors)
@@ -283,18 +292,12 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         elements = Stream.concat(elements, methodScopes.stream().flatMap(this::locals));
         elements = Stream.concat(elements, thisScopes.stream().flatMap(this::instanceMembers));
         elements = Stream.concat(elements, classScopes.stream().flatMap(this::staticMembers));
-        elements = Stream.concat(elements, allClassNames(scope));
-        elements = Stream.concat(elements, defaultImports());
+        elements = Stream.concat(elements, sourcePath.allSymbols(ElementKind.CLASS).flatMap(this::topLevelClassElement));
+        // TODO elements on classpath
 
         return elements
                 .filter(e -> isAccessible(e, scope))
                 .flatMap(this::completionItem);
-    }
-
-    private Stream<Element> allClassNames(Scope scope) {
-        return allTopLevelClasses("")
-                .filter(name -> isAccessible(classElement(name.packageName, name.className), scope))
-                .map(name -> elements.getTypeElement(name.fullyQualifiedName()));
     }
 
     private Collection<TypeElement> thisScopes(Scope scope) {
@@ -371,21 +374,6 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     private Stream<? extends Element> thisAndSuper(Scope scope) {
         return StreamSupport.stream(scope.getLocalElements().spliterator(), false)
                 .filter(e -> isThisOrSuper(e));
-    }
-
-    private Stream<? extends Element> packageMembers(TypeElement enclosingClass) {
-        return packageOf(enclosingClass)
-                .map(PackageElement::getEnclosedElements)
-                .map(List::stream)
-                .orElseGet(Stream::empty);
-    }
-
-    private Stream<? extends Element> defaultImports() {
-        return elements.getPackageElement("java.lang").getEnclosedElements().stream();
-    }
-
-    private Optional<PackageElement> packageOf(Element enclosing) {
-        return Optional.ofNullable(elements.getPackageOf(enclosing));
     }
 
     private boolean isStaticMethod(Scope scope) {
@@ -518,4 +506,6 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     private Optional<String> docstring(Element e) {
         return Optional.ofNullable(elements.getDocComment(e));
     }
+
+    private static final Logger LOG = Logger.getLogger("main");
 }
