@@ -471,7 +471,7 @@ public class CompletionsTest extends CompletionsBase {
     public void innerEnum() throws IOException {
         String file = "/org/javacs/example/AutocompleteInners.java";
 
-        Set<String> suggestions = insertText(file, 15, 310);
+        Set<String> suggestions = insertText(file, 15, 40);
 
         assertThat("suggests enum constants", suggestions, hasItems("Foo", "Bar"));
     }

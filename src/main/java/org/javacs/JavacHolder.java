@@ -63,11 +63,17 @@ public class JavacHolder {
     public FocusedResult compileFocused(URI file, Optional<String> textContent, int line, int column) {
         initialIndexComplete.join();
 
-        JavaFileObject object = findFile(file, textContent);
-        JavacTask task = createTask(Collections.singleton(object));
+        JavaFileObject original = findFile(file, textContent);
+        JavaFileObject withSemi = TreePruner.putSemicolonAfterCursor(original, line, column);
+        JavacTask task = createTask(Collections.singleton(withSemi));
 
         try {
             Iterable<? extends CompilationUnitTree> parse = task.parse();
+            TreePruner pruner = new TreePruner(task);
+
+            for (CompilationUnitTree tree : parse)
+                pruner.removeStatementsAfterCursor(tree, line, column);
+
             Iterable<? extends Element> analyze = task.analyze();
             Function<CompilationUnitTree, Stream<TreePath>> findPath = PathAtCursor.create(task, line, column).andThen(JavacHolder::stream);
             Supplier<Stream<? extends CompilationUnitTree>> compilationUnits = () -> StreamSupport.stream(parse.spliterator(), false);
