@@ -224,31 +224,19 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> constructors(Scope scope) {
-        // TODO autocomplete classes that are imported *anywhere* on the source path and sort them second
         Collection<TypeElement> staticScopes = classScopes(scope);
         Stream<? extends Element> elements = Stream.empty();
 
         elements = Stream.concat(elements, staticScopes.stream().flatMap(this::staticMembers));
         elements = Stream.concat(elements, packageMembers(scope.getEnclosingClass()));
+        elements = Stream.concat(elements, defaultImports());
 
         return elements
-                .filter(this::isTypeSymbol)
+                .filter(e -> e.getKind() == ElementKind.CLASS)
+                .flatMap(e -> members(e.asType()).stream())
+                .filter(e -> e.getKind() == ElementKind.CONSTRUCTOR)
                 .filter(e -> isAccessible(e, scope))
-                .flatMap(this::explodeConstructors)
                 .flatMap(this::completionItem);
-    }
-
-    private Stream<ExecutableElement> explodeConstructors(Element element) {
-        List<? extends Element> all = members(element.asType());
-
-        return all.stream().flatMap(this::asConstructor);
-    }
-
-    private Stream<ExecutableElement> asConstructor(Element element) {
-        if (element.getKind() == ElementKind.CONSTRUCTOR)
-            return Stream.of((ExecutableElement) element);
-        else
-            return Stream.empty();
     }
 
     /**
