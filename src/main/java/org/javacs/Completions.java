@@ -120,19 +120,38 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> completeImport(String parentPackage, Scope from) {
+        return allTopLevelClasses(parentPackage)
+                .filter(info -> isAccessible(classElement(info.packageName, info.className), from))
+                .filter(info -> !isAlreadyImported(info.packageName, info.className))
+                .map(info -> completeFullyQualifiedClassName(info.packageName, info.className, parentPackage));
+    }
+
+    private Stream<ClassName> allTopLevelClasses(String parentPackage) {
         return Stream.concat(
                 classPath.getTopLevelClasses().stream()
                         .filter(info -> info.getPackageName().startsWith(parentPackage))
-                        .filter(info -> !isAlreadyImported(info.getPackageName(), info.getSimpleName()))
-                        .filter(info -> isAccessible(classElement(info.getPackageName(), info.getSimpleName()), from))
-                        .map(info -> completeFullyQualifiedClassName(info.getPackageName(), info.getSimpleName(), parentPackage)),
+                        .map(info -> new ClassName(info.getPackageName(), info.getSimpleName())),
                 sourcePath.allSymbols(ElementKind.CLASS)
                         .filter(info -> info.getContainerName().startsWith(parentPackage))
-                        .filter(info -> !isAlreadyImported(info.getContainerName(), info.getName()))
                         .filter(info -> isTopLevelClass(info.getContainerName(), info.getName()))
-                        .filter(info -> isAccessible(classElement(info.getContainerName(), info.getName()), from))
-                        .map(info -> completeFullyQualifiedClassName(info.getContainerName(), info.getName(), parentPackage))
+                        .map(info -> new ClassName(info.getContainerName(), info.getName()))
         );
+    }
+
+    private static class ClassName {
+        final String packageName, className;
+
+        ClassName(String packageName, String className) {
+            this.packageName = packageName;
+            this.className = className;
+        }
+
+        String fullyQualifiedName() {
+            if (packageName.isEmpty())
+                return className;
+            else
+                return packageName + "." + className;
+        }
     }
 
     private boolean isAlreadyImported(String packageName, String className) {
@@ -264,12 +283,18 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         elements = Stream.concat(elements, methodScopes.stream().flatMap(this::locals));
         elements = Stream.concat(elements, thisScopes.stream().flatMap(this::instanceMembers));
         elements = Stream.concat(elements, classScopes.stream().flatMap(this::staticMembers));
-        elements = Stream.concat(elements, packageMembers(scope.getEnclosingClass()));
+        elements = Stream.concat(elements, allClassNames(scope));
         elements = Stream.concat(elements, defaultImports());
 
         return elements
                 .filter(e -> isAccessible(e, scope))
                 .flatMap(this::completionItem);
+    }
+
+    private Stream<Element> allClassNames(Scope scope) {
+        return allTopLevelClasses("")
+                .filter(name -> isAccessible(classElement(name.packageName, name.className), scope))
+                .map(name -> elements.getTypeElement(name.fullyQualifiedName()));
     }
 
     private Collection<TypeElement> thisScopes(Scope scope) {
@@ -390,6 +415,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 item.setKind(CompletionItemKind.Class);
                 item.setLabel(name);
                 item.setInsertText(name);
+                // TODO edit imports if necessary
 
                 return Stream.of(item);
             }
@@ -460,6 +486,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 item.setInsertText(insertText);
                 item.setSortText(name);
                 item.setFilterText(name);
+                // TODO edit imports if necessary
 
                 return Stream.of(item);
             }
@@ -482,6 +509,8 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
         if (enclosing instanceof DeclaredType)
             return trees.isAccessible(scope, e, (DeclaredType) enclosing);
+        else if (e instanceof TypeElement)
+            return trees.isAccessible(scope, (TypeElement) e);
         else
             return true;
     }
