@@ -33,10 +33,10 @@ public class TreePrunerSpec {
     public void putSemicolonAfterCursor() throws IOException {
         String source =
                 "public class Example {\n" +
-                "  void main() {\n" +
-                "    this.m\n" +
-                "  }\n" +
-                "}\n";
+                        "  void main() {\n" +
+                        "    this.m\n" +
+                        "  }\n" +
+                        "}\n";
         JavaFileObject after = TreePruner.putSemicolonAfterCursor(
                 new StringFileObject(source, URI.create("Example.java")),
                 3, 11
@@ -46,6 +46,28 @@ public class TreePrunerSpec {
                 "public class Example {\n" +
                         "  void main() {\n" +
                         "    this.m;\n" +
+                        "  }\n" +
+                        "}\n"
+        ));
+    }
+
+    @Test
+    public void putSemicolonAtEndOfLine() throws IOException {
+        String source =
+                "public class Example {\n" +
+                        "  void main() {\n" +
+                        "    this.main\n" +
+                        "  }\n" +
+                        "}\n";
+        JavaFileObject after = TreePruner.putSemicolonAfterCursor(
+                new StringFileObject(source, URI.create("Example.java")),
+                3, 11
+        );
+
+        assertThat(after.getCharContent(true).toString(), equalTo(
+                "public class Example {\n" +
+                        "  void main() {\n" +
+                        "    this.main;\n" +
                         "  }\n" +
                         "}\n"
         ));

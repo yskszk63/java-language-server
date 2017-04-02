@@ -83,6 +83,7 @@ public class TreePruner {
             StringBuilder acc = new StringBuilder();
             int line = 1, character = 1;
 
+            // Go to the cursor
             while (line < cursorLine || character < cursorCharacter) {
                 int next = reader.read();
 
@@ -98,7 +99,17 @@ public class TreePruner {
                 acc.append((char) next);
             }
 
-            acc.append(";");
+            // Go to the end of the line
+            while (true) {
+                int next = reader.read();
+
+                if (next == -1 || next == '\n')
+                    break;
+
+                acc.append((char) next);
+            }
+
+            acc.append(";\n");
 
             for (int next = reader.read(); next > 0; next = reader.read()) {
                 acc.append((char) next);
