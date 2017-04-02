@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.google.common.reflect.ClassPath;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
@@ -20,21 +21,25 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
     public static Stream<CompletionItem> at(FocusedResult compiled) {
         return compiled.cursor
-                .map(new Completions(compiled.task))
+                .map(new Completions(compiled.task, compiled.classPath, compiled.sourcePath))
                 .orElseGet(Stream::empty);
     }
 
     private final JavacTask task;
+    private final ClassPath classPath;
+    private final SymbolIndex sourcePath;
     private final Trees trees;
     private final Elements elements;
     private final Name thisName, superName;
 
-    private Completions(JavacTask task) {
+    private Completions(JavacTask task, ClassPath classPath, SymbolIndex sourcePath) {
         this.task = task;
         this.trees = Trees.instance(task);
         this.elements = task.getElements();
         this.thisName = task.getElements().getName("this");
         this.superName = task.getElements().getName("super");
+        this.classPath = classPath;
+        this.sourcePath = sourcePath;
     }
 
     @Override
@@ -69,8 +74,11 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     private Stream<CompletionItem> completeMembers(TreePath expression, Scope from) {
         Element element = trees.getElement(expression);
 
-        if (element instanceof PackageElement)
-            return packageElementMembers((PackageElement) element, from);
+        if (element instanceof PackageElement) {
+            PackageElement packageElement = (PackageElement) element;
+
+            return completeImport(packageElement.getQualifiedName().toString(), from);
+        }
 
         TypeMirror type = trees.getTypeMirror(expression);
 
@@ -102,12 +110,68 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return filter;
     }
 
-    private Stream<CompletionItem> packageElementMembers(PackageElement element, Scope from) {
-        return element.getEnclosedElements().stream()
-                .filter(e -> isAccessible(e, from))
-                .flatMap(this::completionItem);
+    private Optional<String> parentPackageName(Element enclosingElement) {
+        if (enclosingElement instanceof PackageElement) {
+            PackageElement enclosingPackage = (PackageElement) enclosingElement;
+
+            return Optional.of(enclosingPackage.getQualifiedName().toString());
+        }
+        else return Optional.empty();
     }
 
+    private Stream<CompletionItem> completeImport(String parentPackage, Scope from) {
+        return Stream.concat(
+                classPath.getTopLevelClasses().stream()
+                        .filter(info -> info.getPackageName().startsWith(parentPackage))
+                        .filter(info -> !isAlreadyImported(info.getPackageName(), info.getSimpleName()))
+                        .filter(info -> isAccessible(classElement(info.getPackageName(), info.getSimpleName()), from))
+                        .map(info -> completeFullyQualifiedClassName(info.getPackageName(), info.getSimpleName(), parentPackage)),
+                sourcePath.allSymbols(ElementKind.CLASS)
+                        .filter(info -> info.getContainerName().startsWith(parentPackage))
+                        .filter(info -> !isAlreadyImported(info.getContainerName(), info.getName()))
+                        .filter(info -> isTopLevelClass(info.getContainerName(), info.getName()))
+                        .filter(info -> isAccessible(classElement(info.getContainerName(), info.getName()), from))
+                        .map(info -> completeFullyQualifiedClassName(info.getContainerName(), info.getName(), parentPackage))
+        );
+    }
+
+    private boolean isAlreadyImported(String packageName, String className) {
+        return false; // TODO
+    }
+
+    private boolean isTopLevelClass(String packageName, String className) {
+        return true; // TODO
+    }
+
+    private Element classElement(String containerName, String name) {
+        return elements.getTypeElement(containerName + "." + name);
+    }
+
+    private CompletionItem completeFullyQualifiedClassName(String packageName, String className, String parentPackage) {
+        assert packageName.startsWith(parentPackage);
+
+        CompletionItem item = new CompletionItem();
+
+        item.setKind(CompletionItemKind.Class);
+        item.setLabel(packageName + "." + className);
+        item.setInsertText(importInsertText(packageName, className, parentPackage));
+
+        return item;
+    }
+
+    private String importInsertText(String packageName, String className, String parentPackage) {
+        StringJoiner insertText = new StringJoiner(".");
+        String[] packages = packageName.substring(parentPackage.length()).split("\\.");
+
+        for (String each : packages) {
+            if (!each.isEmpty())
+                insertText.add(each);
+        }
+
+        insertText.add(className);
+
+        return insertText.toString();
+    }
 
     /**
      * All members of element, if it is TypeElement
@@ -413,6 +477,9 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private boolean isAccessible(Element e, Scope scope) {
+        if (e == null)
+            return false;
+
         TypeMirror enclosing = e.getEnclosingElement().asType();
 
         if (enclosing instanceof DeclaredType)

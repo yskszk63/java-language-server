@@ -388,7 +388,6 @@ public class CompletionsTest extends CompletionsBase {
         // Static method
         Set<String> suggestions = insertText(file, 3, 12);
 
-        assertThat("Has next package", suggestions, hasItems("javacs"));
         assertThat("Has deeply nested class", suggestions, hasItems("javacs.example.AutocompleteMember"));
     }
 
