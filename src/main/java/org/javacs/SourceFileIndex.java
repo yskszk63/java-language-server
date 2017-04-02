@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Contains all symbol declarations and referencs in a single source file
+ * Contains all symbol declarations and references in a single source file
  */
 class SourceFileIndex {
     final EnumMap<ElementKind, Map<String, SymbolInformation>> declarations = new EnumMap<>(ElementKind.class);
