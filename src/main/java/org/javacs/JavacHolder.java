@@ -3,12 +3,13 @@ package org.javacs;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.reflect.ClassPath;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
+import com.sun.tools.javac.api.JavacTaskImpl;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
+import com.sun.tools.javac.util.Options;
 import org.eclipse.lsp4j.SymbolInformation;
 
 import javax.lang.model.element.Element;
@@ -19,10 +20,7 @@ import javax.tools.JavaFileObject;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -81,7 +79,7 @@ public class JavacHolder {
                     .flatMap(findPath)
                     .findAny();
 
-            return new FocusedResult(cursor, task, reflectClassPath, index);
+            return new FocusedResult(cursor, task, classPathIndex, index);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -151,7 +149,7 @@ public class JavacHolder {
 
     private final List<String> options;
 
-    private final ClassPath reflectClassPath;
+    private final ClassPathIndex classPathIndex;
 
     private JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory, boolean index) {
         this.classPath = Collections.unmodifiableSet(classPath);
@@ -175,36 +173,20 @@ public class JavacHolder {
         );
         this.index = new SymbolIndex();
         this.initialIndexComplete = index ? startIndexingSourcePath() : CompletableFuture.completedFuture(null);
-        this.reflectClassPath = classPath(classPath);
+        this.classPathIndex = new ClassPathIndex(createTask(Collections.emptyList()), classPath);
 
         ensureOutputDirectory(outputDirectory);
         clearOutputDirectory(outputDirectory);
     }
 
-    private static ClassPath classPath(Set<Path> classPath) {
-        URL[] urls = classPath.stream()
-                .flatMap(JavacHolder::url)
-                .toArray(URL[]::new);
-
-        try {
-            return ClassPath.from(new URLClassLoader(urls));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static Stream<URL> url(Path path) {
-        try {
-            return Stream.of(path.toUri().toURL());
-        } catch (MalformedURLException e) {
-            LOG.warning(e.getMessage());
-
-            return Stream.empty();
-        }
-    }
-
     private JavacTask createTask(Collection<JavaFileObject> files) {
-        return javac.getTask(null, fileManager, this::onError, options, null, files);
+        JavacTask result = javac.getTask(null, fileManager, this::onError, options, null, files);
+        JavacTaskImpl impl = (JavacTaskImpl) result;
+        Options options = Options.instance(impl.getContext());
+
+        options.put("dev", "");
+
+        return result;
     }
 
     /**

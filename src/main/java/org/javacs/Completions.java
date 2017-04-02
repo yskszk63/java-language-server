@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.google.common.reflect.ClassPath;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
@@ -28,13 +27,13 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private final JavacTask task;
-    private final ClassPath classPath;
+    private final ClassPathIndex classPath;
     private final SymbolIndex sourcePath;
     private final Trees trees;
     private final Elements elements;
     private final Name thisName, superName;
 
-    private Completions(JavacTask task, ClassPath classPath, SymbolIndex sourcePath) {
+    private Completions(JavacTask task, ClassPathIndex classPath, SymbolIndex sourcePath) {
         this.task = task;
         this.trees = Trees.instance(task);
         this.elements = task.getElements();
@@ -113,19 +112,20 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> completeImport(String parentPackage, Scope from) {
-        Stream<String> sourcePathCompletions = sourcePath.allSymbols(ElementKind.CLASS)
-                .flatMap(this::topLevelClassElement)
+        return allClasses()
                 .filter(el -> trees.isAccessible(from, el))
-                .map(el -> el.getQualifiedName().toString());
-        Stream<String> classPathCompletions = classPath.getTopLevelClasses().stream()
-                .filter(info -> info.getPackageName().startsWith(parentPackage)) // filter early to speed things up
-                .filter(info -> isTopLevelClassAccessible(info, from))
-                .map(info -> info.getName());
-
-        return Stream.concat(sourcePathCompletions, classPathCompletions)
+                .map(el -> el.getQualifiedName().toString())
                 .filter(name -> !isAlreadyImported(name))
                 .filter(name -> name.startsWith(parentPackage))
                 .map(name -> completeImport(name, parentPackage));
+    }
+
+    private Stream<TypeElement> allClasses() {
+        Stream<TypeElement> sourcePathClasses = sourcePath.allSymbols(ElementKind.CLASS)
+                .flatMap(this::topLevelClassElement);
+        Stream<TypeElement> classPathClasses = classPath.publicTopLevelClasses();
+
+        return Stream.concat(sourcePathClasses, classPathClasses);
     }
 
     private Stream<TypeElement> topLevelClassElement(SymbolInformation info) {
@@ -141,37 +141,6 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
             return Stream.of(candidate);
 
         return Stream.empty();
-    }
-
-    /**
-     * Is class `info` accessible from scope `from`?
-     *
-     * Avoid using elements.getTypeElement, which is a costly operation.
-     */
-    private boolean isTopLevelClassAccessible(ClassPath.ClassInfo info, Scope from) {
-        assert !info.getName().contains("$") : info.getName() + " is an inner class";
-
-        try {
-            Class<?> c = info.load();
-            boolean isPublic = java.lang.reflect.Modifier.isPublic(c.getModifiers());
-            boolean isPrivate = java.lang.reflect.Modifier.isPrivate(c.getModifiers());
-            boolean isProtected = java.lang.reflect.Modifier.isProtected(c.getModifiers());
-
-            return isPublic || (samePackage(info, from) && !isPrivate && !isProtected);
-        } catch (LinkageError e) {
-            LOG.warning(e.getMessage());
-
-            return false;
-        }
-    }
-
-    private boolean samePackage(ClassPath.ClassInfo info, Scope from) {
-        TypeElement enclosingClass = from.getEnclosingClass();
-
-        if (enclosingClass == null)
-            return false;
-
-        return elements.getPackageOf(enclosingClass).getQualifiedName().contentEquals(info.getPackageName());
     }
 
     private boolean isAlreadyImported(String fullyQualifiedName) {
@@ -253,13 +222,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> constructors(Scope scope) {
-        Collection<TypeElement> staticScopes = classScopes(scope);
-        Stream<? extends Element> elements = Stream.empty();
-
-        elements = Stream.concat(elements, staticScopes.stream().flatMap(this::staticMembers));
-        // TODO elements on classpath
-
-        return elements
+        return allClasses()
                 .flatMap(this::explodeConstructors)
                 .filter(e -> isAccessible(e, scope))
                 .flatMap(this::completionItem);
@@ -292,8 +255,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         elements = Stream.concat(elements, methodScopes.stream().flatMap(this::locals));
         elements = Stream.concat(elements, thisScopes.stream().flatMap(this::instanceMembers));
         elements = Stream.concat(elements, classScopes.stream().flatMap(this::staticMembers));
-        elements = Stream.concat(elements, sourcePath.allSymbols(ElementKind.CLASS).flatMap(this::topLevelClassElement));
-        // TODO elements on classpath
+        elements = Stream.concat(elements, allClasses());
 
         return elements
                 .filter(e -> isAccessible(e, scope))

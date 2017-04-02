@@ -1,16 +1,14 @@
 package org.javacs;
 
-import com.sun.tools.javac.code.Type;
-
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.type.*;
 import javax.lang.model.util.AbstractTypeVisitor8;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.logging.*;
 
 public class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
     private static final Logger LOG = Logger.getLogger("main");
-    
+
     private ShortTypePrinter() {
 
     }
