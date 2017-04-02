@@ -13,6 +13,9 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
+import java.lang.reflect.Parameter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -102,6 +105,36 @@ public class Hovers implements Function<TreePath, Optional<String>> {
 
             for (TypeMirror t : e.getThrownTypes())
                 thrown.add(ShortTypePrinter.print(t));
+
+            signature += " throws " + thrown;
+        }
+
+        return signature;
+    }
+
+    public static String reflectedMethodSignature(Executable e) {
+        String name = e instanceof Constructor ? e.getDeclaringClass().getSimpleName() : e.getName();
+        boolean varargs = e.isVarArgs();
+        StringJoiner params = new StringJoiner(", ");
+
+        Parameter[] parameters = e.getParameters();
+        for (int i = 0; i < parameters.length; i++) {
+            Parameter p = parameters[i];
+            String pName = p.getName();
+
+            if (varargs && i == parameters.length - 1)
+                pName += "...";
+
+            params.add(pName);
+        }
+
+        String signature = name + "(" + params + ")";
+
+        if (e.getExceptionTypes().length > 0) {
+            StringJoiner thrown = new StringJoiner(", ");
+
+            for (Class<?> t : e.getExceptionTypes())
+                thrown.add(t.getSimpleName());
 
             signature += " throws " + thrown;
         }

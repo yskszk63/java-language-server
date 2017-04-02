@@ -173,7 +173,7 @@ public class JavacHolder {
         );
         this.index = new SymbolIndex();
         this.initialIndexComplete = index ? startIndexingSourcePath() : CompletableFuture.completedFuture(null);
-        this.classPathIndex = new ClassPathIndex(createTask(Collections.emptyList()), classPath);
+        this.classPathIndex = new ClassPathIndex(classPath);
 
         ensureOutputDirectory(outputDirectory);
         clearOutputDirectory(outputDirectory);

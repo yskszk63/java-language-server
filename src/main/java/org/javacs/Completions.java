@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.google.common.reflect.ClassPath;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
@@ -12,6 +13,7 @@ import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
+import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.function.Function;
 import java.util.logging.Logger;
@@ -112,20 +114,32 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> completeImport(String parentPackage, Scope from) {
-        return allClasses()
+        String fromPackage = packageOf(from);
+        Stream<String> sourcePathNames = sourcePath.allSymbols(ElementKind.CLASS)
+                .flatMap(this::topLevelClassElement)
                 .filter(el -> trees.isAccessible(from, el))
-                .map(el -> el.getQualifiedName().toString())
+                .map(el -> el.getQualifiedName().toString());
+        Stream<String> classPathNames = classPath.topLevelClasses(fromPackage)
+                .map(info -> info.getName());
+
+        return Stream.concat(sourcePathNames, classPathNames)
                 .filter(name -> !isAlreadyImported(name))
                 .filter(name -> name.startsWith(parentPackage))
                 .map(name -> completeImport(name, parentPackage));
     }
 
-    private Stream<TypeElement> allClasses() {
-        Stream<TypeElement> sourcePathClasses = sourcePath.allSymbols(ElementKind.CLASS)
-                .flatMap(this::topLevelClassElement);
-        Stream<TypeElement> classPathClasses = classPath.publicTopLevelClasses();
+    private String packageOf(Scope from) {
+        TypeElement enclosingClass = from.getEnclosingClass();
 
-        return Stream.concat(sourcePathClasses, classPathClasses);
+        if (enclosingClass == null)
+            return "";
+
+        PackageElement enclosingPackage = elements.getPackageOf(enclosingClass);
+
+        if (enclosingPackage == null)
+            return "";
+
+        return enclosingPackage.getQualifiedName().toString();
     }
 
     private Stream<TypeElement> topLevelClassElement(SymbolInformation info) {
@@ -222,19 +236,60 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> constructors(Scope scope) {
-        return allClasses()
+        Stream<CompletionItem> sourcePathItems = sourcePath.allSymbols(ElementKind.CLASS)
+                .flatMap(this::topLevelClassElement)
                 .flatMap(this::explodeConstructors)
-                .filter(e -> isAccessible(e, scope))
-                .flatMap(this::completionItem);
+                .map(this::completeJavacConstructor);
+        Stream<CompletionItem> classPathItems = classPath.topLevelConstructors(packageOf(scope))
+                .map(this::completeReflectedConstructor);
+
+        return Stream.concat(sourcePathItems, classPathItems);
     }
 
-    private Stream<? extends Element> explodeConstructors(Element element) {
+    private CompletionItem completeReflectedConstructor(Constructor<?> method) {
+        String name = method.getDeclaringClass().getSimpleName();
+        Optional<String> docString = Optional.empty(); // TODO doc path
+        boolean hasTypeParameters = method.getTypeParameters().length > 0;
+        String methodSignature = Hovers.reflectedMethodSignature(method);
+
+        return completeConstructor(name, hasTypeParameters, methodSignature, docString);
+    }
+
+    private CompletionItem completeJavacConstructor(ExecutableElement method) {
+        String name = Hovers.constructorName(method);
+        Optional<String> docString = docstring(method);
+        boolean hasTypeParameters = !method.getTypeParameters().isEmpty();
+        String methodSignature = Hovers.methodSignature(method);
+
+        return completeConstructor(name, hasTypeParameters, methodSignature, docString);
+    }
+
+    private CompletionItem completeConstructor(String name, boolean hasTypeParameters, String methodSignature, Optional<String> docString) {
+        CompletionItem item = new CompletionItem();
+        String insertText = name;
+
+        if (hasTypeParameters)
+            insertText += "<>";
+
+        item.setKind(CompletionItemKind.Constructor);
+        item.setLabel(methodSignature);
+        docString.ifPresent(item::setDocumentation);
+        item.setInsertText(insertText);
+        item.setSortText(name);
+        item.setFilterText(name);
+        // TODO edit imports if necessary
+
+        return item;
+    }
+
+    private Stream<ExecutableElement> explodeConstructors(Element element) {
         switch (element.getKind()) {
             case CLASS:
                 return members(element.asType()).stream()
-                        .filter(e -> e.getKind() == ElementKind.CONSTRUCTOR);
+                        .filter(e -> e.getKind() == ElementKind.CONSTRUCTOR)
+                        .map(e -> (ExecutableElement) e);
             case CONSTRUCTOR:
-                return Stream.of(element);
+                return Stream.of((ExecutableElement) element);
             default:
                 return Stream.empty();
         }
@@ -244,6 +299,27 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
      * Suggest all completions that are visible from scope
      */
     private Stream<CompletionItem> allSymbols(Scope scope) {
+        Stream<CompletionItem> sourcePathItems = allSourcePathSymbols(scope)
+                .filter(e -> isAccessible(e, scope))
+                .flatMap(this::completionItem);
+        Stream<CompletionItem> classPathItems = classPath.topLevelClasses(packageOf(scope))
+                .map(this::completeTopLevelClassSymbol);
+
+        return Stream.concat(sourcePathItems, classPathItems);
+    }
+
+    private CompletionItem completeTopLevelClassSymbol(ClassPath.ClassInfo info) {
+        CompletionItem item = new CompletionItem();
+
+        item.setKind(CompletionItemKind.Class);
+        item.setLabel(info.getSimpleName());
+        item.setInsertText(info.getSimpleName());
+        // TODO edit imports if necessary
+
+        return item;
+    }
+
+    private Stream<? extends Element> allSourcePathSymbols(Scope scope) {
         Collection<TypeElement> thisScopes = thisScopes(scope);
         Collection<TypeElement> classScopes = classScopes(scope);
         List<Scope> methodScopes = methodScopes(scope);
@@ -255,11 +331,9 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         elements = Stream.concat(elements, methodScopes.stream().flatMap(this::locals));
         elements = Stream.concat(elements, thisScopes.stream().flatMap(this::instanceMembers));
         elements = Stream.concat(elements, classScopes.stream().flatMap(this::staticMembers));
-        elements = Stream.concat(elements, allClasses());
+        elements = Stream.concat(elements, sourcePath.allSymbols(ElementKind.CLASS).flatMap(this::topLevelClassElement));
 
-        return elements
-                .filter(e -> isAccessible(e, scope))
-                .flatMap(this::completionItem);
+        return elements;
     }
 
     private Collection<TypeElement> thisScopes(Scope scope) {
@@ -353,7 +427,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> completionItem(Element e) {
-        String name = e.getKind() == ElementKind.CONSTRUCTOR ? Hovers.constructorName((ExecutableElement) e) : e.getSimpleName().toString();
+        String name = e.getSimpleName().toString();
 
         switch (e.getKind()) {
             case PACKAGE:
@@ -423,22 +497,8 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 return Stream.of(item);
             }
             case CONSTRUCTOR: {
-                ExecutableElement method = (ExecutableElement) e;
-                CompletionItem item = new CompletionItem();
-                String insertText = name;
-
-                if (!method.getTypeParameters().isEmpty())
-                    insertText += "<>";
-
-                item.setKind(CompletionItemKind.Constructor);
-                item.setLabel(Hovers.methodSignature(method));
-                docstring(e).ifPresent(item::setDocumentation);
-                item.setInsertText(insertText);
-                item.setSortText(name);
-                item.setFilterText(name);
-                // TODO edit imports if necessary
-
-                return Stream.of(item);
+                // Constructors are completed differently
+                return Stream.empty();
             }
             case STATIC_INIT:
             case INSTANCE_INIT:
