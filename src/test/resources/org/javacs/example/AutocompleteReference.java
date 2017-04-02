@@ -1,8 +1,14 @@
 package org.javacs.example;
 
+import java.util.function.Supplier;
+
 public class AutocompleteReference {
     public void test() {
-        this::
+        print(this::)
+    }
+
+    private void print(Supplier<String> message) {
+        System.out.println(message.get());
     }
 
     private static String fieldStatic;

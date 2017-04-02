@@ -25,12 +25,11 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    @Ignore
     public void staticReference() throws IOException {
         String file = "/org/javacs/example/AutocompleteStaticReference.java";
 
         // Static method
-        Set<String> suggestions = insertText(file, 3, 38);
+        Set<String> suggestions = insertText(file, 7, 44);
 
         assertThat(suggestions, hasItems("methodStatic"));
         assertThat(suggestions, not(hasItems( "method", "new")));
@@ -139,7 +138,7 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteMembers.java";
 
         // this::m
-        Set<String> suggestions = insertText(file, 25, 16);
+        Set<String> suggestions = insertText(file, 25, 59);
 
         assertThat(suggestions, hasItems("method"));
         assertThat(suggestions, not(hasItems("field", "fieldStatic", "methodStatic")));
@@ -150,7 +149,7 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteMembers.java";
 
         // AutocompleteMembers::m
-        Set<String> suggestions = insertText(file, 26, 31);
+        Set<String> suggestions = insertText(file, 26, 74);
 
         assertThat(suggestions, hasItems("methodStatic"));
         assertThat(suggestions, not(hasItems("field", "fieldStatic", "method")));
@@ -322,7 +321,7 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteReference.java";
 
         // Static method
-        Set<String> suggestions = insertText(file, 3, 15);
+        Set<String> suggestions = insertText(file, 7, 21);
 
         assertThat(suggestions, not(hasItems("methodStatic")));
         assertThat(suggestions, hasItems("method", "getClass"));

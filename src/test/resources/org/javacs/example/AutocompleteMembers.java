@@ -22,8 +22,8 @@ public class AutocompleteMembers {
         f; // field, fieldStatic, method, methodStatic, argument
         this.f; // field, method
         AutocompleteMembers.f; // fieldStatic, methodStatic
-        this::m; // method
-        AutocompleteMembers::m; // methodStatic
+        java.util.function.Supplier<String> test = this::m; // method
+        java.util.function.Supplier<String> test = AutocompleteMembers::m; // methodStatic
     }
 
     private static void methodStatic(String argument) {
