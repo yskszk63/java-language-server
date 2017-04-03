@@ -53,33 +53,58 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
             MemberSelectTree select = (MemberSelectTree) leaf;
             TreePath expressionPath = new TreePath(path.getParentPath(), select.getExpression());
 
-            return completeMembers(expressionPath, scope);
+            return completeMembers(expressionPath, partialIdentifier(select.getIdentifier()), scope);
         }
         else if (leaf instanceof MemberReferenceTree) {
             MemberReferenceTree select = (MemberReferenceTree) leaf;
             TreePath expressionPath = new TreePath(path.getParentPath(), select.getQualifierExpression());
 
-            return completeMembers(expressionPath, scope);
+            return completeMembers(expressionPath, partialIdentifier(select.getName()), scope);
         }
         else if (leaf instanceof NewClassTree) {
-            return constructors(scope);
+            NewClassTree newClass = (NewClassTree) leaf;
+            ExpressionTree identifier = newClass.getIdentifier();
+
+            if (identifier instanceof MemberSelectTree) {
+                MemberSelectTree select = (MemberSelectTree) identifier;
+                TreePath pathToExpression = TreePath.getPath(TreePath.getPath(path, identifier), select.getExpression());
+
+                return innerConstructors(pathToExpression, partialIdentifier(select.getIdentifier()), scope);
+            }
+            else if (identifier instanceof IdentifierTree) {
+                return constructors(partialIdentifier(((IdentifierTree) identifier).getName()), scope);
+            }
+            else {
+                LOG.warning("Expected MemberSelectTree or IdentifierTree but found " + identifier.getClass() + ", cannot complete constructor");
+
+                return Stream.empty();
+            }
         }
         else if (leaf instanceof IdentifierTree) {
-            return allSymbols(scope);
+            IdentifierTree id = (IdentifierTree) leaf;
+
+            return allSymbols(partialIdentifier(id.getName()), scope);
         }
         else return Stream.empty();
+    }
+
+    private String partialIdentifier(Name name) {
+        if (name.contentEquals("<error>"))
+            return "";
+        else
+            return name.toString();
     }
 
     /**
      * Suggest all accessible members of expression
      */
-    private Stream<CompletionItem> completeMembers(TreePath expression, Scope from) {
+    private Stream<CompletionItem> completeMembers(TreePath expression, String partialIdentifier, Scope from) {
         Element element = trees.getElement(expression);
 
         if (element instanceof PackageElement) {
             PackageElement packageElement = (PackageElement) element;
 
-            return completeImport(packageElement.getQualifiedName().toString(), from);
+            return completeImport(packageElement.getQualifiedName().toString(), partialIdentifier, from);
         }
 
         TypeMirror type = trees.getTypeMirror(expression);
@@ -91,6 +116,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         List<? extends Element> all = members(type);
 
         Stream<CompletionItem> filter = all.stream()
+                .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier))
                 .filter(e -> isAccessible(e, from))
                 .filter(e -> e.getModifiers().contains(Modifier.STATIC) == isStatic)
                 .flatMap(this::completionItem);
@@ -112,12 +138,13 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return filter;
     }
 
-    private Stream<CompletionItem> completeImport(String parentPackage, Scope from) {
+    private Stream<CompletionItem> completeImport(String parentPackage, String partialClass, Scope from) {
         Stream<String> sourcePathNames = sourcePath.allSymbols(ElementKind.CLASS)
+                .filter(symbol -> containsCharactersInOrder(symbol.getContainerName(), parentPackage) && containsCharactersInOrder(symbol.getName(), partialClass))
                 .flatMap(this::topLevelClassElement)
                 .filter(el -> trees.isAccessible(from, el))
                 .map(el -> el.getQualifiedName().toString());
-        Stream<String> classPathNames = classPath.topLevelClasses(packageOf(from))
+        Stream<String> classPathNames = classPath.topLevelClasses(parentPackage, partialClass, packageOf(from))
                 .map(c -> c.getName());
 
         return Stream.concat(sourcePathNames, classPathNames)
@@ -233,15 +260,31 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return Optional.empty();
     }
 
-    private Stream<CompletionItem> constructors(Scope scope) {
+    private Stream<CompletionItem> constructors(String partialClass, Scope scope) {
         Stream<CompletionItem> sourcePathItems = sourcePath.allSymbols(ElementKind.CLASS)
+                .filter(symbol -> containsCharactersInOrder(symbol.getName(), partialClass))
                 .flatMap(this::topLevelClassElement)
                 .flatMap(this::explodeConstructors)
                 .map(this::completeJavacConstructor);
-        Stream<CompletionItem> classPathItems = classPath.topLevelConstructors(packageOf(scope))
+        Stream<CompletionItem> classPathItems = classPath.topLevelConstructors("", partialClass, packageOf(scope))
                 .map(this::completeReflectedConstructor);
 
         return Stream.concat(sourcePathItems, classPathItems);
+    }
+
+    private Stream<CompletionItem> innerConstructors(TreePath parent, String partialClass, Scope scope) {
+        Element element = trees.getElement(parent);
+
+        if (element == null)
+            return Stream.empty();
+
+        return members(element.asType()).stream()
+                .filter(el -> el.getKind() == ElementKind.CLASS)
+                .map(el -> (TypeElement) el)
+                .filter(el -> containsCharactersInOrder(el.getSimpleName(), partialClass))
+                .flatMap(this::explodeConstructors)
+                .filter(el -> isAccessible(el, scope))
+                .map(this::completeJavacConstructor);
     }
 
     private CompletionItem completeReflectedConstructor(Constructor<?> method) {
@@ -296,11 +339,12 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     /**
      * Suggest all completions that are visible from scope
      */
-    private Stream<CompletionItem> allSymbols(Scope scope) {
+    private Stream<CompletionItem> allSymbols(String partialIdentifier, Scope scope) {
         Stream<CompletionItem> sourcePathItems = allSourcePathSymbols(scope)
+                .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier))
                 .filter(e -> isAccessible(e, scope))
                 .flatMap(this::completionItem);
-        Stream<CompletionItem> classPathItems = classPath.topLevelClasses(packageOf(scope))
+        Stream<CompletionItem> classPathItems = classPath.topLevelClasses("", partialIdentifier, packageOf(scope))
                 .map(this::completeTopLevelClassSymbol);
 
         return Stream.concat(sourcePathItems, classPathItems);
@@ -525,6 +569,23 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
     private Optional<String> docstring(Element e) {
         return Optional.ofNullable(elements.getDocComment(e));
+    }
+
+    public static boolean containsCharactersInOrder(CharSequence candidate, CharSequence pattern) {
+        int iCandidate = 0, iPattern = 0;
+
+        while (iCandidate < candidate.length() && iPattern < pattern.length()) {
+            char patternChar = Character.toLowerCase(pattern.charAt(iPattern));
+            char testChar = Character.toLowerCase(candidate.charAt(iCandidate));
+
+            if (patternChar == testChar) {
+                iPattern++;
+                iCandidate++;
+            }
+            else iCandidate++;
+        }
+
+        return iPattern == pattern.length();
     }
 
     private static final Logger LOG = Logger.getLogger("main");

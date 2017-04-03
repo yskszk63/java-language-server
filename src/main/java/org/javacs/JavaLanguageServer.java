@@ -39,15 +39,16 @@ import static org.javacs.Main.JSON;
 
 class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
+    int maxCompletions = 100;
     private Path workspaceRoot;
     private Map<URI, String> activeDocuments = new HashMap<>();
     private LanguageClient client;
 
-    public JavaLanguageServer() {
+    JavaLanguageServer() {
         this.testJavac = Optional.empty();
     }
 
-    public JavaLanguageServer(JavacHolder testJavac) {
+    JavaLanguageServer(JavacHolder testJavac) {
         this.testJavac = Optional.of(testJavac);
     }
 
@@ -95,8 +96,9 @@ class JavaLanguageServer implements LanguageServer {
                         .map(compiler -> compiler.compileFocused(uri, content, line, character))
                         .map(Completions::at)
                         .orElseGet(Stream::empty)
+                        .limit(maxCompletions)
                         .collect(Collectors.toList());
-                CompletionList result = new CompletionList(false, items);
+                CompletionList result = new CompletionList(items.size() == maxCompletions, items);
 
                 return CompletableFuture.completedFuture(Either.forRight(result));
             }

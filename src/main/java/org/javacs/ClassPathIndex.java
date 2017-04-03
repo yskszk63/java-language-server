@@ -10,8 +10,8 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.Arrays;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -26,24 +26,19 @@ import java.util.stream.Stream;
  */
 class ClassPathIndex {
 
-    private final CompletableFuture<List<Class<?>>> topLevelClasses = new CompletableFuture<>();
+    private final Set<ClassPath.ClassInfo> topLevelClasses;
 
     ClassPathIndex(Set<Path> classPath) {
+        topLevelClasses = classPath(classPath).getTopLevelClasses();
+
         new Thread(() -> {
             try {
-                ClassPath reflect = classPath(classPath);
-                List<Class<?>> loadAll = new ArrayList<>();
-
-                for (ClassPath.ClassInfo each : reflect.getTopLevelClasses())
-                    tryLoad(each).ifPresent(loadAll::add);
-
-                topLevelClasses.complete(loadAll);
+                for (ClassPath.ClassInfo each : topLevelClasses)
+                    tryLoad(each);
             } catch (Throwable e) {
                 LOG.log(Level.SEVERE, e.getMessage(), e);
-
-                topLevelClasses.completeExceptionally(e);
             }
-        }, "IndexClassPath").start();
+        }, "PrefetchAllClasses").start();
     }
 
     public static URLClassLoader parentClassLoader() {
@@ -74,21 +69,23 @@ class ClassPathIndex {
         }
     }
 
-    private static Optional<Class<?>> tryLoad(ClassPath.ClassInfo info) {
+    private static Stream<Class<?>> tryLoad(ClassPath.ClassInfo info) {
         try {
-            return Optional.of(info.load());
+            return Stream.of(info.load());
         } catch (LinkageError e) {
             LOG.warning(e.getMessage());
 
-            return Optional.empty();
+            return Stream.empty();
         }
     }
 
     /**
      * Find all top-level classes accessible from `fromPackage`
      */
-    Stream<Class<?>> topLevelClasses(String fromPackage) {
-        return topLevelClasses.join().stream()
+    Stream<Class<?>> topLevelClasses(String partialPackage, String partialClass, String fromPackage) {
+        return topLevelClasses.stream()
+                .filter(c -> Completions.containsCharactersInOrder(c.getPackageName(), partialPackage) && Completions.containsCharactersInOrder(c.getSimpleName(), partialClass))
+                .flatMap(ClassPathIndex::tryLoad)
                 .filter(c -> Modifier.isPublic(c.getModifiers()) || isInPackage(c, fromPackage));
     }
 
@@ -99,8 +96,8 @@ class ClassPathIndex {
     /**
      * Find all constructors in top-level classes accessible to any class in `fromPackage`
      */
-    Stream<Constructor<?>> topLevelConstructors(String fromPackage) {
-        return topLevelClasses(fromPackage)
+    Stream<Constructor<?>> topLevelConstructors(String partialPackage, String partialClass, String fromPackage) {
+        return topLevelClasses(partialPackage, partialClass, fromPackage)
                 .flatMap(this::explodeConstructors);
     }
 
