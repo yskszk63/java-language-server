@@ -7,6 +7,7 @@ import com.sun.source.util.Trees;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.SymbolInformation;
+import org.eclipse.lsp4j.TextEdit;
 
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
@@ -23,7 +24,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
     public static Stream<CompletionItem> at(FocusedResult compiled) {
         return compiled.cursor
-                .map(new Completions(compiled.task, compiled.classPath, compiled.sourcePath))
+                .map(path -> new Completions(compiled.task, compiled.classPath, compiled.sourcePath, path.getCompilationUnit()).apply(path))
                 .orElseGet(Stream::empty);
     }
 
@@ -33,8 +34,9 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     private final Trees trees;
     private final Elements elements;
     private final Name thisName, superName;
+    private final CompilationUnitTree compilationUnit;
 
-    private Completions(JavacTask task, ClassPathIndex classPath, SymbolIndex sourcePath) {
+    private Completions(JavacTask task, ClassPathIndex classPath, SymbolIndex sourcePath, CompilationUnitTree compilationUnit) {
         this.task = task;
         this.trees = Trees.instance(task);
         this.elements = task.getElements();
@@ -42,6 +44,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         this.superName = task.getElements().getName("super");
         this.classPath = classPath;
         this.sourcePath = sourcePath;
+        this.compilationUnit = compilationUnit;
     }
 
     @Override
@@ -182,8 +185,34 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return Stream.empty();
     }
 
-    private boolean isAlreadyImported(String fullyQualifiedName) {
-        return false; // TODO
+    private boolean isAlreadyImported(String qualifiedName) {
+        if (qualifiedName.startsWith("java.lang"))
+            return true;
+
+        if (qualifiedName.startsWith(compilationUnit.getPackageName().toString()))
+            return true;
+
+        for (ImportTree each : compilationUnit.getImports()) {
+            if (each.isStatic())
+                continue;
+
+            String importName = each.getQualifiedIdentifier().toString();
+
+            if (importName.endsWith(".*") && mostOfId(importName).equals(mostOfId(qualifiedName)))
+                return true;
+            else if (importName.equals(qualifiedName))
+                return true;
+        }
+
+        return false;
+    }
+
+    private String mostOfId(String qualifiedName) {
+        return qualifiedName.substring(0, qualifiedName.lastIndexOf('.'));
+    }
+
+    private String endOfId(String qualifiedName) {
+        return qualifiedName.substring(qualifiedName.lastIndexOf('.') + 1);
     }
 
     private CompletionItem completeImport(String qualifiedName, String parentPackage) {
@@ -357,7 +386,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         item.setLabel(c.getSimpleName());
         item.setDetail(c.getPackage().getName());
         item.setInsertText(c.getSimpleName());
-        // TODO edit imports if necessary
+        item.setAdditionalTextEdits(addImport(c.getName()));
 
         return item;
     }
@@ -486,7 +515,8 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 PackageElement classPackage = elements.getPackageOf(e);
                 if (classPackage != null)
                     item.setDetail(classPackage.getSimpleName().toString());
-                // TODO edit imports if necessary
+
+                item.setAdditionalTextEdits(addImport(((TypeElement)e).getQualifiedName().toString()));
 
                 return Stream.of(item);
             }
@@ -556,6 +586,13 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 // Nothing user-enterable
                 return Stream.empty();
         }
+    }
+
+    private List<TextEdit> addImport(String qualifiedName) {
+        if (!isAlreadyImported(qualifiedName))
+            return RefactorFile.addImport(compilationUnit, mostOfId(qualifiedName), endOfId(qualifiedName));
+        else
+            return Collections.emptyList();
     }
 
     private boolean isAccessible(Element e, Scope scope) {

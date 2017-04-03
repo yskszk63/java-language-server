@@ -26,7 +26,7 @@ public class CompletionsBase {
                 .collect(Collectors.toSet());
     }
 
-    private static String itemInsertText(CompletionItem i) {
+    static String itemInsertText(CompletionItem i) {
         if (i.getInsertText() != null)
             return i.getInsertText();
         else

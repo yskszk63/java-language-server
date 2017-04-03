@@ -1,4 +1,4 @@
-package org.javacs.example; import java.util.*;
+package org.javacs.example; import java.util.Arrays; import java.util.concurrent.*;
 
 public class AutocompleteOther {
     public void test() {

@@ -1,11 +1,14 @@
 package org.javacs;
 
 import org.eclipse.lsp4j.CompletionItem;
+import org.eclipse.lsp4j.TextEdit;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URLClassLoader;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -283,6 +286,115 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
+    public void addImport() {
+        String file = "/org/javacs/example/AutocompleteOther.java";
+
+        // Name of class
+        List<? extends CompletionItem> items = items(file, 6, 10);
+
+        for (CompletionItem item : items) {
+            if ("ArrayList".equals(item.getLabel())) {
+                assertThat(item.getAdditionalTextEdits(), not(nullValue()));
+                assertThat(item.getAdditionalTextEdits(), not(empty()));
+
+                return;
+            }
+        }
+
+        fail("No ArrayList in " + items);
+    }
+
+    @Test
+    public void dontImportSamePackage() {
+        String file = "/org/javacs/example/AutocompleteOther.java";
+
+        // Name of class
+        List<? extends CompletionItem> items = items(file, 6, 10);
+
+        for (CompletionItem item : items) {
+            if ("AutocompleteMember".equals(item.getLabel())) {
+                assertThat(item.getAdditionalTextEdits(), either(empty()).or(nullValue()));
+
+                return;
+            }
+        }
+
+        fail("No AutocompleteMember in " + items);
+    }
+
+    @Test
+    public void dontImportJavaLang() {
+        String file = "/org/javacs/example/AutocompleteOther.java";
+
+        // Name of class
+        List<? extends CompletionItem> items = items(file, 6, 10);
+
+        for (CompletionItem item : items) {
+            if ("ArrayIndexOutOfBoundsException".equals(item.getLabel())) {
+                assertThat(item.getAdditionalTextEdits(), either(empty()).or(nullValue()));
+
+                return;
+            }
+        }
+
+        fail("No ArrayIndexOutOfBoundsException in " + items);
+    }
+
+    @Test
+    public void dontImportSelf() {
+        String file = "/org/javacs/example/AutocompleteOther.java";
+
+        // Name of class
+        List<? extends CompletionItem> items = items(file, 6, 10);
+
+        for (CompletionItem item : items) {
+            if ("AutocompleteOther".equals(item.getLabel())) {
+                assertThat(item.getAdditionalTextEdits(), either(empty()).or(nullValue()));
+
+                return;
+            }
+        }
+
+        fail("No AutocompleteOther in " + items);
+    }
+
+    @Test
+    public void dontImportAlreadyImported() {
+        String file = "/org/javacs/example/AutocompleteOther.java";
+
+        // Name of class
+        List<? extends CompletionItem> items = items(file, 6, 10);
+
+        for (CompletionItem item : items) {
+            if ("Arrays".equals(item.getLabel())) {
+                assertThat(item.getAdditionalTextEdits(), either(empty()).or(nullValue()));
+
+                return;
+            }
+        }
+
+        fail("No Arrays in " + items);
+    }
+
+    @Test
+    public void dontImportAlreadyImportedStar() {
+        String file = "/org/javacs/example/AutocompleteOther.java";
+
+        // Name of class
+        List<? extends CompletionItem> items = items(file, 6, 10);
+
+        for (CompletionItem item : items) {
+            if ("ArrayBlockingQueue".equals(item.getLabel())) {
+                assertThat(item.getAdditionalTextEdits(), either(empty()).or(nullValue()));
+
+                return;
+            }
+        }
+
+        fail("No ArrayBlockingQueue in " + items);
+    }
+
+    @Test
     public void fromClasspath() throws IOException {
         String file = "/org/javacs/example/AutocompleteFromClasspath.java";
 
@@ -373,7 +485,9 @@ public class CompletionsTest extends CompletionsBase {
         // Static methods
         Set<String> suggestions = insertText(file, 3, 12);
 
-        assertThat("Has deeply nested class", suggestions, hasItems("javacs.example.AutocompleteMember"));
+        assertThat("Does not have own package class", suggestions, not(hasItems("javacs.example.AutocompleteMember")));
+        assertThat("Does not have package-private class", suggestions, not(hasItems("javacs.other.OtherPackagePrivate")));
+        assertThat("Has other package class", suggestions, hasItems("javacs.other.OtherPackagePublic"));
     }
 
     @Test
@@ -383,7 +497,8 @@ public class CompletionsTest extends CompletionsBase {
         // Static methods
         Set<String> suggestions = insertText(file, 5, 13);
 
-        assertThat("Has deeply nested class", suggestions, hasItems("util.ArrayList"));
+        assertThat("Has class from classpath", suggestions, hasItems("util.ArrayList"));
+        assertThat("Does not have package-private class", suggestions, not(hasItems("util.ComparableTimSort")));
     }
 
     @Test
@@ -416,9 +531,9 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompletePackage.java";
 
         // Static methods
-        Set<String> suggestions = insertText(file, 4, 27);
+        Set<String> suggestions = insertText(file, 4, 25);
 
-        assertThat(suggestions, hasItems("AutocompleteMember"));
+        assertThat(suggestions, hasItems("OtherPackagePublic"));
     }
 
     @Test

@@ -1,7 +1,7 @@
 package org.javacs.example;
 
 import org.;
-import org.javacs.example.;
+import org.javacs.other.;
 import java.;
 import com.;
 
