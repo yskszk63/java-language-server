@@ -39,7 +39,7 @@ import static org.javacs.Main.JSON;
 
 class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
-    int maxCompletions = 100;
+    int maxItems = 100;
     private Path workspaceRoot;
     private Map<URI, String> activeDocuments = new HashMap<>();
     private LanguageClient client;
@@ -96,9 +96,9 @@ class JavaLanguageServer implements LanguageServer {
                         .map(compiler -> compiler.compileFocused(uri, content, line, character))
                         .map(Completions::at)
                         .orElseGet(Stream::empty)
-                        .limit(maxCompletions)
+                        .limit(maxItems)
                         .collect(Collectors.toList());
-                CompletionList result = new CompletionList(items.size() == maxCompletions, items);
+                CompletionList result = new CompletionList(items.size() == maxItems, items);
 
                 return CompletableFuture.completedFuture(Either.forRight(result));
             }
@@ -358,7 +358,7 @@ class JavaLanguageServer implements LanguageServer {
                         .orElseGet(compilerCache::values);
                 List<SymbolInformation> infos = compilers.stream()
                         .flatMap(compiler -> compiler.searchWorkspace(params.getQuery()))
-                        .limit(100)
+                        .limit(maxItems)
                         .collect(Collectors.toList());
 
                 return CompletableFuture.completedFuture(infos);
