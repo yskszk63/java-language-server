@@ -1,6 +1,7 @@
 package org.javacs;
 
 import com.google.common.reflect.ClassPath;
+import com.google.common.reflect.ClassPath.ClassInfo;
 import sun.misc.Launcher;
 
 import java.io.IOException;
@@ -15,6 +16,8 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Index the classpath *without* using the java compiler API.
@@ -26,10 +29,12 @@ import java.util.stream.Stream;
  */
 class ClassPathIndex {
 
-    private final Set<ClassPath.ClassInfo> topLevelClasses;
+    private final List<ClassPath.ClassInfo> topLevelClasses;
 
     ClassPathIndex(Set<Path> classPath) {
-        topLevelClasses = classPath(classPath).getTopLevelClasses();
+        topLevelClasses = classPath(classPath).getTopLevelClasses().stream()
+            .sorted(ClassPathIndex::shortestName)
+            .collect(Collectors.toList());
 
         new Thread(() -> {
             try {
@@ -39,6 +44,10 @@ class ClassPathIndex {
                 LOG.log(Level.SEVERE, e.getMessage(), e);
             }
         }, "PrefetchAllClasses").start();
+    }
+
+    private static int shortestName(ClassPath.ClassInfo left, ClassPath.ClassInfo right) {
+        return Integer.compare(left.getSimpleName().length(), right.getSimpleName().length());
     }
 
     public static URLClassLoader parentClassLoader() {
