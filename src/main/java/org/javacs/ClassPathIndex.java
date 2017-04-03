@@ -9,14 +9,10 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -29,16 +25,16 @@ import java.util.stream.Stream;
  */
 class ClassPathIndex {
 
-    private final CompletableFuture<List<ClassPath.ClassInfo>> topLevelClasses = new CompletableFuture<>();
+    private final CompletableFuture<List<Class<?>>> topLevelClasses = new CompletableFuture<>();
 
     ClassPathIndex(Set<Path> classPath) {
         new Thread(() -> {
             try {
                 ClassPath reflect = classPath(classPath);
-                List<ClassPath.ClassInfo> loadAll = reflect.getTopLevelClasses()
-                        .stream()
-                        .peek(info -> tryLoad(info))
-                        .collect(Collectors.toList());
+                List<Class<?>> loadAll = new ArrayList<>();
+
+                for (ClassPath.ClassInfo each : reflect.getTopLevelClasses())
+                    tryLoad(each).ifPresent(loadAll::add);
 
                 topLevelClasses.complete(loadAll);
             } catch (Throwable e) {
@@ -71,12 +67,6 @@ class ClassPathIndex {
         }
     }
 
-    private static boolean isPublic(ClassPath.ClassInfo info) {
-        return tryLoad(info)
-                .map(c -> Modifier.isPublic(c.getModifiers()))
-                .orElse(false);
-    }
-
     private static Optional<Class<?>> tryLoad(ClassPath.ClassInfo info) {
         try {
             return Optional.of(info.load());
@@ -90,15 +80,13 @@ class ClassPathIndex {
     /**
      * Find all top-level classes accessible from `fromPackage`
      */
-    Stream<ClassPath.ClassInfo> topLevelClasses(String fromPackage) {
+    Stream<Class<?>> topLevelClasses(String fromPackage) {
         return topLevelClasses.join().stream()
-                .filter(info -> isPublic(info) || isInPackage(info, fromPackage));
+                .filter(c -> Modifier.isPublic(c.getModifiers()) || isInPackage(c, fromPackage));
     }
 
-    private boolean isInPackage(ClassPath.ClassInfo info, String fromPackage) {
-        return tryLoad(info)
-                .map(c -> c.getPackage().getName().equals(fromPackage))
-                .orElse(false);
+    private boolean isInPackage(Class<?> c, String fromPackage) {
+        return c.getPackage().getName().equals(fromPackage);
     }
 
     /**
@@ -109,11 +97,8 @@ class ClassPathIndex {
                 .flatMap(this::explodeConstructors);
     }
 
-    private Stream<Constructor<?>> explodeConstructors(ClassPath.ClassInfo classInfo) {
-        return tryLoad(classInfo)
-                .map(c -> constructors(c))
-                .orElseGet(Stream::empty)
-                .filter(cons -> isAccessible(cons));
+    private Stream<Constructor<?>> explodeConstructors(Class<?> c) {
+        return constructors(c).filter(cons -> isAccessible(cons));
     }
 
     private Stream<Constructor<?>> constructors(Class<?> c) {

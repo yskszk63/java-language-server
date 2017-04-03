@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.google.common.reflect.ClassPath;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
@@ -308,12 +307,12 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return Stream.concat(sourcePathItems, classPathItems);
     }
 
-    private CompletionItem completeTopLevelClassSymbol(ClassPath.ClassInfo info) {
+    private CompletionItem completeTopLevelClassSymbol(Class<?> c) {
         CompletionItem item = new CompletionItem();
 
         item.setKind(CompletionItemKind.Class);
-        item.setLabel(info.getSimpleName());
-        item.setInsertText(info.getSimpleName());
+        item.setLabel(c.getSimpleName());
+        item.setInsertText(c.getSimpleName());
         // TODO edit imports if necessary
 
         return item;
