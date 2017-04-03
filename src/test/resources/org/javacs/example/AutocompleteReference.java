@@ -12,11 +12,11 @@ public class AutocompleteReference {
     }
 
     private static String fieldStatic;
-    private String field;
+    private String fields;
     private static String methodStatic() {
         return "foo";
     }
-    private String method() {
+    private String methods() {
         return "foo";
     }
 }

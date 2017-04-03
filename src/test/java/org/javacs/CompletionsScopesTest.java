@@ -18,18 +18,18 @@ public class CompletionsScopesTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 15, 14);
 
         // Locals
-        assertThat(suggestions, hasItems("localVariable", "argument"));
+        assertThat(suggestions, hasItems("localVariables", "arguments"));
         // Static methods in enclosing scopes
         assertThat(suggestions, hasItems("testStatic"));
         assertThat(suggestions, hasItems("outerStaticMethod"));
         // Virtual methods in enclosing scopes
         assertThat(suggestions, not(hasItems("testInner")));
         assertThat(suggestions, hasItems("test"));
-        assertThat(suggestions, not(hasItems("outerMethod")));
+        assertThat(suggestions, not(hasItems("outerMethods")));
         // Inherited static methods
         assertThat(suggestions, hasItems("inheritedStaticMethod"));
         // Inherited virtual methods
-        assertThat(suggestions, hasItems("inheritedMethod"));
+        assertThat(suggestions, hasItems("inheritedMethods"));
         // this/super in enclosing scopes
         assertThat(suggestions, hasItems("this", "super"));
     }
@@ -54,18 +54,18 @@ public class CompletionsScopesTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 45, 22);
 
         // Locals
-        assertThat(suggestions, hasItems("localVariable", "argument"));
+        assertThat(suggestions, hasItems("localVariables", "arguments"));
         // Static methods in enclosing scopes
         assertThat(suggestions, hasItems("testStatic"));
         assertThat(suggestions, hasItems("outerStaticMethod"));
         // Virtual methods in enclosing scopes
         assertThat(suggestions, hasItems("testInner"));
         assertThat(suggestions, hasItems("test"));
-        assertThat(suggestions, not(hasItems("outerMethod")));
+        assertThat(suggestions, not(hasItems("outerMethods")));
         // Inherited static methods
         assertThat(suggestions, hasItems("inheritedStaticMethod"));
         // Inherited virtual methods
-        assertThat(suggestions, hasItems("inheritedMethod"));
+        assertThat(suggestions, hasItems("inheritedMethods"));
         // this/super in enclosing scopes
         assertThat(suggestions, hasItems("this", "super"));
     }
@@ -90,18 +90,18 @@ public class CompletionsScopesTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 78, 14);
 
         // Locals
-        assertThat(suggestions, hasItems("localVariable", "argument"));
+        assertThat(suggestions, hasItems("localVariables", "arguments"));
         // Static methods in enclosing scopes
         assertThat(suggestions, hasItems("testStatic"));
         assertThat(suggestions, hasItems("outerStaticMethod"));
         // Virtual methods in enclosing scopes
         assertThat(suggestions, not(hasItems("testInner")));
         assertThat(suggestions, not(hasItems("test")));
-        assertThat(suggestions, not(hasItems("outerMethod")));
+        assertThat(suggestions, not(hasItems("outerMethods")));
         // Inherited static methods
         assertThat(suggestions, hasItems("inheritedStaticMethod"));
         // Inherited virtual methods
-        assertThat(suggestions, not(hasItems("inheritedMethod")));
+        assertThat(suggestions, not(hasItems("inheritedMethods")));
         // this/super in enclosing scopes
         assertThat(suggestions, not(hasItems("this", "super")));
     }
@@ -126,18 +126,18 @@ public class CompletionsScopesTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 108, 22);
 
         // Locals
-        assertThat(suggestions, hasItems("localVariable", "argument"));
+        assertThat(suggestions, hasItems("localVariables", "arguments"));
         // Static methods in enclosing scopes
         assertThat(suggestions, hasItems("testStatic"));
         assertThat(suggestions, hasItems("outerStaticMethod"));
         // Virtual methods in enclosing scopes
         assertThat(suggestions, hasItems("testInner"));
         assertThat(suggestions, not(hasItems("test")));
-        assertThat(suggestions, not(hasItems("outerMethod")));
+        assertThat(suggestions, not(hasItems("outerMethods")));
         // Inherited static methods
         assertThat(suggestions, hasItems("inheritedStaticMethod"));
         // Inherited virtual methods
-        assertThat(suggestions, not(hasItems("inheritedMethod")));
+        assertThat(suggestions, not(hasItems("inheritedMethods")));
         // this/super in enclosing scopes
         assertThat(suggestions, hasItems("this", "super"));
     }
@@ -162,18 +162,18 @@ public class CompletionsScopesTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 143, 14);
 
         // Locals
-        assertThat(suggestions, hasItems("localVariable", "argument"));
+        assertThat(suggestions, hasItems("localVariables", "arguments"));
         // Static methods in enclosing scopes
         assertThat(suggestions, not(hasItems("testStatic")));
         assertThat(suggestions, hasItems("outerStaticMethod"));
         // Virtual methods in enclosing scopes
         assertThat(suggestions, not(hasItems("testInner")));
         assertThat(suggestions, hasItems("test"));
-        assertThat(suggestions, hasItems("outerMethod"));
+        assertThat(suggestions, hasItems("outerMethods"));
         // Inherited static methods
         assertThat(suggestions, hasItems("inheritedStaticMethod"));
         // Inherited virtual methods
-        assertThat(suggestions, hasItems("inheritedMethod"));
+        assertThat(suggestions, hasItems("inheritedMethods"));
         // this/super in enclosing scopes
         assertThat(suggestions, hasItems("this", "super"));
     }
@@ -198,18 +198,18 @@ public class CompletionsScopesTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 166, 22);
 
         // Locals
-        assertThat(suggestions, hasItems("localVariable", "argument"));
+        assertThat(suggestions, hasItems("localVariables", "arguments"));
         // Static methods in enclosing scopes
         assertThat(suggestions, not(hasItems("testStatic")));
         assertThat(suggestions, hasItems("outerStaticMethod"));
         // Virtual methods in enclosing scopes
         assertThat(suggestions, hasItems("testInner"));
         assertThat(suggestions, hasItems("test"));
-        assertThat(suggestions, hasItems("outerMethod"));
+        assertThat(suggestions, hasItems("outerMethods"));
         // Inherited static methods
         assertThat(suggestions, hasItems("inheritedStaticMethod"));
         // Inherited virtual methods
-        assertThat(suggestions, hasItems("inheritedMethod"));
+        assertThat(suggestions, hasItems("inheritedMethods"));
         // this/super in enclosing scopes
         assertThat(suggestions, hasItems("this", "super"));
     }

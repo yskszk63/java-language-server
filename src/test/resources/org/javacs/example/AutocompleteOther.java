@@ -3,7 +3,7 @@ package org.javacs.example; import java.util.*;
 public class AutocompleteOther {
     public void test() {
         new AutocompleteMember().;
-        Autocomplete;
+        A;
         AutocompleteMember.;
         AutocompleteOther.class.;
     }

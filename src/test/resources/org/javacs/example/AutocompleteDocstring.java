@@ -17,9 +17,9 @@ public class AutocompleteDocstring {
      */
     public static String fieldStatic;
     /**
-     * A field
+     * A fields
      */
-    public String field;
+    public String fields;
     /**
      * A methodStatic
      */
@@ -27,9 +27,9 @@ public class AutocompleteDocstring {
         return "foo";
     }
     /**
-     * A method
+     * A methods
      */
-    public String method() {
+    public String methods() {
         return "foo";
     }
 }

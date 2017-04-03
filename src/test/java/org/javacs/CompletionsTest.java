@@ -10,8 +10,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.hamcrest.Matchers.*;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 public class CompletionsTest extends CompletionsBase {
 
@@ -19,43 +18,43 @@ public class CompletionsTest extends CompletionsBase {
     public void staticMember() throws IOException {
         String file = "/org/javacs/example/AutocompleteStaticMember.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = insertText(file, 5, 34);
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic", "class"));
-        assertThat(suggestions, not(hasItems("field", "method", "getClass")));
+        assertThat(suggestions, not(hasItems("fields", "methods", "getClass")));
     }
 
     @Test
     public void staticReference() throws IOException {
         String file = "/org/javacs/example/AutocompleteStaticReference.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = insertText(file, 7, 44);
 
         assertThat(suggestions, hasItems("methodStatic"));
-        assertThat(suggestions, not(hasItems( "method", "new")));
+        assertThat(suggestions, not(hasItems( "methods", "new")));
     }
 
     @Test
     public void member() throws IOException {
         String file = "/org/javacs/example/AutocompleteMember.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = insertText(file, 5, 14);
 
         assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "fieldStaticPrivate", "methodStaticPrivate", "class")));
-        assertThat(suggestions, hasItems("field", "method", "fieldPrivate", "methodPrivate", "getClass"));
+        assertThat(suggestions, hasItems("fields", "methods", "fieldsPrivate", "methodsPrivate", "getClass"));
     }
 
     @Test
     public void throwsSignature() throws IOException {
         String file = "/org/javacs/example/AutocompleteMember.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = items(file, 5, 14).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
 
-        assertThat(suggestions, hasItems("method() throws Exception"));
+        assertThat(suggestions, hasItems("methods() throws Exception"));
     }
 
     @Test
@@ -65,7 +64,7 @@ public class CompletionsTest extends CompletionsBase {
         // f
         Set<String> suggestions = insertText(file, 8, 10);
 
-        assertThat(suggestions, hasItems("field", "fieldStatic", "method", "methodStatic"));
+        assertThat(suggestions, hasItems("fields", "fieldStatic", "methods", "methodStatic"));
     }
 
     @Test
@@ -75,7 +74,7 @@ public class CompletionsTest extends CompletionsBase {
         // this.f
         Set<String> suggestions = insertText(file, 9, 15);
 
-        assertThat(suggestions, hasItems("field", "method"));
+        assertThat(suggestions, hasItems("fields", "methods"));
         assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic")));
     }
 
@@ -87,20 +86,20 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 10, 30);
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
-        assertThat(suggestions, not(hasItems("field", "method")));
+        assertThat(suggestions, not(hasItems("fields", "methods")));
 
         // TODO
 //        // this::m
 //        suggestions = insertText(file, 10, 15);
 //
-//        assertThat(suggestions, hasItems("method"));
-//        assertThat(suggestions, not(hasItems("field", "fieldStatic", "methodStatic")));
+//        assertThat(suggestions, hasItems("methods"));
+//        assertThat(suggestions, not(hasItems("fields", "fieldStatic", "methodStatic")));
 //
 //        // AutocompleteMembers::m
 //        suggestions = insertText(file, 11, 30);
 //
 //        assertThat(suggestions, hasItems("methodStatic"));
-//        assertThat(suggestions, not(hasItems("field", "fieldStatic", "method")));
+//        assertThat(suggestions, not(hasItems("fields", "fieldStatic", "methods")));
     }
 
     @Test
@@ -110,7 +109,7 @@ public class CompletionsTest extends CompletionsBase {
         // f
         Set<String> suggestions = insertText(file, 22, 10);
 
-        assertThat(suggestions, hasItems("field", "fieldStatic", "method", "methodStatic", "argument"));
+        assertThat(suggestions, hasItems("fields", "fieldStatic", "methods", "methodStatic", "arguments"));
     }
 
     @Test
@@ -120,8 +119,8 @@ public class CompletionsTest extends CompletionsBase {
         // this.f
         Set<String> suggestions = insertText(file, 23, 15);
 
-        assertThat(suggestions, hasItems("field", "method"));
-        assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "argument")));
+        assertThat(suggestions, hasItems("fields", "methods"));
+        assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "arguments")));
     }
 
     @Test
@@ -132,7 +131,7 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 24, 30);
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
-        assertThat(suggestions, not(hasItems("field", "method", "argument")));
+        assertThat(suggestions, not(hasItems("fields", "methods", "arguments")));
     }
 
     @Test
@@ -142,8 +141,8 @@ public class CompletionsTest extends CompletionsBase {
         // this::m
         Set<String> suggestions = insertText(file, 25, 59);
 
-        assertThat(suggestions, hasItems("method"));
-        assertThat(suggestions, not(hasItems("field", "fieldStatic", "methodStatic")));
+        assertThat(suggestions, hasItems("methods"));
+        assertThat(suggestions, not(hasItems("fields", "fieldStatic", "methodStatic")));
     }
 
     @Test
@@ -154,7 +153,7 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 26, 74);
 
         assertThat(suggestions, hasItems("methodStatic"));
-        assertThat(suggestions, not(hasItems("field", "fieldStatic", "method")));
+        assertThat(suggestions, not(hasItems("fields", "fieldStatic", "methods")));
     }
 
     @Test
@@ -166,7 +165,7 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 16, 10);
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
-        assertThat(suggestions, not(hasItems("field", "method")));
+        assertThat(suggestions, not(hasItems("fields", "methods")));
     }
 
     @Test
@@ -177,7 +176,7 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 17, 30);
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
-        assertThat(suggestions, not(hasItems("field", "method")));
+        assertThat(suggestions, not(hasItems("fields", "methods")));
     }
 
     @Test
@@ -188,7 +187,7 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 17, 30);
 
         assertThat(suggestions, hasItems("methodStatic"));
-        assertThat(suggestions, not(hasItems("field", "fieldStatic", "method")));
+        assertThat(suggestions, not(hasItems("fields", "fieldStatic", "methods")));
     }
 
     @Test
@@ -198,8 +197,8 @@ public class CompletionsTest extends CompletionsBase {
         // f
         Set<String> suggestions = insertText(file, 30, 10);
 
-        assertThat(suggestions, hasItems("fieldStatic", "methodStatic", "argument"));
-        assertThat(suggestions, not(hasItems("field", "method")));
+        assertThat(suggestions, hasItems("fieldStatic", "methodStatic", "arguments"));
+        assertThat(suggestions, not(hasItems("fields", "methods")));
     }
 
     @Test
@@ -210,7 +209,7 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 31, 30);
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
-        assertThat(suggestions, not(hasItems("field", "method", "argument")));
+        assertThat(suggestions, not(hasItems("fields", "methods", "arguments")));
     }
 
     @Test
@@ -222,22 +221,7 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 17, 30);
 
         assertThat(suggestions, hasItems("methodStatic"));
-        assertThat(suggestions, not(hasItems("field", "fieldStatic", "method")));
-    }
-    
-    @Test
-    public void order() throws IOException {
-        String file = "/org/javacs/example/AutocompleteOrder.java";
-
-        // this.
-        Set<String> suggestions = items(file, 5, 27).stream().map(CompletionsTest::sortText).collect(Collectors.toSet());
-
-        assertThat(suggestions, hasItems("getMethod", "getInheritedMethod", "getClass"));
-        
-        // identifier
-        suggestions = items(file, 7, 10).stream().map(CompletionsTest::sortText).collect(Collectors.toSet());
-
-        assertThat(suggestions, hasItems("localVariable", "parameter", "test", "AutocompleteOrder"));
+        assertThat(suggestions, not(hasItems("fields", "fieldStatic", "methods")));
     }
 
     private static String sortText(CompletionItem i) {
@@ -256,8 +240,8 @@ public class CompletionsTest extends CompletionsBase {
 
         assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "class")));
         assertThat(suggestions, not(hasItems("fieldStaticPrivate", "methodStaticPrivate")));
-        assertThat(suggestions, not(hasItems("fieldPrivate", "methodPrivate")));
-        assertThat(suggestions, hasItems("field", "method", "getClass"));
+        assertThat(suggestions, not(hasItems("fieldsPrivate", "methodsPrivate")));
+        assertThat(suggestions, hasItems("fields", "methods", "getClass"));
     }
 
     @Test
@@ -269,8 +253,8 @@ public class CompletionsTest extends CompletionsBase {
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic", "class"));
         assertThat(suggestions, not(hasItems("fieldStaticPrivate", "methodStaticPrivate")));
-        assertThat(suggestions, not(hasItems("fieldPrivate", "methodPrivate")));
-        assertThat(suggestions, not(hasItems("field", "method", "getClass")));
+        assertThat(suggestions, not(hasItems("fieldsPrivate", "methodsPrivate")));
+        assertThat(suggestions, not(hasItems("fields", "methods", "getClass")));
     }
 
     @Test
@@ -283,8 +267,8 @@ public class CompletionsTest extends CompletionsBase {
         assertThat(suggestions, hasItems("getName", "getClass"));
         assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "class")));
         assertThat(suggestions, not(hasItems("fieldStaticPrivate", "methodStaticPrivate")));
-        assertThat(suggestions, not(hasItems("fieldPrivate", "methodPrivate")));
-        assertThat(suggestions, not(hasItems("field", "method")));
+        assertThat(suggestions, not(hasItems("fieldsPrivate", "methodsPrivate")));
+        assertThat(suggestions, not(hasItems("fields", "methods")));
     }
 
     @Test
@@ -292,17 +276,17 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteOther.java";
 
         // Name of class
-        Set<String> suggestions = insertText(file, 6, 21);
+        Set<String> suggestions = insertText(file, 6, 10);
 
         // String is in root scope, List is in import java.util.*
-        assertThat(suggestions, hasItems("AutocompleteOther", "AutocompleteMember", "String", "List"));
+        assertThat(suggestions, hasItems("AutocompleteOther", "AutocompleteMember", "ArrayList"));
     }
 
     @Test
     public void fromClasspath() throws IOException {
         String file = "/org/javacs/example/AutocompleteFromClasspath.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = items(file, 8, 17).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
 
         assertThat(suggestions, hasItems("add(E)", "add(int, E)"));
@@ -312,7 +296,7 @@ public class CompletionsTest extends CompletionsBase {
     public void betweenLines() throws IOException {
         String file = "/org/javacs/example/AutocompleteBetweenLines.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = insertText(file, 9, 18);
 
         assertThat(suggestions, hasItems("add"));
@@ -322,11 +306,11 @@ public class CompletionsTest extends CompletionsBase {
     public void reference() throws IOException {
         String file = "/org/javacs/example/AutocompleteReference.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = insertText(file, 7, 21);
 
         assertThat(suggestions, not(hasItems("methodStatic")));
-        assertThat(suggestions, hasItems("method", "getClass"));
+        assertThat(suggestions, hasItems("methods", "getClass"));
     }
 
     @Test
@@ -335,7 +319,7 @@ public class CompletionsTest extends CompletionsBase {
 
         Set<String> docstrings = documentation(file, 8, 14);
 
-        assertThat(docstrings, hasItems("A method", "A field"));
+        assertThat(docstrings, hasItems("A methods", "A fields"));
 
         docstrings = documentation(file, 12, 31);
 
@@ -346,7 +330,7 @@ public class CompletionsTest extends CompletionsBase {
     public void classes() throws IOException {
         String file = "/org/javacs/example/AutocompleteClasses.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = insertText(file, 5, 10);
 
         assertThat(suggestions, hasItems("String", "SomeInnerClass"));
@@ -356,7 +340,7 @@ public class CompletionsTest extends CompletionsBase {
     public void editMethodName() throws IOException {
         String file = "/org/javacs/example/AutocompleteEditMethodName.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = insertText(file, 5, 21);
 
         assertThat(suggestions, hasItems("getClass"));
@@ -366,7 +350,7 @@ public class CompletionsTest extends CompletionsBase {
     public void restParams() throws IOException {
         String file = "/org/javacs/example/AutocompleteRest.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = items(file, 5, 18).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
 
         assertThat(suggestions, hasItems("restMethod(String... params)"));
@@ -376,17 +360,17 @@ public class CompletionsTest extends CompletionsBase {
     public void constructor() throws IOException {
         String file = "/org/javacs/example/AutocompleteConstructor.java";
 
-        // Static method
-        Set<String> suggestions = insertText(file, 5, 17);
+        // Static methods
+        Set<String> suggestions = insertText(file, 5, 14);
 
-        assertThat(suggestions, hasItems("AutocompleteConstructor", "AutocompleteMember", "String"));
+        assertThat(suggestions, hasItems("AutocompleteConstructor", "AutocompleteMember", "ArrayList"));
     }
 
     @Test
     public void importFromSource() throws IOException {
         String file = "/org/javacs/example/AutocompletePackage.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = insertText(file, 3, 12);
 
         assertThat("Has deeply nested class", suggestions, hasItems("javacs.example.AutocompleteMember"));
@@ -396,7 +380,7 @@ public class CompletionsTest extends CompletionsBase {
     public void importFromClasspath() throws IOException {
         String file = "/org/javacs/example/AutocompletePackage.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = insertText(file, 5, 13);
 
         assertThat("Has deeply nested class", suggestions, hasItems("util.ArrayList"));
@@ -421,7 +405,7 @@ public class CompletionsTest extends CompletionsBase {
     public void emptyClasspath() throws IOException {
         String file = "/org/javacs/example/AutocompletePackage.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = insertText(file, 6, 12);
 
         assertThat("Has deeply nested class", suggestions, not(hasItems("google.common.collect.Lists")));
@@ -431,7 +415,7 @@ public class CompletionsTest extends CompletionsBase {
     public void importClass() throws IOException {
         String file = "/org/javacs/example/AutocompletePackage.java";
 
-        // Static method
+        // Static methods
         Set<String> suggestions = insertText(file, 4, 27);
 
         assertThat(suggestions, hasItems("AutocompleteMember"));
@@ -445,7 +429,7 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 12, 14);
 
         assertThat(suggestions, hasItems("methodStatic", "fieldStatic"));
-        assertThat(suggestions, not(hasItems("method", "field")));
+        assertThat(suggestions, not(hasItems("methods", "fields")));
     }
 
     @Test
@@ -456,7 +440,7 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 18, 14);
 
         assertThat(suggestions, hasItems("methodStatic", "fieldStatic"));
-        assertThat(suggestions, hasItems("method", "field"));
+        assertThat(suggestions, hasItems("methods", "fields"));
     }
 
     @Test
@@ -509,6 +493,16 @@ public class CompletionsTest extends CompletionsBase {
 
         Set<String> suggestions = insertText(file, 15, 40);
 
-        assertThat("suggests enum constants", suggestions, hasItems("Foo", "Bar"));
+        assertThat("suggests enum constants", suggestions, hasItems("Foo"));
+    }
+
+    @Test
+    public void containsCharactersInOrder() {
+        assertTrue(Completions.containsCharactersInOrder("FooBar", "FooBar"));
+        assertTrue(Completions.containsCharactersInOrder("FooBar", "foobar"));
+        assertTrue(Completions.containsCharactersInOrder("FooBar", "FB"));
+        assertTrue(Completions.containsCharactersInOrder("FooBar", "fb"));
+        assertFalse(Completions.containsCharactersInOrder("FooBar", "FooBar1"));
+        assertFalse(Completions.containsCharactersInOrder("FooBar", "FB1"));
     }
 }

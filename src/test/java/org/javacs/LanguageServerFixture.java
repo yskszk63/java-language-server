@@ -51,6 +51,8 @@ public class LanguageServerFixture {
             }
         });
 
+        server.maxCompletions = Integer.MAX_VALUE;
+
         return server;
     }
 }

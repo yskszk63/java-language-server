@@ -6,20 +6,20 @@ public class AutocompleteMember {
     }
 
     public static String fieldStatic;
-    public String field;
+    public String fields;
     public static String methodStatic() {
         return "foo";
     }
-    public String method() throws Exception {
+    public String methods() throws Exception {
         return "foo";
     }
 
     private static String fieldStaticPrivate;
-    private String fieldPrivate;
+    private String fieldsPrivate;
     private static String methodStaticPrivate() {
         return "foo";
     }
-    private String methodPrivate() {
+    private String methodsPrivate() {
         return "foo";
     }
 }

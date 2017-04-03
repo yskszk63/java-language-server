@@ -1,34 +1,34 @@
 package org.javacs.example;
 
 public class AutocompleteMembers {
-    private String field;
+    private String fields;
     private static String fieldStatic;
 
     {
-        f; // field, fieldStatic, method, methodStatic
-        this.f; // field, method
-        AutocompleteMembers.f; // fieldStatic, methodStatic
-        this::m; // method
-        AutocompleteMembers::m; // methodStatic
+        s; // fields, fieldStatic, methods, methodStatic
+        this.s; // fields, methods
+        AutocompleteMembers.s; // fieldStatic, methodStatic
+        this::s; // methods
+        AutocompleteMembers::s; // methodStatic
     }
 
     static {
-        f; // fieldStatic
-        AutocompleteMembers.f; // fieldStatic
-        AutocompleteMembers::m; // methodStatic
+        s; // fieldStatic
+        AutocompleteMembers.s; // fieldStatic
+        AutocompleteMembers::s; // methodStatic
     }
 
-    private void method(String argument) {
-        f; // field, fieldStatic, method, methodStatic, argument
-        this.f; // field, method
-        AutocompleteMembers.f; // fieldStatic, methodStatic
-        java.util.function.Supplier<String> test = this::m; // method
-        java.util.function.Supplier<String> test = AutocompleteMembers::m; // methodStatic
+    private void methods(String arguments) {
+        s; // fields, fieldStatic, methods, methodStatic, arguments
+        this.s; // fields, methods
+        AutocompleteMembers.s; // fieldStatic, methodStatic
+        java.util.function.Supplier<String> test = this::s; // methods
+        java.util.function.Supplier<String> test = AutocompleteMembers::s; // methodStatic
     }
 
-    private static void methodStatic(String argument) {
-        f; // fieldStatic, argument
-        AutocompleteMembers.f; // fieldStatic
-        AutocompleteMembers::m; // methodStatic
+    private static void methodStatic(String arguments) {
+        s; // fieldStatic, arguments
+        AutocompleteMembers.s; // fieldStatic
+        AutocompleteMembers::s; // methodStatic
     }
 }
