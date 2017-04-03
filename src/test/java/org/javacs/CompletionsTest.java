@@ -5,11 +5,13 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.net.URLClassLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 
 public class CompletionsTest extends CompletionsBase {
 
@@ -398,6 +400,31 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 5, 13);
 
         assertThat("Has deeply nested class", suggestions, hasItems("util.ArrayList"));
+    }
+
+    @Test
+    public void createEmptyLoader() throws ClassNotFoundException {
+        URLClassLoader emptyClassLoader = ClassPathIndex.parentClassLoader();
+
+        assertThat(emptyClassLoader.loadClass("java.util.ArrayList"), not(nullValue()));
+
+        try {
+            Class<?> found = emptyClassLoader.loadClass("com.google.common.collect.Lists");
+
+            fail("Found " + found);
+        } catch (ClassNotFoundException e) {
+            // OK
+        }
+    }
+
+    @Test
+    public void emptyClasspath() throws IOException {
+        String file = "/org/javacs/example/AutocompletePackage.java";
+
+        // Static method
+        Set<String> suggestions = insertText(file, 6, 12);
+
+        assertThat("Has deeply nested class", suggestions, not(hasItems("google.common.collect.Lists")));
     }
 
     @Test

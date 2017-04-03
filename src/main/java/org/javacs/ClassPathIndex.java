@@ -1,6 +1,7 @@
 package org.javacs;
 
 import com.google.common.reflect.ClassPath;
+import sun.misc.Launcher;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -45,13 +46,19 @@ class ClassPathIndex {
         }, "IndexClassPath").start();
     }
 
+    public static URLClassLoader parentClassLoader() {
+        URL[] bootstrap = Launcher.getBootstrapClassPath().getURLs();
+
+        return new URLClassLoader(bootstrap, null);
+    }
+
     private static ClassPath classPath(Set<Path> classPath) {
         URL[] urls = classPath.stream()
                 .flatMap(ClassPathIndex::url)
                 .toArray(URL[]::new);
 
         try {
-            return ClassPath.from(new URLClassLoader(urls));
+            return ClassPath.from(new URLClassLoader(urls, parentClassLoader()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
