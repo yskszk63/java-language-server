@@ -13,6 +13,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -27,14 +29,24 @@ import java.util.stream.Stream;
  */
 class ClassPathIndex {
 
-    private final List<ClassPath.ClassInfo> topLevelClasses;
+    private final CompletableFuture<List<ClassPath.ClassInfo>> topLevelClasses = new CompletableFuture<>();
 
     ClassPathIndex(Set<Path> classPath) {
-        ClassPath reflect = classPath(classPath);
+        new Thread(() -> {
+            try {
+                ClassPath reflect = classPath(classPath);
+                List<ClassPath.ClassInfo> loadAll = reflect.getTopLevelClasses()
+                        .stream()
+                        .peek(info -> tryLoad(info))
+                        .collect(Collectors.toList());
 
-        this.topLevelClasses = reflect.getTopLevelClasses()
-                .stream()
-                .collect(Collectors.toList());
+                topLevelClasses.complete(loadAll);
+            } catch (Throwable e) {
+                LOG.log(Level.SEVERE, e.getMessage(), e);
+
+                topLevelClasses.completeExceptionally(e);
+            }
+        }, "IndexClassPath").start();
     }
 
     private static ClassPath classPath(Set<Path> classPath) {
@@ -79,7 +91,7 @@ class ClassPathIndex {
      * Find all top-level classes accessible from `fromPackage`
      */
     Stream<ClassPath.ClassInfo> topLevelClasses(String fromPackage) {
-        return topLevelClasses.stream()
+        return topLevelClasses.join().stream()
                 .filter(info -> isPublic(info) || isInPackage(info, fromPackage));
     }
 
