@@ -381,13 +381,23 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void importPackage() throws IOException {
+    public void importFromSource() throws IOException {
         String file = "/org/javacs/example/AutocompletePackage.java";
 
         // Static method
         Set<String> suggestions = insertText(file, 3, 12);
 
         assertThat("Has deeply nested class", suggestions, hasItems("javacs.example.AutocompleteMember"));
+    }
+
+    @Test
+    public void importFromClasspath() throws IOException {
+        String file = "/org/javacs/example/AutocompletePackage.java";
+
+        // Static method
+        Set<String> suggestions = insertText(file, 5, 13);
+
+        assertThat("Has deeply nested class", suggestions, hasItems("util.ArrayList"));
     }
 
     @Test

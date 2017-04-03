@@ -113,13 +113,12 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> completeImport(String parentPackage, Scope from) {
-        String fromPackage = packageOf(from);
         Stream<String> sourcePathNames = sourcePath.allSymbols(ElementKind.CLASS)
                 .flatMap(this::topLevelClassElement)
                 .filter(el -> trees.isAccessible(from, el))
                 .map(el -> el.getQualifiedName().toString());
-        Stream<String> classPathNames = classPath.topLevelClasses(fromPackage)
-                .map(info -> info.getName());
+        Stream<String> classPathNames = classPath.topLevelClasses(packageOf(from))
+                .map(c -> c.getName());
 
         return Stream.concat(sourcePathNames, classPathNames)
                 .filter(name -> !isAlreadyImported(name))
