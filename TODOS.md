@@ -1,6 +1,15 @@
 # Todo
 
+## Bugs
+* new ...autocomplete doesn't auto-import
+* import Collectors...autocomplete errors
+* Auto-import in empty file generates extra line of WS
+* Rename-symbol doesn't work across files
+* Error squiggles are off
+
 ## Polish
+* Keep imports organized
+* Autocomplete already-imported first
 * Add import code action
 * Resolve methods with badly typed arguments
 * Hover shows javadoc if available
@@ -16,7 +25,7 @@
 * Autocomplete types in method args
 * Class names not imported
   * Order by imported, name, use in sourcepath
-
+* Signature help
 
 ## Features 
 * Go-to-subclasses
