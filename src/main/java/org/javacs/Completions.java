@@ -355,6 +355,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
         item.setKind(CompletionItemKind.Class);
         item.setLabel(c.getSimpleName());
+        item.setDetail(c.getPackage().getName());
         item.setInsertText(c.getSimpleName());
         // TODO edit imports if necessary
 
@@ -481,6 +482,10 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 item.setKind(CompletionItemKind.Class);
                 item.setLabel(name);
                 item.setInsertText(name);
+
+                PackageElement classPackage = elements.getPackageOf(e);
+                if (classPackage != null)
+                    item.setDetail(classPackage.getSimpleName().toString());
                 // TODO edit imports if necessary
 
                 return Stream.of(item);
