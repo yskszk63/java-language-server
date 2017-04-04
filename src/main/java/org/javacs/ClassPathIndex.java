@@ -1,7 +1,6 @@
 package org.javacs;
 
 import com.google.common.reflect.ClassPath;
-import com.google.common.reflect.ClassPath.ClassInfo;
 import sun.misc.Launcher;
 
 import java.io.IOException;
@@ -12,12 +11,12 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Stream;
-import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Index the classpath *without* using the java compiler API.
@@ -91,9 +90,25 @@ class ClassPathIndex {
     /**
      * Find all top-level classes accessible from `fromPackage`
      */
-    Stream<Class<?>> topLevelClasses(String partialPackage, String partialClass, String fromPackage) {
+    Stream<Class<?>> topLevelClasses(String partialClass, String fromPackage) {
         return topLevelClasses.stream()
-                .filter(c -> Completions.containsCharactersInOrder(c.getPackageName(), partialPackage) && Completions.containsCharactersInOrder(c.getSimpleName(), partialClass))
+                .filter(c -> Completions.containsCharactersInOrder(c.getSimpleName(), partialClass))
+                .flatMap(ClassPathIndex::tryLoad)
+                .filter(c -> Modifier.isPublic(c.getModifiers()) || isInPackage(c, fromPackage));
+    }
+
+    /**
+     * Find all packages in parentPackage
+     */
+    Stream<String> packagesStartingWith(String partialPackage) {
+        return topLevelClasses.stream()
+                .filter(c -> c.getPackageName().startsWith(partialPackage))
+                .map(c -> c.getPackageName());
+    }
+
+    Stream<Class<?>> topLevelClassesIn(String parentPackage, String partialClass, String fromPackage) {
+        return topLevelClasses.stream()
+                .filter(c -> c.getPackageName().equals(parentPackage) && Completions.containsCharactersInOrder(c.getSimpleName(), partialClass))
                 .flatMap(ClassPathIndex::tryLoad)
                 .filter(c -> Modifier.isPublic(c.getModifiers()) || isInPackage(c, fromPackage));
     }
@@ -105,8 +120,8 @@ class ClassPathIndex {
     /**
      * Find all constructors in top-level classes accessible to any class in `fromPackage`
      */
-    Stream<Constructor<?>> topLevelConstructors(String partialPackage, String partialClass, String fromPackage) {
-        return topLevelClasses(partialPackage, partialClass, fromPackage)
+    Stream<Constructor<?>> topLevelConstructors(String partialClass, String fromPackage) {
+        return topLevelClasses(partialClass, fromPackage)
                 .flatMap(this::explodeConstructors);
     }
 

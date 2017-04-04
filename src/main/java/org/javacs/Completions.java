@@ -17,6 +17,7 @@ import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.function.Function;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -107,7 +108,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         if (element instanceof PackageElement) {
             PackageElement packageElement = (PackageElement) element;
 
-            return completeImport(packageElement.getQualifiedName().toString(), partialIdentifier, from);
+            return packageMembers(packageElement.getQualifiedName().toString(), partialIdentifier, from);
         }
 
         TypeMirror type = trees.getTypeMirror(expression);
@@ -141,19 +142,59 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return filter;
     }
 
-    private Stream<CompletionItem> completeImport(String parentPackage, String partialClass, Scope from) {
-        Stream<String> sourcePathNames = sourcePath.allSymbols(ElementKind.CLASS)
-                .filter(symbol -> containsCharactersInOrder(symbol.getContainerName(), parentPackage) && containsCharactersInOrder(symbol.getName(), partialClass))
-                .flatMap(this::topLevelClassElement)
-                .filter(el -> trees.isAccessible(from, el))
-                .map(el -> el.getQualifiedName().toString());
-        Stream<String> classPathNames = classPath.topLevelClasses(parentPackage, partialClass, packageOf(from))
-                .map(c -> c.getName());
+    private Stream<CompletionItem> packageMembers(String parentPackage, String partialIdentifier, Scope from) {
+        // Source-path packages that match parentPackage.partialIdentifier
+        Stream<CompletionItem> packageItems = subPackages(parentPackage, partialIdentifier).stream()
+                .map(this::completePackagePart);
+        Stream<TypeElement> sourcePathClasses = sourcePath.allSymbols(ElementKind.CLASS)
+                .filter(c -> c.getContainerName().equals(parentPackage))
+                .filter(c -> containsCharactersInOrder(c.getName(), partialIdentifier))
+                .map(c -> elements.getTypeElement(qualifiedName(c.getContainerName(), c.getName())));
+        Stream<TypeElement> classPathClasses = classPath.topLevelClassesIn(parentPackage, partialIdentifier, packageOf(from))
+                .map(c -> elements.getTypeElement(c.getName()));
+        Stream<CompletionItem> classItems = Stream.concat(sourcePathClasses, classPathClasses)
+                .filter(e -> isAccessible(e, from))
+                .flatMap(this::completionItem);
 
-        return Stream.concat(sourcePathNames, classPathNames)
-                .filter(name -> !isAlreadyImported(name))
-                .filter(name -> name.startsWith(parentPackage))
-                .map(name -> completeImport(name, parentPackage));
+        return Stream.concat(packageItems, classItems);
+    }
+
+    /**
+     * Complete a single identifier as part of a package chain.
+     * This isn't really a Java concept, so we have to implement a special case rather than use {@link this#completionItem(Element)}
+     */
+    private CompletionItem completePackagePart(String id) {
+        CompletionItem item = new CompletionItem();
+
+        item.setKind(CompletionItemKind.Module);
+        item.setLabel(id);
+
+        return item;
+    }
+
+    /**
+     * All sub-packages of parentPackage that match partialIdentifier
+     */
+    private Set<String> subPackages(String parentPackage, String partialIdentifier) {
+        Stream<String> sourcePathMembers = sourcePath.allSymbols(ElementKind.CLASS)
+                .map(c -> c.getContainerName())
+                .filter(p -> p.startsWith(parentPackage + "."));
+        Stream<String> classPathMembers = classPath.packagesStartingWith(parentPackage + ".");
+
+        return Stream.concat(sourcePathMembers, classPathMembers)
+                .map(p -> p.substring(parentPackage.length() + 1))
+                .map(Completions::firstId)
+                .filter(p -> containsCharactersInOrder(p, partialIdentifier))
+                .collect(Collectors.toSet());
+    }
+
+    private static String qualifiedName(String parentPackage, String partialIdentifier) {
+        if (parentPackage.isEmpty())
+            return partialIdentifier;
+        else if (partialIdentifier.isEmpty())
+            return parentPackage;
+        else
+            return parentPackage + "." + partialIdentifier;
     }
 
     private String packageOf(Scope from) {
@@ -198,7 +239,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
             String importName = each.getQualifiedIdentifier().toString();
 
-            if (importName.endsWith(".*") && mostOfId(importName).equals(mostOfId(qualifiedName)))
+            if (importName.endsWith(".*") && mostIds(importName).equals(mostIds(qualifiedName)))
                 return true;
             else if (importName.equals(qualifiedName))
                 return true;
@@ -207,36 +248,31 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         return false;
     }
 
-    private String mostOfId(String qualifiedName) {
-        return qualifiedName.substring(0, qualifiedName.lastIndexOf('.'));
+    private static String firstId(String qualifiedName) {
+        int firstDot = qualifiedName.indexOf('.');
+
+        if (firstDot == -1)
+            return qualifiedName;
+        else
+            return qualifiedName.substring(0, firstDot);
     }
 
-    private String endOfId(String qualifiedName) {
-        return qualifiedName.substring(qualifiedName.lastIndexOf('.') + 1);
+    private static String mostIds(String qualifiedName) {
+        int lastDot = qualifiedName.lastIndexOf('.');
+
+        if (lastDot == -1)
+            return qualifiedName;
+        else
+            return qualifiedName.substring(0, lastDot);
     }
 
-    private CompletionItem completeImport(String qualifiedName, String parentPackage) {
-        assert qualifiedName.startsWith(parentPackage);
+    private static String lastId(String qualifiedName) {
+        int lastDot = qualifiedName.lastIndexOf('.');
 
-        CompletionItem item = new CompletionItem();
-
-        item.setKind(CompletionItemKind.Class);
-        item.setLabel(qualifiedName);
-        item.setInsertText(importInsertText(qualifiedName, parentPackage));
-
-        return item;
-    }
-
-    private String importInsertText(String qualifiedName, String parentPackage) {
-        StringJoiner insertText = new StringJoiner(".");
-        String[] parts = qualifiedName.substring(parentPackage.length()).split("\\.");
-
-        for (String each : parts) {
-            if (!each.isEmpty())
-                insertText.add(each);
-        }
-
-        return insertText.toString();
+        if (lastDot == -1)
+            return qualifiedName;
+        else
+            return qualifiedName.substring(lastDot + 1);
     }
 
     /**
@@ -295,7 +331,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 .flatMap(this::topLevelClassElement)
                 .flatMap(this::explodeConstructors)
                 .map(this::completeJavacConstructor);
-        Stream<CompletionItem> classPathItems = classPath.topLevelConstructors("", partialClass, packageOf(scope))
+        Stream<CompletionItem> classPathItems = classPath.topLevelConstructors(partialClass, packageOf(scope))
                 .map(this::completeReflectedConstructor);
 
         return Stream.concat(sourcePathItems, classPathItems);
@@ -373,7 +409,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier))
                 .filter(e -> isAccessible(e, scope))
                 .flatMap(this::completionItem);
-        Stream<CompletionItem> classPathItems = classPath.topLevelClasses("", partialIdentifier, packageOf(scope))
+        Stream<CompletionItem> classPathItems = classPath.topLevelClasses(partialIdentifier, packageOf(scope))
                 .map(this::completeTopLevelClassSymbol);
 
         return Stream.concat(sourcePathItems, classPathItems);
@@ -502,8 +538,17 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         String name = e.getSimpleName().toString();
 
         switch (e.getKind()) {
-            case PACKAGE:
-                return Stream.empty();
+            case PACKAGE: {
+                PackageElement p = (PackageElement) e;
+                CompletionItem item = new CompletionItem();
+                String id = lastId(p.getSimpleName().toString());
+
+                item.setKind(CompletionItemKind.Module);
+                item.setLabel(id);
+                item.setInsertText(id);
+
+                return Stream.of(item);
+            }
             case ENUM:
             case CLASS: {
                 CompletionItem item = new CompletionItem();
@@ -590,7 +635,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
     private List<TextEdit> addImport(String qualifiedName) {
         if (!isAlreadyImported(qualifiedName))
-            return RefactorFile.addImport(compilationUnit, mostOfId(qualifiedName), endOfId(qualifiedName));
+            return RefactorFile.addImport(compilationUnit, mostIds(qualifiedName), lastId(qualifiedName));
         else
             return Collections.emptyList();
     }

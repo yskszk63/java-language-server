@@ -1,14 +1,12 @@
 package org.javacs;
 
 import org.eclipse.lsp4j.CompletionItem;
-import org.eclipse.lsp4j.TextEdit;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URLClassLoader;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -485,9 +483,7 @@ public class CompletionsTest extends CompletionsBase {
         // Static methods
         Set<String> suggestions = insertText(file, 3, 12);
 
-        assertThat("Does not have own package class", suggestions, not(hasItems("javacs.example.AutocompleteMember")));
-        assertThat("Does not have package-private class", suggestions, not(hasItems("javacs.other.OtherPackagePrivate")));
-        assertThat("Has other package class", suggestions, hasItems("javacs.other.OtherPackagePublic"));
+        assertThat("Does not have own package class", suggestions, hasItems("javacs"));
     }
 
     @Test
@@ -497,8 +493,7 @@ public class CompletionsTest extends CompletionsBase {
         // Static methods
         Set<String> suggestions = insertText(file, 5, 13);
 
-        assertThat("Has class from classpath", suggestions, hasItems("util.ArrayList"));
-        assertThat("Does not have package-private class", suggestions, not(hasItems("util.ComparableTimSort")));
+        assertThat("Has class from classpath", suggestions, hasItems("util"));
     }
 
     @Test
@@ -534,6 +529,7 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 4, 25);
 
         assertThat(suggestions, hasItems("OtherPackagePublic"));
+        assertThat(suggestions, not(hasItems("OtherPackagePrivate")));
     }
 
     @Test
