@@ -2,7 +2,6 @@
 
 ## Bugs
 * new ...autocomplete doesn't auto-import
-* import Collectors...autocomplete errors
 * Auto-import in empty file generates extra line of WS
 * Rename-symbol doesn't work across files
 * Error squiggles are off
