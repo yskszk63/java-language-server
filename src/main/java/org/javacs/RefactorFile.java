@@ -28,6 +28,7 @@ class RefactorFile {
     private final JavacTask task;
     private final CompilationUnitTree source;
     private final SourcePositions pos;
+    private static final Position zero = new Position(0, 0);
 
     RefactorFile(JavacTask task, CompilationUnitTree source) {
         this.task = task;
@@ -43,7 +44,6 @@ class RefactorFile {
             return Collections.emptyList();
 
         Position lastExistingImport = endOfImports();
-        Position zero = new Position(0, 0);
         String afterString = organizeImports(source, packageName, className);
 
         if (lastExistingImport.equals(zero))
@@ -53,7 +53,6 @@ class RefactorFile {
     }
 
     private Position endOfImports() {
-        Position zero = new Position(0, 0);
         Position endOfPackage = Optional.ofNullable(source.getPackageName())
                 .map(p -> findEndOfLine(source.getSourceFile(), pos.getStartPosition(source, p)))
                 .orElse(zero);
