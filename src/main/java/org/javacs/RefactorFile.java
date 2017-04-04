@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.util.*;
+import java.util.function.Supplier;
 
 class RefactorFile {
     private final JavacTask task;
@@ -43,37 +44,84 @@ class RefactorFile {
         if (alreadyImported(source, packageName, className))
             return Collections.emptyList();
 
-        Position lastExistingImport = endOfImports();
-        String afterString = organizeImports(source, packageName, className);
-
-        if (lastExistingImport.equals(zero))
-            afterString += "\n";
-
-        return Collections.singletonList(new TextEdit(new Range(zero, lastExistingImport), afterString));
+        return Collections.singletonList(insertSomehow(packageName, className));
     }
 
-    private Position endOfImports() {
-        Position endOfPackage = Optional.ofNullable(source.getPackageName())
-                .map(p -> findEndOfLine(source.getSourceFile(), pos.getStartPosition(source, p)))
-                .orElse(zero);
+    private TextEdit insertSomehow(String packageName, String className) {
+        Supplier<TextEdit> 
+          top = () -> insertAtTop(packageName, className),
+          afterPackage = () -> insertAfterPackage(packageName, className).orElseGet(top),
+          afterImports = () -> insertAfterImports(packageName, className).orElseGet(afterPackage),
+          alphabetical = () -> insertInAlphabeticalOrder(packageName, className).orElseGet(afterImports);
+
+        return alphabetical.get();
+    }
+
+    private Optional<TextEdit> insertInAlphabeticalOrder(String packageName, String className) {
+        String insertLine = String.format("\nimport %s.%s;", packageName, className);
+
+        return source.getImports().stream()
+            .filter(i -> qualifiedName(i).compareTo(packageName + "." + className) > 0)
+            .map(this::startPosition)
+            .findFirst()
+            .map(at -> new TextEdit(new Range(at, at), insertLine));
+    }
+
+    private String qualifiedName(ImportTree tree) {
+        return tree.getQualifiedIdentifier().toString();
+    }
+
+    private Optional<TextEdit> insertAfterImports(String packageName, String className) {
+        String insertLine = String.format("\nimport %s.%s;", packageName, className);
+
+        return endOfImports()
+            .map(at -> new TextEdit(new Range(at, at), insertLine));
+    }
+
+    private Optional<TextEdit> insertAfterPackage(String packageName, String className) {
+        String insertLine = String.format("\n\nimport %s.%s;", packageName, className);
+
+        return endOfPackage()
+            .map(at -> new TextEdit(new Range(at, at), insertLine));
+    }
+
+    private TextEdit insertAtTop(String packageName, String className) {
+        String insertLine = String.format("import %s.%s;\n\n", packageName, className);
+
+        return new TextEdit(new Range(zero, zero), insertLine);
+    }
+
+    private Optional<Position> endOfImports() {
         return source.getImports().stream()
                 .max(this::comparePosition)
-                .map(def -> pos.getStartPosition(source, def))
-                .map(offset -> findEndOfLine(source.getSourceFile(), offset))
-                .orElse(endOfPackage);
+                .map(this::endPosition);
+    }
+
+    private Optional<Position> endOfPackage() {
+        return Optional.ofNullable(source.getPackageName())
+                .map(this::endPosition);
+    }
+
+    private Position startPosition(Tree tree) {
+        return findOffset(pos.getStartPosition(source, tree), false);
+    }
+
+    private Position endPosition(Tree tree) {
+        return findOffset(pos.getEndPosition(source, tree), true);
     }
 
     /**
      * Convert on offset-based position to a {@link Position}
      */
-    static Position findEndOfLine(JavaFileObject file, long findOffset) {
+    private Position findOffset(long find, boolean endOfLine) {
+        JavaFileObject file = source.getSourceFile();
+
         try (Reader in = file.openReader(true)) {
             long offset = 0;
             int line = 0;
             int character = 0;
 
-            // Find the start position
-            while (offset < findOffset) {
+            while (offset < find) {
                 int next = in.read();
 
                 if (next < 0)
@@ -89,17 +137,16 @@ class RefactorFile {
                 }
             }
 
-            while (true) {
-                int next = in.read();
+            if (endOfLine) {
+                while (true) {
+                    int next = in.read();
 
-                if (next < 0)
-                    break;
-                else {
-                    offset++;
-                    character++;
-
-                    if (next == '\n')
+                    if (next < 0 || next == '\n')
                         break;
+                    else {
+                        offset++;
+                        character++;
+                    }
                 }
             }
 

@@ -91,7 +91,6 @@ public class RefactorFileTest {
         String after = applyEdits(before, edits);
 
         assertThat(after, equalTo(
-                "\n" +
                 "import java.util.List;\n" +
                 "import org.javacs.Foo;\n" +
                 "\n" +
@@ -106,7 +105,6 @@ public class RefactorFileTest {
         String after = applyEdits(before, edits);
 
         assertThat(after, equalTo(
-                        "\n" +
                         "import org.javacs.Foo;\n" +
                         "\n" +
                         "public class Example { void main() { } }"
