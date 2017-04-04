@@ -743,6 +743,15 @@ class JavaLanguageServer implements LanguageServer {
         Logger.getLogger("").addHandler(new Handler() {
             @Override
             public void publish(LogRecord record) {
+                String message = record.getMessage();
+
+                if (record.getThrown() != null) {
+                    StringWriter trace = new StringWriter();
+
+                    record.getThrown().printStackTrace(new PrintWriter(trace));
+                    message += "\n" + trace;
+                }
+
                 client.logMessage(new MessageParams(
                         messageType(record.getLevel().intValue()),
                         record.getMessage()
