@@ -15,17 +15,17 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import java.lang.reflect.Constructor;
 import java.util.*;
-import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-public class Completions implements Function<TreePath, Stream<CompletionItem>> {
+public class Completions implements Supplier<Stream<CompletionItem>> {
 
     public static Stream<CompletionItem> at(FocusedResult compiled) {
         return compiled.cursor
-                .map(path -> new Completions(compiled.task, compiled.classPath, compiled.sourcePath, path.getCompilationUnit()).apply(path))
+                .map(path -> new Completions(compiled.task, compiled.classPath, compiled.sourcePath, path).get())
                 .orElseGet(Stream::empty);
     }
 
@@ -36,8 +36,9 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     private final Elements elements;
     private final Name thisName, superName;
     private final CompilationUnitTree compilationUnit;
+    private final TreePath path;
 
-    private Completions(JavacTask task, ClassPathIndex classPath, SymbolIndex sourcePath, CompilationUnitTree compilationUnit) {
+    private Completions(JavacTask task, ClassPathIndex classPath, SymbolIndex sourcePath, TreePath path) {
         this.task = task;
         this.trees = Trees.instance(task);
         this.elements = task.getElements();
@@ -45,11 +46,12 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         this.superName = task.getElements().getName("super");
         this.classPath = classPath;
         this.sourcePath = sourcePath;
-        this.compilationUnit = compilationUnit;
+        this.compilationUnit = path.getCompilationUnit();
+        this.path = path;
     }
 
     @Override
-    public Stream<CompletionItem> apply(TreePath path) {
+    public Stream<CompletionItem> get() {
         Tree leaf = path.getLeaf();
         Scope scope = trees.getScope(path);
 
@@ -662,7 +664,7 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
     }
 
     private List<TextEdit> addImport(String qualifiedName) {
-        if (!isAlreadyImported(qualifiedName))
+        if (!isAlreadyImported(qualifiedName) && !inImport(path))
             return RefactorFile.addImport(compilationUnit, mostIds(qualifiedName), lastId(qualifiedName));
         else
             return Collections.emptyList();

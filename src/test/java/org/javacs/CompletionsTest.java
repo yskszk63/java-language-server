@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.google.common.collect.Lists;
 import org.eclipse.lsp4j.CompletionItem;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -536,10 +537,16 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompletePackage.java";
 
         // Static methods
-        Set<String> suggestions = insertText(file, 4, 25);
+        List<? extends CompletionItem> items = items(file, 4, 25);
+        List<String> suggestions = Lists.transform(items, i -> i.getLabel());
 
         assertThat(suggestions, hasItems("OtherPackagePublic"));
         assertThat(suggestions, not(hasItems("OtherPackagePrivate")));
+
+        for (CompletionItem item : items) {
+            if (item.getLabel().equals("OtherPackagePublic"))
+                assertThat("Don't import when completing imports", item.getAdditionalTextEdits(), either(empty()).or(nullValue()));
+        }
     }
 
     @Test
