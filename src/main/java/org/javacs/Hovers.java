@@ -167,7 +167,7 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         return ShortTypePrinter.print(type);
     }
 
-    public static String constructorName(ExecutableElement e) {
+    private static String constructorName(ExecutableElement e) {
         return e.getEnclosingElement().getSimpleName().toString();
     }
 }

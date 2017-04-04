@@ -1,7 +1,6 @@
 # Todo
 
 ## Bugs
-* new ...autocomplete doesn't auto-import
 * Auto-import in empty file generates extra line of WS
 * Rename-symbol doesn't work across files
 * Error squiggles are off
@@ -17,6 +16,7 @@
 * Status bar info during indexing
 
 ## Autocomplete
+* Statically imported functions
 * Autocomplete constructor signatures instead of just class name
 * Autocomplete is using the entire method signature
 * Autocomplete annotation fields

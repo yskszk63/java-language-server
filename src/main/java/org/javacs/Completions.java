@@ -369,24 +369,27 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
     }
 
     private CompletionItem completeReflectedConstructor(Constructor<?> method) {
+        String qualifiedName = method.getDeclaringClass().getName();
         String name = method.getDeclaringClass().getSimpleName();
         Optional<String> docString = Optional.empty(); // TODO doc path
         boolean hasTypeParameters = method.getTypeParameters().length > 0;
         String methodSignature = Hovers.reflectedMethodSignature(method);
 
-        return completeConstructor(name, hasTypeParameters, methodSignature, docString);
+        return completeConstructor(qualifiedName, name, hasTypeParameters, methodSignature, docString);
     }
 
     private CompletionItem completeJavacConstructor(ExecutableElement method) {
-        String name = Hovers.constructorName(method);
+        TypeElement enclosingClass = (TypeElement) method.getEnclosingElement();
         Optional<String> docString = docstring(method);
         boolean hasTypeParameters = !method.getTypeParameters().isEmpty();
         String methodSignature = Hovers.methodSignature(method);
+        String qualifiedName = enclosingClass.getQualifiedName().toString();
+        String name = enclosingClass.getSimpleName().toString();
 
-        return completeConstructor(name, hasTypeParameters, methodSignature, docString);
+        return completeConstructor(qualifiedName, name, hasTypeParameters, methodSignature, docString);
     }
 
-    private CompletionItem completeConstructor(String name, boolean hasTypeParameters, String methodSignature, Optional<String> docString) {
+    private CompletionItem completeConstructor(String qualifiedName, String name, boolean hasTypeParameters, String methodSignature, Optional<String> docString) {
         CompletionItem item = new CompletionItem();
         String insertText = name;
 
@@ -399,7 +402,7 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
         item.setInsertText(insertText);
         item.setSortText(name);
         item.setFilterText(name);
-        // TODO edit imports if necessary
+        item.setAdditionalTextEdits(addImport(qualifiedName));
 
         return item;
     }

@@ -472,9 +472,15 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteConstructor.java";
 
         // Static methods
-        Set<String> suggestions = insertText(file, 5, 14);
+        List<? extends CompletionItem> items = items(file, 5, 14);
+        List<String> suggestions = Lists.transform(items, i -> i.getInsertText());
 
         assertThat(suggestions, hasItems("AutocompleteConstructor", "AutocompleteMember", "ArrayList"));
+
+        for (CompletionItem each : items) {
+            if (each.getInsertText().equals("ArrayList"))
+                assertThat("new ? auto-imports", each.getAdditionalTextEdits(), both(not(empty())).and(not(nullValue())));
+        }
     }
 
     @Test
