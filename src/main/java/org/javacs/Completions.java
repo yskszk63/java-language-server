@@ -227,13 +227,11 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
         return enclosingPackage.getQualifiedName().toString();
     }
 
-    private Stream<TypeElement> topLevelClassElement(SymbolInformation info) {
-        String qualifiedName = info.getContainerName().isEmpty() ? info.getName() : info.getContainerName() + "." + info.getName();
-        TypeElement candidate = elements.getTypeElement(qualifiedName);
-
-        if (candidate == null || candidate.getKind() != ElementKind.CLASS)
+    private Stream<TypeElement> topLevelClassElement(Element e) {
+        if (e == null || e.getKind() != ElementKind.CLASS)
             return Stream.empty();
 
+        TypeElement candidate = (TypeElement) e;
         Element parent = candidate.getEnclosingElement();
 
         if (parent == null || parent.getKind() == ElementKind.PACKAGE)
@@ -352,8 +350,8 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> constructors(String partialClass, Scope scope) {
-        Stream<CompletionItem> sourcePathItems = sourcePath.allSymbols(ElementKind.CLASS)
-                .filter(symbol -> containsCharactersInOrder(symbol.getName(), partialClass))
+        Stream<CompletionItem> sourcePathItems = Stream.concat(defaultImports(), Stream.concat(importedSymbols(), notAlreadyImportedSourcePathClasses()))
+                .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialClass))
                 .flatMap(this::topLevelClassElement)
                 .flatMap(this::explodeConstructors)
                 .map(this::completeJavacConstructor);
@@ -492,8 +490,10 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
                 .flatMap(this::importedSymbolsIn);
     }
 
-    private Stream<? extends Element> notAlreadyImportedSourcePathClasses() {
+    private Stream<TypeElement> notAlreadyImportedSourcePathClasses() {
         return sourcePath.allSymbols(ElementKind.CLASS)
+                .map(symbol -> elements.getTypeElement(qualifiedName(symbol.getContainerName(), symbol.getName())))
+                .filter(e -> e != null)
                 .flatMap(this::topLevelClassElement)
                 // We've already resolved already-imported symbols
                 .filter(e -> !isAlreadyImported(e.getQualifiedName().toString()));
