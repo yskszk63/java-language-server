@@ -62,6 +62,27 @@ public class RefactorFileTest {
     }
 
     @Test
+    public void addImportAtBeginning() {
+        String before =
+                "package org.javacs;\n" +
+                "\n" +
+                "import org.javacs.Foo;\n" +
+                "\n" +
+                "public class Example { void main() { } }";
+        List<TextEdit> edits = addImport(file(before), "java.util", "List");
+        String after = applyEdits(before, edits);
+
+        assertThat(after, equalTo(
+                "package org.javacs;\n" +
+                "\n" +
+                "import java.util.List;\n" +
+                "import org.javacs.Foo;\n" +
+                "\n" +
+                "public class Example { void main() { } }"
+        ));
+    }
+
+    @Test
     public void importAlreadyExists() {
         String before =
                 "package org.javacs;\n" +

@@ -58,7 +58,7 @@ class RefactorFile {
     }
 
     private Optional<TextEdit> insertInAlphabeticalOrder(String packageName, String className) {
-        String insertLine = String.format("\nimport %s.%s;", packageName, className);
+        String insertLine = String.format("import %s.%s;\n", packageName, className);
 
         return source.getImports().stream()
             .filter(i -> qualifiedName(i).compareTo(packageName + "." + className) > 0)
