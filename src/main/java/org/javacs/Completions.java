@@ -550,10 +550,12 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 return Stream.of(item);
             }
             case ENUM:
+            case INTERFACE:
+            case ANNOTATION_TYPE:
             case CLASS: {
                 CompletionItem item = new CompletionItem();
 
-                item.setKind(CompletionItemKind.Class);
+                item.setKind(classKind(e.getKind()));
                 item.setLabel(name);
                 item.setInsertText(name);
 
@@ -565,8 +567,6 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
 
                 return Stream.of(item);
             }
-            case ANNOTATION_TYPE:
-            case INTERFACE:
             case TYPE_PARAMETER: {
                 CompletionItem item = new CompletionItem();
 
@@ -630,6 +630,20 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
                 // Nothing user-enterable
                 // Nothing user-enterable
                 return Stream.empty();
+        }
+    }
+
+    private CompletionItemKind classKind(ElementKind kind) {
+        switch (kind) {
+            case CLASS:
+                return CompletionItemKind.Class;
+            case ANNOTATION_TYPE:
+            case INTERFACE:
+                return CompletionItemKind.Interface;
+            case ENUM:
+                return CompletionItemKind.Enum;
+            default:
+                throw new RuntimeException("Expected CLASS, INTERFACE or ENUM but found " + kind);
         }
     }
 
