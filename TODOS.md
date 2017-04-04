@@ -4,12 +4,14 @@
 * Auto-import in empty file generates extra line of WS
 * Rename-symbol doesn't work across files
 * Error squiggles are off
+* Autocomplete is showing arg0, arg1 for constructors
 
 ## Polish
 * Keep imports organized
 * Autocomplete already-imported first
 * Add import code action
 * Resolve methods with badly typed arguments
+* Show return type on hover
 * Hover shows javadoc if available
 * Hover show FQ types if not imported
 * Javadoc path for hover, autocomplete
@@ -53,6 +55,7 @@
 * Enum options
 * Cast to type
 * Import missing file
+* Unused return value auto-add
 
 ### Code lens
 * "N references" on method, class
