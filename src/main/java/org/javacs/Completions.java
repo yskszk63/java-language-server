@@ -87,9 +87,22 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
         else if (leaf instanceof IdentifierTree) {
             IdentifierTree id = (IdentifierTree) leaf;
 
+            // Special case: import com
+            if (inImport(path))
+                return packageMembers("", id.getName().toString(), scope);
+
             return allSymbols(partialIdentifier(id.getName()), scope);
         }
         else return Stream.empty();
+    }
+
+    private static boolean inImport(TreePath path) {
+        if (path == null)
+            return false;
+        else if (path.getLeaf().getKind() == Tree.Kind.IMPORT)
+            return true;
+        else
+            return inImport(path.getParentPath());
     }
 
     private String partialIdentifier(Name name) {
@@ -176,13 +189,14 @@ public class Completions implements Function<TreePath, Stream<CompletionItem>> {
      * All sub-packages of parentPackage that match partialIdentifier
      */
     private Set<String> subPackages(String parentPackage, String partialIdentifier) {
+        String prefix = parentPackage.isEmpty() ? "" : parentPackage + ".";
         Stream<String> sourcePathMembers = sourcePath.allSymbols(ElementKind.CLASS)
                 .map(c -> c.getContainerName())
-                .filter(p -> p.startsWith(parentPackage + "."));
-        Stream<String> classPathMembers = classPath.packagesStartingWith(parentPackage + ".");
+                .filter(p -> p.startsWith(prefix));
+        Stream<String> classPathMembers = classPath.packagesStartingWith(prefix);
 
         return Stream.concat(sourcePathMembers, classPathMembers)
-                .map(p -> p.substring(parentPackage.length() + 1))
+                .map(p -> p.substring(prefix.length()))
                 .map(Completions::firstId)
                 .filter(p -> containsCharactersInOrder(p, partialIdentifier))
                 .collect(Collectors.toSet());

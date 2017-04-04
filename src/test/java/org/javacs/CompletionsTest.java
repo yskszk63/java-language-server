@@ -497,6 +497,16 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
+    public void importFirstId() throws IOException {
+        String file = "/org/javacs/example/AutocompletePackage.java";
+
+        // Static methods
+        Set<String> suggestions = insertText(file, 7, 9);
+
+        assertThat("Has class from classpath", suggestions, hasItems("com", "org"));
+    }
+
+    @Test
     public void createEmptyLoader() throws ClassNotFoundException {
         URLClassLoader emptyClassLoader = ClassPathIndex.parentClassLoader();
 
