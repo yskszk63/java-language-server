@@ -155,7 +155,17 @@ public class JavacHolder {
         this.classPath = Collections.unmodifiableSet(classPath);
         this.sourcePath = Collections.unmodifiableSet(sourcePath);
         this.outputDirectory = outputDirectory;
-        this.options = ImmutableList.of(
+        this.options = options(classPath, sourcePath, outputDirectory);
+        this.index = new SymbolIndex();
+        this.initialIndexComplete = index ? startIndexingSourcePath() : CompletableFuture.completedFuture(null);
+        this.classPathIndex = new ClassPathIndex(classPath);
+
+        ensureOutputDirectory(outputDirectory);
+        clearOutputDirectory(outputDirectory);
+    }
+
+    static List<String> options(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
+        return ImmutableList.of(
                 "-classpath", Joiner.on(File.pathSeparator).join(classPath),
                 "-sourcepath", Joiner.on(File.pathSeparator).join(sourcePath),
                 "-d", outputDirectory.toString(),
@@ -171,12 +181,6 @@ public class JavacHolder {
                 "-Xlint:varargs",
                 "-Xlint:static"
         );
-        this.index = new SymbolIndex();
-        this.initialIndexComplete = index ? startIndexingSourcePath() : CompletableFuture.completedFuture(null);
-        this.classPathIndex = new ClassPathIndex(classPath);
-
-        ensureOutputDirectory(outputDirectory);
-        clearOutputDirectory(outputDirectory);
     }
 
     private JavacTask createTask(Collection<JavaFileObject> files) {
@@ -324,7 +328,7 @@ public class JavacHolder {
         onErrorDelegate = error -> {};
     }
 
-    public CompilationUnitTree parse(URI file, Optional<String> textContent, DiagnosticListener<JavaFileObject> onError) {
+    public ParseResult parse(URI file, Optional<String> textContent, DiagnosticListener<JavaFileObject> onError) {
         JavaFileObject object = findFile(file, textContent);
         JavacTask task = createTask(Collections.singleton(object));
         onErrorDelegate = onError;
@@ -335,7 +339,7 @@ public class JavacHolder {
             if (trees.isEmpty())
                 throw new RuntimeException("Compiling " + file + " produced 0 results");
             else if (trees.size() == 1)
-                return trees.get(0);
+                return new ParseResult(task, trees.get(0));
             else
                 throw new RuntimeException("Compiling " + file + " produced " + trees.size() + " results");
         } catch (IOException e) {

@@ -2,6 +2,12 @@ package org.javacs;
 
 import com.google.common.collect.Lists;
 import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.tree.ImportTree;
+import com.sun.source.tree.MemberSelectTree;
+import com.sun.source.tree.Tree;
+import com.sun.source.util.JavacTask;
+import com.sun.source.util.SourcePositions;
+import com.sun.source.util.Trees;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.Pretty;
@@ -16,23 +22,27 @@ import javax.tools.JavaFileObject;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 class RefactorFile {
-    public static List<TextEdit> addImport(CompilationUnitTree sourceTree, String packageName, String className) {
-        // TODO switch to public APIs
-        JCTree.JCCompilationUnit source = (JCTree.JCCompilationUnit) sourceTree;
+    private final JavacTask task;
+    private final CompilationUnitTree source;
+    private final SourcePositions pos;
 
+    RefactorFile(JavacTask task, CompilationUnitTree source) {
+        this.task = task;
+        this.source = source;
+        this.pos = Trees.instance(task).getSourcePositions();
+    }
+
+    List<TextEdit> addImport(String packageName, String className) {
         Objects.requireNonNull(packageName, "Package name is null");
         Objects.requireNonNull(className, "Class name is null");
 
         if (alreadyImported(source, packageName, className))
             return Collections.emptyList();
 
-        Position lastExistingImport = endOfImports(source);
+        Position lastExistingImport = endOfImports();
         Position zero = new Position(0, 0);
         String afterString = organizeImports(source, packageName, className);
 
@@ -42,15 +52,14 @@ class RefactorFile {
         return Collections.singletonList(new TextEdit(new Range(zero, lastExistingImport), afterString));
     }
 
-    private static Position endOfImports(JCTree.JCCompilationUnit source) {
+    private Position endOfImports() {
         Position zero = new Position(0, 0);
-        Position endOfPackage = Optional.ofNullable(source.pid)
-                .map(p -> findEndOfLine(source.getSourceFile(), p.getStartPosition()))
+        Position endOfPackage = Optional.ofNullable(source.getPackageName())
+                .map(p -> findEndOfLine(source.getSourceFile(), pos.getStartPosition(source, p)))
                 .orElse(zero);
-        return source.defs.stream()
-                .filter(RefactorFile::isImportSection)
-                .max(RefactorFile::comparePosition)
-                .map(def -> def.getStartPosition())
+        return source.getImports().stream()
+                .max(this::comparePosition)
+                .map(def -> pos.getStartPosition(source, def))
                 .map(offset -> findEndOfLine(source.getSourceFile(), offset))
                 .orElse(endOfPackage);
     }
@@ -58,7 +67,7 @@ class RefactorFile {
     /**
      * Convert on offset-based position to a {@link Position}
      */
-    public static Position findEndOfLine(JavaFileObject file, long findOffset) {
+    static Position findEndOfLine(JavaFileObject file, long findOffset) {
         try (Reader in = file.openReader(true)) {
             long offset = 0;
             int line = 0;
@@ -101,18 +110,18 @@ class RefactorFile {
         }
     }
 
-    private static boolean alreadyImported(JCTree.JCCompilationUnit source, String packageName, String className) {
+    private static boolean alreadyImported(CompilationUnitTree source, String packageName, String className) {
         return source.getImports()
                     .stream()
                     .anyMatch(i -> importEquals(i, packageName, className));
     }
 
-    private static String organizeImports(JCTree.JCCompilationUnit source, String packageName, String className) {
+    private static String organizeImports(CompilationUnitTree source, String packageName, String className) {
         Context context = new Context();
         JavacFileManager fileManager = new JavacFileManager(context, true, null);
         Names names = Names.instance(context);
         TreeMaker factory = TreeMaker.instance(context);
-        List<JCTree.JCImport> imports = Lists.newArrayList(source.getImports());
+        List<ImportTree> imports = Lists.newArrayList(source.getImports());
 
         imports.add(factory.Import(
                 factory.Select(
@@ -122,9 +131,9 @@ class RefactorFile {
         ));
 
         JCTree.JCCompilationUnit after = factory.TopLevel(
-                source.packageAnnotations,
-                source.pid,
-                com.sun.tools.javac.util.List.from(imports)
+                list(JCTree.JCAnnotation.class, source.getPackageAnnotations()),
+                (JCTree.JCExpression) source.getPackageName(),
+                list(JCTree.class, imports)
         );
         StringWriter buffer = new StringWriter();
         Pretty prettyPrint = new Pretty(buffer, true);
@@ -138,22 +147,26 @@ class RefactorFile {
         return buffer.toString();
     }
 
-    private static int comparePosition(JCTree left, JCTree right) {
-        return Integer.compare(left.getStartPosition(), right.getStartPosition());
-    }
+    private static <T> com.sun.tools.javac.util.List<T> list(Class<T> cast, List<?> from) {
+        List<T> out = new ArrayList<>();
 
-    private static boolean isImportSection(JCTree tree) {
-        switch (tree.getKind()) {
-            case IMPORT:
-                return true;
-            default:
-                return false;
+        for (Object each : from) {
+            out.add(cast.cast(each));
         }
+
+        return com.sun.tools.javac.util.List.from(out);
     }
 
-    private static boolean importEquals(JCTree.JCImport i, String packageName, String className) {
-        JCTree.JCFieldAccess access = (JCTree.JCFieldAccess) i.qualid;
+    private int comparePosition(Tree left, Tree right) {
+        long leftPos = pos.getStartPosition(source, left);
+        long rightPos = pos.getStartPosition(source, right);
 
-        return access.selected.toString().equals(packageName) && access.name.toString().equals(className);
+        return Long.compare(leftPos, rightPos);
+    }
+
+    private static boolean importEquals(ImportTree i, String packageName, String className) {
+        MemberSelectTree access = (MemberSelectTree) i.getQualifiedIdentifier();
+
+        return access.getExpression().toString().equals(packageName) && access.getIdentifier().toString().equals(className);
     }
 }

@@ -668,7 +668,7 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
 
     private List<TextEdit> addImport(String qualifiedName) {
         if (!isAlreadyImported(qualifiedName) && !inImport(path))
-            return RefactorFile.addImport(compilationUnit, mostIds(qualifiedName), lastId(qualifiedName));
+            return new RefactorFile(task, compilationUnit).addImport(mostIds(qualifiedName), lastId(qualifiedName));
         else
             return Collections.emptyList();
     }

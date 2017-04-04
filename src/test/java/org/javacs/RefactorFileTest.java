@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.sun.source.tree.CompilationUnitTree;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextEdit;
 import org.junit.Test;
@@ -21,7 +20,7 @@ import static org.junit.Assert.assertThat;
 public class RefactorFileTest {
 
     private static final Logger LOG = Logger.getLogger("main");
-    public static final URI FAKE_FILE = URI.create("test/imaginary-resources/org/javacs/Example.java");
+    private static final URI FAKE_FILE = URI.create("test/imaginary-resources/org/javacs/Example.java");
 
     @Test
     public void addImportToEmpty() {
@@ -29,15 +28,15 @@ public class RefactorFileTest {
                 "package org.javacs;\n" +
                 "\n" +
                 "public class Example { void main() { } }";
-        List<TextEdit> edits = RefactorFile.addImport(file(before), "org.javacs", "Foo");
+        List<TextEdit> edits = addImport(file(before), "org.javacs", "Foo");
         String after = applyEdits(before, edits);
 
         assertThat(after, equalTo(
                 "package org.javacs;\n" +
-                        "\n" +
-                        "import org.javacs.Foo;\n" +
-                        "\n" +
-                        "public class Example { void main() { } }"
+                "\n" +
+                "import org.javacs.Foo;\n" +
+                "\n" +
+                "public class Example { void main() { } }"
         ));
     }
 
@@ -45,20 +44,20 @@ public class RefactorFileTest {
     public void addImportToExisting() {
         String before =
                 "package org.javacs;\n" +
-                        "\n" +
-                        "import java.util.List;\n" +
-                        "\n" +
-                        "public class Example { void main() { } }";
-        List<TextEdit> edits = RefactorFile.addImport(file(before), "org.javacs", "Foo");
+                "\n" +
+                "import java.util.List;\n" +
+                "\n" +
+                "public class Example { void main() { } }";
+        List<TextEdit> edits = addImport(file(before), "org.javacs", "Foo");
         String after = applyEdits(before, edits);
 
         assertThat(after, equalTo(
                 "package org.javacs;\n" +
-                        "\n" +
-                        "import java.util.List;\n" +
-                        "import org.javacs.Foo;\n" +
-                        "\n" +
-                        "public class Example { void main() { } }"
+                "\n" +
+                "import java.util.List;\n" +
+                "import org.javacs.Foo;\n" +
+                "\n" +
+                "public class Example { void main() { } }"
         ));
     }
 
@@ -66,19 +65,19 @@ public class RefactorFileTest {
     public void importAlreadyExists() {
         String before =
                 "package org.javacs;\n" +
-                        "\n" +
-                        "import java.util.List;\n" +
-                        "\n" +
-                        "public class Example { void main() { } }";
-        List<TextEdit> edits = RefactorFile.addImport(file(before), "java.util", "List");
+                "\n" +
+                "import java.util.List;\n" +
+                "\n" +
+                "public class Example { void main() { } }";
+        List<TextEdit> edits = addImport(file(before), "java.util", "List");
         String after = applyEdits(before, edits);
 
         assertThat(after, equalTo(
                 "package org.javacs;\n" +
-                        "\n" +
-                        "import java.util.List;\n" +
-                        "\n" +
-                        "public class Example { void main() { } }"
+                "\n" +
+                "import java.util.List;\n" +
+                "\n" +
+                "public class Example { void main() { } }"
         ));
     }
 
@@ -86,32 +85,36 @@ public class RefactorFileTest {
     public void noPackage() {
         String before =
                 "import java.util.List;\n" +
-                        "\n" +
-                        "public class Example { void main() { } }";
-        List<TextEdit> edits = RefactorFile.addImport(file(before), "org.javacs", "Foo");
+                "\n" +
+                "public class Example { void main() { } }";
+        List<TextEdit> edits = addImport(file(before), "org.javacs", "Foo");
         String after = applyEdits(before, edits);
 
         assertThat(after, equalTo(
                 "\n" +
-                        "import java.util.List;\n" +
-                        "import org.javacs.Foo;\n" +
-                        "\n" +
-                        "public class Example { void main() { } }"
+                "import java.util.List;\n" +
+                "import org.javacs.Foo;\n" +
+                "\n" +
+                "public class Example { void main() { } }"
         ));
     }
 
     @Test
     public void noPackageNoImports() {
         String before = "public class Example { void main() { } }";
-        List<TextEdit> edits = RefactorFile.addImport(file(before), "org.javacs", "Foo");
+        List<TextEdit> edits = addImport(file(before), "org.javacs", "Foo");
         String after = applyEdits(before, edits);
 
         assertThat(after, equalTo(
                         "\n" +
-                                "import org.javacs.Foo;\n" +
+                        "import org.javacs.Foo;\n" +
                         "\n" +
                         "public class Example { void main() { } }"
         ));
+    }
+
+    private List<TextEdit> addImport(ParseResult parse, String packageName, String className) {
+        return new RefactorFile(parse.task, parse.tree).addImport(packageName, className);
     }
 
     private String applyEdits(String before, List<TextEdit> edits) {
@@ -177,7 +180,7 @@ public class RefactorFileTest {
         }
     }
 
-    private CompilationUnitTree file(String content) {
+    private ParseResult file(String content) {
         JavacHolder compiler = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.emptySet(), Paths.get("test-output"));
 
         return compiler.parse(FAKE_FILE, Optional.of(content), error -> LOG.warning(error.toString()));
