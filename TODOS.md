@@ -11,7 +11,6 @@
 * Autocomplete already-imported first
 * Add import code action
 * Resolve methods with badly typed arguments
-* Show return type on hover
 * Hover shows javadoc if available
 * Hover show FQ types if not imported
 * Javadoc path for hover, autocomplete
