@@ -11,29 +11,33 @@ Requires that you have Java 8 installed on your system.
 
 ## Features
 
-### Autocomplete
+### Autocomplete symbols (with auto-import)
 
-<img src="http://g.recordit.co/bCbYuegVRV.gif">
+<img src="http://g.recordit.co/HpNZPIDA8T.gif">
+
+### Autocomplete members
+
+<img src="http://g.recordit.co/np8mXIWfQ8.gif">
 
 ### Go-to-definition
 
-<img src="http://g.recordit.co/Fg7cpH1rnz.gif">
+<img src="http://g.recordit.co/AJGsEVoF6z.gif">
 
 ### Find symbol
 
-<img src="http://g.recordit.co/6g1bESw3Pp.gif">
+<img src="http://g.recordit.co/XuZvrCJfBx.gif">
 
 ### Lint
 
-<img src="http://g.recordit.co/DGTYfpFdSD.gif">
+<img src="http://g.recordit.co/Fu8vgP0uG0.gif">
 
 ### Type information on hover
 
-<img src="http://g.recordit.co/R3T0nLUpZJ.gif">
+<img src="http://g.recordit.co/w5nRIfef65.gif">
 
 ### Find references
 
-<img src="http://g.recordit.co/71PXpvFfs8.gif">
+<img src="http://g.recordit.co/3tNYL8StgJ.gif">
 
 ## Usage
 
