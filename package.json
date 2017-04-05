@@ -3,7 +3,7 @@
     "displayName": "Java Language Support",
     "description": "Java support using the Java Compiler API",
     "icon": "icon.png",
-    "version": "0.0.27",
+    "version": "0.0.28",
     "publisher": "georgewfraser",
     "repository": {
         "type": "git",
@@ -52,7 +52,6 @@
             }
         ]
     },
-    "preview": true,
     "scripts": {
         "vscode:prepublish": "tsc -p ./",
         "compile": "tsc -watch -p ./",
