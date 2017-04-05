@@ -416,7 +416,7 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
         TypeElement enclosingClass = (TypeElement) method.getEnclosingElement();
         Optional<String> docString = docstring(method);
         boolean hasTypeParameters = !method.getTypeParameters().isEmpty();
-        String methodSignature = Hovers.methodSignature(method);
+        String methodSignature = Hovers.methodSignature(method, true);
         String qualifiedName = enclosingClass.getQualifiedName().toString();
         String name = enclosingClass.getSimpleName().toString();
 
@@ -698,7 +698,7 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
                 CompletionItem item = new CompletionItem();
 
                 item.setKind(CompletionItemKind.Method);
-                item.setLabel(Hovers.methodSignature(method));
+                item.setLabel(Hovers.methodSignature(method, false));
                 item.setDetail(ShortTypePrinter.print(method.getReturnType()));
                 docstring(e).ifPresent(item::setDocumentation);
                 item.setInsertText(name); // TODO

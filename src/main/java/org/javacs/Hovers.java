@@ -58,7 +58,7 @@ public class Hovers implements Function<TreePath, Optional<String>> {
             case INTERFACE:
                 return Optional.of("interface " + element.getSimpleName());
             case METHOD:
-                return Optional.of(methodSignature((Symbol.MethodSymbol) element));
+                return Optional.of(methodSignature((Symbol.MethodSymbol) element, true));
             case CONSTRUCTOR:
             case STATIC_INIT:
             case INSTANCE_INIT:
@@ -85,7 +85,7 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         return Optional.ofNullable(trees.getTypeMirror(path));
     }
 
-    public static String methodSignature(ExecutableElement e) {
+    public static String methodSignature(ExecutableElement e, boolean showReturn) {
         String name = e.getKind() == ElementKind.CONSTRUCTOR ? constructorName(e) : e.getSimpleName().toString();
         boolean varargs = e.isVarArgs();
         StringJoiner params = new StringJoiner(", ");
@@ -98,8 +98,12 @@ public class Hovers implements Function<TreePath, Optional<String>> {
             params.add(pName);
         }
 
-        String returnType = ShortTypePrinter.print(e.getReturnType());
-        String signature = returnType + " " + name + "(" + params + ")";
+        String signature = "";
+        
+        if (showReturn)
+            signature += ShortTypePrinter.print(e.getReturnType()) + " ";
+
+        signature += name + "(" + params + ")";
 
         if (!e.getThrownTypes().isEmpty()) {
             StringJoiner thrown = new StringJoiner(", ");

@@ -56,7 +56,7 @@ public class CompletionsTest extends CompletionsBase {
         // Static methods
         Set<String> suggestions = items(file, 5, 14).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
 
-        assertThat(suggestions, hasItems("String methods() throws Exception"));
+        assertThat(suggestions, hasItems("methods() throws Exception"));
     }
 
     @Test
@@ -400,7 +400,7 @@ public class CompletionsTest extends CompletionsBase {
         // Static methods
         Set<String> suggestions = items(file, 8, 17).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
 
-        assertThat(suggestions, hasItems("boolean add(E)", "void add(int, E)"));
+        assertThat(suggestions, hasItems("add(E)", "add(int, E)"));
     }
 
     @Test
@@ -464,7 +464,7 @@ public class CompletionsTest extends CompletionsBase {
         // Static methods
         Set<String> suggestions = items(file, 5, 18).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
 
-        assertThat(suggestions, hasItems("void restMethod(String... params)"));
+        assertThat(suggestions, hasItems("restMethod(String... params)"));
     }
 
     @Test
