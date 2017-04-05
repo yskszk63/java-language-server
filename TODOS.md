@@ -24,6 +24,7 @@
 * Class names not imported
   * Order by imported, name, use in sourcepath
 * Signature help
+* Other methods of class when we have already statically imported 1 method
 
 ## Features 
 * Go-to-subclasses
