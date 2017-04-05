@@ -52,6 +52,7 @@ export function activate(context: VSCode.ExtensionContext) {
                     let args = [
                         '-cp', fatJar, 
                         '-Djavacs.port=' + port,
+                        '-Xverify:none', // helps VisualVM avoid 'error 62'
                         'org.javacs.Main'
                     ];
                     
