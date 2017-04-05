@@ -354,9 +354,7 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> constructors(String partialClass, Scope scope) {
-        Stream<TypeElement> alreadyImported = sourcePathClasses().filter(e -> isAlreadyImported(e.getQualifiedName().toString()));
-        Stream<TypeElement> notImported = sourcePathClasses().filter(e -> !isAlreadyImported(e.getQualifiedName().toString()));
-        Stream<CompletionItem> sourcePathItems = Stream.concat(alreadyImported, notImported)
+        Stream<CompletionItem> sourcePathItems = sourcePathClasses(partialClass)
                 .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialClass))
                 .flatMap(this::topLevelClassElement)
                 .flatMap(this::explodeConstructors)
@@ -366,6 +364,13 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
                 .flatMap(this::tryCompleteJavacConstructor);
 
         return Stream.concat(sourcePathItems, classPathItems);
+    }
+
+    private int alreadyImportedFirst(TypeElement left, TypeElement right) {
+        return -Boolean.compare(
+            isAlreadyImported(left.getQualifiedName().toString()),
+            isAlreadyImported(right.getQualifiedName().toString())
+        );
     }
 
     private Stream<ExecutableElement> asJavacConstructor(Constructor<?> c) {
@@ -458,7 +463,7 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
      * Suggest all completions that are visible from scope
      */
     private Stream<CompletionItem> allSymbols(String partialIdentifier, Scope scope) {
-        Stream<CompletionItem> sourcePathItems = allSourcePathSymbols(scope)
+        Stream<CompletionItem> sourcePathItems = allSourcePathSymbols(scope, partialIdentifier)
                 .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier))
                 .filter(e -> isAccessible(e, scope))
                 .flatMap(this::completionItem);
@@ -480,13 +485,12 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
         return item;
     }
 
-    private Stream<? extends Element> allSourcePathSymbols(Scope scope) {
+    private Stream<? extends Element> allSourcePathSymbols(Scope scope, String partialIdentifier) {
         Collection<TypeElement> thisScopes = thisScopes(scope);
         Collection<TypeElement> classScopes = classScopes(scope);
         List<Scope> methodScopes = methodScopes(scope);
         Stream<? extends Element> staticImports = compilationUnit.getImports().stream().flatMap(this::staticImports);
-        Stream<TypeElement> alreadyImported = sourcePathClasses().filter(e -> isAlreadyImported(e.getQualifiedName().toString()));
-        Stream<TypeElement> notImported = sourcePathClasses().filter(e -> !isAlreadyImported(e.getQualifiedName().toString()));
+        Stream<TypeElement> sourcePathClasses = sourcePathClasses(partialIdentifier);
         Stream<? extends Element> elements = Stream.empty();
 
         if (!isStaticMethod(scope))
@@ -496,14 +500,14 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
         elements = Stream.concat(elements, thisScopes.stream().flatMap(this::instanceMembers));
         elements = Stream.concat(elements, classScopes.stream().flatMap(this::staticMembers));
         elements = Stream.concat(elements, staticImports);
-        elements = Stream.concat(elements, alreadyImported);
-        elements = Stream.concat(elements, notImported);
+        elements = Stream.concat(elements, sourcePathClasses);
 
         return elements;
     }
 
-    private Stream<TypeElement> sourcePathClasses() {
+    private Stream<TypeElement> sourcePathClasses(String partialClass) {
         return sourcePath.allSymbols(ElementKind.CLASS)
+                .filter(symbol -> containsCharactersInOrder(symbol.getName(), partialClass))
                 .flatMap(this::typeElementForSymbol)
                 .flatMap(this::topLevelClassElement);
     }

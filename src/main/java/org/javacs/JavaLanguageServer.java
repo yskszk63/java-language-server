@@ -113,6 +113,7 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public CompletableFuture<CompletionItem> resolveCompletionItem(CompletionItem unresolved) {
                 return null;
+                
             }
 
             @Override
