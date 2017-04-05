@@ -4,6 +4,7 @@ import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
+import com.sun.tools.javac.code.Symbol;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.SymbolInformation;
@@ -15,6 +16,7 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import java.lang.reflect.Constructor;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -360,9 +362,28 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
                 .flatMap(this::explodeConstructors)
                 .map(this::completeJavacConstructor);
         Stream<CompletionItem> classPathItems = classPath.topLevelConstructors(partialClass, packageOf(scope))
-                .map(this::completeReflectedConstructor);
+                .flatMap(this::asJavacConstructor)
+                .flatMap(this::tryCompleteJavacConstructor);
 
         return Stream.concat(sourcePathItems, classPathItems);
+    }
+
+    private Stream<ExecutableElement> asJavacConstructor(Constructor<?> c) {
+        TypeElement declaringClass = elements.getTypeElement(c.getDeclaringClass().getName());
+
+        if (declaringClass == null)
+            return Stream.empty();
+
+        // Completing constructors from the classpath can fail
+        try {
+            return elements.getAllMembers(declaringClass).stream()
+                .filter(member -> member.getKind() == ElementKind.CONSTRUCTOR)
+                .map(member -> (ExecutableElement) member);
+        } catch (Symbol.CompletionFailure failed) {
+            LOG.warning(failed.getMessage());
+
+            return Stream.empty();
+        }
     }
 
     private Stream<CompletionItem> innerConstructors(TreePath parent, String partialClass, Scope scope) {
@@ -380,14 +401,15 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
                 .map(this::completeJavacConstructor);
     }
 
-    private CompletionItem completeReflectedConstructor(Constructor<?> method) {
-        String qualifiedName = method.getDeclaringClass().getName();
-        String name = method.getDeclaringClass().getSimpleName();
-        Optional<String> docString = Optional.empty(); // TODO doc path
-        boolean hasTypeParameters = method.getTypeParameters().length > 0;
-        String methodSignature = Hovers.reflectedMethodSignature(method);
+    private Stream<CompletionItem> tryCompleteJavacConstructor(ExecutableElement method) {
+        // Completing constructors from the classpath can fail
+        try {
+            return Stream.of(completeJavacConstructor(method));
+        } catch (Symbol.CompletionFailure failed) {
+            LOG.warning(failed.getMessage());
 
-        return completeConstructor(qualifiedName, name, hasTypeParameters, methodSignature, docString);
+            return Stream.empty();
+        }
     }
 
     private CompletionItem completeJavacConstructor(ExecutableElement method) {

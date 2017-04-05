@@ -113,36 +113,6 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         return signature;
     }
 
-    public static String reflectedMethodSignature(Executable e) {
-        String name = e instanceof Constructor ? e.getDeclaringClass().getSimpleName() : e.getName();
-        boolean varargs = e.isVarArgs();
-        StringJoiner params = new StringJoiner(", ");
-
-        Parameter[] parameters = e.getParameters();
-        for (int i = 0; i < parameters.length; i++) {
-            Parameter p = parameters[i];
-            String pName = p.getName();
-
-            if (varargs && i == parameters.length - 1)
-                pName += "...";
-
-            params.add(pName);
-        }
-
-        String signature = name + "(" + params + ")";
-
-        if (e.getExceptionTypes().length > 0) {
-            StringJoiner thrown = new StringJoiner(", ");
-
-            for (Class<?> t : e.getExceptionTypes())
-                thrown.add(t.getSimpleName());
-
-            signature += " throws " + thrown;
-        }
-
-        return signature;
-    }
-
     private static String shortName(VariableElement p, boolean varargs) {
         TypeMirror type = p.asType();
 
