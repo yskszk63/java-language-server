@@ -2,7 +2,6 @@
 
 ## Bugs
 * Auto-import in empty file generates extra line of WS
-* Rename-symbol doesn't work across files
 * Error squiggles are off
 * Autocomplete is showing arg0, arg1 for constructors
 
