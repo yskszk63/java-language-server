@@ -484,6 +484,7 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
         Collection<TypeElement> thisScopes = thisScopes(scope);
         Collection<TypeElement> classScopes = classScopes(scope);
         List<Scope> methodScopes = methodScopes(scope);
+        Stream<? extends Element> staticImports = compilationUnit.getImports().stream().flatMap(this::staticImports);
         Stream<TypeElement> alreadyImported = sourcePathClasses().filter(e -> isAlreadyImported(e.getQualifiedName().toString()));
         Stream<TypeElement> notImported = sourcePathClasses().filter(e -> !isAlreadyImported(e.getQualifiedName().toString()));
         Stream<? extends Element> elements = Stream.empty();
@@ -494,6 +495,7 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
         elements = Stream.concat(elements, methodScopes.stream().flatMap(this::locals));
         elements = Stream.concat(elements, thisScopes.stream().flatMap(this::instanceMembers));
         elements = Stream.concat(elements, classScopes.stream().flatMap(this::staticMembers));
+        elements = Stream.concat(elements, staticImports);
         elements = Stream.concat(elements, alreadyImported);
         elements = Stream.concat(elements, notImported);
 
@@ -515,21 +517,30 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
             return Stream.empty();
     }
 
-    /**
-     * All imported symbols
-     */
-    private Stream<? extends Element> importedSymbolsIn(ImportTree tree) {
+    private Stream<? extends Element> staticImports(ImportTree tree) {
+        if (!tree.isStatic())
+            return Stream.empty();
+
         if (isStarImport(tree)) {
             String parentName = mostIds(importId(tree));
-            PackageElement parentElement = elements.getPackageElement(parentName);
+            TypeElement parentElement = elements.getTypeElement(parentName);
 
             return parentElement.getEnclosedElements().stream();
         }
         else {
             String name = importId(tree);
-            TypeElement element = elements.getTypeElement(name);
+            String className = mostIds(name);
+            String memberName = lastId(name);
+            TypeElement classElement = elements.getTypeElement(className);
 
-            return Stream.of(element);
+            for (Element each : classElement.getEnclosedElements()) {
+                if (each.getSimpleName().contentEquals(memberName))
+                    return Stream.of(each);
+            }
+
+            LOG.warning("Couldn't find " + memberName + " in " + className);
+
+            return Stream.empty();
         }
     }
 

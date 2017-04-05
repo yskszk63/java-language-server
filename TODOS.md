@@ -16,7 +16,6 @@
 * Status bar info during indexing
 
 ## Autocomplete
-* Statically imported functions
 * Autocomplete constructor signatures instead of just class name
 * Autocomplete is using the entire method signature
 * Autocomplete annotation fields

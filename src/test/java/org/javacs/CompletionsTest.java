@@ -631,6 +631,24 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
+    public void staticStarImport() throws IOException {
+        String file = "/org/javacs/example/AutocompleteStaticImport.java";
+
+        Set<String> suggestions = insertText(file, 8, 15);
+
+        assertThat("suggests star-imported static method", suggestions, hasItems("emptyList"));
+    }
+
+    @Test
+    public void staticImport() throws IOException {
+        String file = "/org/javacs/example/AutocompleteStaticImport.java";
+
+        Set<String> suggestions = insertText(file, 9, 10);
+
+        assertThat("suggests star-imported static field", suggestions, hasItems("BC"));
+    }
+
+    @Test
     public void containsCharactersInOrder() {
         assertTrue(Completions.containsCharactersInOrder("FooBar", "FooBar"));
         assertTrue(Completions.containsCharactersInOrder("FooBar", "foobar"));
