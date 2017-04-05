@@ -78,7 +78,13 @@ public class JavacHolder {
                     pruner.removeStatementsAfterCursor(tree, line, column);
             }
 
-            Iterable<? extends Element> analyze = task.analyze();
+            try {
+                Iterable<? extends Element> analyze = task.analyze();
+            } catch (AssertionError e) {
+                if (!catchJavacError(e))
+                    throw e;
+            }
+
             Function<CompilationUnitTree, Stream<TreePath>> findPath = PathAtCursor.create(task, line, column).andThen(JavacHolder::stream);
             Supplier<Stream<? extends CompilationUnitTree>> compilationUnits = () -> StreamSupport.stream(parse.spliterator(), false);
             Optional<TreePath> cursor = compilationUnits.get()
@@ -369,9 +375,15 @@ public class JavacHolder {
         try {
             DiagnosticCollector<JavaFileObject> errors = startCollectingErrors();
             Iterable<? extends CompilationUnitTree> parse = task.parse();
-            Iterable<? extends Element> analyze = task.analyze();
 
-            parse.forEach(tree -> index.update(tree, task));
+            try {
+                Iterable<? extends Element> analyze = task.analyze();
+
+                parse.forEach(tree -> index.update(tree, task));
+            } catch (AssertionError e) {
+                if (!catchJavacError(e))
+                    throw e;
+            }
 
             return new BatchResult(task, parse, errors);
         } catch (IOException e) {
@@ -379,6 +391,15 @@ public class JavacHolder {
         } finally {
             stopCollectingErrors();
         }
+    }
+
+    private boolean catchJavacError(AssertionError e) {
+        if (e.getStackTrace().length > 0 && e.getStackTrace()[0].getClassName().startsWith("com.sun.tools.javac")) {
+            LOG.log(Level.WARNING, "Failed analyze phase", e);
+
+            return true;
+        }
+        else return false;
     }
 
     private Collection<JavaFileObject> dependencies(Collection<JavaFileObject> files) {

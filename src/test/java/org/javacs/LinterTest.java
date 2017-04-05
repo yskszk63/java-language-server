@@ -136,6 +136,28 @@ public class LinterTest {
         assertThat(compile.errors.getDiagnostics(), not(empty()));
     }
 
+    @Test
+    public void parseError() {
+        URI file = URI.create("/org/javacs/example/ArrowTry.java");
+        String source =
+                "package org.javacs.example;\n" +
+                "\n" +
+                "class Example {\n" +
+                "    private static <In, Out> Function<In, Stream<Out>> catchClasspathErrors(Function<In, Stream<Out>> f) {\n" +
+                "        return in -> try {\n" +
+                "            return f.apply(in);\n" +
+                "        } catch (Symbol.CompletionFailure failed) {\n" +
+                "            LOG.warning(failed.getMessage());\n" +
+                "            return Stream.empty();\n" +
+                "        };\n" +
+                "    }\n" +
+                "}";
+        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.of(source)));
+
+        assertThat(compile.errors.getDiagnostics(), not(empty()));
+
+    }
+
     public static class MethodTypes extends TreePathScanner<Void, Void> {
         public final Map<String, ExecutableType> methodTypes = new HashMap<>();
 
