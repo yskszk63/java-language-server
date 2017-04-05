@@ -80,7 +80,6 @@ class JavaLanguageServer implements LanguageServer {
 
     @Override
     public void exit() {
-
     }
 
     @Override
@@ -92,6 +91,9 @@ class JavaLanguageServer implements LanguageServer {
                 Optional<String> content = activeContent(uri);
                 int line = position.getPosition().getLine() + 1;
                 int character = position.getPosition().getCharacter() + 1;
+
+                LOG.info(String.format("Complete at %s %d:%d", uri, line, character));
+
                 List<CompletionItem> items = findCompiler(uri)
                         .map(compiler -> compiler.compileFocused(uri, content, line, character, true))
                         .map(Completions::at)
@@ -99,6 +101,11 @@ class JavaLanguageServer implements LanguageServer {
                         .limit(maxItems)
                         .collect(Collectors.toList());
                 CompletionList result = new CompletionList(items.size() == maxItems, items);
+
+                if (result.isIncomplete())
+                    LOG.info(String.format("Found %d items (incomplete)", items.size()));
+                else
+                    LOG.info(String.format("Found %d items", items.size()));
 
                 return CompletableFuture.completedFuture(Either.forRight(result));
             }
