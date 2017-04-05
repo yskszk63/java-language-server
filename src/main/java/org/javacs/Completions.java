@@ -241,10 +241,12 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
     }
 
     private boolean isAlreadyImported(String qualifiedName) {
-        if (qualifiedName.startsWith("java.lang"))
+        String packageName = mostIds(qualifiedName);
+
+        if (packageName.equals("java.lang"))
             return true;
 
-        if (qualifiedName.startsWith(compilationUnit.getPackageName().toString()))
+        if (packageName.equals(compilationUnit.getPackageName().toString()))
             return true;
 
         for (ImportTree each : compilationUnit.getImports()) {
@@ -253,9 +255,9 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
 
             String importName = importId(each);
 
-            if (isStarImport(each) && mostIds(importName).equals(mostIds(qualifiedName)))
+            if (isStarImport(each) && mostIds(importName).equals(packageName))
                 return true;
-            else if (importName.equals(qualifiedName))
+            else if (importName.equals(packageName))
                 return true;
         }
 
@@ -350,7 +352,9 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> constructors(String partialClass, Scope scope) {
-        Stream<CompletionItem> sourcePathItems = Stream.concat(defaultImports(), Stream.concat(importedSymbols(), notAlreadyImportedSourcePathClasses()))
+        Stream<TypeElement> alreadyImported = sourcePathClasses().filter(e -> isAlreadyImported(e.getQualifiedName().toString()));
+        Stream<TypeElement> notImported = sourcePathClasses().filter(e -> !isAlreadyImported(e.getQualifiedName().toString()));
+        Stream<CompletionItem> sourcePathItems = Stream.concat(alreadyImported, notImported)
                 .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialClass))
                 .flatMap(this::topLevelClassElement)
                 .flatMap(this::explodeConstructors)
@@ -437,7 +441,6 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
                 .filter(e -> isAccessible(e, scope))
                 .flatMap(this::completionItem);
         Stream<CompletionItem> classPathItems = classPath.topLevelClasses(partialIdentifier, packageOf(scope))
-                .filter(c -> !isAlreadyImported(c.getName().toString()))
                 .map(this::completeTopLevelClassSymbol);
 
         return Stream.concat(sourcePathItems, classPathItems);
@@ -459,6 +462,8 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
         Collection<TypeElement> thisScopes = thisScopes(scope);
         Collection<TypeElement> classScopes = classScopes(scope);
         List<Scope> methodScopes = methodScopes(scope);
+        Stream<TypeElement> alreadyImported = sourcePathClasses().filter(e -> isAlreadyImported(e.getQualifiedName().toString()));
+        Stream<TypeElement> notImported = sourcePathClasses().filter(e -> !isAlreadyImported(e.getQualifiedName().toString()));
         Stream<? extends Element> elements = Stream.empty();
 
         if (!isStaticMethod(scope))
@@ -467,36 +472,25 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
         elements = Stream.concat(elements, methodScopes.stream().flatMap(this::locals));
         elements = Stream.concat(elements, thisScopes.stream().flatMap(this::instanceMembers));
         elements = Stream.concat(elements, classScopes.stream().flatMap(this::staticMembers));
-        elements = Stream.concat(elements, importedSymbols());
-        elements = Stream.concat(elements, defaultImports());
-        elements = Stream.concat(elements, notAlreadyImportedSourcePathClasses());
+        elements = Stream.concat(elements, alreadyImported);
+        elements = Stream.concat(elements, notImported);
 
         return elements;
     }
 
-    private Stream<? extends Element> defaultImports() {
-        Stream<? extends Element> thisPackage = elements.getPackageElement(compilationUnit.getPackageName().toString())
-            .getEnclosedElements()
-            .stream();
-        Stream<? extends Element> javaLang = elements.getPackageElement("java.lang")
-            .getEnclosedElements()
-            .stream();
-
-        return Stream.concat(thisPackage, javaLang);
-    }
-
-    private Stream<? extends Element> importedSymbols() {
-        return compilationUnit.getImports().stream()
-                .flatMap(this::importedSymbolsIn);
-    }
-
-    private Stream<TypeElement> notAlreadyImportedSourcePathClasses() {
+    private Stream<TypeElement> sourcePathClasses() {
         return sourcePath.allSymbols(ElementKind.CLASS)
-                .map(symbol -> elements.getTypeElement(qualifiedName(symbol.getContainerName(), symbol.getName())))
-                .filter(e -> e != null)
-                .flatMap(this::topLevelClassElement)
-                // We've already resolved already-imported symbols
-                .filter(e -> !isAlreadyImported(e.getQualifiedName().toString()));
+                .flatMap(this::typeElementForSymbol)
+                .flatMap(this::topLevelClassElement);
+    }
+
+    private Stream<TypeElement> typeElementForSymbol(SymbolInformation symbol) {
+        TypeElement result = elements.getTypeElement(qualifiedName(symbol.getContainerName(), symbol.getName()));
+
+        if (result != null)
+            return Stream.of(result);
+        else 
+            return Stream.empty();
     }
 
     /**

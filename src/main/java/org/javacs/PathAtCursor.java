@@ -4,6 +4,7 @@ import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
 
+import java.util.Collection;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -50,6 +51,67 @@ public class PathAtCursor extends CursorScanner<TreePath> {
             return getCurrentPath();
         else
             return super.visitIdentifier(node, aVoid);
+    }
+
+    @Override
+    public TreePath visitMethod(MethodTree node, Void aVoid) {
+        if (methodNameContainsCursor(node))
+            return getCurrentPath();
+        else
+            return super.visitMethod(node, aVoid);
+    }
+
+    private boolean methodNameContainsCursor(MethodTree node) {
+        return containsCursor(node) && 
+                !listContainsCursor(node.getParameters()) &&
+                !listContainsCursor(node.getThrows()) &&
+                !listContainsCursor(node.getTypeParameters()) &&
+                !containsCursor(node.getBody()) &&
+                !containsCursor(node.getDefaultValue()) &&
+                !containsCursor(node.getModifiers()) &&
+                !containsCursor(node.getReceiverParameter()) &&
+                !containsCursor(node.getReturnType());
+    }
+
+    @Override
+    public TreePath visitClass(ClassTree node, Void aVoid) {
+        if (classNameContainsCursor(node))
+            return getCurrentPath();
+        else
+            return super.visitClass(node, aVoid);
+    }
+
+    private boolean classNameContainsCursor(ClassTree node) {
+        return containsCursor(node) &&
+                !listContainsCursor(node.getTypeParameters()) &&
+                !listContainsCursor(node.getImplementsClause()) &&
+                !listContainsCursor(node.getMembers()) &&
+                !containsCursor(node.getModifiers()) &&
+                !containsCursor(node.getExtendsClause());
+    }
+
+    @Override
+    public TreePath visitVariable(VariableTree node, Void aVoid) {
+        if (variableNameContainsCursor(node))
+            return getCurrentPath();
+        else
+            return super.visitVariable(node, aVoid);
+    }
+
+    private boolean variableNameContainsCursor(VariableTree node) {
+        return containsCursor(node) &&
+                !containsCursor(node.getModifiers()) &&
+                !containsCursor(node.getInitializer()) &&
+                !containsCursor(node.getType());
+    }
+
+    private boolean listContainsCursor(Collection<? extends Tree> list) {
+        for (Tree each : list) {
+            if (containsCursor(each))
+                return true;
+        }
+
+        return false;
     }
 
     @Override

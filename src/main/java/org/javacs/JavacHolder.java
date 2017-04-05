@@ -58,19 +58,25 @@ public class JavacHolder {
      *
      * As an optimization, this function may ignore code not accessible to the cursor.
      */
-    public FocusedResult compileFocused(URI file, Optional<String> textContent, int line, int column) {
+    public FocusedResult compileFocused(URI file, Optional<String> textContent, int line, int column, boolean pruneStatements) {
         initialIndexComplete.join();
 
-        JavaFileObject original = findFile(file, textContent);
-        JavaFileObject withSemi = TreePruner.putSemicolonAfterCursor(original, line, column);
-        JavacTask task = createTask(Collections.singleton(withSemi));
+        JavaFileObject fileObject = findFile(file, textContent);
+
+        if (pruneStatements)
+            fileObject = TreePruner.putSemicolonAfterCursor(fileObject, line, column);
+
+        JavacTask task = createTask(Collections.singleton(fileObject));
 
         try {
             Iterable<? extends CompilationUnitTree> parse = task.parse();
-            TreePruner pruner = new TreePruner(task);
 
-            for (CompilationUnitTree tree : parse)
-                pruner.removeStatementsAfterCursor(tree, line, column);
+            if (pruneStatements) {
+                TreePruner pruner = new TreePruner(task);
+
+                for (CompilationUnitTree tree : parse)
+                    pruner.removeStatementsAfterCursor(tree, line, column);
+            }
 
             Iterable<? extends Element> analyze = task.analyze();
             Function<CompilationUnitTree, Stream<TreePath>> findPath = PathAtCursor.create(task, line, column).andThen(JavacHolder::stream);

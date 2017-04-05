@@ -93,7 +93,7 @@ class JavaLanguageServer implements LanguageServer {
                 int line = position.getPosition().getLine() + 1;
                 int character = position.getPosition().getCharacter() + 1;
                 List<CompletionItem> items = findCompiler(uri)
-                        .map(compiler -> compiler.compileFocused(uri, content, line, character))
+                        .map(compiler -> compiler.compileFocused(uri, content, line, character, true))
                         .map(Completions::at)
                         .orElseGet(Stream::empty)
                         .limit(maxItems)
@@ -115,7 +115,7 @@ class JavaLanguageServer implements LanguageServer {
                 int line = position.getPosition().getLine() + 1;
                 int character = position.getPosition().getCharacter() + 1;
                 Hover hover = findCompiler(uri)
-                        .map(compiler -> compiler.compileFocused(uri, content, line, character))
+                        .map(compiler -> compiler.compileFocused(uri, content, line, character, false))
                         .flatMap(Hovers::hoverText)
                         .orElseGet(Hover::new);
 
@@ -135,7 +135,7 @@ class JavaLanguageServer implements LanguageServer {
                 int character = position.getPosition().getCharacter() + 1;
                 List<Location> locations = findCompiler(uri)
                         .flatMap(compiler -> {
-                            FocusedResult result = compiler.compileFocused(uri, content, line, character);
+                            FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
 
                             return References.gotoDefinition(result, compiler.index);
                         })
@@ -153,7 +153,7 @@ class JavaLanguageServer implements LanguageServer {
                 int character = params.getPosition().getCharacter() + 1;
                 List<Location> locations = findCompiler(uri)
                         .map(compiler -> {
-                            FocusedResult result = compiler.compileFocused(uri, content, line, character);
+                            FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
 
                             return References.findReferences(result, compiler.index);
                         })
@@ -729,7 +729,7 @@ class JavaLanguageServer implements LanguageServer {
 
         return findCompiler(file)
                 .flatMap(compiler -> {
-                    FocusedResult result = compiler.compileFocused(file, content, line, character);
+                    FocusedResult result = compiler.compileFocused(file, content, line, character, false);
                     Trees trees = Trees.instance(result.task);
                     Function<TreePath, Optional<Element>> findSymbol = cursor -> Optional.ofNullable(trees.getElement(cursor));
 
@@ -754,7 +754,7 @@ class JavaLanguageServer implements LanguageServer {
 
                 client.logMessage(new MessageParams(
                         messageType(record.getLevel().intValue()),
-                        record.getMessage()
+                        message
                 ));
             }
 

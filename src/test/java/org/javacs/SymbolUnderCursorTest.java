@@ -12,7 +12,6 @@ import static org.junit.Assert.assertEquals;
 
 public class SymbolUnderCursorTest {
 
-    /* symbolAt doesn't work on declarations anymore and I don't think it should
     @Test
     public void classDeclaration() {
         assertEquals("SymbolUnderCursor", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 3, 22));
@@ -42,7 +41,6 @@ public class SymbolUnderCursorTest {
     public void constructorParameterDeclaration() {
         assertEquals("constructorParameter", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 17, 46));
     }
-    */
 
     @Test
     public void classIdentifier() {

@@ -233,7 +233,7 @@ public class SymbolIndex {
                     Map<String, Set<Location>> withKind = index.references.computeIfAbsent(symbol.getKind(), newKind -> new HashMap<>());
                     Set<Location> locations = withKind.computeIfAbsent(key, newName -> new HashSet<>());
 
-                    findElementName(symbol, trees).ifPresent(locations::add);
+                    findPath(getCurrentPath(), trees).ifPresent(locations::add);
                 }
             }
 
@@ -262,6 +262,31 @@ public class SymbolIndex {
         }.scan(compilationUnit, null);
 
         sourcePath.put(file, index);
+    }
+
+    private static Optional<Location> findPath(TreePath path, Trees trees) {
+        CompilationUnitTree compilationUnit = path.getCompilationUnit();
+        long start = trees.getSourcePositions().getStartPosition(compilationUnit, path.getLeaf());
+        long end = trees.getSourcePositions().getEndPosition(compilationUnit, path.getLeaf());
+
+        if (start == Diagnostic.NOPOS)
+            return Optional.empty();
+
+        if (end == Diagnostic.NOPOS)
+            end = start;
+        
+        int startLine = (int) compilationUnit.getLineMap().getLineNumber(start);
+        int startColumn = (int) compilationUnit.getLineMap().getColumnNumber(start);
+        int endLine = (int) compilationUnit.getLineMap().getLineNumber(end);
+        int endColumn = (int) compilationUnit.getLineMap().getColumnNumber(end);
+
+        return Optional.of(new Location(
+                compilationUnit.getSourceFile().toUri().toString(),
+                new Range(
+                        new Position(startLine - 1, startColumn - 1),
+                        new Position(endLine - 1, endColumn - 1)
+                )
+        ));
     }
 
     private static Optional<Location> findElementName(Element symbol, Trees trees) {
