@@ -1,6 +1,7 @@
 package org.javacs;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 import org.eclipse.lsp4j.*;
@@ -62,7 +63,7 @@ class JavaLanguageServer implements LanguageServer {
 
         c.setTextDocumentSync(TextDocumentSyncKind.Incremental);
         c.setDefinitionProvider(true);
-        c.setCompletionProvider(new CompletionOptions());
+        c.setCompletionProvider(new CompletionOptions(false, ImmutableList.of(".")));
         c.setHoverProvider(true);
         c.setWorkspaceSymbolProvider(true);
         c.setReferencesProvider(true);
