@@ -79,6 +79,11 @@ public class References {
     }
 
     private Optional<Location> doGotoDefinition(TreePath cursor) {
+        CursorContext context = CursorContext.from(cursor);
+
+        if (context == CursorContext.NewClass)
+            cursor = context.find(cursor);
+
         Trees trees = Trees.instance(task);
         Element symbol = trees.getElement(cursor);
 

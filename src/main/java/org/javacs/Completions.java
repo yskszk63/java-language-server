@@ -55,13 +55,13 @@ class Completions implements Supplier<Stream<CompletionItem>> {
     public Stream<CompletionItem> get() {
         Tree leaf = path.getLeaf();
         Scope scope = trees.getScope(path);
-        Context context = context(path);
+        CursorContext context = CursorContext.from(path);
 
         if (leaf instanceof MemberSelectTree) {
             MemberSelectTree select = (MemberSelectTree) leaf;
             TreePath expressionPath = new TreePath(path.getParentPath(), select.getExpression());
 
-            if (context == Context.NewClass)
+            if (context == CursorContext.NewClass)
                 return innerConstructors(expressionPath, partialIdentifier(select.getIdentifier()), scope);
             else
                 return completeMembers(expressionPath, partialIdentifier(select.getIdentifier()), scope);
@@ -75,43 +75,14 @@ class Completions implements Supplier<Stream<CompletionItem>> {
         else if (leaf instanceof IdentifierTree) {
             IdentifierTree id = (IdentifierTree) leaf;
 
-            if (context == Context.Import)
+            if (context == CursorContext.Import)
                 return packageMembers("", id.getName().toString(), scope);
-            else if (context == Context.NewClass)
+            else if (context == CursorContext.NewClass)
                 return constructors(partialIdentifier(id.getName()), scope);
             else
                 return allSymbols(partialIdentifier(id.getName()), scope);
         }
         else return Stream.empty();
-    }
-
-    private enum Context {
-        NewClass,
-        Import,
-        Other
-    }
-
-    /**
-     * Is this identifier or member embedded in an important context, for example:
-     *
-     *   new OuterClass.InnerClass|
-     *   import package.Class|
-     */
-    private static Context context(TreePath path) {
-        if (path == null)
-            return Context.Other;
-        else switch (path.getLeaf().getKind()) {
-            case MEMBER_SELECT:
-            case MEMBER_REFERENCE:
-            case IDENTIFIER:
-                return context(path.getParentPath());
-            case NEW_CLASS:
-                return Context.NewClass;
-            case IMPORT:
-                return Context.Import;
-            default:
-                return Context.Other;
-        }
     }
 
     private String partialIdentifier(Name name) {
@@ -757,7 +728,7 @@ class Completions implements Supplier<Stream<CompletionItem>> {
     }
 
     private List<TextEdit> addImport(String qualifiedName) {
-        if (!isAlreadyImported(qualifiedName) && context(path) != Context.Import)
+        if (!isAlreadyImported(qualifiedName) && CursorContext.from(path) != CursorContext.Import)
             return new RefactorFile(task, compilationUnit).addImport(mostIds(qualifiedName), lastId(qualifiedName));
         else
             return Collections.emptyList();
