@@ -16,16 +16,15 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import java.lang.reflect.Constructor;
 import java.util.*;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-public class Completions implements Supplier<Stream<CompletionItem>> {
+class Completions implements Supplier<Stream<CompletionItem>> {
 
-    public static Stream<CompletionItem> at(FocusedResult compiled) {
+    static Stream<CompletionItem> at(FocusedResult compiled) {
         return compiled.cursor
                 .map(path -> new Completions(compiled.task, compiled.classPath, compiled.sourcePath, path).get())
                 .orElseGet(Stream::empty);
@@ -56,12 +55,16 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
     public Stream<CompletionItem> get() {
         Tree leaf = path.getLeaf();
         Scope scope = trees.getScope(path);
+        Context context = context(path);
 
         if (leaf instanceof MemberSelectTree) {
             MemberSelectTree select = (MemberSelectTree) leaf;
             TreePath expressionPath = new TreePath(path.getParentPath(), select.getExpression());
 
-            return completeMembers(expressionPath, partialIdentifier(select.getIdentifier()), scope);
+            if (context == Context.NewClass)
+                return innerConstructors(expressionPath, partialIdentifier(select.getIdentifier()), scope);
+            else
+                return completeMembers(expressionPath, partialIdentifier(select.getIdentifier()), scope);
         }
         else if (leaf instanceof MemberReferenceTree) {
             MemberReferenceTree select = (MemberReferenceTree) leaf;
@@ -69,44 +72,46 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
 
             return completeMembers(expressionPath, partialIdentifier(select.getName()), scope);
         }
-        else if (leaf instanceof NewClassTree) {
-            NewClassTree newClass = (NewClassTree) leaf;
-            ExpressionTree identifier = newClass.getIdentifier();
-
-            if (identifier instanceof MemberSelectTree) {
-                MemberSelectTree select = (MemberSelectTree) identifier;
-                TreePath pathToExpression = TreePath.getPath(TreePath.getPath(path, identifier), select.getExpression());
-
-                return innerConstructors(pathToExpression, partialIdentifier(select.getIdentifier()), scope);
-            }
-            else if (identifier instanceof IdentifierTree) {
-                return constructors(partialIdentifier(((IdentifierTree) identifier).getName()), scope);
-            }
-            else {
-                LOG.warning("Expected MemberSelectTree or IdentifierTree but found " + identifier.getClass() + ", cannot complete constructor");
-
-                return Stream.empty();
-            }
-        }
         else if (leaf instanceof IdentifierTree) {
             IdentifierTree id = (IdentifierTree) leaf;
 
-            // Special case: import com
-            if (inImport(path))
+            if (context == Context.Import)
                 return packageMembers("", id.getName().toString(), scope);
-
-            return allSymbols(partialIdentifier(id.getName()), scope);
+            else if (context == Context.NewClass)
+                return constructors(partialIdentifier(id.getName()), scope);
+            else
+                return allSymbols(partialIdentifier(id.getName()), scope);
         }
         else return Stream.empty();
     }
 
-    private static boolean inImport(TreePath path) {
+    private enum Context {
+        NewClass,
+        Import,
+        Other
+    }
+
+    /**
+     * Is this identifier or member embedded in an important context, for example:
+     *
+     *   new OuterClass.InnerClass|
+     *   import package.Class|
+     */
+    private static Context context(TreePath path) {
         if (path == null)
-            return false;
-        else if (path.getLeaf().getKind() == Tree.Kind.IMPORT)
-            return true;
-        else
-            return inImport(path.getParentPath());
+            return Context.Other;
+        else switch (path.getLeaf().getKind()) {
+            case MEMBER_SELECT:
+            case MEMBER_REFERENCE:
+            case IDENTIFIER:
+                return context(path.getParentPath());
+            case NEW_CLASS:
+                return Context.NewClass;
+            case IMPORT:
+                return Context.Import;
+            default:
+                return Context.Other;
+        }
     }
 
     private String partialIdentifier(Name name) {
@@ -752,7 +757,7 @@ public class Completions implements Supplier<Stream<CompletionItem>> {
     }
 
     private List<TextEdit> addImport(String qualifiedName) {
-        if (!isAlreadyImported(qualifiedName) && !inImport(path))
+        if (!isAlreadyImported(qualifiedName) && context(path) != Context.Import)
             return new RefactorFile(task, compilationUnit).addImport(mostIds(qualifiedName), lastId(qualifiedName));
         else
             return Collections.emptyList();
