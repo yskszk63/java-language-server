@@ -29,7 +29,6 @@ import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -85,10 +84,9 @@ public class JavacHolder {
                     throw e;
             }
 
-            Function<CompilationUnitTree, Stream<TreePath>> findPath = PathAtCursor.create(task, line, column).andThen(JavacHolder::stream);
             Supplier<Stream<? extends CompilationUnitTree>> compilationUnits = () -> StreamSupport.stream(parse.spliterator(), false);
             Optional<TreePath> cursor = compilationUnits.get()
-                    .flatMap(findPath)
+                    .flatMap(source -> stream(FindCursor.find(task, source, line, column)))
                     .findAny();
 
             return new FocusedResult(cursor, task, classPathIndex, index);

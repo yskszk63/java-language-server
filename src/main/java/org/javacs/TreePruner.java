@@ -2,6 +2,9 @@ package org.javacs;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
+import com.sun.source.util.SourcePositions;
+import com.sun.source.util.TreeScanner;
+import com.sun.source.util.Trees;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.List;
 
@@ -12,18 +15,21 @@ import java.io.Reader;
 /**
  * Fix up the tree to make it easier to autocomplete, index
  */
-public class TreePruner {
+class TreePruner {
     private final JavacTask task;
 
-    public TreePruner(JavacTask task) {
+    TreePruner(JavacTask task) {
         this.task = task;
     }
 
     /**
      * Remove all statements after the statement the cursor is in
      */
-    public void removeStatementsAfterCursor(CompilationUnitTree tree, int line, int character) {
-        new CursorScanner<Void>(task, line, character) {
+    void removeStatementsAfterCursor(CompilationUnitTree source, int line, int column) {
+        SourcePositions sourcePositions = Trees.instance(task).getSourcePositions();
+        long offset = source.getLineMap().getPosition(line, column);
+
+        class Pruner extends TreeScanner<Void, Void> {
             @Override
             public Void visitBlock(BlockTree node, Void aVoid) {
                 JCTree.JCBlock impl = (JCTree.JCBlock) node;
@@ -72,13 +78,27 @@ public class TreePruner {
                 // Remove all statements after statement containing cursor
                 return stats.take(countStatements);
             }
-        }.apply(tree);
+
+            boolean containsCursor(Tree leaf) {
+                long start = sourcePositions.getStartPosition(source, leaf);
+                long end = sourcePositions.getEndPosition(source, leaf);
+
+                return start <= offset && offset <= end;
+            }
+
+            @Override
+            public Void visitErroneous(ErroneousTree node, Void nothing) {
+                return super.scan(node.getErrorTrees(), nothing);
+            }
+        }
+
+        new Pruner().scan(source, null);
     }
 
     /**
      * Insert ';' after the users cursor so we recover from parse errors in a helpful way when doing autocomplete.
      */
-    public static JavaFileObject putSemicolonAfterCursor(JavaFileObject file, int cursorLine, int cursorCharacter) {
+    static JavaFileObject putSemicolonAfterCursor(JavaFileObject file, int cursorLine, int cursorCharacter) {
         try (Reader reader = file.openReader(true)) {
             StringBuilder acc = new StringBuilder();
             int line = 1, character = 1;
