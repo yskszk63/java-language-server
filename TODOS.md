@@ -25,6 +25,7 @@
   * Order by imported, name, use in sourcepath
 * Signature help
 * Other methods of class when we have already statically imported 1 method
+* Constructor of scope-local class
 
 ## Features 
 * Go-to-subclasses
