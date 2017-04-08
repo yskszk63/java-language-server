@@ -36,6 +36,10 @@
 * javaconfig.json sourcePath / sourcePathFile
 * Reformat selection, file
 
+## Code actions
+* Explode import *
+* Show only method name
+
 ### Refactoring
 * Inline method, variable
 * Extract method, variable
