@@ -7,6 +7,8 @@ import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.resources.compiler;
+import java.time.Duration;
+import java.time.Instant;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -93,6 +95,7 @@ class JavaLanguageServer implements LanguageServer {
         return new TextDocumentService() {
             @Override
             public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(TextDocumentPositionParams position) {
+                Instant started = Instant.now();
                 URI uri = URI.create(position.getTextDocument().getUri());
                 Optional<String> content = activeContent(uri);
                 int line = position.getPosition().getLine() + 1;
@@ -107,11 +110,12 @@ class JavaLanguageServer implements LanguageServer {
                         .limit(maxItems)
                         .collect(Collectors.toList());
                 CompletionList result = new CompletionList(items.size() == maxItems, items);
-
+                Duration elapsed = Duration.between(started, Instant.now());
+                
                 if (result.isIncomplete())
-                    LOG.info(String.format("Found %d items (incomplete)", items.size()));
+                    LOG.info(String.format("Found %d items (incomplete) in %d ms", items.size(), elapsed.toMillis()));
                 else
-                    LOG.info(String.format("Found %d items", items.size()));
+                    LOG.info(String.format("Found %d items in %d ms", items.size(), elapsed.toMillis()));
 
                 return CompletableFuture.completedFuture(Either.forRight(result));
             }
@@ -584,7 +588,7 @@ class JavaLanguageServer implements LanguageServer {
             Set<Path> sourcePath = sourceDirectories(pomXml);
 
             // Use target/javacs
-            Path outputDirectory = Paths.get("target/javacs").toAbsolutePath();
+            Path outputDirectory = Paths.get("target/classes").toAbsolutePath();
 
             JavacConfig config = new JavacConfig(sourcePath, classPath, outputDirectory);
 
