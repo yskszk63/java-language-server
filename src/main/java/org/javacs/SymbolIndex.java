@@ -129,6 +129,9 @@ public class SymbolIndex {
     }
 
     public static boolean shouldIndex(Element symbol) {
+        if (symbol == null)
+            return false;
+            
         ElementKind kind = symbol.getKind();
 
         switch (kind) {

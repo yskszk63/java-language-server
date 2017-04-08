@@ -159,7 +159,7 @@ public class JavacHolder {
 
     private final List<String> options;
 
-    private final ClassPathIndex classPathIndex;
+    public final ClassPathIndex classPathIndex;
 
     private JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory, boolean index) {
         this.classPath = Collections.unmodifiableSet(classPath);

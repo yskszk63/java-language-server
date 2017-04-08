@@ -397,7 +397,7 @@ class Completions implements Supplier<Stream<CompletionItem>> {
         TypeElement enclosingClass = (TypeElement) method.getEnclosingElement();
         Optional<String> docString = docstring(method);
         boolean hasTypeParameters = !method.getTypeParameters().isEmpty();
-        String methodSignature = Hovers.methodSignature(method, true);
+        String methodSignature = Hovers.methodSignature(method, false);
         String qualifiedName = enclosingClass.getQualifiedName().toString();
         String name = enclosingClass.getSimpleName().toString();
 

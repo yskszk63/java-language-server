@@ -1,8 +1,6 @@
 package org.javacs;
 
-import com.sun.source.tree.CompilationUnitTree;
-import com.sun.source.tree.ErroneousTree;
-import com.sun.source.tree.Tree;
+import com.sun.source.tree.*;
 import com.sun.source.util.*;
 
 import java.util.Optional;

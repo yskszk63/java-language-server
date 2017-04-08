@@ -7,24 +7,14 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+
 import com.sun.tools.javac.util.List;
 
-public class LanguageServerFixture {
+class LanguageServerFixture {
 
-    public static JavaLanguageServer getJavaLanguageServer() {
-        Set<Path> classPath = Collections.emptySet();
-        Set<Path> sourcePath = Collections.singleton(Paths.get("src/test/resources").toAbsolutePath());
-        Path outputDirectory = Paths.get("out").toAbsolutePath();
-        JavacHolder javac = JavacHolder.create(classPath, sourcePath, outputDirectory);
-        JavaLanguageServer server = new JavaLanguageServer(javac);
-
-        InitializeParams init = new InitializeParams();
-        String workspaceRoot = Paths.get(".").toAbsolutePath().toString();
-
-        init.setRootPath(workspaceRoot);
-
-        server.initialize(init);
-        server.installClient(new LanguageClient() {
+    static JavaLanguageServer getJavaLanguageServer() {
+        return getJavaLanguageServer(new LanguageClient() {
             @Override
             public void telemetryEvent(Object o) {
 
@@ -50,6 +40,22 @@ public class LanguageServerFixture {
 
             }
         });
+    }
+
+    static JavaLanguageServer getJavaLanguageServer(LanguageClient client) {
+        Set<Path> classPath = Collections.emptySet();
+        Set<Path> sourcePath = Collections.singleton(Paths.get("src/test/resources").toAbsolutePath());
+        Path outputDirectory = Paths.get("out").toAbsolutePath();
+        JavacHolder javac = JavacHolder.create(classPath, sourcePath, outputDirectory);
+        JavaLanguageServer server = new JavaLanguageServer(javac);
+
+        InitializeParams init = new InitializeParams();
+        String workspaceRoot = Paths.get(".").toAbsolutePath().toString();
+
+        init.setRootPath(workspaceRoot);
+
+        server.initialize(init);
+        server.installClient(client);
 
         server.maxItems = Integer.MAX_VALUE;
 

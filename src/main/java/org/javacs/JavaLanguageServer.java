@@ -2,8 +2,11 @@ package org.javacs;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
+import com.sun.tools.javac.resources.compiler;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -68,6 +71,8 @@ class JavaLanguageServer implements LanguageServer {
         c.setWorkspaceSymbolProvider(true);
         c.setReferencesProvider(true);
         c.setDocumentSymbolProvider(true);
+        c.setCodeActionProvider(true);
+        c.setExecuteCommandProvider(new ExecuteCommandOptions(ImmutableList.of("Java.importClass")));
 
         result.setCapabilities(c);
 
@@ -190,16 +195,12 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<List<? extends Command>> codeAction(CodeActionParams params) {
-                /*
                 URI file = URI.create(params.getTextDocument().getUri());
                 List<? extends Command> commands = findCompiler(file)
                         .map(compiler -> new CodeActions(compiler, file, activeContent(file)).find(params))
                         .orElse(Collections.emptyList());
 
                 return CompletableFuture.completedFuture(commands);
-                */
-                // TODO
-                return null;
             }
 
             @Override
@@ -357,7 +358,37 @@ class JavaLanguageServer implements LanguageServer {
         return new WorkspaceService() {
             @Override
             public CompletableFuture<Object> executeCommand(ExecuteCommandParams params) {
-                throw new UnsupportedOperationException(); // TODO
+                LOG.info(params.toString());
+
+                switch (params.getCommand()) {
+                    case "Java.importClass":
+                        String fileString = (String) params.getArguments().get(0);
+                        URI fileUri = URI.create(fileString);
+                        String packageName = (String) params.getArguments().get(1);
+                        String className = (String) params.getArguments().get(2);
+
+                        findCompiler(fileUri).ifPresent(compiler -> {
+                            BatchResult compiled = compiler.compileBatch(ImmutableMap.of(fileUri, activeContent(fileUri)));
+
+                            for (CompilationUnitTree each : compiled.trees) {
+                                if (each.getSourceFile().toUri().equals(fileUri)) {
+                                    List<TextEdit> edits = new RefactorFile(compiled.task, each).addImport(packageName, className);
+
+                                    client.applyEdit(new ApplyWorkspaceEditParams(new WorkspaceEdit(
+                                            Collections.singletonMap(fileString, edits),
+                                            null
+                                    )));
+                                }
+                            }
+
+                        });
+
+                        break;
+                    default:
+                        LOG.warning("Don't know what to do with " + params.getCommand());
+                }
+
+                return CompletableFuture.completedFuture("Done");
             }
 
             @Override

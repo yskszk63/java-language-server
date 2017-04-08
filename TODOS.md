@@ -1,5 +1,8 @@
 # Todo
 
+## Videos
+* Add-import code action
+
 ## Bugs
 * Auto-import in empty file generates extra line of WS
 * Error squiggles are off
@@ -31,6 +34,7 @@
 * Go-to-subclasses
 * Signature help
 * javaconfig.json sourcePath / sourcePathFile
+* Reformat selection, file
 
 ### Refactoring
 * Inline method, variable
