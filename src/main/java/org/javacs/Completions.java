@@ -396,7 +396,7 @@ class Completions implements Supplier<Stream<CompletionItem>> {
     private CompletionItem completeJavacConstructor(ExecutableElement method) {
         TypeElement enclosingClass = (TypeElement) method.getEnclosingElement();
         Optional<String> docString = docstring(method);
-        boolean hasTypeParameters = !method.getTypeParameters().isEmpty();
+        boolean hasTypeParameters = !enclosingClass.getTypeParameters().isEmpty();
         String methodSignature = Hovers.methodSignature(method, false);
         String qualifiedName = enclosingClass.getQualifiedName().toString();
         String name = enclosingClass.getSimpleName().toString();
@@ -412,7 +412,8 @@ class Completions implements Supplier<Stream<CompletionItem>> {
             insertText += "<>";
 
         item.setKind(CompletionItemKind.Constructor);
-        item.setLabel(methodSignature);
+        item.setLabel(name);
+        item.setDetail(methodSignature);
         docString.ifPresent(item::setDocumentation);
         item.setInsertText(insertText);
         item.setSortText(name);
@@ -689,8 +690,8 @@ class Completions implements Supplier<Stream<CompletionItem>> {
                 CompletionItem item = new CompletionItem();
 
                 item.setKind(CompletionItemKind.Method);
-                item.setLabel(Hovers.methodSignature(method, false));
-                item.setDetail(ShortTypePrinter.print(method.getReturnType()));
+                item.setLabel(name);
+                item.setDetail(Hovers.methodSignature(method, true));
                 docstring(e).ifPresent(item::setDocumentation);
                 item.setInsertText(name); // TODO
                 item.setSortText(name);

@@ -103,7 +103,7 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         if (showReturn)
             signature += ShortTypePrinter.print(e.getReturnType()) + " ";
 
-        signature += name + "(" + params + ")";
+        signature += "(" + params + ")";
 
         if (!e.getThrownTypes().isEmpty()) {
             StringJoiner thrown = new StringJoiner(", ");

@@ -1,6 +1,7 @@
 package org.javacs;
 
 import com.google.common.collect.Lists;
+import java.util.Map;
 import org.eclipse.lsp4j.CompletionItem;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -54,9 +55,12 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteMember.java";
 
         // Static methods
-        Set<String> suggestions = items(file, 5, 14).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
+        List<? extends CompletionItem> items = items(file, 5, 14);
+        Set<String> suggestions = items.stream().map(i -> i.getLabel()).collect(Collectors.toSet());
+        Set<String> details = items.stream().map(i -> i.getDetail()).collect(Collectors.toSet());
 
-        assertThat(suggestions, hasItems("methods() throws Exception"));
+        assertThat(suggestions, hasItems("methods"));
+        assertThat(details, hasItems("String () throws Exception"));
     }
 
     @Test
@@ -398,9 +402,12 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteFromClasspath.java";
 
         // Static methods
-        Set<String> suggestions = items(file, 8, 17).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
+        List<? extends CompletionItem> items = items(file, 8, 17);
+        Set<String> suggestions = items.stream().map(i -> i.getLabel()).collect(Collectors.toSet());
+        Set<String> details = items.stream().map(i -> i.getDetail()).collect(Collectors.toSet());
 
-        assertThat(suggestions, hasItems("add(E)", "add(int, E)"));
+        assertThat(suggestions, hasItems("add", "addAll"));
+        assertThat(details, hasItems("boolean (E)", "void (int, E)"));
     }
 
     @Test
@@ -462,9 +469,12 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteRest.java";
 
         // Static methods
-        Set<String> suggestions = items(file, 5, 18).stream().map(i -> i.getLabel()).collect(Collectors.toSet());
+        List<? extends CompletionItem> items = items(file, 5, 18);
+        Set<String> suggestions = items.stream().map(i -> i.getLabel()).collect(Collectors.toSet());
+        Set<String> details = items.stream().map(i -> i.getDetail()).collect(Collectors.toSet());
 
-        assertThat(suggestions, hasItems("restMethod(String... params)"));
+        assertThat(suggestions, hasItems("restMethod"));
+        assertThat(details, hasItems("void (String... params)"));
     }
 
     @Test
@@ -475,7 +485,7 @@ public class CompletionsTest extends CompletionsBase {
         List<? extends CompletionItem> items = items(file, 5, 14);
         List<String> suggestions = Lists.transform(items, i -> i.getInsertText());
 
-        assertThat(suggestions, hasItems("AutocompleteConstructor", "AutocompleteMember", "ArrayList"));
+        assertThat(suggestions, hasItems("AutocompleteConstructor<>", "AutocompleteMember", "ArrayList<>"));
 
         for (CompletionItem each : items) {
             if (each.getInsertText().equals("ArrayList"))
