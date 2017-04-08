@@ -222,8 +222,6 @@ public class JavacHolder {
                 Map<URI, Optional<String>> files = objects.stream().collect(Collectors.toMap(key -> key, key -> Optional.empty()));
                 BatchResult result = doCompile(files);
 
-                result.trees.forEach(compiled -> index.update(compiled, result.task));
-
                 // TODO minimize memory use during this process
                 // Instead of doing parse-all / compileFileObjects-all,
                 // queue all files, then do parse / compileFileObjects on each
@@ -362,6 +360,8 @@ public class JavacHolder {
     }
 
     private BatchResult doCompile(Map<URI, Optional<String>> files) {
+        // TODO remove all URIs from fileManager
+        
         List<JavaFileObject> objects = files
                 .entrySet()
                 .stream()
