@@ -22,6 +22,40 @@ class TreePruner {
         this.task = task;
     }
 
+    void removeNonCursorMethodBodies(CompilationUnitTree source, int line, int column) {
+        SourcePositions sourcePositions = Trees.instance(task).getSourcePositions();
+        long offset = source.getLineMap().getPosition(line, column);
+
+        class Pruner extends TreeScanner<Void, Void> {
+            @Override
+            public Void visitBlock(BlockTree node, Void aVoid) {
+                if (containsCursor(node)) 
+                    super.visitBlock(node, aVoid);
+                else {
+                    JCTree.JCBlock impl = (JCTree.JCBlock) node;
+
+                    impl.stats = List.nil();
+                }
+
+                return null;
+            }
+
+            boolean containsCursor(Tree leaf) {
+                long start = sourcePositions.getStartPosition(source, leaf);
+                long end = sourcePositions.getEndPosition(source, leaf);
+
+                return start <= offset && offset <= end;
+            }
+
+            @Override
+            public Void visitErroneous(ErroneousTree node, Void nothing) {
+                return super.scan(node.getErrorTrees(), nothing);
+            }
+        }
+
+        new Pruner().scan(source, null);
+    }
+
     /**
      * Remove all statements after the statement the cursor is in
      */

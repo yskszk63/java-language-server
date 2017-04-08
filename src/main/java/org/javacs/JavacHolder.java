@@ -73,8 +73,10 @@ public class JavacHolder {
             if (pruneStatements) {
                 TreePruner pruner = new TreePruner(task);
 
-                for (CompilationUnitTree tree : parse)
+                for (CompilationUnitTree tree : parse) {
+                    pruner.removeNonCursorMethodBodies(tree, line, column);
                     pruner.removeStatementsAfterCursor(tree, line, column);
+                }
             }
 
             try {
