@@ -5,6 +5,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
+import com.sun.source.util.TaskEvent;
+import com.sun.source.util.TaskListener;
 import com.sun.source.util.TreePath;
 import com.sun.tools.javac.api.JavacTaskImpl;
 import com.sun.tools.javac.api.JavacTool;
@@ -26,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -60,12 +63,14 @@ public class JavacHolder {
     public FocusedResult compileFocused(URI file, Optional<String> textContent, int line, int column, boolean pruneStatements) {
         initialIndexComplete.join();
 
+        profile.clear();
+
         JavaFileObject fileObject = findFile(file, textContent);
 
         if (pruneStatements)
             fileObject = TreePruner.putSemicolonAfterCursor(fileObject, line, column);
 
-        JavacTask task = createTask(Collections.singleton(fileObject));
+        JavacTask task = createTask(Collections.singleton(fileObject), true);
 
         try {
             Iterable<? extends CompilationUnitTree> parse = task.parse();
@@ -90,6 +95,19 @@ public class JavacHolder {
             Optional<TreePath> cursor = compilationUnits.get()
                     .flatMap(source -> stream(FindCursor.find(task, source, line, column)))
                     .findAny();
+
+            profile.forEach((kind, files) -> {
+                long elapsed = files.values().stream()
+                        .mapToLong(p -> p.elapsed().toMillis())
+                        .sum();
+
+                LOG.info(String.format(
+                        "%s\t%d ms\t%d files",
+                        kind.name(),
+                        elapsed,
+                        files.size()
+                ));
+            });
 
             return new FocusedResult(cursor, task, classPathIndex, index);
         } catch (IOException e) {
@@ -195,12 +213,41 @@ public class JavacHolder {
         );
     }
 
-    private JavacTask createTask(Collection<JavaFileObject> files) {
+    private static class Profile {
+        Instant started = Instant.now();
+        Optional<Instant> finished = Optional.empty();
+
+        Duration elapsed() {
+            return Duration.between(started, finished.orElse(started));
+        }
+    }
+
+    private final EnumMap<TaskEvent.Kind, Map<URI, Profile>> profile = new EnumMap<>(TaskEvent.Kind.class);
+
+    private JavacTask createTask(Collection<JavaFileObject> files, boolean profileTiming) {
         JavacTask result = javac.getTask(null, fileManager, this::onError, options, null, files);
         JavacTaskImpl impl = (JavacTaskImpl) result;
         Options options = Options.instance(impl.getContext());
 
         options.put("dev", "");
+
+        if (profileTiming) {
+            result.addTaskListener(new TaskListener() {
+                @Override
+                public void started(TaskEvent e) {
+                    profile.computeIfAbsent(e.getKind(), newKind -> new HashMap<>())
+                            .put(e.getSourceFile().toUri(), new Profile());
+                }
+
+                @Override
+                public void finished(TaskEvent e) {
+                    profile.get(e.getKind())
+                            .get(e.getSourceFile().toUri()).finished = Optional.of(Instant.now());
+
+                    // TODO prune method bodies when in compileFocused mode
+                }
+            });
+        }
 
         return result;
     }
@@ -217,6 +264,8 @@ public class JavacHolder {
 
                 // Parse each file
                 sourcePath.forEach(s -> findAllFiles(s, objects));
+
+                LOG.info("Index " + objects.size() + " source files");
 
                 // Compile all parsed files
                 Map<URI, Optional<String>> files = objects.stream().collect(Collectors.toMap(key -> key, key -> Optional.empty()));
@@ -242,8 +291,6 @@ public class JavacHolder {
                     throw new UncheckedIOException(e);
                 }
                 else if (path.getFileName().toString().endsWith(".java")) {
-                    LOG.info("Index " + path);
-
                     uris.add(path.toUri());
                 }
             }
@@ -271,8 +318,6 @@ public class JavacHolder {
     private static void clearOutputDirectory(Path file) {
         try {
             if (file.getFileName().toString().endsWith(".class")) {
-                LOG.info("Invalidate " + file);
-
                 Files.setLastModifiedTime(file, FileTime.from(Instant.EPOCH));
             }
             else if (Files.isDirectory(file))
@@ -340,7 +385,7 @@ public class JavacHolder {
 
     public ParseResult parse(URI file, Optional<String> textContent, DiagnosticListener<JavaFileObject> onError) {
         JavaFileObject object = findFile(file, textContent);
-        JavacTask task = createTask(Collections.singleton(object));
+        JavacTask task = createTask(Collections.singleton(object), false);
         onErrorDelegate = onError;
 
         try {
@@ -370,7 +415,7 @@ public class JavacHolder {
 
         objects.addAll(dependencies(objects));
 
-        JavacTask task = createTask(objects);
+        JavacTask task = createTask(objects, false);
 
         try {
             DiagnosticCollector<JavaFileObject> errors = startCollectingErrors();
