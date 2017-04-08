@@ -11,25 +11,31 @@ import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
 
-import java.net.InetSocketAddress;
-import java.util.Objects;
-import java.util.concurrent.ExecutionException;
-
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.concurrent.Executors;
-import java.util.function.Consumer;
+import java.util.Objects;
+import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Main {
-    private static final Logger LOG = Logger.getLogger("main");
     public static final ObjectMapper JSON = new ObjectMapper().registerModule(new Jdk8Module())
                                                               .registerModule(new JSR310Module())
                                                               .registerModule(pathAsJson())
                                                               .configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+
+    private static final Logger LOG = Logger.getLogger("main");
+
+    public static void setRootFormat() {
+        Logger root = Logger.getLogger("");
+
+        for (Handler h : root.getHandlers())
+            h.setFormatter(new LogFormat());
+    }
 
     private static SimpleModule pathAsJson() {
         SimpleModule m = new SimpleModule();
@@ -55,6 +61,8 @@ public class Main {
     }
 
     public static void main(String[] args) throws IOException {
+        setRootFormat();
+
         try {
             Connection connection = connectToNode();
 
@@ -115,4 +123,5 @@ public class Main {
 
         LOG.info("Connection closed");
     }
+
 }

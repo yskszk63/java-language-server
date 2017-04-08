@@ -2,16 +2,18 @@ package org.javacs;
 
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageClient;
+
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
-
-import com.sun.tools.javac.util.List;
 
 class LanguageServerFixture {
+
+    static {
+        Main.setRootFormat();
+    }
 
     static JavaLanguageServer getJavaLanguageServer() {
         return getJavaLanguageServer(new LanguageClient() {
