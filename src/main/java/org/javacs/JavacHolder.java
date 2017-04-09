@@ -418,7 +418,7 @@ public class JavacHolder {
             }
 
             // So incremental compile can use these .class files
-            task.generate();
+            Iterable<? extends JavaFileObject> output = task.generate();
 
             return new BatchResult(task, parse, errors);
         } catch (IOException e) {
