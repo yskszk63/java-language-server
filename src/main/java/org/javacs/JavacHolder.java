@@ -16,10 +16,7 @@ import com.sun.tools.javac.util.Options;
 import org.eclipse.lsp4j.SymbolInformation;
 
 import javax.lang.model.element.Element;
-import javax.tools.Diagnostic;
-import javax.tools.DiagnosticCollector;
-import javax.tools.DiagnosticListener;
-import javax.tools.JavaFileObject;
+import javax.tools.*;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -28,7 +25,6 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -189,7 +185,6 @@ public class JavacHolder {
         this.classPathIndex = new ClassPathIndex(classPath);
 
         ensureOutputDirectory(outputDirectory);
-        clearOutputDirectory(outputDirectory);
     }
 
     private List<String> options(boolean incremental) {
@@ -231,7 +226,8 @@ public class JavacHolder {
     }
 
     private JavacTask createTask(Collection<JavaFileObject> files, boolean incremental) {
-        JavacTask result = javac.getTask(null, fileManager, this::onError, options(incremental), null, files);
+        JavaFileManager incrementalFileManager = incremental ? new ClassOnlyFileManager(fileManager) : fileManager;
+        JavacTask result = javac.getTask(null, incrementalFileManager, this::onError, options(incremental), null, files);
         JavacTaskImpl impl = (JavacTaskImpl) result;
         Options options = Options.instance(impl.getContext());
 
@@ -317,21 +313,6 @@ public class JavacHolder {
         }
         else if (!Files.isDirectory(dir))
             throw ShowMessageException.error("Output directory " + dir + " is not a directory", null);
-    }
-
-    /** 
-     * Set all .class files to modified-apply 1970 so javac won't skip them when we invoke it
-     */
-    private static void clearOutputDirectory(Path file) {
-        try {
-            if (file.getFileName().toString().endsWith(".class")) {
-                Files.setLastModifiedTime(file, FileTime.from(Instant.EPOCH));
-            }
-            else if (Files.isDirectory(file))
-                Files.list(file).forEach(JavacHolder::clearOutputDirectory);
-        } catch (IOException e) {
-            LOG.log(Level.SEVERE, e.getMessage(), e);
-        }
     }
 
     private static <T> Stream<T> stream(Optional<T> option) {
@@ -436,6 +417,9 @@ public class JavacHolder {
                 if (!catchJavacError(e))
                     throw e;
             }
+
+            // So incremental compile can use these .class files
+            task.generate();
 
             return new BatchResult(task, parse, errors);
         } catch (IOException e) {
