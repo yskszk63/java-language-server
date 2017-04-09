@@ -190,12 +190,11 @@ public class JavacHolder {
     private List<String> options(boolean incremental) {
         Iterable<Path> incrementalClassPath = incremental ? Iterables.concat(classPath, Collections.singleton(outputDirectory)) : classPath;
         Iterable<Path> incrementalSourcePath = incremental ? Collections.emptyList() : sourcePath;
-        String incrementalOutputDirectory = incremental ? "" : outputDirectory.toString();
-        
+
         return ImmutableList.of(
                 "-classpath", Joiner.on(File.pathSeparator).join(incrementalClassPath),
                 "-sourcepath", Joiner.on(File.pathSeparator).join(incrementalSourcePath),
-                "-d", incrementalOutputDirectory,
+                "-d", outputDirectory.toString(),
                 // You would think we could do -Xlint:all,
                 // but some lints trigger fatal errors in the presence of parse errors
                 "-Xlint:cast",
