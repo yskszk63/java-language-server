@@ -2,6 +2,7 @@ package org.javacs;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
@@ -177,15 +178,12 @@ public class JavacHolder {
      */
     private final CompletableFuture<Void> initialIndexComplete;
 
-    private final List<String> options;
-
     public final ClassPathIndex classPathIndex;
 
     private JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory, boolean index) {
         this.classPath = Collections.unmodifiableSet(classPath);
         this.sourcePath = Collections.unmodifiableSet(sourcePath);
         this.outputDirectory = outputDirectory;
-        this.options = options(classPath, sourcePath, outputDirectory);
         this.index = new SymbolIndex();
         this.initialIndexComplete = index ? startIndexingSourcePath() : CompletableFuture.completedFuture(null);
         this.classPathIndex = new ClassPathIndex(classPath);
@@ -194,11 +192,15 @@ public class JavacHolder {
         clearOutputDirectory(outputDirectory);
     }
 
-    static List<String> options(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
+    private List<String> options(boolean incremental) {
+        Iterable<Path> incrementalClassPath = incremental ? Iterables.concat(classPath, Collections.singleton(outputDirectory)) : classPath;
+        Iterable<Path> incrementalSourcePath = incremental ? Collections.emptyList() : sourcePath;
+        String incrementalOutputDirectory = incremental ? "" : outputDirectory.toString();
+        
         return ImmutableList.of(
-                "-classpath", Joiner.on(File.pathSeparator).join(classPath),
-                "-sourcepath", Joiner.on(File.pathSeparator).join(sourcePath),
-                "-d", outputDirectory.toString(),
+                "-classpath", Joiner.on(File.pathSeparator).join(incrementalClassPath),
+                "-sourcepath", Joiner.on(File.pathSeparator).join(incrementalSourcePath),
+                "-d", incrementalOutputDirectory,
                 // You would think we could do -Xlint:all,
                 // but some lints trigger fatal errors in the presence of parse errors
                 "-Xlint:cast",
@@ -228,14 +230,15 @@ public class JavacHolder {
         return Collections.unmodifiableMap(profile);
     }
 
-    private JavacTask createTask(Collection<JavaFileObject> files, boolean profileTiming) {
-        JavacTask result = javac.getTask(null, fileManager, this::onError, options, null, files);
+    private JavacTask createTask(Collection<JavaFileObject> files, boolean incremental) {
+        JavacTask result = javac.getTask(null, fileManager, this::onError, options(incremental), null, files);
         JavacTaskImpl impl = (JavacTaskImpl) result;
         Options options = Options.instance(impl.getContext());
 
+        // Better stack traces inside javac
         options.put("dev", "");
 
-        if (profileTiming) {
+        if (incremental) {
             result.addTaskListener(new TaskListener() {
                 @Override
                 public void started(TaskEvent e) {

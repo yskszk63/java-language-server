@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.logging.Logger;
 
-import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.Assert.assertThat;
 
@@ -55,11 +54,7 @@ public class JavaCompilerTest {
     public void incremental() {
         JavacHolder javac = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target"));
         File file = Paths.get("src/test/resources/org/javacs/example/AutocompleteOther.java").toFile();
-        FocusedResult once = javac.compileFocused(file.toURI(), Optional.empty(), 6, 10, true);
-
-        assertThat(javac.profile().get(TaskEvent.Kind.PARSE).keySet(), hasSize(greaterThan(1)));
-
-        FocusedResult twice = javac.compileFocused(file.toURI(), Optional.empty(), 6, 10, true);
+        FocusedResult compile = javac.compileFocused(file.toURI(), Optional.empty(), 6, 10, true);
 
         assertThat(javac.profile().get(TaskEvent.Kind.PARSE).keySet(), hasSize(1));
     }
