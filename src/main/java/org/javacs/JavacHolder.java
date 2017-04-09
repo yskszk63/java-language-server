@@ -224,6 +224,10 @@ public class JavacHolder {
 
     private final EnumMap<TaskEvent.Kind, Map<URI, Profile>> profile = new EnumMap<>(TaskEvent.Kind.class);
 
+    Map<TaskEvent.Kind, Map<URI, Profile>> profile() {
+        return Collections.unmodifiableMap(profile);
+    }
+
     private JavacTask createTask(Collection<JavaFileObject> files, boolean profileTiming) {
         JavacTask result = javac.getTask(null, fileManager, this::onError, options, null, files);
         JavacTaskImpl impl = (JavacTaskImpl) result;
