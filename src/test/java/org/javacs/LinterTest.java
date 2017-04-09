@@ -40,7 +40,7 @@ public class LinterTest {
     public void inspectTree() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/HelloWorld.java");
         BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
-        CollectMethods scanner = new CollectMethods(compile.task);
+        CollectMethods scanner = new CollectMethods();
 
         compile.trees.forEach(tree -> scanner.scan(tree, null));
 
@@ -51,7 +51,7 @@ public class LinterTest {
     public void missingMethodBody() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/MissingMethodBody.java");
         BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
-        CollectMethods scanner = new CollectMethods(compile.task);
+        CollectMethods scanner = new CollectMethods();
 
         compile.trees.forEach(tree -> scanner.scan(tree, null));
 
@@ -68,7 +68,7 @@ public class LinterTest {
     public void incompleteAssignment() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/IncompleteAssignment.java");
         BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
-        CollectMethods scanner = new CollectMethods(compile.task);
+        CollectMethods scanner = new CollectMethods();
 
         compile.trees.forEach(tree -> scanner.scan(tree, null));
 
@@ -80,7 +80,7 @@ public class LinterTest {
     public void undefinedSymbol() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/UndefinedSymbol.java");
         BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
-        CollectMethods scanner = new CollectMethods(compile.task);
+        CollectMethods scanner = new CollectMethods();
 
         compile.trees.forEach(tree -> scanner.scan(tree, null));
 
@@ -177,12 +177,6 @@ public class LinterTest {
 
     public static class CollectMethods extends TreePathScanner<Void, Void> {
         public final Set<String> methodNames = new HashSet<>();
-
-        private final Trees trees;
-
-        public CollectMethods(JavacTask task) {
-            trees = Trees.instance(task);
-        }
 
         @Override
         public Void visitMethod(MethodTree node, Void aVoid) {

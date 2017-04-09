@@ -1,9 +1,7 @@
 package org.javacs;
 
 import com.sun.source.tree.ClassTree;
-import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePathScanner;
-import com.sun.source.util.Trees;
 import org.junit.Test;
 
 import javax.tools.DiagnosticCollector;
@@ -26,7 +24,7 @@ public class RecompileTest {
         JavacHolder compiler = newCompiler();
         List<String> visits = new ArrayList<>();
         BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
-        GetClass getClass = new GetClass(compile.task, visits);
+        GetClass getClass = new GetClass(visits);
 
         compile.trees.forEach(tree -> getClass.scan(tree, null));
 
@@ -56,7 +54,7 @@ public class RecompileTest {
         BatchResult goodCompile = compiler.compileBatch(Collections.singletonMap(good, Optional.empty()));
         DiagnosticCollector<JavaFileObject> goodErrors = goodCompile.errors;
         List<String> parsedClassNames = new ArrayList<>();
-        GetClass getClass = new GetClass(goodCompile.task, parsedClassNames);
+        GetClass getClass = new GetClass(parsedClassNames);
 
         goodCompile.trees.forEach(tree -> getClass.scan(tree, null));
 
@@ -77,7 +75,7 @@ public class RecompileTest {
         BatchResult goodCompile = compiler.compileBatch(Collections.singletonMap(good, Optional.empty()));
         DiagnosticCollector<JavaFileObject> goodErrors = goodCompile.errors;
         List<String> parsedClassNames = new ArrayList<>();
-        GetClass getClass = new GetClass(goodCompile.task, parsedClassNames);
+        GetClass getClass = new GetClass(parsedClassNames);
 
         goodCompile.trees.forEach(tree -> getClass.scan(tree, null));
 
@@ -110,11 +108,9 @@ public class RecompileTest {
 
     private static class GetClass extends TreePathScanner<Void, Void> {
         private final List<String> visits;
-        private final Trees trees;
 
-        public GetClass(JavacTask context, List<String> visits) {
+        public GetClass(List<String> visits) {
             this.visits = visits;
-            this.trees = Trees.instance(context);
         }
 
         @Override
