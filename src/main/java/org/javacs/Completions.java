@@ -506,6 +506,12 @@ class Completions implements Supplier<Stream<CompletionItem>> {
             String parentName = mostIds(importId(tree));
             TypeElement parentElement = elements.getTypeElement(parentName);
 
+            if (parentElement == null) {
+                LOG.warning("Can't find " + parentName);
+
+                return Stream.empty();
+            }
+
             return parentElement.getEnclosedElements().stream();
         }
         else {
@@ -513,6 +519,12 @@ class Completions implements Supplier<Stream<CompletionItem>> {
             String className = mostIds(name);
             String memberName = lastId(name);
             TypeElement classElement = elements.getTypeElement(className);
+
+            if (classElement == null) {
+                LOG.warning("Can't find " + className);
+
+                return Stream.empty();
+            }
 
             for (Element each : classElement.getEnclosedElements()) {
                 if (each.getSimpleName().contentEquals(memberName))

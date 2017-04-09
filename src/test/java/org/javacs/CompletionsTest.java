@@ -1,7 +1,6 @@
 package org.javacs;
 
 import com.google.common.collect.Lists;
-import java.util.Map;
 import org.eclipse.lsp4j.CompletionItem;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -644,7 +643,7 @@ public class CompletionsTest extends CompletionsBase {
     public void staticStarImport() throws IOException {
         String file = "/org/javacs/example/AutocompleteStaticImport.java";
 
-        Set<String> suggestions = insertText(file, 8, 15);
+        Set<String> suggestions = insertText(file, 9, 15);
 
         assertThat("suggests star-imported static method", suggestions, hasItems("emptyList"));
     }
@@ -653,9 +652,19 @@ public class CompletionsTest extends CompletionsBase {
     public void staticImport() throws IOException {
         String file = "/org/javacs/example/AutocompleteStaticImport.java";
 
-        Set<String> suggestions = insertText(file, 9, 10);
+        Set<String> suggestions = insertText(file, 10, 10);
 
         assertThat("suggests star-imported static field", suggestions, hasItems("BC"));
+    }
+
+    @Test
+    public void staticImportSourcePath() throws IOException {
+        String file = "/org/javacs/example/AutocompleteStaticImport.java";
+
+        Set<String> suggestions = insertText(file, 11, 13);
+
+        assertThat("suggests star-imported public static field from source path", suggestions, hasItems("publicStaticFinal"));
+        assertThat("suggests star-imported package-private static field from source path", suggestions, hasItems("packagePrivateStaticFinal"));
     }
 
     @Test
