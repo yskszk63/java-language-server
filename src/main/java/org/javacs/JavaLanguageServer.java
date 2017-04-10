@@ -97,7 +97,7 @@ class JavaLanguageServer implements LanguageServer {
                 int line = position.getPosition().getLine() + 1;
                 int character = position.getPosition().getCharacter() + 1;
 
-                LOG.info(String.format("Complete at %s %d:%d", uri, line, character));
+                LOG.info(String.format("completion at %s %d:%d", uri, line, character));
 
                 List<CompletionItem> items = findCompiler(uri)
                         .map(compiler -> compiler.compileFocused(uri, content, line, character, true))
@@ -128,6 +128,9 @@ class JavaLanguageServer implements LanguageServer {
                 Optional<String> content = activeContent(uri);
                 int line = position.getPosition().getLine() + 1;
                 int character = position.getPosition().getCharacter() + 1;
+
+                LOG.info(String.format("hover at %s %d:%d", uri, line, character));
+
                 Hover hover = findCompiler(uri)
                         .map(compiler -> compiler.compileFocused(uri, content, line, character, false))
                         .flatMap(Hovers::hoverText)
@@ -147,6 +150,9 @@ class JavaLanguageServer implements LanguageServer {
                 Optional<String> content = activeContent(uri);
                 int line = position.getPosition().getLine() + 1;
                 int character = position.getPosition().getCharacter() + 1;
+
+                LOG.info(String.format("definition at %s %d:%d", uri, line, character));
+
                 List<Location> locations = findCompiler(uri)
                         .flatMap(compiler -> {
                             FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
@@ -165,6 +171,9 @@ class JavaLanguageServer implements LanguageServer {
                 Optional<String> content = activeContent(uri);
                 int line = params.getPosition().getLine() + 1;
                 int character = params.getPosition().getCharacter() + 1;
+
+                LOG.info(String.format("references at %s %d:%d", uri, line, character));
+
                 List<Location> locations = findCompiler(uri)
                         .map(compiler -> {
                             FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
@@ -195,11 +204,14 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<List<? extends Command>> codeAction(CodeActionParams params) {
-                URI file = URI.create(params.getTextDocument().getUri());
+                URI uri = URI.create(params.getTextDocument().getUri());
                 int line = params.getRange().getStart().getLine() + 1;
                 int character = params.getRange().getStart().getCharacter() + 1;
-                List<? extends Command> commands = findCompiler(file)
-                        .map(compiler -> new CodeActions(compiler, file, activeContent(file), line, character).find(params))
+
+                LOG.info(String.format("codeAction at %s %d:%d", uri, line, character));
+
+                List<? extends Command> commands = findCompiler(uri)
+                        .map(compiler -> new CodeActions(compiler, uri, activeContent(uri), line, character).find(params))
                         .orElse(Collections.emptyList());
 
                 return CompletableFuture.completedFuture(commands);
