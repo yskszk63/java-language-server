@@ -35,6 +35,10 @@ Requires that you have Java 8 installed on your system.
 
 <img src="http://g.recordit.co/w5nRIfef65.gif">
 
+### Code actions
+
+<img src="http://g.recordit.co/pjQh1KuyK4.gif">
+
 ### Find references
 
 <img src="http://g.recordit.co/3tNYL8StgJ.gif">
