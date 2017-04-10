@@ -8,6 +8,4 @@ mvn package
 # Build vsix
 vsce package -o build.vsix
 
-# Install vsix
-# Note that this will fail if you already have the plugin installed, in which case you should install it through the UI
-code --install-extension build.vsix
+echo 'Install build.vsix using the extensions menu'
