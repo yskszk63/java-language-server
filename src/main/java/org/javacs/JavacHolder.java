@@ -189,11 +189,10 @@ public class JavacHolder {
 
     private List<String> options(boolean incremental) {
         Iterable<Path> incrementalClassPath = incremental ? Iterables.concat(classPath, Collections.singleton(outputDirectory)) : classPath;
-        Iterable<Path> incrementalSourcePath = incremental ? Collections.emptyList() : sourcePath;
 
         return ImmutableList.of(
                 "-classpath", Joiner.on(File.pathSeparator).join(incrementalClassPath),
-                "-sourcepath", Joiner.on(File.pathSeparator).join(incrementalSourcePath),
+                "-sourcepath", Joiner.on(File.pathSeparator).join(sourcePath),
                 "-d", outputDirectory.toString(),
                 // You would think we could do -Xlint:all,
                 // but some lints trigger fatal errors in the presence of parse errors
@@ -225,7 +224,8 @@ public class JavacHolder {
     }
 
     private JavacTask createTask(Collection<JavaFileObject> files, boolean incremental) {
-        JavaFileManager incrementalFileManager = incremental ? new ClassOnlyFileManager(fileManager) : fileManager;
+        Set<URI> uris = files.stream().map(JavaFileObject::toUri).collect(Collectors.toSet());
+        JavaFileManager incrementalFileManager = incremental ? new IncrementalFileManager(fileManager) : fileManager;
         JavacTask result = javac.getTask(null, incrementalFileManager, this::onError, options(incremental), null, files);
         JavacTaskImpl impl = (JavacTaskImpl) result;
         Options options = Options.instance(impl.getContext());
@@ -246,7 +246,8 @@ public class JavacHolder {
                     profile.get(e.getKind())
                             .get(e.getSourceFile().toUri()).finished = Optional.of(Instant.now());
 
-                    // TODO prune method bodies when in compileFocused mode
+                    if (!uris.contains(e.getSourceFile().toUri()))
+                        new TreePruner(result).removeNonCursorMethodBodies(e.getCompilationUnit(), 1, 1);
                 }
             });
         }

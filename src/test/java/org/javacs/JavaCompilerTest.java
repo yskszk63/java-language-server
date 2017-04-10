@@ -53,8 +53,14 @@ public class JavaCompilerTest {
     @Test
     public void incremental() {
         JavacHolder javac = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target"));
-        File file = Paths.get("src/test/resources/org/javacs/example/AutocompleteOther.java").toFile();
-        FocusedResult compile = javac.compileFocused(file.toURI(), Optional.empty(), 6, 10, true);
+
+        // Compile AutocompleteMember to a .class file
+        File target = Paths.get("src/test/resources/org/javacs/example/Target.java").toFile();
+        BatchResult batch = javac.compileBatch(Collections.singletonMap(target.toURI(), Optional.empty()));
+
+        // Incremental compilation should use AutocompleteMember.class, not AutocompleteMember.java
+        File dependsOnTarget = Paths.get("src/test/resources/org/javacs/example/DependsOnTarget.java").toFile();
+        FocusedResult incremental = javac.compileFocused(dependsOnTarget.toURI(), Optional.empty(), 5, 27, true);
 
         assertThat(javac.profile().get(TaskEvent.Kind.PARSE).keySet(), hasSize(1));
     }
