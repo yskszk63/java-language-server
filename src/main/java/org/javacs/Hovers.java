@@ -5,6 +5,8 @@ import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
+import javax.lang.model.element.PackageElement;
+import javax.lang.model.element.TypeElement;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
@@ -47,18 +49,21 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         Optional<TypeMirror> type = type(element);
 
         switch (element.getKind()) {
-            case PACKAGE:
-                return Optional.of("package " + element.getSimpleName());
+            case PACKAGE: {
+                PackageElement p = (PackageElement) element;
+
+                return Optional.of(p.getQualifiedName().toString());
+            }
             case ENUM:
-                return Optional.of("enum " + element.getSimpleName());
             case CLASS:
-                return Optional.of("class " + element.getSimpleName());
             case ANNOTATION_TYPE:
-                return Optional.of("@interface " + element.getSimpleName());
-            case INTERFACE:
-                return Optional.of("interface " + element.getSimpleName());
+            case INTERFACE: {
+                TypeElement t = (TypeElement) element;
+
+                return Optional.of(t.getQualifiedName().toString());
+            }
             case METHOD:
-                return Optional.of(methodSignature((Symbol.MethodSymbol) element, true));
+                return Optional.of(methodSignature((Symbol.MethodSymbol) element, true, true));
             case CONSTRUCTOR:
             case STATIC_INIT:
             case INSTANCE_INIT:
@@ -85,7 +90,7 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         return Optional.ofNullable(trees.getTypeMirror(path));
     }
 
-    public static String methodSignature(ExecutableElement e, boolean showReturn) {
+    public static String methodSignature(ExecutableElement e, boolean showReturn, boolean showMethodName) {
         String name = e.getKind() == ElementKind.CONSTRUCTOR ? constructorName(e) : e.getSimpleName().toString();
         boolean varargs = e.isVarArgs();
         StringJoiner params = new StringJoiner(", ");
@@ -102,6 +107,9 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         
         if (showReturn)
             signature += ShortTypePrinter.print(e.getReturnType()) + " ";
+
+        if (showMethodName)
+            signature += e.getSimpleName();
 
         signature += "(" + params + ")";
 

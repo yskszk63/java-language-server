@@ -6,9 +6,6 @@
 * Autocomplete is showing arg0, arg1 for constructors
 
 ## Polish
-* Keep imports organized
-* Autocomplete already-imported first
-* Add import code action
 * Resolve methods with badly typed arguments
 * Hover shows javadoc if available
 * Hover show FQ types if not imported

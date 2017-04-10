@@ -278,16 +278,10 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public void didSave(DidSaveTextDocumentParams params) {
-                TextDocumentIdentifier document = params.getTextDocument();
-                URI uri = URI.create(document.getUri());
-                // TODO can we just re-line uri?
-
                 // Re-lint all active documents
-                // 
-                // We would prefer to just re-lint the documents that the user can see
-                // But there is no didSwitchTo(document) event, so we have no way of knowing when the user switches between tabs
-                // Therefore, we just re-lint all open editors
                 doLint(activeDocuments.keySet());
+
+                params.getText();
             }
         };
     }
@@ -337,7 +331,7 @@ class JavaLanguageServer implements LanguageServer {
 
         for (URI each : paths) {
             file(each).flatMap(this::findConfig).ifPresent(config -> {
-                files.computeIfAbsent(config, newConfig -> new HashMap<>()).put(each, activeContent(each));
+                files.computeIfAbsent(config, newConfig -> new HashMap<>()).put(each, Optional.empty());
             });
         }
 
