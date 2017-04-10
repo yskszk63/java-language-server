@@ -661,7 +661,7 @@ public class CompletionsTest extends CompletionsBase {
     public void staticImportSourcePath() throws IOException {
         String file = "/org/javacs/example/AutocompleteStaticImport.java";
 
-        Set<String> suggestions = insertText(file, 11, 13);
+        Set<String> suggestions = insertText(file, 11, 20);
 
         assertThat("suggests star-imported public static field from source path", suggestions, hasItems("publicStaticFinal"));
         assertThat("suggests star-imported package-private static field from source path", suggestions, hasItems("packagePrivateStaticFinal"));
