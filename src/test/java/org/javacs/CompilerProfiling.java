@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.google.common.collect.Lists;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -12,10 +11,6 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.logging.Logger;
-
-import static org.hamcrest.Matchers.empty;
-import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertThat;
 
 @Ignore
 public class CompilerProfiling {
@@ -37,8 +32,6 @@ public class CompilerProfiling {
         JavacHolder compiler = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.emptySet(), Paths.get("out"));
         BatchResult result = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
         long finish = System.nanoTime();
-
-        assertThat(Lists.newArrayList(result.trees), not(empty()));
 
         return Duration.ofNanos(finish - start);
     }

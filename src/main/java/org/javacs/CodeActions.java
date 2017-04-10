@@ -2,30 +2,20 @@ package org.javacs;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.util.JavacTask;
+import org.eclipse.lsp4j.CodeActionParams;
+import org.eclipse.lsp4j.Command;
+import org.eclipse.lsp4j.Diagnostic;
 
+import javax.lang.model.element.ElementKind;
 import java.net.URI;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import javax.lang.model.element.ElementKind;
-import javax.tools.DiagnosticCollector;
-import javax.tools.JavaFileObject;
-
-import com.sun.source.tree.*;
-import com.sun.source.util.JavacTask;
-import com.sun.source.util.SourcePositions;
-import com.sun.source.util.TreePath;
-import com.sun.source.util.TreePathScanner;
-import com.sun.source.util.Trees;
-import org.eclipse.lsp4j.CodeActionParams;
-import org.eclipse.lsp4j.Command;
-import org.eclipse.lsp4j.Diagnostic;
-import org.eclipse.lsp4j.Range;
-import org.eclipse.lsp4j.SymbolInformation;
 
 class CodeActions {
     private final JavacHolder compiler;
@@ -33,18 +23,16 @@ class CodeActions {
     private final Optional<String> textContent;
     private final JavacTask task;
     private final CompilationUnitTree source;
-    private final DiagnosticCollector<JavaFileObject> errors;
 
-    CodeActions(JavacHolder compiler, URI file, Optional<String> textContent) {
+    CodeActions(JavacHolder compiler, URI file, Optional<String> textContent, int line, int character) {
         this.compiler = compiler;
         this.file = file;
         this.textContent = textContent;
 
-        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, textContent));
+        FocusedResult compile = compiler.compileFocused(file, textContent, line, character, false);
 
         this.task = compile.task;
-        this.source = pickFile(compile.trees, file);
-        this.errors = compile.errors;
+        this.source = compile.compilationUnit;
     }
 
     private CompilationUnitTree pickFile(Iterable<? extends CompilationUnitTree> compiled, URI file) {

@@ -2,13 +2,8 @@ package org.javacs;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
-import com.sun.tools.javac.resources.compiler;
-import java.time.Duration;
-import java.time.Instant;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -30,6 +25,8 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -39,7 +36,6 @@ import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import static org.javacs.Main.JSON;
 
@@ -200,8 +196,10 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public CompletableFuture<List<? extends Command>> codeAction(CodeActionParams params) {
                 URI file = URI.create(params.getTextDocument().getUri());
+                int line = params.getRange().getStart().getLine() + 1;
+                int character = params.getRange().getStart().getCharacter() + 1;
                 List<? extends Command> commands = findCompiler(file)
-                        .map(compiler -> new CodeActions(compiler, file, activeContent(file)).find(params))
+                        .map(compiler -> new CodeActions(compiler, file, activeContent(file), line, character).find(params))
                         .orElse(Collections.emptyList());
 
                 return CompletableFuture.completedFuture(commands);
@@ -346,7 +344,7 @@ class JavaLanguageServer implements LanguageServer {
         files.forEach((config, configFiles) -> {
             BatchResult compile = findCompilerForConfig(config).compileBatch(configFiles);
 
-            publishDiagnostics(compile);
+            publishDiagnostics(paths, compile);
         });
     }
 
@@ -372,19 +370,17 @@ class JavaLanguageServer implements LanguageServer {
                         String className = (String) params.getArguments().get(2);
 
                         findCompiler(fileUri).ifPresent(compiler -> {
-                            BatchResult compiled = compiler.compileBatch(ImmutableMap.of(fileUri, activeContent(fileUri)));
+                            FocusedResult compiled = compiler.compileFocused(fileUri, activeContent(fileUri), 1, 1, false);
 
-                            for (CompilationUnitTree each : compiled.trees) {
-                                if (each.getSourceFile().toUri().equals(fileUri)) {
-                                    List<TextEdit> edits = new RefactorFile(compiled.task, each).addImport(packageName, className);
+                            if (compiled.compilationUnit.getSourceFile().toUri().equals(fileUri)) {
+                                List<TextEdit> edits = new RefactorFile(compiled.task, compiled.compilationUnit)
+                                        .addImport(packageName, className);
 
-                                    client.applyEdit(new ApplyWorkspaceEditParams(new WorkspaceEdit(
-                                            Collections.singletonMap(fileString, edits),
-                                            null
-                                    )));
-                                }
+                                client.applyEdit(new ApplyWorkspaceEditParams(new WorkspaceEdit(
+                                        Collections.singletonMap(fileString, edits),
+                                        null
+                                )));
                             }
-
                         });
 
                         break;
@@ -425,7 +421,7 @@ class JavaLanguageServer implements LanguageServer {
                             findCompiler(uri).ifPresent(compiler -> {
                                 BatchResult result = compiler.delete(uri);
 
-                                publishDiagnostics(result);
+                                publishDiagnostics(Collections.singleton(uri), result);
                             });
                         }
                     }
@@ -437,10 +433,7 @@ class JavaLanguageServer implements LanguageServer {
         };
     }
     
-    private void publishDiagnostics(BatchResult result) {
-        List<URI> touched = StreamSupport.stream(result.trees.spliterator(), false)
-                .map(tree -> tree.getSourceFile().toUri())
-                .collect(Collectors.toList());
+    private void publishDiagnostics(Collection<URI> touched, BatchResult result) {
         Map<URI, PublishDiagnosticsParams> files = new HashMap<>();
 
         touched.forEach(p -> files.put(p, newPublishDiagnostics(p)));

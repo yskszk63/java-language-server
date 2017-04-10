@@ -29,12 +29,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 /**
  * Maintains a reference to a Java compiler, 
@@ -71,14 +69,13 @@ public class JavacHolder {
 
         try {
             Iterable<? extends CompilationUnitTree> parse = task.parse();
+            CompilationUnitTree compilationUnit = parse.iterator().next();
 
             if (pruneStatements) {
                 TreePruner pruner = new TreePruner(task);
 
-                for (CompilationUnitTree tree : parse) {
-                    pruner.removeNonCursorMethodBodies(tree, line, column);
-                    pruner.removeStatementsAfterCursor(tree, line, column);
-                }
+                pruner.removeNonCursorMethodBodies(compilationUnit, line, column);
+                pruner.removeStatementsAfterCursor(compilationUnit, line, column);
             }
 
             try {
@@ -88,10 +85,7 @@ public class JavacHolder {
                     throw e;
             }
 
-            Supplier<Stream<? extends CompilationUnitTree>> compilationUnits = () -> StreamSupport.stream(parse.spliterator(), false);
-            Optional<TreePath> cursor = compilationUnits.get()
-                    .flatMap(source -> stream(FindCursor.find(task, source, line, column)))
-                    .findAny();
+            Optional<TreePath> cursor = FindCursor.find(task, compilationUnit, line, column);
 
             profile.forEach((kind, files) -> {
                 long elapsed = files.values().stream()
@@ -106,7 +100,7 @@ public class JavacHolder {
                 ));
             });
 
-            return new FocusedResult(cursor, task, classPathIndex, index);
+            return new FocusedResult(compilationUnit, cursor, task, classPathIndex, index);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -421,7 +415,7 @@ public class JavacHolder {
             // So incremental compile can use these .class files
             Iterable<? extends JavaFileObject> output = task.generate();
 
-            return new BatchResult(task, parse, errors);
+            return new BatchResult(task, errors);
         } catch (IOException e) {
             throw new RuntimeException(e);
         } finally {
