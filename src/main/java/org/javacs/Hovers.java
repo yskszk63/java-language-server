@@ -41,6 +41,17 @@ public class Hovers implements Function<TreePath, Optional<String>> {
 
     @Override
     public Optional<String> apply(TreePath path) {
+        return title(path).map(title -> {
+            String docstring = trees.getDocComment(path);
+
+            if (docstring != null)
+                return String.format("**%s**\n\n%s", title, docstring);
+            else 
+                return String.format("**%s**", title);
+        });
+    }
+
+    private Optional<String> title(TreePath path) {
         Element element = trees.getElement(path);
 
         if (element == null)
@@ -71,7 +82,7 @@ public class Hovers implements Function<TreePath, Optional<String>> {
             case LOCAL_VARIABLE:
             case EXCEPTION_PARAMETER:
             case ENUM_CONSTANT:
-            case FIELD:
+            case FIELD: 
                 return type.map(ShortTypePrinter::print);
             case TYPE_PARAMETER:
             case OTHER:

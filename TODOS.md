@@ -6,20 +6,13 @@
 * Autocomplete is showing arg0, arg1 for constructors
 
 ## Polish
-* Resolve methods with badly typed arguments
-* Hover shows javadoc if available
-* Hover show FQ types if not imported
 * Javadoc path for hover, autocomplete
 * Status bar info during indexing
 
 ## Autocomplete
-* Autocomplete constructor signatures instead of just class name
-* Autocomplete is using the entire method signature
 * Autocomplete annotation fields
 * Autocomplete enum options in switch statement
 * Autocomplete types in method args
-* Class names not imported
-  * Order by imported, name, use in sourcepath
 * Signature help
 * Other methods of class when we have already statically imported 1 method
 * Constructor of scope-local class
