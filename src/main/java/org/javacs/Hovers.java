@@ -45,9 +45,9 @@ public class Hovers implements Function<TreePath, Optional<String>> {
             String docstring = trees.getDocComment(path);
 
             if (docstring != null)
-                return String.format("**%s**\n\n%s", title, docstring);
+                return String.format("```java\n%s\n```\n%s", title, docstring);
             else 
-                return String.format("**%s**", title);
+                return String.format("```java\n%s\n```", title);
         });
     }
 
