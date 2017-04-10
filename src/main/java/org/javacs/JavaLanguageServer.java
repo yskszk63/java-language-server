@@ -204,6 +204,12 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<List<? extends Command>> codeAction(CodeActionParams params) {
+                // Compilation is expensive
+                // Don't do it unless a codeAction is actually possible
+                // At the moment we only generate code actions in response to diagnostics
+                if (params.getContext().getDiagnostics().isEmpty())
+                    return CompletableFuture.completedFuture(Collections.emptyList());
+
                 URI uri = URI.create(params.getTextDocument().getUri());
                 int line = params.getRange().getStart().getLine() + 1;
                 int character = params.getRange().getStart().getCharacter() + 1;
