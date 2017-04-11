@@ -41,7 +41,7 @@ import static org.javacs.Main.JSON;
 
 class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
-    int maxItems = 100;
+    int maxItems = 30;
     private Path workspaceRoot;
     private Map<URI, String> activeDocuments = new HashMap<>();
     private LanguageClient client;

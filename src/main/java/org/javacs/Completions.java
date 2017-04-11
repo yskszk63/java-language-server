@@ -344,12 +344,13 @@ class Completions {
      * Suggest all completions that are visible from scope
      */
     private Stream<? extends Element> allSymbols(String partialIdentifier, Scope scope) {
-        Stream<? extends Element> sourcePathItems = allSourcePathSymbols(scope, partialIdentifier)
+        Stream<? extends Element> sourcePathItems = alreadyImportedSymbols(scope, partialIdentifier)
                 .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
+        Stream<TypeElement> sourcePathClasses = sourcePathClasses(partialIdentifier);
         Stream<TypeElement> classPathItems = classPath.topLevelClasses(partialIdentifier, packageOf(scope))
                 .flatMap(this::tryLoad);
 
-        return Stream.concat(sourcePathItems, classPathItems);
+        return Stream.concat(sourcePathItems, Stream.concat(sourcePathClasses, classPathItems));
     }
 
     private Stream<TypeElement> tryLoad(Class<?> c) {
@@ -367,12 +368,11 @@ class Completions {
         }
     }
 
-    private Stream<? extends Element> allSourcePathSymbols(Scope scope, String partialIdentifier) {
+    private Stream<? extends Element> alreadyImportedSymbols(Scope scope, String partialIdentifier) {
         Collection<TypeElement> thisScopes = scopeClasses(thisScopes(scope));
         Collection<TypeElement> classScopes = classScopes(scope);
         List<Scope> methodScopes = methodScopes(scope);
         Stream<? extends Element> staticImports = compilationUnit.getImports().stream().flatMap(this::staticImports);
-        Stream<TypeElement> sourcePathClasses = sourcePathClasses(partialIdentifier);
         Stream<? extends Element> elements = Stream.empty();
 
         if (!isStaticMethod(scope))
@@ -382,7 +382,6 @@ class Completions {
         elements = Stream.concat(elements, thisScopes.stream().flatMap(this::instanceMembers));
         elements = Stream.concat(elements, classScopes.stream().flatMap(this::staticMembers));
         elements = Stream.concat(elements, staticImports);
-        elements = Stream.concat(elements, sourcePathClasses);
 
         return elements;
     }
@@ -572,7 +571,7 @@ class Completions {
 
                     PackageElement classPackage = elements.getPackageOf(e);
                     if (classPackage != null)
-                        item.setDetail(classPackage.getSimpleName().toString());
+                        item.setDetail(classPackage.getQualifiedName().toString());
 
                     item.setAdditionalTextEdits(addImport(((TypeElement) e).getQualifiedName().toString()));
 
