@@ -3,7 +3,7 @@
 ## Bugs
 * Auto-import in empty file generates extra line of WS
 * Error squiggles are off
-* Autocomplete is showing arg0, arg1 for constructors
+* Go-to-def for enum
 
 ## Polish
 * Javadoc path for hover, autocomplete

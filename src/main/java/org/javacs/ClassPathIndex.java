@@ -12,6 +12,7 @@ import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -111,6 +112,13 @@ class ClassPathIndex {
                 .filter(c -> c.getPackageName().equals(parentPackage) && Completions.containsCharactersInOrder(c.getSimpleName(), partialClass))
                 .flatMap(ClassPathIndex::tryLoad)
                 .filter(c -> Modifier.isPublic(c.getModifiers()) || isInPackage(c, fromPackage));
+    }
+
+    Optional<Class<?>> loadPackage(String prefix) {
+        return topLevelClasses.stream()
+                .filter(c -> c.getPackageName().startsWith(prefix))
+                .flatMap(ClassPathIndex::tryLoad)
+                .findAny();
     }
 
     private boolean isInPackage(Class<?> c, String fromPackage) {

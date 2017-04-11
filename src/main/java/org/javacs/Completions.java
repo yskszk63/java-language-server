@@ -4,6 +4,7 @@ import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
+import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
@@ -12,17 +13,15 @@ import org.eclipse.lsp4j.TextEdit;
 
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
-import java.lang.reflect.Constructor;
 import java.util.*;
-import java.util.function.Supplier;
+import java.util.function.Predicate;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-class Completions implements Supplier<Stream<CompletionItem>> {
+class Completions {
 
     static Stream<CompletionItem> at(FocusedResult compiled) {
         return compiled.cursor
@@ -51,8 +50,7 @@ class Completions implements Supplier<Stream<CompletionItem>> {
         this.path = path;
     }
 
-    @Override
-    public Stream<CompletionItem> get() {
+    private Stream<CompletionItem> get() {
         Tree leaf = path.getLeaf();
         Scope scope = trees.getScope(path);
         CursorContext context = CursorContext.from(path);
@@ -61,26 +59,18 @@ class Completions implements Supplier<Stream<CompletionItem>> {
             MemberSelectTree select = (MemberSelectTree) leaf;
             TreePath expressionPath = new TreePath(path.getParentPath(), select.getExpression());
 
-            if (context == CursorContext.NewClass)
-                return innerConstructors(expressionPath, partialIdentifier(select.getIdentifier()), scope);
-            else
-                return completeMembers(expressionPath, partialIdentifier(select.getIdentifier()), scope);
+            return completeMembers(expressionPath, partialIdentifier(select.getIdentifier()), scope, context);
         }
         else if (leaf instanceof MemberReferenceTree) {
             MemberReferenceTree select = (MemberReferenceTree) leaf;
             TreePath expressionPath = new TreePath(path.getParentPath(), select.getQualifierExpression());
 
-            return completeMembers(expressionPath, partialIdentifier(select.getName()), scope);
+            return completeMembers(expressionPath, partialIdentifier(select.getName()), scope, context);
         }
         else if (leaf instanceof IdentifierTree) {
             IdentifierTree id = (IdentifierTree) leaf;
 
-            if (context == CursorContext.Import)
-                return packageMembers("", id.getName().toString(), scope);
-            else if (context == CursorContext.NewClass)
-                return constructors(partialIdentifier(id.getName()), scope);
-            else
-                return allSymbols(partialIdentifier(id.getName()), scope);
+            return completeIdentifier(partialIdentifier(id.getName()), scope, context);
         }
         else return Stream.empty();
     }
@@ -93,93 +83,149 @@ class Completions implements Supplier<Stream<CompletionItem>> {
     }
 
     /**
+     * Suggest all available identifiers
+     */
+    private Stream<CompletionItem> completeIdentifier(String partialIdentifier, Scope from, CursorContext context) {
+        switch (context) {
+            case Import:
+                return packageMembers("", partialIdentifier, from)
+                        .flatMap(this::completionItem);
+            case NewClass:
+                return allSymbols(partialIdentifier, from)
+                        .flatMap(this::explodeConstructors)
+                        .filter(init -> trees.isAccessible(from, init, (DeclaredType) init.getEnclosingElement().asType()))
+                        .flatMap(this::completionItem);
+            case Other:
+            default: {
+                Predicate<Element> accessible = e -> {
+                    if (e == null)
+                        return false;
+                        // Class names
+                    else if (e instanceof TypeElement)
+                        return trees.isAccessible(from, (TypeElement) e);
+                    else if (e.getEnclosingElement() == null)
+                        return false;
+                        // Members of other classes
+                    else if (e.getEnclosingElement() instanceof DeclaredType)
+                        return trees.isAccessible(from, e, (DeclaredType) e.getEnclosingElement());
+                        // Local variables
+                    else
+                        return true;
+                };
+
+                return allSymbols(partialIdentifier, from)
+                        .filter(accessible)
+                        .flatMap(this::completionItem);
+            }
+        }
+    }
+
+    /**
      * Suggest all accessible members of expression
      */
-    private Stream<CompletionItem> completeMembers(TreePath expression, String partialIdentifier, Scope from) {
+    private Stream<CompletionItem> completeMembers(TreePath expression, String partialIdentifier, Scope from, CursorContext context) {
+        switch (context) {
+            case NewClass:
+                return allMembers(expression, partialIdentifier, from)
+                        .flatMap(this::explodeConstructors)
+                        .filter(init -> trees.isAccessible(from, init, (DeclaredType) init.getEnclosingElement().asType()))
+                        .flatMap(this::completionItem);
+            case Import: {
+                return allMembers(expression, partialIdentifier, from)
+                        .filter(member -> !(member instanceof TypeElement) || trees.isAccessible(from, (TypeElement) member))
+                        .flatMap(this::completionItem);
+            }
+            case Other:
+            default: {
+                DeclaredType type = (DeclaredType) trees.getTypeMirror(expression);
+
+                return allMembers(expression, partialIdentifier, from)
+                        .filter(e -> trees.isAccessible(from, e, type))
+                        .flatMap(this::completionItem);
+            }
+        }
+    }
+
+    private Stream<? extends Element> allMembers(TreePath expression, String partialIdentifier, Scope from) {
         Element element = trees.getElement(expression);
 
+        if (element == null)
+            return Stream.empty();
+
+        // com.foo.?
         if (element instanceof PackageElement) {
             PackageElement packageElement = (PackageElement) element;
 
             return packageMembers(packageElement.getQualifiedName().toString(), partialIdentifier, from);
         }
-
-        TypeMirror type = trees.getTypeMirror(expression);
-
-        if (element == null || type == null)
-            return Stream.empty();
-
-        boolean isStatic = isTypeSymbol(element);
-        List<? extends Element> all = members(type);
-
-        Stream<CompletionItem> filter = all.stream()
-                .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier))
-                .filter(e -> isAccessible(e, from))
-                .filter(e -> e.getModifiers().contains(Modifier.STATIC) == isStatic)
-                .flatMap(this::completionItem);
-
-        if (isStatic) {
-            filter = Stream.concat(
-                    Stream.of(namedProperty("class")),
-                    filter
+        // MyClass.?
+        else if (element instanceof TypeElement) {
+            // OuterClass.this, OuterClass.super
+            Stream<? extends Element> thisAndSuper = thisScopes(from).stream()
+                    .filter(scope -> scope.getEnclosingClass().equals(element))
+                    .flatMap(this::thisAndSuper);
+            // MyClass.?
+            Stream<? extends Element> members = elements.getAllMembers((TypeElement) element).stream()
+                    .filter(e -> e.getModifiers().contains(Modifier.STATIC));
+            // MyClass.class
+            Element dotClass = new Symbol.VarSymbol(
+                    Flags.PUBLIC | Flags.STATIC | Flags.FINAL,
+                    (com.sun.tools.javac.util.Name) task.getElements().getName("class"),
+                    (com.sun.tools.javac.code.Type) element.asType(),
+                    (Symbol) element
             );
 
-            if (thisScopes(from).contains(element)) {
-                filter = Stream.concat(
-                        Stream.of(namedProperty("this"), namedProperty("super")),
-                        filter
-                );
-            }
+            return Stream.concat(Stream.of(dotClass), Stream.concat(thisAndSuper, members))
+                    .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
         }
+        // myValue.?
+        else {
+            DeclaredType type = (DeclaredType) trees.getTypeMirror(expression);
+            List<? extends Element> members = elements.getAllMembers((TypeElement) type.asElement());
 
-        return filter;
+            return members.stream()
+                    .filter(e -> !e.getModifiers().contains(Modifier.STATIC))
+                    .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
+        }
     }
 
-    private Stream<CompletionItem> packageMembers(String parentPackage, String partialIdentifier, Scope from) {
+    private Stream<? extends Element> packageMembers(String parentPackage, String partialIdentifier, Scope from) {
         // Source-path packages that match parentPackage.partialIdentifier
-        Stream<CompletionItem> packageItems = subPackages(parentPackage, partialIdentifier).stream()
-                .map(this::completePackagePart);
+        Stream<PackageElement> packages = subPackages(parentPackage, partialIdentifier);
         Stream<TypeElement> sourcePathClasses = sourcePath.allSymbols(ElementKind.CLASS)
                 .filter(c -> c.getContainerName().equals(parentPackage))
                 .filter(c -> containsCharactersInOrder(c.getName(), partialIdentifier))
                 .map(c -> elements.getTypeElement(qualifiedName(c.getContainerName(), c.getName())));
         Stream<TypeElement> classPathClasses = classPath.topLevelClassesIn(parentPackage, partialIdentifier, packageOf(from))
                 .map(c -> elements.getTypeElement(c.getName()));
-        Stream<CompletionItem> classItems = Stream.concat(sourcePathClasses, classPathClasses)
-                .filter(e -> isAccessible(e, from))
-                .flatMap(this::completionItem);
 
-        return Stream.concat(packageItems, classItems);
-    }
-
-    /**
-     * Complete a single identifier as part of a package chain.
-     * This isn't really a Java concept, so we have to implement a special case rather than use {@link this#completionItem(Element)}
-     */
-    private CompletionItem completePackagePart(String id) {
-        CompletionItem item = new CompletionItem();
-
-        item.setKind(CompletionItemKind.Module);
-        item.setLabel(id);
-
-        return item;
+        return Stream.concat(packages, Stream.concat(sourcePathClasses, classPathClasses));
     }
 
     /**
      * All sub-packages of parentPackage that match partialIdentifier
      */
-    private Set<String> subPackages(String parentPackage, String partialIdentifier) {
+    private Stream<PackageElement> subPackages(String parentPackage, String partialIdentifier) {
         String prefix = parentPackage.isEmpty() ? "" : parentPackage + ".";
         Stream<String> sourcePathMembers = sourcePath.allSymbols(ElementKind.CLASS)
                 .map(c -> c.getContainerName())
                 .filter(p -> p.startsWith(prefix));
         Stream<String> classPathMembers = classPath.packagesStartingWith(prefix);
-
-        return Stream.concat(sourcePathMembers, classPathMembers)
+        Set<String> next = Stream.concat(sourcePathMembers, classPathMembers)
                 .map(p -> p.substring(prefix.length()))
                 .map(Completions::firstId)
                 .filter(p -> containsCharactersInOrder(p, partialIdentifier))
                 .collect(Collectors.toSet());
+
+        // Load 1 member of package to force javac to recognize that it exists
+        for (String part : next) {
+            classPath.loadPackage(prefix + part)
+                    .ifPresent(this::tryLoad);
+        }
+
+        return next.stream()
+                .map(last -> elements.getPackageElement(prefix + last))
+                .filter(sym -> sym != null);
     }
 
     private static String qualifiedName(String parentPackage, String partialIdentifier) {
@@ -279,191 +325,50 @@ class Completions implements Supplier<Stream<CompletionItem>> {
             return qualifiedName.substring(lastDot + 1);
     }
 
-    /**
-     * All members of element, if it is TypeElement
-     */
-    private List<? extends Element> members(TypeMirror expressionType) {
-        if (expressionType == null)
-            return Collections.emptyList();
-
-        return typeElement(expressionType)
-                .map(elements::getAllMembers)
-                .orElseGet(Collections::emptyList);
-    }
-
-    /**
-     * Suggest a simple completion 'name'
-     */
-    private static CompletionItem namedProperty(String name) {
-        CompletionItem item = new CompletionItem();
-
-        item.setKind(CompletionItemKind.Property);
-        item.setLabel(name);
-
-        return item;
-    }
-
-    private boolean isTypeSymbol(Element element) {
-        if (element == null)
-            return false;
-
-        switch (element.getKind()) {
-            case CLASS:
-            case INTERFACE:
-            case ENUM:
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private Optional<TypeElement> typeElement(TypeMirror type) {
-        if (type instanceof DeclaredType) {
-            DeclaredType declared = (DeclaredType) type;
-            Element element = declared.asElement();
-
-            if (element instanceof TypeElement)
-                return Optional.of((TypeElement) element);
-        }
-
-        return Optional.empty();
-    }
-
-    private Stream<CompletionItem> constructors(String partialClass, Scope scope) {
-        Stream<CompletionItem> sourcePathItems = sourcePathClasses(partialClass)
-                .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialClass))
-                .flatMap(this::topLevelClassElement)
-                .flatMap(this::explodeConstructors)
-                .map(this::completeJavacConstructor);
-        Stream<CompletionItem> classPathItems = classPath.topLevelConstructors(partialClass, packageOf(scope))
-                .flatMap(this::asJavacConstructor)
-                .flatMap(this::tryCompleteJavacConstructor);
-
-        return Stream.concat(sourcePathItems, classPathItems);
-    }
-
-    private int alreadyImportedFirst(TypeElement left, TypeElement right) {
-        return -Boolean.compare(
-            isAlreadyImported(left.getQualifiedName().toString()),
-            isAlreadyImported(right.getQualifiedName().toString())
-        );
-    }
-
-    private Stream<ExecutableElement> asJavacConstructor(Constructor<?> c) {
-        TypeElement declaringClass = elements.getTypeElement(c.getDeclaringClass().getName());
-
-        if (declaringClass == null)
-            return Stream.empty();
-
-        // Completing constructors from the classpath can fail
-        try {
-            return elements.getAllMembers(declaringClass).stream()
-                .filter(member -> member.getKind() == ElementKind.CONSTRUCTOR)
-                .map(member -> (ExecutableElement) member);
-        } catch (Symbol.CompletionFailure failed) {
-            LOG.warning(failed.getMessage());
-
-            return Stream.empty();
-        }
-    }
-
-    private Stream<CompletionItem> innerConstructors(TreePath parent, String partialClass, Scope scope) {
-        Element element = trees.getElement(parent);
-
-        if (element == null)
-            return Stream.empty();
-
-        return members(element.asType()).stream()
-                .filter(el -> el.getKind() == ElementKind.CLASS)
-                .map(el -> (TypeElement) el)
-                .filter(el -> containsCharactersInOrder(el.getSimpleName(), partialClass))
-                .flatMap(this::explodeConstructors)
-                .filter(el -> isAccessible(el, scope))
-                .map(this::completeJavacConstructor);
-    }
-
-    private Stream<CompletionItem> tryCompleteJavacConstructor(ExecutableElement method) {
-        // Completing constructors from the classpath can fail
-        try {
-            return Stream.of(completeJavacConstructor(method));
-        } catch (Symbol.CompletionFailure failed) {
-            LOG.warning(failed.getMessage());
-
-            return Stream.empty();
-        }
-    }
-
-    private CompletionItem completeJavacConstructor(ExecutableElement method) {
-        TypeElement enclosingClass = (TypeElement) method.getEnclosingElement();
-        Optional<String> docString = docstring(method);
-        boolean hasTypeParameters = !enclosingClass.getTypeParameters().isEmpty();
-        String methodSignature = Hovers.methodSignature(method, false, false);
-        String qualifiedName = enclosingClass.getQualifiedName().toString();
-        String name = enclosingClass.getSimpleName().toString();
-
-        return completeConstructor(qualifiedName, name, hasTypeParameters, methodSignature, docString);
-    }
-
-    private CompletionItem completeConstructor(String qualifiedName, String name, boolean hasTypeParameters, String methodSignature, Optional<String> docString) {
-        CompletionItem item = new CompletionItem();
-        String insertText = name;
-
-        if (hasTypeParameters)
-            insertText += "<>";
-
-        item.setKind(CompletionItemKind.Constructor);
-        item.setLabel(name);
-        item.setDetail(methodSignature);
-        docString.ifPresent(item::setDocumentation);
-        item.setInsertText(insertText);
-        item.setSortText(name);
-        item.setFilterText(name);
-        item.setAdditionalTextEdits(addImport(qualifiedName));
-
-        return item;
-    }
-
     private Stream<ExecutableElement> explodeConstructors(Element element) {
-        switch (element.getKind()) {
-            case CLASS:
-                return members(element.asType()).stream()
-                        .filter(e -> e.getKind() == ElementKind.CONSTRUCTOR)
-                        .map(e -> (ExecutableElement) e);
-            case CONSTRUCTOR:
-                return Stream.of((ExecutableElement) element);
-            default:
-                return Stream.empty();
+        if (element.getKind() != ElementKind.CLASS)
+            return Stream.empty();
+
+        try {
+            return elements.getAllMembers((TypeElement) element).stream()
+                    .filter(e -> e.getKind() == ElementKind.CONSTRUCTOR)
+                    .map(e -> (ExecutableElement) e);
+        } catch (Symbol.CompletionFailure failed) {
+            LOG.warning(failed.getMessage());
+
+            return Stream.empty();
         }
     }
 
     /**
      * Suggest all completions that are visible from scope
      */
-    private Stream<CompletionItem> allSymbols(String partialIdentifier, Scope scope) {
-        Stream<CompletionItem> sourcePathItems = allSourcePathSymbols(scope, partialIdentifier)
-                .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier))
-                .filter(e -> isAccessible(e, scope))
-                .flatMap(this::completionItem);
-        Stream<CompletionItem> classPathItems = classPath.topLevelClasses(partialIdentifier, packageOf(scope))
-                .map(this::completeTopLevelClassSymbol);
+    private Stream<? extends Element> allSymbols(String partialIdentifier, Scope scope) {
+        Stream<? extends Element> sourcePathItems = allSourcePathSymbols(scope, partialIdentifier)
+                .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
+        Stream<TypeElement> classPathItems = classPath.topLevelClasses(partialIdentifier, packageOf(scope))
+                .flatMap(this::tryLoad);
 
         return Stream.concat(sourcePathItems, classPathItems);
     }
 
-    private CompletionItem completeTopLevelClassSymbol(Class<?> c) {
-        CompletionItem item = new CompletionItem();
+    private Stream<TypeElement> tryLoad(Class<?> c) {
+        try {
+            TypeElement type = elements.getTypeElement(c.getName());
 
-        item.setKind(CompletionItemKind.Class);
-        item.setLabel(c.getSimpleName());
-        item.setDetail(c.getPackage().getName());
-        item.setInsertText(c.getSimpleName());
-        item.setAdditionalTextEdits(addImport(c.getName()));
+            if (type != null)
+                return Stream.of(type);
+            else
+                return Stream.empty();
+        } catch (Symbol.CompletionFailure failed) {
+            LOG.warning(failed.getMessage());
 
-        return item;
+            return Stream.empty();
+        }
     }
 
     private Stream<? extends Element> allSourcePathSymbols(Scope scope, String partialIdentifier) {
-        Collection<TypeElement> thisScopes = thisScopes(scope);
+        Collection<TypeElement> thisScopes = scopeClasses(thisScopes(scope));
         Collection<TypeElement> classScopes = classScopes(scope);
         List<Scope> methodScopes = methodScopes(scope);
         Stream<? extends Element> staticImports = compilationUnit.getImports().stream().flatMap(this::staticImports);
@@ -537,8 +442,8 @@ class Completions implements Supplier<Stream<CompletionItem>> {
         }
     }
 
-    private Collection<TypeElement> thisScopes(Scope scope) {
-        Map<Name, TypeElement> acc = new LinkedHashMap<>();
+    private List<Scope> thisScopes(Scope scope) {
+        List<Scope> acc = new ArrayList<>();
 
         while (scope != null && scope.getEnclosingClass() != null) {
             TypeElement each = scope.getEnclosingClass();
@@ -551,16 +456,28 @@ class Completions implements Supplier<Stream<CompletionItem>> {
                 break;
             // If the user has indicated this is a static class, it's the last scope in the chain
             else if (staticClass && !anonymousClass) {
-                acc.put(each.getQualifiedName(), each);
+                acc.add(scope);
 
                 break;
             }
             // If this is an inner class, add it to the chain and keep going
             else {
-                acc.put(each.getQualifiedName(), each);
+                acc.add(scope);
 
                 scope = scope.getEnclosingScope();
             }
+        }
+
+        return acc;
+    }
+
+    private Collection<TypeElement> scopeClasses(Collection<Scope> scopes) {
+        Map<Name, TypeElement> acc = new LinkedHashMap<>();
+
+        for (Scope scope : scopes) {
+            TypeElement each = scope.getEnclosingClass();
+
+            acc.put(each.getQualifiedName(), each);
         }
 
         return acc.values();
@@ -628,101 +545,125 @@ class Completions implements Supplier<Stream<CompletionItem>> {
     }
 
     private Stream<CompletionItem> completionItem(Element e) {
-        String name = e.getSimpleName().toString();
+        try {
+            String name = e.getSimpleName().toString();
 
-        switch (e.getKind()) {
-            case PACKAGE: {
-                PackageElement p = (PackageElement) e;
-                CompletionItem item = new CompletionItem();
-                String id = lastId(p.getSimpleName().toString());
+            switch (e.getKind()) {
+                case PACKAGE: {
+                    PackageElement p = (PackageElement) e;
+                    CompletionItem item = new CompletionItem();
+                    String id = lastId(p.getSimpleName().toString());
 
-                item.setKind(CompletionItemKind.Module);
-                item.setLabel(id);
-                item.setInsertText(id);
+                    item.setKind(CompletionItemKind.Module);
+                    item.setLabel(id);
+                    item.setInsertText(id);
 
-                return Stream.of(item);
+                    return Stream.of(item);
+                }
+                case ENUM:
+                case INTERFACE:
+                case ANNOTATION_TYPE:
+                case CLASS: {
+                    CompletionItem item = new CompletionItem();
+
+                    item.setKind(classKind(e.getKind()));
+                    item.setLabel(name);
+                    item.setInsertText(name);
+
+                    PackageElement classPackage = elements.getPackageOf(e);
+                    if (classPackage != null)
+                        item.setDetail(classPackage.getSimpleName().toString());
+
+                    item.setAdditionalTextEdits(addImport(((TypeElement) e).getQualifiedName().toString()));
+
+                    return Stream.of(item);
+                }
+                case TYPE_PARAMETER: {
+                    CompletionItem item = new CompletionItem();
+
+                    item.setKind(CompletionItemKind.Reference);
+                    item.setLabel(name);
+
+                    return Stream.of(item);
+                }
+                case ENUM_CONSTANT: {
+                    CompletionItem item = new CompletionItem();
+
+                    item.setKind(CompletionItemKind.Enum);
+                    item.setLabel(name);
+                    item.setDetail(e.getEnclosingElement().getSimpleName().toString());
+
+                    return Stream.of(item);
+                }
+                case FIELD: {
+                    CompletionItem item = new CompletionItem();
+
+                    item.setKind(CompletionItemKind.Property);
+                    item.setLabel(name);
+                    item.setDetail(ShortTypePrinter.print(e.asType()));
+                    docstring(e).ifPresent(item::setDocumentation);
+
+                    return Stream.of(item);
+                }
+                case PARAMETER:
+                case LOCAL_VARIABLE:
+                case EXCEPTION_PARAMETER: {
+                    CompletionItem item = new CompletionItem();
+
+                    item.setKind(CompletionItemKind.Variable);
+                    item.setLabel(name);
+
+                    return Stream.of(item);
+                }
+                case METHOD: {
+                    ExecutableElement method = (ExecutableElement) e;
+                    CompletionItem item = new CompletionItem();
+
+                    item.setKind(CompletionItemKind.Method);
+                    item.setLabel(name);
+                    item.setDetail(Hovers.methodSignature(method, true, false));
+                    docstring(e).ifPresent(item::setDocumentation);
+                    item.setInsertText(name); // TODO
+                    item.setSortText(name);
+                    item.setFilterText(name);
+
+                    return Stream.of(item);
+                }
+                case CONSTRUCTOR: {
+                    TypeElement enclosingClass = (TypeElement) e.getEnclosingElement();
+                    name = enclosingClass.getSimpleName().toString();
+
+                    ExecutableElement method = (ExecutableElement) e;
+                    CompletionItem item = new CompletionItem();
+                    String insertText = name;
+
+                    if (!enclosingClass.getTypeParameters().isEmpty())
+                        insertText += "<>";
+
+                    item.setKind(CompletionItemKind.Constructor);
+                    item.setLabel(name);
+                    item.setDetail(Hovers.methodSignature(method, false, false));
+                    docstring(e).ifPresent(item::setDocumentation);
+                    item.setInsertText(insertText);
+                    item.setSortText(name);
+                    item.setFilterText(name);
+                    item.setAdditionalTextEdits(addImport(enclosingClass.getQualifiedName().toString()));
+
+                    return Stream.of(item);
+                }
+                case STATIC_INIT:
+                case INSTANCE_INIT:
+                case OTHER:
+                case RESOURCE_VARIABLE:
+                default:
+                    // Nothing user-enterable
+                    // Nothing user-enterable
+                    return Stream.empty();
             }
-            case ENUM:
-            case INTERFACE:
-            case ANNOTATION_TYPE:
-            case CLASS: {
-                CompletionItem item = new CompletionItem();
+        } catch (Symbol.CompletionFailure failed) {
+            LOG.warning(failed.getMessage());
 
-                item.setKind(classKind(e.getKind()));
-                item.setLabel(name);
-                item.setInsertText(name);
-
-                PackageElement classPackage = elements.getPackageOf(e);
-                if (classPackage != null)
-                    item.setDetail(classPackage.getSimpleName().toString());
-
-                item.setAdditionalTextEdits(addImport(((TypeElement)e).getQualifiedName().toString()));
-
-                return Stream.of(item);
-            }
-            case TYPE_PARAMETER: {
-                CompletionItem item = new CompletionItem();
-
-                item.setKind(CompletionItemKind.Reference);
-                item.setLabel(name);
-
-                return Stream.of(item);
-            }
-            case ENUM_CONSTANT: {
-                CompletionItem item = new CompletionItem();
-
-                item.setKind(CompletionItemKind.Enum);
-                item.setLabel(name);
-                item.setDetail(e.getEnclosingElement().getSimpleName().toString());
-
-                return Stream.of(item);
-            }
-            case FIELD: {
-                CompletionItem item = new CompletionItem();
-
-                item.setKind(CompletionItemKind.Property);
-                item.setLabel(name);
-                item.setDetail(ShortTypePrinter.print(e.asType()));
-                docstring(e).ifPresent(item::setDocumentation);
-
-                return Stream.of(item);
-            }
-            case PARAMETER:
-            case LOCAL_VARIABLE:
-            case EXCEPTION_PARAMETER: {
-                CompletionItem item = new CompletionItem();
-
-                item.setKind(CompletionItemKind.Variable);
-                item.setLabel(name);
-
-                return Stream.of(item);
-            }
-            case METHOD: {
-                ExecutableElement method = (ExecutableElement) e;
-                CompletionItem item = new CompletionItem();
-
-                item.setKind(CompletionItemKind.Method);
-                item.setLabel(name);
-                item.setDetail(Hovers.methodSignature(method, true, false));
-                docstring(e).ifPresent(item::setDocumentation);
-                item.setInsertText(name); // TODO
-                item.setSortText(name);
-                item.setFilterText(name);
-
-                return Stream.of(item);
-            }
-            case CONSTRUCTOR: {
-                // Constructors are completed differently
-                return Stream.empty();
-            }
-            case STATIC_INIT:
-            case INSTANCE_INIT:
-            case OTHER:
-            case RESOURCE_VARIABLE:
-            default:
-                // Nothing user-enterable
-                // Nothing user-enterable
-                return Stream.empty();
+            return Stream.empty();
         }
     }
 
@@ -745,20 +686,6 @@ class Completions implements Supplier<Stream<CompletionItem>> {
             return new RefactorFile(task, compilationUnit).addImport(mostIds(qualifiedName), lastId(qualifiedName));
         else
             return Collections.emptyList();
-    }
-
-    private boolean isAccessible(Element e, Scope scope) {
-        if (e == null)
-            return false;
-
-        TypeMirror enclosing = e.getEnclosingElement().asType();
-
-        if (enclosing instanceof DeclaredType)
-            return trees.isAccessible(scope, e, (DeclaredType) enclosing);
-        else if (e instanceof TypeElement)
-            return trees.isAccessible(scope, (TypeElement) e);
-        else
-            return true;
     }
 
     private Optional<String> docstring(Element e) {
