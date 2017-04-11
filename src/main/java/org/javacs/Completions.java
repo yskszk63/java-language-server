@@ -281,7 +281,7 @@ class Completions {
 
             if (isStarImport(each) && mostIds(importName).equals(packageName))
                 return true;
-            else if (importName.equals(packageName))
+            else if (importName.equals(qualifiedName))
                 return true;
         }
 
@@ -556,6 +556,7 @@ class Completions {
                     item.setKind(CompletionItemKind.Module);
                     item.setLabel(id);
                     item.setInsertText(id);
+                    item.setSortText("0/" + id);
 
                     return Stream.of(item);
                 }
@@ -563,6 +564,8 @@ class Completions {
                 case INTERFACE:
                 case ANNOTATION_TYPE:
                 case CLASS: {
+                    TypeElement type = (TypeElement) e;
+                    int order = isAlreadyImported(type.getQualifiedName().toString()) ? 1 : 2;
                     CompletionItem item = new CompletionItem();
 
                     item.setKind(classKind(e.getKind()));
@@ -574,6 +577,7 @@ class Completions {
                         item.setDetail(classPackage.getQualifiedName().toString());
 
                     item.setAdditionalTextEdits(addImport(((TypeElement) e).getQualifiedName().toString()));
+                    item.setSortText(order + "/" + name);
 
                     return Stream.of(item);
                 }
@@ -582,6 +586,7 @@ class Completions {
 
                     item.setKind(CompletionItemKind.Reference);
                     item.setLabel(name);
+                    item.setSortText("0/" + name);
 
                     return Stream.of(item);
                 }
@@ -591,6 +596,7 @@ class Completions {
                     item.setKind(CompletionItemKind.Enum);
                     item.setLabel(name);
                     item.setDetail(e.getEnclosingElement().getSimpleName().toString());
+                    item.setSortText("0/" + name);
 
                     return Stream.of(item);
                 }
@@ -601,6 +607,7 @@ class Completions {
                     item.setLabel(name);
                     item.setDetail(ShortTypePrinter.print(e.asType()));
                     docstring(e).ifPresent(item::setDocumentation);
+                    item.setSortText("0/" + name);
 
                     return Stream.of(item);
                 }
@@ -611,6 +618,7 @@ class Completions {
 
                     item.setKind(CompletionItemKind.Variable);
                     item.setLabel(name);
+                    item.setSortText("0/" + name);
 
                     return Stream.of(item);
                 }
@@ -625,11 +633,13 @@ class Completions {
                     item.setInsertText(name); // TODO
                     item.setSortText(name);
                     item.setFilterText(name);
+                    item.setSortText("0/" + name);
 
                     return Stream.of(item);
                 }
                 case CONSTRUCTOR: {
                     TypeElement enclosingClass = (TypeElement) e.getEnclosingElement();
+                    int order = isAlreadyImported(enclosingClass.getQualifiedName().toString()) ? 1 : 2;
                     name = enclosingClass.getSimpleName().toString();
 
                     ExecutableElement method = (ExecutableElement) e;
@@ -647,6 +657,7 @@ class Completions {
                     item.setSortText(name);
                     item.setFilterText(name);
                     item.setAdditionalTextEdits(addImport(enclosingClass.getQualifiedName().toString()));
+                    item.setSortText(order + "/" + name);
 
                     return Stream.of(item);
                 }
