@@ -65,7 +65,7 @@ public class RecompileTest {
         return JavacHolder.createWithoutIndex(
                 Collections.emptySet(),
                 Collections.singleton(Paths.get("src/test/resources")),
-                Paths.get("out")
+                Paths.get("target/test-output")
         );
     }
 

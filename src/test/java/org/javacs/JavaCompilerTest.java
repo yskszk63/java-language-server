@@ -8,6 +8,7 @@ import com.sun.tools.javac.api.JavacTool;
 import org.junit.Test;
 
 import javax.lang.model.element.Element;
+import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
@@ -21,7 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.logging.Logger;
 
-import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
 public class JavaCompilerTest {
@@ -45,24 +46,29 @@ public class JavaCompilerTest {
 
     @Test
     public void javacHolder() {
-        JavacHolder javac = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target"));
+        JavacHolder javac = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target/test-output"));
         File file = Paths.get("src/test/resources/org/javacs/example/Bad.java").toFile();
         BatchResult compile = javac.compileBatch(Collections.singletonMap(file.toURI(), Optional.empty()));
     }
 
     @Test
     public void incremental() {
-        JavacHolder javac = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target"));
+        JavacHolder javac = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target/test-output"));
 
-        // Compile AutocompleteMember to a .class file
+        // Compile Target to a .class file
         File target = Paths.get("src/test/resources/org/javacs/example/Target.java").toFile();
         BatchResult batch = javac.compileBatch(Collections.singletonMap(target.toURI(), Optional.empty()));
 
-        // Incremental compilation should use AutocompleteMember.class, not AutocompleteMember.java
+        // Incremental compilation should use Target.class, not Target.java
         File dependsOnTarget = Paths.get("src/test/resources/org/javacs/example/DependsOnTarget.java").toFile();
         FocusedResult incremental = javac.compileFocused(dependsOnTarget.toURI(), Optional.empty(), 5, 27, true);
 
         assertThat(javac.profile().get(TaskEvent.Kind.PARSE).keySet(), hasSize(1));
+
+        // Check that we can find org.javacs.example.Target
+        TypeElement targetClass = incremental.task.getElements().getTypeElement("org.javacs.example.Target");
+
+        assertThat(targetClass, not(nullValue()));
     }
 
     private void reportError(Diagnostic<? extends JavaFileObject> error) {

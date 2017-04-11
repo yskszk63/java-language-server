@@ -21,7 +21,7 @@ public class LinterTest {
     private static final JavacHolder compiler = JavacHolder.createWithoutIndex(
             Collections.emptySet(),
             Collections.singleton(Paths.get("src/test/resources")),
-            Paths.get("out")
+            Paths.get("target/test-output")
     );
 
     @Test
