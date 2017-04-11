@@ -344,7 +344,7 @@ class Completions {
      * Suggest all completions that are visible from scope
      */
     private Stream<? extends Element> allSymbols(String partialIdentifier, Scope scope) {
-        Stream<? extends Element> sourcePathItems = alreadyImportedSymbols(scope, partialIdentifier)
+        Stream<? extends Element> sourcePathItems = alreadyImportedSymbols(scope)
                 .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
         Stream<TypeElement> sourcePathClasses = sourcePathClasses(partialIdentifier);
         Stream<TypeElement> classPathItems = classPath.topLevelClasses(partialIdentifier, packageOf(scope))
@@ -368,7 +368,7 @@ class Completions {
         }
     }
 
-    private Stream<? extends Element> alreadyImportedSymbols(Scope scope, String partialIdentifier) {
+    private Stream<? extends Element> alreadyImportedSymbols(Scope scope) {
         Collection<TypeElement> thisScopes = scopeClasses(thisScopes(scope));
         Collection<TypeElement> classScopes = classScopes(scope);
         List<Scope> methodScopes = methodScopes(scope);
