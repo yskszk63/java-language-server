@@ -146,7 +146,7 @@ class JavaLanguageServer implements LanguageServer {
                 Hover hover = findCompiler(uri)
                         .map(compiler -> compiler.compileFocused(uri, content, line, character, false))
                         .flatMap(Hovers::hoverText)
-                        .orElseGet(Hover::new);
+                        .orElse(new Hover(Collections.emptyList(), null));
 
                 return CompletableFuture.completedFuture(hover);
             }
