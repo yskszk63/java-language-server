@@ -71,6 +71,7 @@ class JavaLanguageServer implements LanguageServer {
         c.setDocumentSymbolProvider(true);
         c.setCodeActionProvider(true);
         c.setExecuteCommandProvider(new ExecuteCommandOptions(ImmutableList.of("Java.importClass")));
+        c.setSignatureHelpProvider(new SignatureHelpOptions(ImmutableList.of("(")));
 
         result.setCapabilities(c);
 
@@ -141,7 +142,19 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<SignatureHelp> signatureHelp(TextDocumentPositionParams position) {
-                return null;
+                URI uri = URI.create(position.getTextDocument().getUri());
+                Optional<String> content = activeContent(uri);
+                int line = position.getPosition().getLine() + 1;
+                int character = position.getPosition().getCharacter() + 1;
+
+                LOG.info(String.format("signatureHelp at %s %d:%d", uri, line, character));
+
+                SignatureHelp help = findCompiler(uri)
+                        .map(compiler -> compiler.compileFocused(uri, content, line, character, true))
+                        .flatMap(compiled -> Signatures.help(compiled, line, character))
+                        .orElseGet(SignatureHelp::new);
+
+                return CompletableFuture.completedFuture(help);
             }
 
             @Override

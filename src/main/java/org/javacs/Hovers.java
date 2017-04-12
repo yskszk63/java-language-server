@@ -136,7 +136,7 @@ public class Hovers {
         return signature;
     }
 
-    private static String shortName(VariableElement p, boolean varargs) {
+    public static String shortName(VariableElement p, boolean varargs) {
         TypeMirror type = p.asType();
 
         if (varargs) {
