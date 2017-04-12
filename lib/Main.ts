@@ -53,7 +53,6 @@ export function activate(context: VSCode.ExtensionContext) {
                         '-cp', fatJar, 
                         '-Djavacs.port=' + port,
                         '-Xverify:none', // helps VisualVM avoid 'error 62'
-                        '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=39587', // allows us to attach debugger
                         'org.javacs.Main'
                     ];
                     
