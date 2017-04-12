@@ -6,6 +6,7 @@
 ## Bugs
 * Error squiggles are off
 * Go-to-def for enum
+* Multiple commands are getting sent by client
 
 ## Polish
 * Javadoc path for hover, autocomplete

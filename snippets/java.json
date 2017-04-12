@@ -1,11 +1,2 @@
 {
-	"Javadoc": {
-		"prefix": "doc",
-		"body": [
-			"/**",
-			" * $0",
-			" */"
-		],
-		"description": "Javadoc"
-	}
 }
