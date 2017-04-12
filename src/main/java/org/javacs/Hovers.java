@@ -24,12 +24,13 @@ import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.function.Function;
 
-public class Hovers implements Function<TreePath, Optional<String>> {
+public class Hovers {
     public static Optional<Hover> hoverText(FocusedResult compiled) {
         Trees trees = Trees.instance(compiled.task);
+        Hovers hovers = new Hovers(compiled.task);
 
         return compiled.cursor
-                .flatMap(new Hovers(compiled.task))
+                .flatMap(hovers::apply)
                 .map(text -> new Hover(Collections.singletonList(Either.forLeft(text)), null));
     }
 
@@ -39,8 +40,7 @@ public class Hovers implements Function<TreePath, Optional<String>> {
         trees = Trees.instance(task);
     }
 
-    @Override
-    public Optional<String> apply(TreePath path) {
+    private Optional<String> apply(TreePath path) {
         return title(path).map(title -> {
             String docstring = trees.getDocComment(path);
 
