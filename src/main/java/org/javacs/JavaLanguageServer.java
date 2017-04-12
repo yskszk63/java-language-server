@@ -43,7 +43,7 @@ class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
     int maxItems = 30;
     private Path workspaceRoot;
-    private Map<URI, String> activeDocuments = new HashMap<>();
+    private Map<URI, VersionedContent> activeDocuments = new HashMap<>();
     private LanguageClient client;
 
     JavaLanguageServer() {
@@ -258,9 +258,8 @@ class JavaLanguageServer implements LanguageServer {
                 try {
                     TextDocumentItem document = params.getTextDocument();
                     URI uri = URI.create(document.getUri());
-                    String text = document.getText();
 
-                    activeDocuments.put(uri, text);
+                    activeDocuments.put(uri, new VersionedContent(document.getText(), document.getVersion()));
 
                     doLint(Collections.singleton(uri));
                 } catch (NoJavaConfigException e) {
@@ -272,17 +271,20 @@ class JavaLanguageServer implements LanguageServer {
             public void didChange(DidChangeTextDocumentParams params) {
                 VersionedTextDocumentIdentifier document = params.getTextDocument();
                 URI uri = URI.create(document.getUri());
+                VersionedContent existing = activeDocuments.get(uri);
+                String newText = existing.content;
 
-                for (TextDocumentContentChangeEvent change : params.getContentChanges()) {
-                    if (change.getRange() == null)
-                        activeDocuments.put(uri, change.getText());
-                    else {
-                        String existingText = activeDocuments.get(uri);
-                        String newText = patch(existingText, change);
-
-                        activeDocuments.put(uri, newText);
+                if (document.getVersion() > existing.version) {
+                    for (TextDocumentContentChangeEvent change : params.getContentChanges()) {
+                        if (change.getRange() == null)
+                            activeDocuments.put(uri, new VersionedContent(change.getText(), document.getVersion()));
+                        else
+                            newText = patch(newText, change);
                     }
+
+                    activeDocuments.put(uri, new VersionedContent(newText, document.getVersion()));
                 }
+                else LOG.warning("Ignored change with version " + document.getVersion() + " <= " + existing.version);
             }
 
             @Override
@@ -364,7 +366,8 @@ class JavaLanguageServer implements LanguageServer {
      * Text of file, if it is in the active set
      */
     private Optional<String> activeContent(URI file) {
-        return Optional.ofNullable(activeDocuments.get(file));
+        return Optional.ofNullable(activeDocuments.get(file))
+                .map(doc -> doc.content);
     }
 
     @Override
