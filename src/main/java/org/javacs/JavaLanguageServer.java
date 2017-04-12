@@ -42,9 +42,18 @@ import static org.javacs.Main.JSON;
 class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
     int maxItems = 30;
-    private Path workspaceRoot;
     private Map<URI, VersionedContent> activeDocuments = new HashMap<>();
     private LanguageClient client;
+
+    private final Map<JavacConfig, JavacHolder> compilerCache = new HashMap<>();
+
+    /**
+     * Instead of looking for javaconfig.json and creating a JavacHolder, just use this.
+     * For testing.
+     */
+    private final Optional<JavacHolder> testJavac;
+
+    private FindConfig findConfig;
 
     JavaLanguageServer() {
         this.testJavac = Optional.empty();
@@ -56,7 +65,9 @@ class JavaLanguageServer implements LanguageServer {
 
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
-        workspaceRoot = Paths.get(params.getRootPath()).toAbsolutePath().normalize();
+        Path workspaceRoot = Paths.get(params.getRootPath()).toAbsolutePath().normalize();
+
+        findConfig = new FindConfig(workspaceRoot, testJavac.map(j -> new JavacConfig(j.sourcePath, j.classPath, j.outputDirectory)));
 
         InitializeResult result = new InitializeResult();
 
@@ -363,7 +374,7 @@ class JavaLanguageServer implements LanguageServer {
         Map<JavacConfig, Map<URI, Optional<String>>> files = new HashMap<>();
 
         for (URI each : paths) {
-            file(each).flatMap(this::findConfig).ifPresent(config -> {
+            file(each).flatMap(findConfig::forFile).ifPresent(config -> {
                 files.computeIfAbsent(config, newConfig -> new HashMap<>()).put(each, Optional.empty());
             });
         }
@@ -510,14 +521,6 @@ class JavaLanguageServer implements LanguageServer {
         return p;
     }
 
-    private Map<JavacConfig, JavacHolder> compilerCache = new HashMap<>();
-
-    /**
-     * Instead of looking for javaconfig.json and creating a JavacHolder, just use this.
-     * For testing.
-     */
-    private final Optional<JavacHolder> testJavac;
-
     /**
      * Look for a configuration in a parent directory of uri
      */
@@ -526,7 +529,7 @@ class JavaLanguageServer implements LanguageServer {
             return testJavac;
         else
             return dir(uri)
-                    .flatMap(this::findConfig)
+                    .flatMap(findConfig::forFile)
                     .map(this::findCompilerForConfig);
     }
 
@@ -552,190 +555,6 @@ class JavaLanguageServer implements LanguageServer {
         return JavacHolder.create(c.classPath,
                                c.sourcePath,
                                c.outputDirectory);
-    }
-
-    // TODO invalidate cache when VSCode notifies us config file has changed
-    private Map<Path, Optional<JavacConfig>> configCache = new HashMap<>();
-
-    private Optional<JavacConfig> findConfig(Path file) {
-        if (!file.toFile().isDirectory())
-            file = file.getParent();
-
-        if (file == null)
-            return Optional.empty();
-
-        return configCache.computeIfAbsent(file, this::doFindConfig);
-    }
-
-    private Optional<JavacConfig> doFindConfig(Path dir) {
-        if (testJavac.isPresent())
-            return testJavac.map(j -> new JavacConfig(j.sourcePath, j.classPath, j.outputDirectory));
-
-        while (true) {
-            Optional<JavacConfig> found = readIfConfig(dir);
-
-            if (found.isPresent())
-                return found;
-            else if (workspaceRoot.startsWith(dir))
-                return Optional.empty();
-            else
-                dir = dir.getParent();
-        }
-    }
-
-    /**
-     * If directory contains a config file, for example javaconfig.json or an eclipse project file, read it.
-     */
-    private Optional<JavacConfig> readIfConfig(Path dir) {
-        if (Files.exists(dir.resolve("javaconfig.json"))) {
-            JavaConfigJson json = readJavaConfigJson(dir.resolve("javaconfig.json"));
-            Set<Path> classPath = json.classPathFile.map(classPathFile -> {
-                Path classPathFilePath = dir.resolve(classPathFile);
-                return readClassPathFile(classPathFilePath);
-            }).orElse(Collections.emptySet());
-            Set<Path> sourcePath = json.sourcePath.stream().map(dir::resolve).collect(Collectors.toSet());
-            Path outputDirectory = dir.resolve(json.outputDirectory);
-            JavacConfig config = new JavacConfig(sourcePath, classPath, outputDirectory);
-
-            return Optional.of(config);
-        }
-        else if (Files.exists(dir.resolve("pom.xml"))) {
-            Path pomXml = dir.resolve("pom.xml");
-
-            // Invoke maven to get classpath
-            Set<Path> classPath = buildClassPath(pomXml);
-
-            // Get source directory from pom.xml
-            Set<Path> sourcePath = sourceDirectories(pomXml);
-
-            // Use target/javacs
-            Path outputDirectory = Paths.get("target/classes").toAbsolutePath();
-
-            JavacConfig config = new JavacConfig(sourcePath, classPath, outputDirectory);
-
-            return Optional.of(config);
-        }
-        // TODO add more file types
-        else {
-            return Optional.empty();
-        }
-    }
-
-    public static Set<Path> buildClassPath(Path pomXml) {
-        try {
-            Objects.requireNonNull(pomXml, "pom.xml path is null");
-
-            // Tell maven to output classpath to a temporary file
-            // TODO if pom.xml already specifies outputFile, use that location
-            Path classPathTxt = Files.createTempFile("classpath", ".txt");
-
-            LOG.info("Emit classpath to " + classPathTxt);
-
-            String cmd = getMvnCommand() + " dependency:build-classpath -Dmdep.outputFile=" + classPathTxt;
-            File workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
-            int result = Runtime.getRuntime().exec(cmd, null, workingDirectory).waitFor();
-
-            if (result != 0)
-                throw new RuntimeException("`" + cmd + "` returned " + result);
-
-            return readClassPathFile(classPathTxt);
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static String getMvnCommand() {
-        String mvnCommand = "mvn";
-        if (File.separatorChar == '\\') {
-            mvnCommand = findExecutableOnPath("mvn.cmd");
-            if (mvnCommand == null) {
-                mvnCommand = findExecutableOnPath("mvn.bat");
-            }
-        }
-        return mvnCommand;
-    }
-
-    private static String findExecutableOnPath(String name) {
-        for (String dirname : System.getenv("PATH").split(File.pathSeparator)) {
-            File file = new File(dirname, name);
-            if (file.isFile() && file.canExecute()) {
-                return file.getAbsolutePath();
-            }
-        }
-        return null;
-    }
-
-    private static Set<Path> sourceDirectories(Path pomXml) {
-        try {
-            Set<Path> all = new HashSet<>();
-
-            // Parse pom.xml
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(pomXml.toFile());
-
-            // Find source directory
-            String sourceDir = XPathFactory.newInstance().newXPath().compile("/project/build/sourceDirectory").evaluate(doc);
-
-            if (sourceDir == null || sourceDir.isEmpty()) {
-                LOG.info("Use default source directory src/main/java");
-
-                sourceDir = "src/main/java";
-            }
-            else LOG.info("Use source directory from pom.xml " + sourceDir);
-            
-            all.add(pomXml.resolveSibling(sourceDir).toAbsolutePath());
-
-            // Find test directory
-            String testDir = XPathFactory.newInstance().newXPath().compile("/project/build/testSourceDirectory").evaluate(doc);
-
-            if (testDir == null || testDir.isEmpty()) {
-                LOG.info("Use default test directory src/test/java");
-
-                testDir = "src/test/java";
-            }
-            else LOG.info("Use test directory from pom.xml " + testDir);
-            
-            all.add(pomXml.resolveSibling(testDir).toAbsolutePath());
-
-            return all;
-        } catch (IOException | ParserConfigurationException | SAXException | XPathExpressionException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private JavaConfigJson readJavaConfigJson(Path configFile) {
-        try {
-            return JSON.readValue(configFile.toFile(), JavaConfigJson.class);
-        } catch (IOException e) {
-            MessageParams message = new MessageParams();
-
-            message.setMessage("Error reading " + configFile);
-            message.setType(MessageType.Error);
-
-            throw new ShowMessageException(message, e);
-        }
-    }
-
-    private static Set<Path> readClassPathFile(Path classPathFilePath) {
-        try {
-            InputStream in = Files.newInputStream(classPathFilePath);
-            String text = new BufferedReader(new InputStreamReader(in))
-                    .lines()
-                    .collect(Collectors.joining());
-            Path dir = classPathFilePath.getParent();
-
-            return Arrays.stream(text.split(File.pathSeparator))
-                         .map(dir::resolve)
-                         .collect(Collectors.toSet());
-        } catch (IOException e) {
-            MessageParams message = new MessageParams();
-
-            message.setMessage("Error reading " + classPathFilePath);
-            message.setType(MessageType.Error);
-
-            throw new ShowMessageException(message, e);
-        }
     }
 
     private Range position(javax.tools.Diagnostic<? extends JavaFileObject> error) {

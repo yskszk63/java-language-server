@@ -7,6 +7,7 @@
 * Error squiggles are off
 * Go-to-def for enum
 * Multiple commands are getting sent by client
+* Signature help for constructors
 
 ## Polish
 * Javadoc path for hover, autocomplete
