@@ -13,11 +13,13 @@
 * Javadoc path for hover, autocomplete
 * Status bar info during indexing
 * Re-lint after applying workspace edit
+* Signature help only if cursor is INSIDE parens, not method(...)|
 
 ## Autocomplete
 * Autocomplete annotation fields
 * Autocomplete enum options in switch statement
 * Other methods of class when we have already statically imported 1 method
+* Interface name for anonymous class new Runnable() { }
 
 ## Features 
 * Go-to-subclasses

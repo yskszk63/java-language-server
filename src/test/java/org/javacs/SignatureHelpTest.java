@@ -29,6 +29,14 @@ public class SignatureHelpTest {
         assertThat(help.getActiveParameter(), equalTo(1));
     }
 
+    @Test
+    public void constructor() throws IOException {
+        SignatureHelp help = doHelp("/org/javacs/example/SignatureHelp.java", 9, 27);
+
+        assertThat(help.getSignatures(), hasSize(1));
+        assertThat(help.getSignatures().get(0).getLabel(), startsWith("SignatureHelp"));
+    }
+
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     private SignatureHelp doHelp(String file, int row, int column) throws IOException {

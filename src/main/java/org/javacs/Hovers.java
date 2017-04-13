@@ -120,7 +120,7 @@ public class Hovers {
             signature += ShortTypePrinter.print(e.getReturnType()) + " ";
 
         if (showMethodName)
-            signature += e.getSimpleName();
+            signature += name;
 
         signature += "(" + params + ")";
 

@@ -2,6 +2,7 @@ package org.javacs;
 
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
+import com.sun.source.tree.NewClassTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.SourcePositions;
@@ -30,7 +31,7 @@ class Signatures {
     private final long cursorOffset;
     private final JavacTask task;
 
-    Signatures(TreePath cursor, long cursorOffset, JavacTask task) {
+    private Signatures(TreePath cursor, long cursorOffset, JavacTask task) {
         this.cursor = cursor;
         this.cursorOffset = cursorOffset;
         this.task = task;
@@ -40,10 +41,34 @@ class Signatures {
     private Optional<SignatureHelp> get() {
         if (cursor.getLeaf().getKind() == Tree.Kind.METHOD_INVOCATION)
             return Optional.of(methodHelp((MethodInvocationTree) cursor.getLeaf()));
+        if (cursor.getLeaf().getKind() == Tree.Kind.NEW_CLASS)
+            return Optional.of(constructorHelp((NewClassTree) cursor.getLeaf()));
         if (cursor.getParentPath().getLeaf().getKind() == Tree.Kind.METHOD_INVOCATION)
             return Optional.of(methodHelp((MethodInvocationTree) cursor.getParentPath().getLeaf()));
+        if (cursor.getParentPath().getLeaf().getKind() == Tree.Kind.NEW_CLASS)
+            return Optional.of(constructorHelp((NewClassTree) cursor.getParentPath().getLeaf()));
         else
             return Optional.empty();
+    }
+
+    private SignatureHelp constructorHelp(NewClassTree leaf) {
+        Trees trees = Trees.instance(task);
+        TreePath identifierPath = TreePath.getPath(cursor.getCompilationUnit(), leaf.getIdentifier());
+        Element classElement = trees.getElement(identifierPath);
+        List<ExecutableElement> candidates = classElement.getEnclosedElements().stream()
+                .filter(member -> member.getKind() == ElementKind.CONSTRUCTOR)
+                .map(method -> (ExecutableElement) method)
+                .collect(Collectors.toList());
+        List<SignatureInformation> signatures = candidates.stream()
+                .map(member -> methodInfo(member, false))
+                .collect(Collectors.toList());
+        int activeSignature = candidates.indexOf(classElement);
+
+        return new SignatureHelp(
+                signatures,
+                activeSignature < 0 ? null : activeSignature,
+                activeParameter(leaf.getArguments())
+        );
     }
 
     private SignatureHelp methodHelp(MethodInvocationTree leaf) {
@@ -56,20 +81,20 @@ class Signatures {
                 .map(method -> (ExecutableElement) method)
                 .collect(Collectors.toList());
         List<SignatureInformation> signatures = candidates.stream()
-                .map(member -> methodInfo(member))
+                .map(member -> methodInfo(member, true))
                 .collect(Collectors.toList());
         int activeSignature = candidates.indexOf(methodElement);
 
         return new SignatureHelp(
                 signatures,
                 activeSignature < 0 ? null : activeSignature,
-                activeParameter(leaf)
+                activeParameter(leaf.getArguments())
         );
     }
 
-    private SignatureInformation methodInfo(ExecutableElement method) {
+    private SignatureInformation methodInfo(ExecutableElement method, boolean showReturn) {
         return new SignatureInformation(
-                Hovers.methodSignature(method, true, true),
+                Hovers.methodSignature(method, showReturn, true),
                 task.getElements().getDocComment(method),
                 paramInfo(method)
         );
@@ -92,11 +117,11 @@ class Signatures {
         return params;
     }
 
-    private Integer activeParameter(MethodInvocationTree leaf) {
+    private Integer activeParameter(List<? extends ExpressionTree> arguments) {
         SourcePositions pos = Trees.instance(task).getSourcePositions();
 
         int i = 0;
-        for (ExpressionTree arg : leaf.getArguments()) {
+        for (ExpressionTree arg : arguments) {
             if (pos.getEndPosition(cursor.getCompilationUnit(), arg) >= cursorOffset)
                 return i;
 
