@@ -11,6 +11,8 @@ import {LanguageClient, LanguageClientOptions, StreamInfo} from "vscode-language
 
 /** Called when extension is activated */
 export function activate(context: VSCode.ExtensionContext) {
+    console.log('Activating Java');
+
     let javaExecutablePath = findJavaExecutable('java');
     
     if (javaExecutablePath == null) {
@@ -76,8 +78,7 @@ export function activate(context: VSCode.ExtensionContext) {
         }
 
         // Create the language client and start the client.
-        let client = new LanguageClient('Language Server Example', createServer, clientOptions);
-        let disposable = client.start();
+        let disposable = new LanguageClient('vscode-javac', 'Java Language Server', createServer, clientOptions).start();
 
         // Push the disposable to the context's subscriptions so that the 
         // client can be deactivated on extension deactivation
