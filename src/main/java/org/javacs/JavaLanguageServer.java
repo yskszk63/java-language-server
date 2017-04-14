@@ -379,11 +379,15 @@ class JavaLanguageServer implements LanguageServer {
             });
         }
 
+        List<javax.tools.Diagnostic<? extends JavaFileObject>> errors = new ArrayList<>();
+
         files.forEach((config, configFiles) -> {
             BatchResult compile = findCompilerForConfig(config).compileBatch(configFiles);
 
-            publishDiagnostics(paths, compile);
+            errors.addAll(compile.errors.getDiagnostics());
         });
+
+        publishDiagnostics(paths, errors);
     }
 
     /**
@@ -460,7 +464,7 @@ class JavaLanguageServer implements LanguageServer {
                             findCompiler(uri).ifPresent(compiler -> {
                                 BatchResult result = compiler.delete(uri);
 
-                                publishDiagnostics(Collections.singleton(uri), result);
+                                publishDiagnostics(Collections.singleton(uri), result.errors.getDiagnostics());
                             });
                         }
                     }
@@ -472,12 +476,12 @@ class JavaLanguageServer implements LanguageServer {
         };
     }
     
-    private void publishDiagnostics(Collection<URI> touched, BatchResult result) {
+    private void publishDiagnostics(Collection<URI> touched, List<javax.tools.Diagnostic<? extends JavaFileObject>> diagnostics) {
         Map<URI, PublishDiagnosticsParams> files = new HashMap<>();
 
         touched.forEach(p -> files.put(p, newPublishDiagnostics(p)));
         
-        result.errors.getDiagnostics().forEach(error -> {
+        diagnostics.forEach(error -> {
             if (error.getStartPosition() != javax.tools.Diagnostic.NOPOS) {
                 URI uri = error.getSource().toUri();
                 PublishDiagnosticsParams publish = files.computeIfAbsent(uri, this::newPublishDiagnostics);

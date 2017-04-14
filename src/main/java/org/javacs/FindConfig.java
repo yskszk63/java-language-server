@@ -1,7 +1,10 @@
 package org.javacs;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Sets;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 import org.eclipse.lsp4j.*;
@@ -49,7 +52,7 @@ class FindConfig {
     private final Optional<JavacConfig> testConfig;
 
     // TODO invalidate cache when VSCode notifies us config file has changed
-    private final Map<Path, Optional<JavacConfig>> configCache = new HashMap<>();
+    private final Map<Path, List<JavacConfig>> configBySource = new HashMap<>(), configByDir = new HashMap<>();
 
     FindConfig(Path workspaceRoot, Optional<JavacConfig> testConfig) {
         this.workspaceRoot = workspaceRoot;
@@ -63,64 +66,114 @@ class FindConfig {
         if (file == null)
             return Optional.empty();
 
-        return configCache.computeIfAbsent(file, this::doFindConfig);
+        List<JavacConfig> found = configBySource.computeIfAbsent(file, this::doFindConfig);
+
+        return chooseConfig(found, file);
     }
 
-    private Optional<JavacConfig> doFindConfig(Path dir) {
+    private List<JavacConfig> doFindConfig(final Path sourceDir) {
         if (testConfig.isPresent())
-            return testConfig;
+            return ImmutableList.of(testConfig.get());
+
+        Path dir = sourceDir;
 
         while (true) {
-            Optional<JavacConfig> found = readIfConfig(dir);
+            List<JavacConfig> found = readIfConfig(dir);
 
-            if (found.isPresent())
+            if (!found.isEmpty()) {
+                LOG.info("Found " + dir + "/javaconfig.json for " + sourceDir);
+
                 return found;
+            }
             else if (workspaceRoot.startsWith(dir))
-                return Optional.empty();
+                return Collections.emptyList();
             else
                 dir = dir.getParent();
         }
     }
 
+    private Optional<JavacConfig> chooseConfig(List<JavacConfig> found, Path dir) {
+        return found.stream()
+            .filter(config -> matchesDir(config, dir))
+            .findFirst();
+    }
+
+    private boolean matchesDir(JavacConfig config, Path sourceDir) {
+        for (Path each : config.sourcePath) {
+            if (sourceDir.startsWith(each)) 
+                return true;
+        }
+
+        return false;
+    }
+
     /**
      * If directory contains a config file, for example javaconfig.json or an eclipse project file, read it.
      */
-    private Optional<JavacConfig> readIfConfig(Path dir) {
-        if (Files.exists(dir.resolve("javaconfig.json"))) {
-            JavaConfigJson json = readJavaConfigJson(dir.resolve("javaconfig.json"));
-            Set<Path> classPath = json.classPathFile.map(classPathFile -> {
-                Path classPathFilePath = dir.resolve(classPathFile);
-                return readClassPathFile(classPathFilePath);
-            }).orElse(Collections.emptySet());
+    private List<JavacConfig> readIfConfig(Path dir) {
+        return configByDir.computeIfAbsent(dir, this::doReadIfConfig);
+    }
+
+    private List<JavacConfig> doReadIfConfig(Path dir) {
+        Function<JavaConfigJson, JavacConfig> parseJavaConfigJson = json -> {
+            Set<Path> classPath = readClassPath(dir, json);
             Set<Path> sourcePath = json.sourcePath.stream().map(dir::resolve).collect(Collectors.toSet());
             Path outputDirectory = dir.resolve(json.outputDirectory);
-            JavacConfig config = new JavacConfig(sourcePath, classPath, outputDirectory);
 
-            return Optional.of(config);
+            return new JavacConfig(sourcePath, classPath, outputDirectory);
+        };
+        if (Files.exists(dir.resolve("javaconfig.json"))) {
+            return readJavaConfigJson(dir.resolve("javaconfig.json")).stream()
+                .map(parseJavaConfigJson)
+                .collect(Collectors.toList());
         }
         else if (Files.exists(dir.resolve("pom.xml"))) {
-            Path pomXml = dir.resolve("pom.xml");
-
-            // Invoke maven to get classpath
-            Set<Path> classPath = buildClassPath(pomXml);
-
-            // Get source directory from pom.xml
-            Set<Path> sourcePath = sourceDirectories(pomXml);
-
-            // Use target/javacs
-            Path outputDirectory = Paths.get("target/classes").toAbsolutePath();
-
-            JavacConfig config = new JavacConfig(sourcePath, classPath, outputDirectory);
-
-            return Optional.of(config);
+            return ImmutableList.of(
+                readPomXml(dir, false), 
+                readPomXml(dir, true)
+            );
         }
         // TODO add more file types
         else {
-            return Optional.empty();
+            return Collections.emptyList();
         }
     }
 
-    public static Set<Path> buildClassPath(Path pomXml) {
+    private Set<Path> readClassPath(Path dir, JavaConfigJson json) {
+        Set<Path> classPath = new HashSet<>();
+
+        json.classPathFile.ifPresent(classPathFile -> {
+            Path classPathFilePath = dir.resolve(classPathFile);
+            Set<Path> paths = readClassPathFile(classPathFilePath);
+
+            classPath.addAll(paths);
+        });
+
+        json.classPath.forEach(entry -> classPath.add(dir.resolve(entry)));
+
+        return classPath;
+    }
+
+    private JavacConfig readPomXml(Path dir, boolean testScope) {
+        Path pomXml = dir.resolve("pom.xml");
+
+        // Invoke maven to get classpath
+        Set<Path> classPath = buildClassPath(pomXml, testScope);
+
+        // Get source directory from pom.xml
+        Set<Path> sourcePath = sourceDirectories(pomXml, testScope);
+
+        // Use maven output directory so incremental compilation uses maven-generated .class files
+        Path outputDirectory = testScope ? 
+            Paths.get("target/test-classes").toAbsolutePath() : 
+            Paths.get("target/classes").toAbsolutePath();
+
+        JavacConfig config = new JavacConfig(sourcePath, classPath, outputDirectory);
+
+        return config;
+    }
+
+    public static Set<Path> buildClassPath(Path pomXml, boolean testScope) {
         try {
             Objects.requireNonNull(pomXml, "pom.xml path is null");
 
@@ -130,7 +183,12 @@ class FindConfig {
 
             LOG.info("Emit classpath to " + classPathTxt);
 
-            String cmd = getMvnCommand() + " dependency:build-classpath -Dmdep.outputFile=" + classPathTxt;
+            String cmd = String.format(
+                "%s dependency:build-classpath -DincludeScope=%s -Dmdep.outputFile=%s",
+                getMvnCommand(),
+                testScope ? "test" : "compile",
+                classPathTxt
+            );
             File workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
             int result = Runtime.getRuntime().exec(cmd, null, workingDirectory).waitFor();
 
@@ -164,48 +222,55 @@ class FindConfig {
         return null;
     }
 
-    private static Set<Path> sourceDirectories(Path pomXml) {
+    private static Set<Path> sourceDirectories(Path pomXml, boolean testScope) {
+        return testScope ? 
+            Sets.union(onlySourceDirectories(pomXml, true), onlySourceDirectories(pomXml, false)) : 
+            onlySourceDirectories(pomXml, false);
+    }
+
+    private static Set<Path> onlySourceDirectories(Path pomXml, boolean testScope) {
+        String defaultSourceDir = testScope ? "src/test/java" : "src/main/java";
+        String xPath = testScope ? "/project/build/testSourceDirectory" : "/project/build/sourceDirectory";
+        Document doc = parsePomXml(pomXml);
+
         try {
-            Set<Path> all = new HashSet<>();
-
-            // Parse pom.xml
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(pomXml.toFile());
-
-            // Find source directory
-            String sourceDir = XPathFactory.newInstance().newXPath().compile("/project/build/sourceDirectory").evaluate(doc);
+            String sourceDir = XPathFactory.newInstance().newXPath().compile(xPath).evaluate(doc);
 
             if (sourceDir == null || sourceDir.isEmpty()) {
-                LOG.info("Use default source directory src/main/java");
+                LOG.info("Use default source directory " + defaultSourceDir);
 
-                sourceDir = "src/main/java";
+                sourceDir = defaultSourceDir;
             }
             else LOG.info("Use source directory from pom.xml " + sourceDir);
             
-            all.add(pomXml.resolveSibling(sourceDir).toAbsolutePath());
+            return Collections.singleton(pomXml.resolveSibling(sourceDir).toAbsolutePath());
+        } catch (XPathExpressionException e) {
+                throw new RuntimeException(e);
+        }
+    }
 
-            // Find test directory
-            String testDir = XPathFactory.newInstance().newXPath().compile("/project/build/testSourceDirectory").evaluate(doc);
+    private static Document parsePomXml(Path pomXml) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
 
-            if (testDir == null || testDir.isEmpty()) {
-                LOG.info("Use default test directory src/test/java");
-
-                testDir = "src/test/java";
-            }
-            else LOG.info("Use test directory from pom.xml " + testDir);
-            
-            all.add(pomXml.resolveSibling(testDir).toAbsolutePath());
-
-            return all;
-        } catch (IOException | ParserConfigurationException | SAXException | XPathExpressionException e) {
+            return builder.parse(pomXml.toFile());
+        } catch (IOException | ParserConfigurationException | SAXException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private JavaConfigJson readJavaConfigJson(Path configFile) {
+    private List<JavaConfigJson> readJavaConfigJson(Path configFile) {
         try {
-            return JSON.readValue(configFile.toFile(), JavaConfigJson.class);
+            JsonNode json = JSON.readValue(configFile.toFile(), JsonNode.class);
+
+            if (json.isArray())
+                return JSON.convertValue(json, new TypeReference<List<JavaConfigJson>>() { });
+            else {
+                JavaConfigJson one = JSON.convertValue(json, JavaConfigJson.class);
+
+                return ImmutableList.of(one);
+            }
         } catch (IOException e) {
             MessageParams message = new MessageParams();
 
