@@ -7,7 +7,6 @@
 * Error squiggles are off
 * Go-to-def for enum
 * Multiple commands are getting sent by client
-* Signature help for constructors
 
 ## Polish
 * Javadoc path for hover, autocomplete
@@ -20,6 +19,7 @@
 * Autocomplete enum options in switch statement
 * Other methods of class when we have already statically imported 1 method
 * Interface name for anonymous class new Runnable() { }
+* Order members stream inherited-last
 
 ## Features 
 * Go-to-subclasses
