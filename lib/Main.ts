@@ -68,10 +68,21 @@ export function activate(context: VSCode.ExtensionContext) {
                             writer: socket
                         });
                     }).listen(port, () => {
-                        let options = { stdio: 'inherit', cwd: VSCode.workspace.rootPath };
-                        
                         // Start the child java process
-                        ChildProcess.execFile(javaExecutablePath, args, options);
+                        let options = { cwd: VSCode.workspace.rootPath };
+                        let process = ChildProcess.spawn(javaExecutablePath, args, options);
+
+                        // Send raw output to a file
+                        if (!FS.existsSync(context.storagePath))
+                            FS.mkdirSync(context.storagePath);
+
+                        let logFile = context.storagePath + '/vscode-javac.log';
+                        let logStream = FS.createWriteStream(logFile, {flags: 'w'});
+
+                        process.stdout.pipe(logStream);
+                        process.stderr.pipe(logStream);
+
+                        console.log(`Storing log in '${logFile}'`);
                     });
                 });
             });
