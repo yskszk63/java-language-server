@@ -1,0 +1,10 @@
+[{
+    "sourcePath": ["src/main/java"],
+    "classPathFile": "classpath.txt",
+    "outputDirectory": "target/classes"
+}, {
+    "sourcePath": ["src/test/java"],
+    "classPath": ["target/classes"],
+    "classPathFile": "test-classpath.txt",
+    "outputDirectory": "target/test-classes"
+}]

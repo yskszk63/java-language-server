@@ -7,3 +7,5 @@ target
 *.iml
 dependency-reduced-pom.xml
 *.vsix
+classpath.txt
+test-classpath.txt
