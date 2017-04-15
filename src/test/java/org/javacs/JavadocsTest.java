@@ -38,7 +38,7 @@ public class JavadocsTest {
 
     @Test
     public void findSystemDoc() throws IOException {
-        RootDoc root = new Javadocs(Collections.emptySet()).index("java.util");
+        RootDoc root = new Javadocs(Collections.emptySet()).index("java.util.ArrayList");
 
         assertThat(root.classes(), not(emptyArray()));
     }

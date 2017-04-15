@@ -1,19 +1,15 @@
 package org.javacs;
 
-import com.sun.javadoc.ClassDoc;
+import com.sun.javadoc.*;
 import com.google.common.collect.ImmutableList;
-import com.sun.javadoc.Doclet;
-import com.sun.javadoc.MethodDoc;
-import com.sun.javadoc.Parameter;
-import com.sun.javadoc.RootDoc;
+import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javadoc.api.JavadocTool;
-import org.eclipse.lsp4j.DiagnosticSeverity;
 
 import javax.lang.model.element.*;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.*;
 import java.io.File;
@@ -23,21 +19,51 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.tools.JavaFileObject.Kind;
 
 public class Javadocs {
+
+    /**
+     * Stores known javadocs across all source paths, including dependencies
+     */
+    private static Javadocs global = new Javadocs(Collections.emptySet());
+
+    /**
+     * Add another source path to global()
+     */
+    public static void addSourcePath(Set<Path> additionalSourcePath) {
+        global = global.withSourcePath(additionalSourcePath);
+    }
+
+    /**
+     * A single global instance of Javadocs that incorporates all source paths
+     */
+    public static Javadocs global() {
+        return global;
+    }
+
+    /**
+     * The indexed source path, not including src.zip
+     */
+    private final Set<Path> userSourcePath;
+
     /**
      * Cache for performance reasons
      */
     private final JavacFileManager fileManager;
 
     /**
-     * All the packages we have indexed so far
+     * All the classes we have indexed so far
      */
-    private final Map<String, RootDoc> packages = new HashMap<>();
+    private final Map<String, RootDoc> topLevelClasses = new HashMap<>();
 
     private final Types types;
 
+    private final Elements elements;
+
     Javadocs(Set<Path> sourcePath) {
+        this.userSourcePath = sourcePath;
+
         Set<File> allSourcePaths = new HashSet<>();
 
         sourcePath.stream()
@@ -53,7 +79,29 @@ public class Javadocs {
             throw new RuntimeException(e);
         }
 
-        types = JavacTool.create().getTask(null, fileManager, Javadocs::onDiagnostic, null, null, null).getTypes();
+        JavacTask task = JavacTool.create().getTask(null, fileManager, Javadocs::onDiagnostic, null, null, null);
+
+        types = task.getTypes();
+        elements = task.getElements();
+    }
+
+    Javadocs withSourcePath(Set<Path> additionalSourcePath) {
+        Set<Path> all = new HashSet<>();
+
+        all.addAll(userSourcePath);
+        all.addAll(additionalSourcePath);
+
+        return new Javadocs(all);
+    }
+
+    // TODO get rid of this and use methodDoc and classDoc, which have additional variable name information
+    Optional<String> docstring(Element el) {
+        if (el instanceof ExecutableElement)
+            return methodDoc((ExecutableElement) el).map(doc -> doc.commentText());
+        else if (el instanceof TypeElement)
+            return classDoc((TypeElement) el).map(doc -> doc.commentText());
+        else
+            return Optional.empty();
     }
 
     Optional<MethodDoc> methodDoc(ExecutableElement method) {
@@ -96,43 +144,76 @@ public class Javadocs {
     }
 
     Optional<ClassDoc> classDoc(TypeElement classElement) {
-        PackageElement enclosingPackage = (PackageElement) classElement.getEnclosingElement();
-        String packageName = enclosingPackage.getQualifiedName().toString();
-        RootDoc packageDoc = index(packageName);
         String className = classElement.getQualifiedName().toString();
-        
-        return Optional.ofNullable(packageDoc.classNamed(className));
+        RootDoc index = index(className);
+
+        return Optional.ofNullable(index.classNamed(className));
     }
 
-    /**
-     * Get or compute the javadoc for `packageName`
-     */
-    RootDoc index(String packageName) {
-        return packages.computeIfAbsent(packageName, this::doIndex);
-    }
-
-    /**
-     * Read all the Javadoc for `packageName`
-     */
-    private RootDoc doIndex(String packageName) {
+    Optional<RootDoc> update(CompilationUnitTree tree) {
         DocumentationTool.DocumentationTask task = new JavadocTool().getTask(
-                null,
-                fileManager,
-                Javadocs::onDiagnostic,
-                Javadocs.class,
-                ImmutableList.of(packageName),
-                null
+            null,
+            fileManager,
+            Javadocs::onDiagnostic,
+            Javadocs.class,
+            null,
+            ImmutableList.of(tree.getSourceFile())
         );
 
         task.call();
 
+        return getSneakyReturn();
+    }
+
+    /**
+     * Get or compute the javadoc for `className`
+     */
+    RootDoc index(String className) {
+        return topLevelClasses.computeIfAbsent(className, this::doIndex);
+    }
+
+    /**
+     * Read all the Javadoc for `className`
+     */
+    private RootDoc doIndex(String className) {
+        try {
+            JavaFileObject source = fileManager.getJavaFileForInput(StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
+
+            if (source == null) {
+                LOG.warning("No source file for " + className);
+
+                return EmptyRootDoc.INSTANCE;
+            }
+            
+            LOG.info("Found " + source.toUri() + " for " + className);
+
+            DocumentationTool.DocumentationTask task = new JavadocTool().getTask(
+                    null,
+                    fileManager,
+                    Javadocs::onDiagnostic,
+                    Javadocs.class,
+                    null,
+                    ImmutableList.of(source)
+            );
+
+            task.call();
+        } catch (IOException e) {
+            throw new RuntimeException();
+        }
+
+        return getSneakyReturn().orElse(EmptyRootDoc.INSTANCE);
+    }
+
+    private Optional<RootDoc> getSneakyReturn() {
         RootDoc result = sneakyReturn.get();
         sneakyReturn.remove();
 
-        if (result == null)
-            throw new RuntimeException("index(" + packageName + ") did not return a RootDoc");
-        else
-            return result;
+        if (result == null) {
+            LOG.warning("index did not return a RootDoc");
+
+            return Optional.empty();
+        }
+        else return Optional.of(result);
     }
 
     /**
@@ -193,4 +274,5 @@ public class Javadocs {
     }
 
     private static final Logger LOG = Logger.getLogger("main");
+
 }

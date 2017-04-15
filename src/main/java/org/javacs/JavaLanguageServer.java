@@ -556,9 +556,13 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private JavacHolder newJavac(JavacConfig c) {
-        return JavacHolder.create(c.classPath,
-                               c.sourcePath,
-                               c.outputDirectory);
+        Javadocs.addSourcePath(c.sourcePath);
+
+        return JavacHolder.create(
+            c.classPath,
+            c.sourcePath,
+            c.outputDirectory
+        );
     }
 
     private Range position(javax.tools.Diagnostic<? extends JavaFileObject> error) {
