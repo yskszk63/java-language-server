@@ -38,13 +38,18 @@ public class JavadocsTest {
 
     @Test
     public void findSystemDoc() throws IOException {
-        RootDoc root = new Javadocs(Collections.emptySet()).index("java.util.ArrayList");
+        Javadocs docs = new Javadocs(Collections.emptySet());
+        RootDoc root = docs.index("java.util.ArrayList");
 
         assertThat(root.classes(), not(emptyArray()));
+
+        Optional<MethodDoc> method = docs.methodDoc("java.util.ArrayList#add(java.lang.Object)");
+
+        assertTrue("add is found", method.isPresent());
     }
 
     @Test
-    public void matchMethodSignature() {
+    public void methodKey() {
         Javadocs docs = new Javadocs(Collections.singleton(Paths.get("src/test/resources")));
         JavacHolder compiler = newCompiler();
         FocusedResult compile = compiler.compileFocused(
@@ -54,6 +59,7 @@ public class JavadocsTest {
             false
         );
         ExecutableElement method = (ExecutableElement) Trees.instance(compile.task).getElement(compile.cursor.get());
-        MethodDoc methodDoc = docs.methodDoc(method).get();
+
+        assertThat(docs.methodKey(method), equalTo("org.javacs.docs.TrickyDocstring#example(java.lang.String,java.lang.String[],java.util.List)"));
     }
 }

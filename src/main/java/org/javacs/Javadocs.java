@@ -8,6 +8,7 @@ import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javadoc.api.JavadocTool;
 
+import java.util.stream.Collectors;
 import javax.lang.model.element.*;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
@@ -94,57 +95,49 @@ public class Javadocs {
         return new Javadocs(all);
     }
 
-    // TODO get rid of this and use methodDoc and classDoc, which have additional variable name information
-    Optional<String> docstring(Element el) {
-        if (el instanceof ExecutableElement)
-            return methodDoc((ExecutableElement) el).map(doc -> doc.commentText());
-        else if (el instanceof TypeElement)
-            return classDoc((TypeElement) el).map(doc -> doc.commentText());
-        else
-            return Optional.empty();
-    }
-
-    Optional<MethodDoc> methodDoc(ExecutableElement method) {
+    String methodKey(ExecutableElement method) {
         TypeElement classElement = (TypeElement) method.getEnclosingElement();
 
-        return classDoc(classElement).flatMap(classDoc -> doMethodDoc(classDoc, method));
+        return classElement.getQualifiedName() + "#" + method.getSimpleName() + "(" + paramsKey(method.getParameters()) + ")";
     }
 
-    private Optional<MethodDoc> doMethodDoc(ClassDoc classDoc, ExecutableElement method) {
+    private String paramsKey(List<? extends VariableElement> params) {
+        return params.stream()
+            .map(p -> types.erasure(p.asType()).toString())
+            .collect(Collectors.joining(","));
+    }
+
+    Optional<MethodDoc> methodDoc(String methodKey) {
+        String className = methodKey.substring(0, methodKey.indexOf('#'));
+
+        return classDoc(className)
+            .flatMap(classDoc -> doMethodDoc(classDoc, methodKey));
+    }
+
+    private Optional<MethodDoc> doMethodDoc(ClassDoc classDoc, String methodKey) {
         for (MethodDoc each : classDoc.methods(false)) {
-            if (methodMatches(method, each))
+            if (methodMatches(methodKey, each))
                 return Optional.of(each);
         }
 
         return Optional.empty();
     }
 
-    private boolean methodMatches(ExecutableElement method, MethodDoc doc) {
-        return method.getSimpleName().toString().equals(doc.name()) &&
-            parametersMatch(method.getParameters(), doc.parameters());
+    private boolean methodMatches(String methodKey, MethodDoc doc) {
+        String docSignature = erasedSignature(doc);
+
+        return docSignature.equals(methodKey);
     }
 
-    private boolean parametersMatch(List<? extends VariableElement> vars, Parameter[] docs) {
-        if (vars.size() != docs.length) 
-            return false;
-        
-        for (int i = 0; i < vars.size(); i++) {
-            if (!parameterMatches(vars.get(i), docs[i]))
-                return false;
-        }
+    private String erasedSignature(MethodDoc doc) {
+        String params = Arrays.stream(doc.parameters())
+                .map(param -> param.type().toString())
+                .collect(Collectors.joining(","));
 
-        return true;
+        return doc.containingClass().qualifiedName() + "#" + doc.name() + "("  + params + ")";
     }
 
-    private boolean parameterMatches(VariableElement var, Parameter doc) {
-        String varString = types.erasure(var.asType()).toString();
-        String docString = doc.type().toString();
-
-        return varString.equals(docString);
-    }
-
-    Optional<ClassDoc> classDoc(TypeElement classElement) {
-        String className = classElement.getQualifiedName().toString();
+    Optional<ClassDoc> classDoc(String className) {
         RootDoc index = index(className);
 
         return Optional.ofNullable(index.classNamed(className));
