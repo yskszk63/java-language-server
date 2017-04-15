@@ -5,6 +5,7 @@ import com.sun.javadoc.*;
 import com.google.common.collect.ImmutableList;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
+import com.sun.source.util.Trees;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javadoc.api.JavadocTool;
@@ -97,6 +98,22 @@ public class Javadocs {
         return new Javadocs(all);
     }
 
+    Optional<? extends ProgramElementDoc> doc(Element el) {
+        if (el instanceof ExecutableElement) {
+            ExecutableElement method = (ExecutableElement) el;
+            String key = methodKey(method);
+
+            return methodDoc(key);
+        }
+        else if (el instanceof TypeElement) {
+            TypeElement type = (TypeElement) el;
+            String key = type.getQualifiedName().toString();
+
+            return classDoc(key);
+        }
+        else return Optional.empty();
+    }
+
     String methodKey(ExecutableElement method) {
         TypeElement classElement = (TypeElement) method.getEnclosingElement();
 
@@ -108,8 +125,6 @@ public class Javadocs {
             .map(p -> types.erasure(p.asType()).toString())
             .collect(Collectors.joining(","));
     }
-
-    // TODO fastMethodSignature that unsafely casts to Doclet api
 
     Optional<MethodDoc> methodDoc(String methodKey) {
         String className = methodKey.substring(0, methodKey.indexOf('#'));

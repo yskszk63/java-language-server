@@ -4,6 +4,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.sun.javadoc.ClassDoc;
 import com.sun.javadoc.MethodDoc;
+import com.sun.javadoc.ProgramElementDoc;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 import org.eclipse.lsp4j.*;
@@ -179,12 +180,25 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("hover at %s %d:%d", uri, line, character));
 
-                Hover hover = findCompiler(uri)
+                Hover result = findCompiler(uri)
                         .map(compiler -> compiler.compileFocused(uri, content, line, character, false))
-                        .flatMap(Hovers::hoverText)
-                        .orElse(new Hover(Collections.emptyList(), null));
+                        .flatMap(this::elementAtCursor)
+                        .map(Hovers::hoverText)
+                        .orElseGet(this::emptyHover);
 
-                return CompletableFuture.completedFuture(hover);
+                return CompletableFuture.completedFuture(result);
+            }
+
+            private Optional<Element> elementAtCursor(FocusedResult compiled) {
+                return compiled.cursor.flatMap(cursor -> {
+                    Element el = Trees.instance(compiled.task).getElement(cursor);
+
+                    return Optional.ofNullable(el);
+                });
+            }
+
+            private Hover emptyHover() {
+                return new Hover(Collections.emptyList(), null);
             }
 
             @Override
