@@ -1,18 +1,28 @@
 package org.javacs;
 
+import com.sun.javadoc.ClassDoc;
+import com.google.common.collect.ImmutableList;
+import com.sun.javadoc.Doclet;
+import com.sun.javadoc.MethodDoc;
+import com.sun.javadoc.Parameter;
+import com.sun.javadoc.RootDoc;
+import com.sun.tools.javac.api.JavacTool;
+import com.sun.tools.javac.file.JavacFileManager;
+import com.sun.tools.javadoc.api.JavadocTool;
+import org.eclipse.lsp4j.DiagnosticSeverity;
+
+import javax.lang.model.element.*;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.Types;
 import javax.tools.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.logging.Level;
 import java.util.logging.Logger;
-import com.google.common.collect.ImmutableList;
-import com.sun.javadoc.Doclet;
-import com.sun.javadoc.RootDoc;
-import com.sun.tools.javac.api.JavacTool;
-import com.sun.tools.javac.file.JavacFileManager;
-import com.sun.tools.javadoc.api.JavadocTool;
 
 public class Javadocs {
     /**
@@ -25,6 +35,8 @@ public class Javadocs {
      */
     private final Map<String, RootDoc> packages = new HashMap<>();
 
+    private final Types types;
+
     Javadocs(Set<Path> sourcePath) {
         Set<File> allSourcePaths = new HashSet<>();
 
@@ -33,13 +45,63 @@ public class Javadocs {
                 .forEach(allSourcePaths::add);
         findSrcZip().ifPresent(allSourcePaths::add);
 
-        fileManager = JavacTool.create().getStandardFileManager(Javadocs::onError, null, null);
+        fileManager = JavacTool.create().getStandardFileManager(Javadocs::onDiagnostic, null, null);
 
         try {
             fileManager.setLocation(StandardLocation.SOURCE_PATH, allSourcePaths);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
+        types = JavacTool.create().getTask(null, fileManager, Javadocs::onDiagnostic, null, null, null).getTypes();
+    }
+
+    Optional<MethodDoc> methodDoc(ExecutableElement method) {
+        TypeElement classElement = (TypeElement) method.getEnclosingElement();
+
+        return classDoc(classElement).flatMap(classDoc -> doMethodDoc(classDoc, method));
+    }
+
+    private Optional<MethodDoc> doMethodDoc(ClassDoc classDoc, ExecutableElement method) {
+        for (MethodDoc each : classDoc.methods(false)) {
+            if (methodMatches(method, each))
+                return Optional.of(each);
+        }
+
+        return Optional.empty();
+    }
+
+    private boolean methodMatches(ExecutableElement method, MethodDoc doc) {
+        return method.getSimpleName().toString().equals(doc.name()) &&
+            parametersMatch(method.getParameters(), doc.parameters());
+    }
+
+    private boolean parametersMatch(List<? extends VariableElement> vars, Parameter[] docs) {
+        if (vars.size() != docs.length) 
+            return false;
+        
+        for (int i = 0; i < vars.size(); i++) {
+            if (!parameterMatches(vars.get(i), docs[i]))
+                return false;
+        }
+
+        return true;
+    }
+
+    private boolean parameterMatches(VariableElement var, Parameter doc) {
+        String varString = types.erasure(var.asType()).toString();
+        String docString = doc.type().toString();
+
+        return varString.equals(docString);
+    }
+
+    Optional<ClassDoc> classDoc(TypeElement classElement) {
+        PackageElement enclosingPackage = (PackageElement) classElement.getEnclosingElement();
+        String packageName = enclosingPackage.getQualifiedName().toString();
+        RootDoc packageDoc = index(packageName);
+        String className = classElement.getQualifiedName().toString();
+        
+        return Optional.ofNullable(packageDoc.classNamed(className));
     }
 
     /**
@@ -56,7 +118,7 @@ public class Javadocs {
         DocumentationTool.DocumentationTask task = new JavadocTool().getTask(
                 null,
                 fileManager,
-                Javadocs::onError,
+                Javadocs::onDiagnostic,
                 Javadocs.class,
                 ImmutableList.of(packageName),
                 null
@@ -108,8 +170,26 @@ public class Javadocs {
             return Optional.empty();
     }
 
-    private static void onError(Diagnostic<? extends JavaFileObject> diagnostic) {
-        LOG.warning(diagnostic.getMessage(null));
+    private static void onDiagnostic(Diagnostic<? extends JavaFileObject> diagnostic) {
+        Level level = level(diagnostic.getKind());
+        String message = diagnostic.getMessage(null);
+
+        LOG.log(level, message);
+    }
+
+    private static Level level(Diagnostic.Kind kind) {
+        switch (kind) {
+            case ERROR:
+                return Level.SEVERE;
+            case WARNING:
+            case MANDATORY_WARNING:
+                return Level.WARNING;
+            case NOTE:
+                return Level.INFO;
+            case OTHER:
+            default:
+                return Level.FINE;
+        }
     }
 
     private static final Logger LOG = Logger.getLogger("main");
