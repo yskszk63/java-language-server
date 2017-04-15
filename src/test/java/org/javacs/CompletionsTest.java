@@ -50,6 +50,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
+    @Ignore // This has been subsumed by Javadocs
     public void throwsSignature() throws IOException {
         String file = "/org/javacs/example/AutocompleteMember.java";
 
@@ -406,7 +407,6 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> details = items.stream().map(i -> i.getDetail()).collect(Collectors.toSet());
 
         assertThat(suggestions, hasItems("add", "addAll"));
-        assertThat(details, hasItems("boolean (E)", "void (int, E)"));
     }
 
     @Test
@@ -431,6 +431,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
+    @Ignore // This has been subsumed by Javadocs
     public void docstring() throws IOException {
         String file = "/org/javacs/example/AutocompleteDocstring.java";
 
@@ -464,6 +465,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
+    @Ignore // This has been subsumed by Javadocs
     public void restParams() throws IOException {
         String file = "/org/javacs/example/AutocompleteRest.java";
 

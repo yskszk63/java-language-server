@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.google.common.base.Joiner;
 import com.sun.javadoc.*;
 import com.google.common.collect.ImmutableList;
 import com.sun.source.tree.CompilationUnitTree;
@@ -8,6 +9,7 @@ import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javadoc.api.JavadocTool;
 
+import java.net.URI;
 import java.util.stream.Collectors;
 import javax.lang.model.element.*;
 import javax.lang.model.util.Elements;
@@ -107,6 +109,8 @@ public class Javadocs {
             .collect(Collectors.joining(","));
     }
 
+    // TODO fastMethodSignature that unsafely casts to Doclet api
+
     Optional<MethodDoc> methodDoc(String methodKey) {
         String className = methodKey.substring(0, methodKey.indexOf('#'));
 
@@ -143,19 +147,31 @@ public class Javadocs {
         return Optional.ofNullable(index.classNamed(className));
     }
 
-    Optional<RootDoc> update(CompilationUnitTree tree) {
+    void update(JavaFileObject source) {
+        LOG.info("Update javadocs for " + source.toUri());
+
         DocumentationTool.DocumentationTask task = new JavadocTool().getTask(
             null,
             fileManager,
             Javadocs::onDiagnostic,
             Javadocs.class,
             null,
-            ImmutableList.of(tree.getSourceFile())
+            ImmutableList.of(source)
         );
 
         task.call();
 
-        return getSneakyReturn();
+        getSneakyReturn().ifPresent(this::updateCache);
+    }
+
+    private void updateCache(RootDoc root) {
+        for (ClassDoc each : root.classes()) {
+            if (each.isPublic()) {
+                topLevelClasses.put(each.qualifiedName(), root);
+
+                return;
+            }
+        }
     }
 
     /**

@@ -606,7 +606,6 @@ class Completions {
                     item.setKind(CompletionItemKind.Property);
                     item.setLabel(name);
                     item.setDetail(ShortTypePrinter.print(e.asType()));
-                    docstring(e).ifPresent(item::setDocumentation);
                     item.setSortText("0/" + name);
 
                     return Stream.of(item);
@@ -628,12 +627,11 @@ class Completions {
 
                     item.setKind(CompletionItemKind.Method);
                     item.setLabel(name);
-                    item.setDetail(Hovers.methodSignature(method, true, false));
-                    docstring(e).ifPresent(item::setDocumentation);
                     item.setInsertText(name); // TODO
                     item.setSortText(name);
                     item.setFilterText(name);
                     item.setSortText("0/" + name);
+                    item.setData(Javadocs.global().methodKey(method));
 
                     return Stream.of(item);
                 }
@@ -651,13 +649,12 @@ class Completions {
 
                     item.setKind(CompletionItemKind.Constructor);
                     item.setLabel(name);
-                    item.setDetail(Hovers.methodSignature(method, false, false));
-                    docstring(e).ifPresent(item::setDocumentation);
                     item.setInsertText(insertText);
                     item.setSortText(name);
                     item.setFilterText(name);
                     item.setAdditionalTextEdits(addImport(enclosingClass.getQualifiedName().toString()));
                     item.setSortText(order + "/" + name);
+                    item.setData(Javadocs.global().methodKey(method));
 
                     return Stream.of(item);
                 }
@@ -696,10 +693,6 @@ class Completions {
             return new RefactorFile(task, compilationUnit).addImport(mostIds(qualifiedName), lastId(qualifiedName));
         else
             return Collections.emptyList();
-    }
-
-    private Optional<String> docstring(Element e) {
-        return Optional.ofNullable(elements.getDocComment(e));
     }
 
     public static boolean containsCharactersInOrder(CharSequence candidate, CharSequence pattern) {

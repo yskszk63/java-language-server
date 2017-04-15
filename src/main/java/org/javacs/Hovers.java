@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.function.Function;
 
+// TODO this should be replaced by Javadocs
 public class Hovers {
     public static Optional<Hover> hoverText(FocusedResult compiled) {
         Trees trees = Trees.instance(compiled.task);

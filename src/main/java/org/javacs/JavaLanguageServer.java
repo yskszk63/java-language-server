@@ -2,9 +2,12 @@ package org.javacs;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.sun.javadoc.ClassDoc;
+import com.sun.javadoc.MethodDoc;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -75,7 +78,7 @@ class JavaLanguageServer implements LanguageServer {
 
         c.setTextDocumentSync(TextDocumentSyncKind.Incremental);
         c.setDefinitionProvider(true);
-        c.setCompletionProvider(new CompletionOptions(false, ImmutableList.of(".")));
+        c.setCompletionProvider(new CompletionOptions(true, ImmutableList.of(".")));
         c.setHoverProvider(true);
         c.setWorkspaceSymbolProvider(true);
         c.setReferencesProvider(true);
@@ -130,8 +133,41 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<CompletionItem> resolveCompletionItem(CompletionItem unresolved) {
-                return null;
+                return CompletableFutures.computeAsync(cancel -> {
+                    if (unresolved.getData() == null)
+                        return unresolved;
+                    
+                    String key = (String) unresolved.getData();
+
+                    // my.package.MyClass#myMethod
+                    if (key.contains("#")) {
+                        return Javadocs.global().methodDoc(key)
+                            .map(doc -> resolveMethodDoc(unresolved, doc))
+                            .orElse(unresolved);
+                    }
+                    else {
+                        return Javadocs.global().classDoc(key)
+                            .map(doc -> resolveClassDoc(unresolved, doc))
+                            .orElse(unresolved);
+                    }
+                });
+            }
+
+            private CompletionItem resolveMethodDoc(CompletionItem unresolved, MethodDoc doc) {
+                LOG.info("Resolve javadoc for " + unresolved.getData());
+
+                unresolved.setDetail(doc.flatSignature());
+                unresolved.setDocumentation(doc.commentText());
+
+                return unresolved;
+            }
+
+            private CompletionItem resolveClassDoc(CompletionItem unresolved, ClassDoc doc) {
+                LOG.info("Resolve javadoc for " + unresolved.getData());
                 
+                unresolved.setDocumentation(doc.commentText());
+
+                return unresolved;
             }
 
             @Override
@@ -325,6 +361,10 @@ class JavaLanguageServer implements LanguageServer {
                 // Re-lint all active documents
                 doLint(activeDocuments.keySet());
 
+                // Re-index javadocs of saved document
+                URI uri = URI.create(params.getTextDocument().getUri());
+                activeContent(uri).ifPresent(content -> doJavadoc(new StringFileObject(content, uri)));
+
                 params.getText();
             }
         };
@@ -388,6 +428,10 @@ class JavaLanguageServer implements LanguageServer {
         });
 
         publishDiagnostics(paths, errors);
+    }
+
+    private void doJavadoc(JavaFileObject source) {
+        Javadocs.global().update(source);
     }
 
     /**
