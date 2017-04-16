@@ -12,12 +12,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.*;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
+import static org.junit.Assert.assertThat;
 
 public class CodeActionsTest {
 
@@ -86,7 +86,7 @@ public class CodeActionsTest {
 
         open.setText(content);
         open.setUri(uri.toString());
-        open.setLanguageId("Java");
+        open.setLanguageId("java");
 
         server.getTextDocumentService().didOpen(new DidOpenTextDocumentParams(open, content));
         server.getTextDocumentService().didSave(new DidSaveTextDocumentParams(document, content));

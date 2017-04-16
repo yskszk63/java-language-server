@@ -1,7 +1,6 @@
 package org.javacs;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
 import org.eclipse.lsp4j.CodeActionParams;
@@ -33,14 +32,6 @@ class CodeActions {
 
         this.task = compile.task;
         this.source = compile.compilationUnit;
-    }
-
-    private CompilationUnitTree pickFile(Iterable<? extends CompilationUnitTree> compiled, URI file) {
-        List<CompilationUnitTree> list = Lists.newArrayList(compiled);
-
-        assert list.size() == 1 : "Compiler produced multiple files " + list;
-
-        return list.get(0);
     }
 
     public List<Command> find(CodeActionParams params) {

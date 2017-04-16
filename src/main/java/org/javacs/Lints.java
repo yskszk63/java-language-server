@@ -1,10 +1,15 @@
 package org.javacs;
 
-import java.io.*;
-import java.net.URI;
-import java.util.*;
+import com.sun.tools.javac.api.ClientCodeWrapper;
+import com.sun.tools.javac.util.DiagnosticSource;
+import com.sun.tools.javac.util.JCDiagnostic;
+import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
+
 import javax.tools.JavaFileObject;
-import org.eclipse.lsp4j.*;
+import java.util.Optional;
 
 class Lints {
 
@@ -39,54 +44,22 @@ class Lints {
     }
 
     private static Range position(javax.tools.Diagnostic<? extends JavaFileObject> error) {
-        // Compute start position
-        Position start = new Position();
+        if (error instanceof ClientCodeWrapper.DiagnosticSourceUnwrapper)
+            error = ((ClientCodeWrapper.DiagnosticSourceUnwrapper) error).d;
 
-        start.setLine((int) (error.getLineNumber() - 1));
-        start.setCharacter((int) (error.getColumnNumber() - 1));
+        JCDiagnostic diagnostic = (JCDiagnostic) error;
+        DiagnosticSource source = diagnostic.getDiagnosticSource();
 
-        // Compute end position
-        Position end = endPosition(error);
-
-        // Combine into Range
-        Range range = new Range();
-
-        range.setStart(start);
-        range.setEnd(end);
-
-        return range;
-    }
-
-    private static Position endPosition(javax.tools.Diagnostic<? extends JavaFileObject> error) {
-        try (Reader reader = error.getSource().openReader(true)) {
-            long startOffset = error.getStartPosition();
-            long endOffset = error.getEndPosition();
-
-            reader.skip(startOffset);
-
-            int line = (int) error.getLineNumber() - 1;
-            int column = (int) error.getColumnNumber() - 1;
-
-            for (long i = startOffset; i < endOffset; i++) {
-                int next = reader.read();
-
-                if (next == '\n') {
-                    line++;
-                    column = 0;
-                }
-                else
-                    column++;
-            }
-
-            Position end = new Position();
-
-            end.setLine(line);
-            end.setCharacter(column);
-
-            return end;
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return new Range(
+            new Position(
+                    source.getLineNumber((int) error.getStartPosition()) - 1,
+                    source.getColumnNumber((int) error.getStartPosition(), true) - 1
+            ),
+            new Position(
+                    source.getLineNumber((int) error.getEndPosition()) - 1,
+                    source.getColumnNumber((int) error.getEndPosition(), true) - 1
+            )
+        );
     }
 
 }
