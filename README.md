@@ -11,6 +11,14 @@ Requires that you have Java 8 installed on your system.
 
 ## Features
 
+### Javadoc
+
+<img src="http://g.recordit.co/GROuFBSPQD.gif">
+
+### Signature help
+
+<img src="http://g.recordit.co/pXkdKptzrI.gif">
+
 ### Autocomplete symbols (with auto-import)
 
 <img src="http://g.recordit.co/HpNZPIDA8T.gif">

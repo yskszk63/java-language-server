@@ -1,9 +1,5 @@
 # Todo
 
-## Videos
-* Signature help
-* Javadoc support
-
 ## Bugs
 * Error squiggles are off
 * Multiple commands are getting sent by client
