@@ -61,7 +61,12 @@ class JavaLanguageServer implements LanguageServer {
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
         Path workspaceRoot = Paths.get(params.getRootPath()).toAbsolutePath().normalize();
 
-        findConfig = new FindConfig(workspaceRoot, testJavac.map(j -> new JavacConfig(j.sourcePath, j.classPath, j.outputDirectory)));
+        findConfig = new FindConfig(workspaceRoot, testJavac.map(j -> new JavacConfig(
+            j.sourcePath, 
+            j.classPath, 
+            j.outputDirectory, 
+            CompletableFuture.completedFuture(Collections.emptySet())
+        )));
 
         InitializeResult result = new InitializeResult();
 
@@ -589,6 +594,9 @@ class JavaLanguageServer implements LanguageServer {
 
     private JavacHolder newJavac(JavacConfig c) {
         Javadocs.addSourcePath(c.sourcePath);
+
+        // When docPath resolves, add it to Javadocs
+        c.docPath.thenAccept(Javadocs::addSourcePath);
 
         return JavacHolder.create(
             c.classPath,

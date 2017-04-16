@@ -12,18 +12,29 @@
                     "items": {
                         "type": "string"
                     },
-                    "description": "Java compiler sourcepath"
+                    "description": "Folders containing .java files"
                 },
                 "classPath": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     },
-                    "description": "Classpath entries"
+                    "description": "Folders and .jar files containing .class files"
+                },
+                "docPath": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Folders and .jar files containing .java files from dependencies"
                 },
                 "classPathFile": {
                     "type": "string",
-                    "description": "File containing the classpath"
+                    "description": "Text file containing the classpath in the format used by `javac -classpath`"
+                },
+                "docPathFile": {
+                    "type": "string",
+                    "description": "Text file containing dependency sources in the same format as classPathFile"
                 },
                 "outputDirectory": {
                     "type": "string",

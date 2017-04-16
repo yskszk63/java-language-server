@@ -60,6 +60,7 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
         }
     }
 
+    // NOTE this only works for regular file objects
     private String className(String packageName, JavaFileObject file) {
         String fileName = Paths.get(file.toUri()).getFileName().toString();
         String className = fileName.substring(0, fileName.indexOf('.'));

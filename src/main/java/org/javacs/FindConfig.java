@@ -116,11 +116,12 @@ class FindConfig {
 
     private List<JavacConfig> doReadIfConfig(Path dir) {
         Function<JavaConfigJson, JavacConfig> parseJavaConfigJson = json -> {
-            Set<Path> classPath = readClassPath(dir, json);
+            Set<Path> classPath = readClassPath(dir, json.classPath, json.classPathFile),
+                      docPath = readClassPath(dir, json.docPath, json.docPathFile);
             Set<Path> sourcePath = json.sourcePath.stream().map(dir::resolve).collect(Collectors.toSet());
             Path outputDirectory = dir.resolve(json.outputDirectory);
 
-            return new JavacConfig(sourcePath, classPath, outputDirectory);
+            return new JavacConfig(sourcePath, classPath, outputDirectory, CompletableFuture.completedFuture(docPath));
         };
         if (Files.exists(dir.resolve("javaconfig.json"))) {
             return readJavaConfigJson(dir.resolve("javaconfig.json")).stream()
@@ -139,17 +140,17 @@ class FindConfig {
         }
     }
 
-    private Set<Path> readClassPath(Path dir, JavaConfigJson json) {
+    private Set<Path> readClassPath(Path dir, Set<Path> jsonClassPath, Optional<Path> jsonClassPathFile) {
         Set<Path> classPath = new HashSet<>();
 
-        json.classPathFile.ifPresent(classPathFile -> {
+        jsonClassPathFile.ifPresent(classPathFile -> {
             Path classPathFilePath = dir.resolve(classPathFile);
             Set<Path> paths = readClassPathFile(classPathFilePath);
 
             classPath.addAll(paths);
         });
 
-        json.classPath.forEach(entry -> classPath.add(dir.resolve(entry)));
+        jsonClassPath.forEach(entry -> classPath.add(dir.resolve(entry)));
 
         return classPath;
     }
@@ -158,7 +159,7 @@ class FindConfig {
         Path pomXml = dir.resolve("pom.xml");
 
         // Invoke maven to get classpath
-        Set<Path> classPath = buildClassPath(pomXml, testScope);
+        Set<Path> classPath = buildClassPath(pomXml, testScope, false);
 
         // Get source directory from pom.xml
         Set<Path> sourcePath = sourceDirectories(pomXml, testScope);
@@ -168,26 +169,42 @@ class FindConfig {
             Paths.get("target/test-classes").toAbsolutePath() : 
             Paths.get("target/classes").toAbsolutePath();
 
-        JavacConfig config = new JavacConfig(sourcePath, classPath, outputDirectory);
+        JavacConfig config = new JavacConfig(
+            sourcePath, 
+            classPath, 
+            outputDirectory,
+            CompletableFuture.supplyAsync(() -> buildClassPath(pomXml, testScope, true))
+        );
+
+        LOG.info("Inferred from " + pomXml + ":");
+        LOG.info("\tsourcePath: " + Joiner.on(" ").join(sourcePath));
+        LOG.info("\tclassPath: " + Joiner.on(" ").join(classPath));
+        LOG.info("\tdocPath: (pending)");
+        LOG.info("\toutputDirectory: " + outputDirectory);
 
         return config;
     }
 
-    public static Set<Path> buildClassPath(Path pomXml, boolean testScope) {
+    public static Set<Path> buildClassPath(Path pomXml, boolean testScope, boolean sourceJars) {
         try {
             Objects.requireNonNull(pomXml, "pom.xml path is null");
 
             // Tell maven to output classpath to a temporary file
             // TODO if pom.xml already specifies outputFile, use that location
-            Path classPathTxt = Files.createTempFile("classpath", ".txt");
+            Path classPathTxt = Files.createTempFile(sourceJars ? "sourcepath" : "classpath", ".txt");
 
-            LOG.info("Emit classpath to " + classPathTxt);
+            LOG.info(String.format(
+                "Emit %s to %s",
+                sourceJars ? "docPath" : "classpath",
+                classPathTxt
+            ));
 
             String cmd = String.format(
-                "%s dependency:build-classpath -DincludeScope=%s -Dmdep.outputFile=%s",
+                "%s dependency:build-classpath -DincludeScope=%s -Dmdep.outputFile=%s %s",
                 getMvnCommand(),
                 testScope ? "test" : "compile",
-                classPathTxt
+                classPathTxt,
+                sourceJars ? "-Dclassifier=sources" : ""
             );
             File workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
             int result = Runtime.getRuntime().exec(cmd, null, workingDirectory).waitFor();
@@ -195,7 +212,11 @@ class FindConfig {
             if (result != 0)
                 throw new RuntimeException("`" + cmd + "` returned " + result);
 
-            return readClassPathFile(classPathTxt);
+            Set<Path> found = readClassPathFile(classPathTxt);
+
+            LOG.info("Read " + Joiner.on(" ").join(found) + " from " + classPathTxt);
+
+            return found;
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
