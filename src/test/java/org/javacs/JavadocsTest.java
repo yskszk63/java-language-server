@@ -37,47 +37,17 @@ public class JavadocsTest {
 
     @Test
     public void findMethodDoc() {
-        FocusedResult compile = compiler.compileFocused(
-                Paths.get("src/test/resources/org/javacs/docs/TrickyDocstring.java").toUri(),
-                Optional.empty(),
-                8, 16,
-                false
-        );
-        ExecutableElement method = (ExecutableElement) Trees.instance(compile.task).getElement(compile.cursor.get());
-
-        docs.update(compile.compilationUnit.getSourceFile());
-
-        assertTrue("Found method", docs.methodDoc(docs.methodKey(method)).isPresent());
+        assertTrue("Found method", docs.methodDoc("org.javacs.docs.TrickyDocstring#example(java.lang.String,java.lang.String[],java.util.List)").isPresent());
     }
 
     @Test
     public void findParameterizedDoc() {
-        FocusedResult compile = compiler.compileFocused(
-                Paths.get("src/test/resources/org/javacs/docs/TrickyDocstring.java").toUri(),
-                Optional.empty(),
-                9, 22,
-                false
-        );
-        ExecutableElement method = (ExecutableElement) Trees.instance(compile.task).getElement(compile.cursor.get());
-
-        docs.update(compile.compilationUnit.getSourceFile());
-
-        assertTrue("Found method", docs.methodDoc(docs.methodKey(method)).isPresent());
+        assertTrue("Found method", docs.methodDoc("org.javacs.docs.TrickyDocstring#parameterized(java.lang.Object)").isPresent());
     }
 
     @Test 
     public void findInheritedDoc() {
-        FocusedResult compile = compiler.compileFocused(
-                Paths.get("src/test/resources/org/javacs/docs/TrickyDocstring.java").toUri(),
-                Optional.empty(),
-                10, 28,
-                false
-        );
-        ExecutableElement method = (ExecutableElement) Trees.instance(compile.task).getElement(compile.cursor.get());
-
-        docs.update(compile.compilationUnit.getSourceFile());
-
-        Optional<MethodDoc> found = docs.methodDoc(docs.methodKey(method));
+        Optional<MethodDoc> found = docs.methodDoc("org.javacs.docs.SubDoc#method()");
 
         assertTrue("Found method", found.isPresent());
 
@@ -90,17 +60,7 @@ public class JavadocsTest {
     @Test
     @Ignore // Doesn't work yet
     public void findInterfaceDoc() {
-        FocusedResult compile = compiler.compileFocused(
-                Paths.get("src/test/resources/org/javacs/docs/TrickyDocstring.java").toUri(),
-                Optional.empty(),
-                11, 37,
-                false
-        );
-        ExecutableElement method = (ExecutableElement) Trees.instance(compile.task).getElement(compile.cursor.get());
-
-        docs.update(compile.compilationUnit.getSourceFile());
-
-        Optional<MethodDoc> found = docs.methodDoc(docs.methodKey(method));
+        Optional<MethodDoc> found = docs.methodDoc("org.javacs.docs.SubDoc#interfaceMethod()");
 
         assertTrue("Found method", found.isPresent());
 
