@@ -31,6 +31,7 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import org.eclipse.lsp4j.CompletionItem;
 
 public class Javadocs {
 
@@ -147,50 +148,64 @@ public class Javadocs {
         if (el instanceof ExecutableElement) {
             ExecutableElement method = (ExecutableElement) el;
 
-            return methodDoc(method);
+            return methodDoc(methodKey(method));
         }
         else if (el instanceof TypeElement) {
             TypeElement type = (TypeElement) el;
 
-            return classDoc(type);
+            return classDoc(type.getQualifiedName().toString());
         }
         else return Optional.empty();
     }
 
-    Optional<MethodDoc> methodDoc(ExecutableElement method) {
-        TypeElement enclosingClass = (TypeElement) method.getEnclosingElement();
+    String methodKey(ExecutableElement method) {
+        TypeElement classElement = (TypeElement) method.getEnclosingElement();
 
-        return classDoc(enclosingClass)
-                .flatMap(classDoc -> doMethodDoc(classDoc, method));
+        return String.format(
+            "%s#%s(%s)",
+            classElement.getQualifiedName(),
+            method.getSimpleName(),
+            paramsKey(method.getParameters())
+        );
+    }
+    
+    private String paramsKey(List<? extends VariableElement> params) {
+        return params.stream()
+            .map(this::paramType)
+            .collect(Collectors.joining(","));
     }
 
-    private Optional<MethodDoc> doMethodDoc(ClassDoc classDoc, ExecutableElement method) {
+    Optional<MethodDoc> methodDoc(String methodKey) {
+        String className = methodKey.substring(0, methodKey.indexOf('#'));
+
+        return classDoc(className)
+                .flatMap(classDoc -> doMethodDoc(classDoc, methodKey));
+    }
+
+    private Optional<MethodDoc> doMethodDoc(ClassDoc classDoc, String methodKey) {
         for (MethodDoc each : classDoc.methods(false)) {
-            if (methodMatches(method, each))
+            if (methodMatches(methodKey, each))
                 return Optional.of(each);
         }
 
         return Optional.empty();
     }
 
-    private boolean methodMatches(ExecutableElement method, MethodDoc doc) {
-        return method.getSimpleName().contentEquals(doc.name()) &&
-            paramsMatch(method.getParameters(), doc.parameters());
+    private boolean methodMatches(String methodKey, MethodDoc doc) {
+        String docKey = String.format(
+            "%s#%s(%s)", 
+            doc.containingClass().qualifiedName(), 
+            doc.name(), 
+            paramSignature(doc.parameters())
+        );
+
+        return docKey.equals(methodKey);
     }
 
-    private boolean paramsMatch(List<? extends VariableElement> params, Parameter[] docs) {
-        if (params.size() != docs.length) 
-            return false;
-        
-        for (int i = 0; i < docs.length; i++) {
-            String paramType = paramType(params.get(i));
-            String docType = docType(docs[i]);
-
-            if (!paramType.equals(docType))
-                return false;
-        }
-
-        return true;
+    private String paramSignature(Parameter[] params) {
+        return Arrays.stream(params)
+            .map(this::docType)
+            .collect(Collectors.joining(","));
     }
 
     private String paramType(VariableElement param) {
@@ -201,28 +216,33 @@ public class Javadocs {
         return doc.type().qualifiedTypeName() + doc.type().dimension();
     }
 
-    Optional<ConstructorDoc> constructorDoc(ExecutableElement method) {
-        TypeElement enclosingClass = (TypeElement) method.getEnclosingElement();
+    Optional<ConstructorDoc> constructorDoc(String methodKey) {
+        String className = methodKey.substring(0, methodKey.indexOf('#'));
 
-        return classDoc(enclosingClass)
-                .flatMap(classDoc -> doConstructorDoc(classDoc, method));
+        return classDoc(className)
+                .flatMap(classDoc -> doConstructorDoc(classDoc, methodKey));
     }
 
-    private Optional<ConstructorDoc> doConstructorDoc(ClassDoc classDoc, ExecutableElement method) {
+    private Optional<ConstructorDoc> doConstructorDoc(ClassDoc classDoc, String methodKey) {
         for (ConstructorDoc each : classDoc.constructors(false)) {
-            if (constructorMatches(method, each))
+            if (constructorMatches(methodKey, each))
                 return Optional.of(each);
         }
 
         return Optional.empty();
     }
 
-    private boolean constructorMatches(ExecutableElement method, ConstructorDoc doc) {
-        return paramsMatch(method.getParameters(), doc.parameters());
+    private boolean constructorMatches(String methodKey, ConstructorDoc doc) {
+        String docKey = String.format(
+            "%s#<init>(%s)", 
+            doc.containingClass().qualifiedName(), 
+            paramSignature(doc.parameters())
+        );
+
+        return docKey.equals(methodKey);
     }
 
-    Optional<ClassDoc> classDoc(TypeElement type) {
-        String className = type.getQualifiedName().toString();
+    Optional<ClassDoc> classDoc(String className) {
         RootDoc index = index(className);
 
         return Optional.ofNullable(index.classNamed(className));
@@ -255,24 +275,11 @@ public class Javadocs {
         }
     }
 
-    private final EvictingExecutor indexPool = new EvictingExecutor();
-
     /**
      * Get or compute the javadoc for `className`
      */
     RootDoc index(String className) {
-        if (topLevelClasses.containsKey(className))
-            return topLevelClasses.get(className);
-        else {
-            // Asynchronously fetch docs
-            indexPool.submit(() -> force(className));
-
-            return EmptyRootDoc.INSTANCE;
-        }
-    }
-
-    void force(String className) {
-        topLevelClasses.put(className, doIndex(className));
+        return topLevelClasses.computeIfAbsent(className, this::doIndex);
     }
 
     /**
@@ -376,6 +383,31 @@ public class Javadocs {
         }
     }
 
+    public void resolveCompletionItem(CompletionItem unresolved) {
+        if (unresolved.getData() == null || unresolved.getDocumentation() != null)
+            return;
+        
+        String key = (String) unresolved.getData();
+
+        LOG.info("Resolve javadoc for " + key);
+
+        // my.package.MyClass#<init>()
+        if (key.contains("<init>")) {
+            constructorDoc(key)
+                .ifPresent(doc -> unresolved.setDocumentation(doc.commentText()));
+        }
+        // my.package.MyClass#myMethod()
+        else if (key.contains("#")) {
+            methodDoc(key)
+                .ifPresent(doc -> unresolved.setDocumentation(doc.commentText()));
+        }
+        // my.package.MyClass
+        else {
+            classDoc(key)
+                .ifPresent(doc -> unresolved.setDocumentation(doc.commentText()));
+        }
+    }
+    
     private static final Logger LOG = Logger.getLogger("main");
 
 }

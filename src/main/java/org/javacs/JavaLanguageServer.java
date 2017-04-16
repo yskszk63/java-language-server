@@ -8,6 +8,8 @@ import com.sun.javadoc.ConstructorDoc;
 import com.sun.javadoc.MethodDoc;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -75,7 +77,7 @@ class JavaLanguageServer implements LanguageServer {
 
         c.setTextDocumentSync(TextDocumentSyncKind.Incremental);
         c.setDefinitionProvider(true);
-        c.setCompletionProvider(new CompletionOptions(false, ImmutableList.of(".")));
+        c.setCompletionProvider(new CompletionOptions(true, ImmutableList.of(".")));
         c.setHoverProvider(true);
         c.setWorkspaceSymbolProvider(true);
         c.setReferencesProvider(true);
@@ -130,7 +132,11 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<CompletionItem> resolveCompletionItem(CompletionItem unresolved) {
-                return null;
+                return CompletableFutures.computeAsync(cancel -> {
+                    Javadocs.global().resolveCompletionItem(unresolved);
+
+                    return unresolved;
+                });
             }
 
             @Override
@@ -396,9 +402,11 @@ class JavaLanguageServer implements LanguageServer {
             .submit(() -> doIndex(uri));
     }
 
+    private final ExecutorService indexExecutor = Executors.newSingleThreadExecutor();
+
     private EvictingExecutor newIndexExecutor(URI ignored) {
         // Index each file at most every 5s
-        return new EvictingExecutor(RateLimiter.create(0.2));
+        return new EvictingExecutor(indexExecutor, RateLimiter.create(0.2));
     }
 
     private void doIndex(URI uri) {

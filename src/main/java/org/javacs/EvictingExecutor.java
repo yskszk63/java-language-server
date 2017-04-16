@@ -14,26 +14,27 @@ import java.util.concurrent.Future;
  * When a new task is submitted, the queued task is evicted.
  */
 class EvictingExecutor {
+    private final ExecutorService delegate;
     private final Optional<RateLimiter> rateLimiter;
     private volatile Optional<Runnable> queued = Optional.empty();
 
-    EvictingExecutor() {
+    EvictingExecutor(ExecutorService delegate) {
+        this.delegate = delegate;
         this.rateLimiter = Optional.empty();
     }
 
     /**
      * Limit the frequency of execution
      */
-    EvictingExecutor(RateLimiter limit) {
+    EvictingExecutor(ExecutorService delegate, RateLimiter limit) {
+        this.delegate = delegate;
         this.rateLimiter = Optional.of(limit);
     }
 
     public Future<?> submit(Runnable task) {
         queued = Optional.of(task);
 
-        // Don't use your own thread for this
-        // We would like to be able to run MANY EvictingExecutors so they need to be lightweight
-        return ForkJoinPool.commonPool().submit(this::take);
+        return delegate.submit(this::take);
     }
 
     private synchronized void take() {

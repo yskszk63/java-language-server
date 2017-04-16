@@ -30,8 +30,6 @@ public class JavadocsTest {
 
     @Test
     public void findSystemDoc() throws IOException {
-        docs.force("java.util.ArrayList");
-
         RootDoc root = docs.index("java.util.ArrayList");
 
         assertThat(root.classes(), not(emptyArray()));
@@ -49,7 +47,7 @@ public class JavadocsTest {
 
         docs.update(compile.compilationUnit.getSourceFile());
 
-        assertTrue("Found method", docs.methodDoc(method).isPresent());
+        assertTrue("Found method", docs.methodDoc(docs.methodKey(method)).isPresent());
     }
 
     @Test
@@ -64,7 +62,7 @@ public class JavadocsTest {
 
         docs.update(compile.compilationUnit.getSourceFile());
 
-        assertTrue("Found method", docs.methodDoc(method).isPresent());
+        assertTrue("Found method", docs.methodDoc(docs.methodKey(method)).isPresent());
     }
 
     @Test 
@@ -78,9 +76,8 @@ public class JavadocsTest {
         ExecutableElement method = (ExecutableElement) Trees.instance(compile.task).getElement(compile.cursor.get());
 
         docs.update(compile.compilationUnit.getSourceFile());
-        docs.force("org.javacs.docs.SubDoc");
 
-        Optional<MethodDoc> found = docs.methodDoc(method);
+        Optional<MethodDoc> found = docs.methodDoc(docs.methodKey(method));
 
         assertTrue("Found method", found.isPresent());
 
@@ -102,9 +99,8 @@ public class JavadocsTest {
         ExecutableElement method = (ExecutableElement) Trees.instance(compile.task).getElement(compile.cursor.get());
 
         docs.update(compile.compilationUnit.getSourceFile());
-        docs.force("org.javacs.docs.SubDoc");
 
-        Optional<MethodDoc> found = docs.methodDoc(method);
+        Optional<MethodDoc> found = docs.methodDoc(docs.methodKey(method));
 
         assertTrue("Found method", found.isPresent());
 

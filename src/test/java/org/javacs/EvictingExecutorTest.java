@@ -1,5 +1,6 @@
 package org.javacs;
 
+import java.util.concurrent.ForkJoinPool;
 import org.junit.Test;
 
 import java.util.concurrent.ExecutionException;
@@ -13,7 +14,7 @@ import static org.junit.Assert.assertThat;
 public class EvictingExecutorTest {
     @Test
     public void evict() throws InterruptedException, ExecutionException, TimeoutException {
-        EvictingExecutor exec = new EvictingExecutor();
+        EvictingExecutor exec = new EvictingExecutor(ForkJoinPool.commonPool());
         int[] tasks = {0, 0, 0};
 
         Future<?> one = exec.submit(() -> {

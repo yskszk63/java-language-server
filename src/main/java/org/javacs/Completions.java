@@ -580,9 +580,7 @@ class Completions {
 
                     item.setAdditionalTextEdits(addImport(((TypeElement) e).getQualifiedName().toString()));
                     item.setSortText(order + "/" + name);
-                    
-                    Javadocs.global().classDoc(type)
-                        .ifPresent(doc -> item.setDocumentation(doc.commentText()));
+                    item.setData(type.getQualifiedName().toString());
 
                     return Stream.of(item);
                 }
@@ -637,9 +635,7 @@ class Completions {
                     item.setSortText(name);
                     item.setFilterText(name);
                     item.setSortText("0/" + name);
-                    Javadocs.global().methodDoc(method)
-                        .flatMap(Javadocs::commentText)
-                        .ifPresent(item::setDocumentation);
+                    item.setData(Javadocs.global().methodKey(method));
 
                     return Stream.of(item);
                 }
@@ -663,8 +659,7 @@ class Completions {
                     item.setFilterText(name);
                     item.setAdditionalTextEdits(addImport(enclosingClass.getQualifiedName().toString()));
                     item.setSortText(order + "/" + name);
-                    Javadocs.global().constructorDoc(method)
-                        .ifPresent(doc -> item.setDocumentation(doc.commentText()));
+                    item.setData(Javadocs.global().methodKey(method));
 
                     return Stream.of(item);
                 }
