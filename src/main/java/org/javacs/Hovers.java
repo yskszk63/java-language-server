@@ -74,6 +74,9 @@ public class Hovers {
      * Hover text if we can't find `el` on the source path
      */
     private static String fallbackHover(Element el) {
+        // These strings are intentionally not formatted as ```java name ``, 
+        // so that they appear less "rich" in the UI remind the user know that they could be improved by adding sourcePath
+        
         if (el.getKind() == ElementKind.CONSTRUCTOR) {
             ExecutableElement method = (ExecutableElement) el;
 
