@@ -95,7 +95,7 @@ class Signatures {
 
     private SignatureInformation methodInfo(ExecutableElement method, boolean showReturn) {
         Javadocs docs = Javadocs.global();
-        Optional<MethodDoc> doc = docs.methodDoc(docs.methodKey(method));
+        Optional<MethodDoc> doc = docs.methodDoc(method);
         
         return new SignatureInformation(
                 Hovers.methodSignature(method, showReturn, true),

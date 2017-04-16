@@ -26,15 +26,16 @@ public class JavadocsTest {
     @Test
     public void findSystemDoc() throws IOException {
         Javadocs docs = new Javadocs(Collections.emptySet());
+
+        docs.force("java.util.ArrayList");
+
         RootDoc root = docs.index("java.util.ArrayList");
 
         assertThat(root.classes(), not(emptyArray()));
-        assertTrue("add is found", docs.methodDoc("java.util.ArrayList#add(java.lang.Object)").isPresent());
-        assertTrue("constructor is found", docs.constructorDoc("java.util.ArrayList#<init>()").isPresent());
     }
 
     @Test
-    public void methodKey() {
+    public void findMethodDoc() {
         Javadocs docs = new Javadocs(Collections.singleton(Paths.get("src/test/resources")));
         JavacHolder compiler = newCompiler();
         FocusedResult compile = compiler.compileFocused(
@@ -45,6 +46,8 @@ public class JavadocsTest {
         );
         ExecutableElement method = (ExecutableElement) Trees.instance(compile.task).getElement(compile.cursor.get());
 
-        assertThat(docs.methodKey(method), equalTo("org.javacs.docs.TrickyDocstring#example(java.lang.String,java.lang.String[],java.util.List)"));
+        docs.update(compile.compilationUnit.getSourceFile());
+
+        assertTrue(docs.methodDoc(method).isPresent());
     }
 }

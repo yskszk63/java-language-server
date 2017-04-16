@@ -579,7 +579,9 @@ class Completions {
 
                     item.setAdditionalTextEdits(addImport(((TypeElement) e).getQualifiedName().toString()));
                     item.setSortText(order + "/" + name);
-                    item.setData(type.getQualifiedName().toString()); // so completionItem/resolve can find the docs
+                    
+                    Javadocs.global().classDoc(type)
+                        .ifPresent(doc -> item.setDocumentation(doc.commentText()));
 
                     return Stream.of(item);
                 }
@@ -634,7 +636,8 @@ class Completions {
                     item.setSortText(name);
                     item.setFilterText(name);
                     item.setSortText("0/" + name);
-                    item.setData(Javadocs.global().methodKey(method)); // so completionItem/resolve can find the docs
+                    Javadocs.global().methodDoc(method)
+                        .ifPresent(doc -> item.setDocumentation(doc.commentText()));
 
                     return Stream.of(item);
                 }
@@ -658,7 +661,8 @@ class Completions {
                     item.setFilterText(name);
                     item.setAdditionalTextEdits(addImport(enclosingClass.getQualifiedName().toString()));
                     item.setSortText(order + "/" + name);
-                    item.setData(Javadocs.global().methodKey(method)); // so completionItem/resolve can find the docs
+                    Javadocs.global().constructorDoc(method)
+                        .ifPresent(doc -> item.setDocumentation(doc.commentText()));
 
                     return Stream.of(item);
                 }
@@ -714,28 +718,6 @@ class Completions {
         }
 
         return iPattern == pattern.length();
-    }
-
-    public static void resolveCompletionItem(CompletionItem unresolved) {
-        if (unresolved.getData() == null || unresolved.getDocumentation() != null)
-            return;
-        
-        String key = (String) unresolved.getData();
-
-        // my.package.MyClass#<init>()
-        if (key.contains("<init>")) {
-            Javadocs.global().constructorDoc(key)
-                .ifPresent(doc -> unresolved.setDocumentation(doc.commentText()));
-        }
-        // my.package.MyClass#myMethod()
-        else if (key.contains("#")) {
-            Javadocs.global().methodDoc(key)
-                .ifPresent(doc -> unresolved.setDocumentation(doc.commentText()));
-        }
-        else {
-            Javadocs.global().classDoc(key)
-                .ifPresent(doc -> unresolved.setDocumentation(doc.commentText()));
-        }
     }
 
     private static final Logger LOG = Logger.getLogger("main");

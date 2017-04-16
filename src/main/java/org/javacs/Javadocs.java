@@ -9,6 +9,8 @@ import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javadoc.api.JavadocTool;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -68,7 +70,7 @@ public class Javadocs {
     /**
      * All the classes we have indexed so far
      */
-    private final Map<String, RootDoc> topLevelClasses = new HashMap<>();
+    private final Map<String, RootDoc> topLevelClasses = new ConcurrentHashMap<>();
 
     private final Types types;
 
@@ -128,20 +130,18 @@ public class Javadocs {
     Optional<? extends ProgramElementDoc> doc(Element el) {
         if (el instanceof ExecutableElement) {
             ExecutableElement method = (ExecutableElement) el;
-            String key = methodKey(method);
 
-            return methodDoc(key);
+            return methodDoc(method);
         }
         else if (el instanceof TypeElement) {
             TypeElement type = (TypeElement) el;
-            String key = type.getQualifiedName().toString();
 
-            return classDoc(key);
+            return classDoc(type);
         }
         else return Optional.empty();
     }
 
-    String methodKey(ExecutableElement method) {
+    private String methodKey(ExecutableElement method) {
         TypeElement classElement = (TypeElement) method.getEnclosingElement();
 
         return classElement.getQualifiedName() + "#" + method.getSimpleName() + "(" + paramsKey(method.getParameters()) + ")";
@@ -153,10 +153,11 @@ public class Javadocs {
             .collect(Collectors.joining(","));
     }
 
-    Optional<MethodDoc> methodDoc(String methodKey) {
-        String className = methodKey.substring(0, methodKey.indexOf('#'));
+    Optional<MethodDoc> methodDoc(ExecutableElement method) {
+        String methodKey = methodKey(method);
+        TypeElement enclosingClass = (TypeElement) method.getEnclosingElement();
 
-        return classDoc(className)
+        return classDoc(enclosingClass)
                 .flatMap(classDoc -> doMethodDoc(classDoc, methodKey));
     }
 
@@ -183,10 +184,11 @@ public class Javadocs {
         return doc.containingClass().qualifiedName() + "#" + doc.name() + "("  + params + ")";
     }
 
-    Optional<ConstructorDoc> constructorDoc(String methodKey) {
-        String className = methodKey.substring(0, methodKey.indexOf('#'));
+    Optional<ConstructorDoc> constructorDoc(ExecutableElement method) {
+        String methodKey = methodKey(method);
+        TypeElement enclosingClass = (TypeElement) method.getEnclosingElement();
 
-        return classDoc(className)
+        return classDoc(enclosingClass)
                 .flatMap(classDoc -> doConstructorDoc(classDoc, methodKey));
     }
 
@@ -213,7 +215,8 @@ public class Javadocs {
         return doc.containingClass().qualifiedName() + "#<init>("  + params + ")";
     }
 
-    Optional<ClassDoc> classDoc(String className) {
+    Optional<ClassDoc> classDoc(TypeElement type) {
+        String className = type.getQualifiedName().toString();
         RootDoc index = index(className);
 
         return Optional.ofNullable(index.classNamed(className));
@@ -227,18 +230,18 @@ public class Javadocs {
             emptyFileManager,
             Javadocs::onDiagnostic,
             Javadocs.class,
-            null,
+            ImmutableList.of("-private"),
             ImmutableList.of(source)
         );
 
         task.call();
 
-        getSneakyReturn().ifPresent(this::updateCache);
+        getSneakyReturn().ifPresent(root -> updateCache(root, source));
     }
 
-    private void updateCache(RootDoc root) {
+    private void updateCache(RootDoc root, JavaFileObject source) {
         for (ClassDoc each : root.classes()) {
-            if (each.isPublic()) {
+            if (source.isNameCompatible(each.simpleTypeName(), JavaFileObject.Kind.SOURCE)) {
                 topLevelClasses.put(each.qualifiedName(), root);
 
                 return;
@@ -250,7 +253,18 @@ public class Javadocs {
      * Get or compute the javadoc for `className`
      */
     RootDoc index(String className) {
-        return topLevelClasses.computeIfAbsent(className, this::doIndex);
+        if (topLevelClasses.containsKey(className))
+            return topLevelClasses.get(className);
+        else {
+            // Asynchronously fetch docs
+            ForkJoinPool.commonPool().submit(() -> force(className));
+
+            return EmptyRootDoc.INSTANCE;
+        }
+    }
+
+    void force(String className) {
+        topLevelClasses.put(className, doIndex(className));
     }
 
     /**
