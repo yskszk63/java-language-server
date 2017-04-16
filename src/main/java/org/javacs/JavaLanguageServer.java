@@ -130,49 +130,10 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public CompletableFuture<CompletionItem> resolveCompletionItem(CompletionItem unresolved) {
                 return CompletableFutures.computeAsync(cancel -> {
-                    if (unresolved.getData() == null)
-                        return unresolved;
-                    
-                    String key = (String) unresolved.getData();
-                    
-                    LOG.info("Resolve javadoc for " + key);
+                    Completions.resolveCompletionItem(unresolved);
 
-                    // my.package.MyClass#<init>()
-                    if (key.contains("<init>")) {
-                        return Javadocs.global().constructorDoc(key)
-                                .map(doc -> resolveConstructorDoc(unresolved, doc))
-                                .orElse(unresolved);
-                    }
-                    // my.package.MyClass#myMethod()
-                    else if (key.contains("#")) {
-                        return Javadocs.global().methodDoc(key)
-                            .map(doc -> resolveMethodDoc(unresolved, doc))
-                            .orElse(unresolved);
-                    }
-                    else {
-                        return Javadocs.global().classDoc(key)
-                            .map(doc -> resolveClassDoc(unresolved, doc))
-                            .orElse(unresolved);
-                    }
+                    return unresolved;
                 });
-            }
-
-            private CompletionItem resolveConstructorDoc(CompletionItem unresolved, ConstructorDoc doc) {
-                unresolved.setDocumentation(doc.commentText());
-
-                return unresolved;
-            }
-
-            private CompletionItem resolveMethodDoc(CompletionItem unresolved, MethodDoc doc) {
-                unresolved.setDocumentation(doc.commentText());
-
-                return unresolved;
-            }
-
-            private CompletionItem resolveClassDoc(CompletionItem unresolved, ClassDoc doc) {
-                unresolved.setDocumentation(doc.commentText());
-
-                return unresolved;
             }
 
             @Override
