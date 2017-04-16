@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.sun.javadoc.MethodDoc;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.NewClassTree;
@@ -93,9 +94,12 @@ class Signatures {
     }
 
     private SignatureInformation methodInfo(ExecutableElement method, boolean showReturn) {
+        Javadocs docs = Javadocs.global();
+        Optional<MethodDoc> doc = docs.methodDoc(docs.methodKey(method));
+        
         return new SignatureInformation(
                 Hovers.methodSignature(method, showReturn, true),
-                task.getElements().getDocComment(method),
+                doc.map(MethodDoc::commentText).orElse(null),
                 paramInfo(method)
         );
     }
