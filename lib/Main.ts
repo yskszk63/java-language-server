@@ -43,7 +43,7 @@ export function activate(context: VSCode.ExtensionContext) {
                 ]
             },
             outputChannelName: 'Java',
-            revealOutputChannelOn: 3
+            revealOutputChannelOn: 4 // never
         }
         
         function createServer(): Promise<StreamInfo> {
