@@ -141,78 +141,62 @@ public class Javadocs {
         else return Optional.empty();
     }
 
-    private String methodKey(ExecutableElement method) {
-        TypeElement classElement = (TypeElement) method.getEnclosingElement();
-
-        return classElement.getQualifiedName() + "#" + method.getSimpleName() + "(" + paramsKey(method.getParameters()) + ")";
-    }
-
-    private String paramsKey(List<? extends VariableElement> params) {
-        return params.stream()
-            .map(p -> types.erasure(p.asType()).toString())
-            .collect(Collectors.joining(","));
-    }
-
     Optional<MethodDoc> methodDoc(ExecutableElement method) {
-        String methodKey = methodKey(method);
         TypeElement enclosingClass = (TypeElement) method.getEnclosingElement();
 
         return classDoc(enclosingClass)
-                .flatMap(classDoc -> doMethodDoc(classDoc, methodKey));
+                .flatMap(classDoc -> doMethodDoc(classDoc, method));
     }
 
-    private Optional<MethodDoc> doMethodDoc(ClassDoc classDoc, String methodKey) {
+    private Optional<MethodDoc> doMethodDoc(ClassDoc classDoc, ExecutableElement method) {
         for (MethodDoc each : classDoc.methods(false)) {
-            if (methodMatches(methodKey, each))
+            if (methodMatches(method, each))
                 return Optional.of(each);
         }
 
         return Optional.empty();
     }
 
-    private boolean methodMatches(String methodKey, MethodDoc doc) {
-        String docSignature = erasedSignature(doc);
-
-        return docSignature.equals(methodKey);
+    private boolean methodMatches(ExecutableElement method, MethodDoc doc) {
+        return method.getSimpleName().contentEquals(doc.name()) &&
+            paramsMatch(method.getParameters(), doc.parameters());
     }
 
-    private String erasedSignature(MethodDoc doc) {
-        String params = Arrays.stream(doc.parameters())
-                .map(param -> param.type().toString())
-                .collect(Collectors.joining(","));
+    private boolean paramsMatch(List<? extends VariableElement> params, Parameter[] docs) {
+        if (params.size() != docs.length) 
+            return false;
+        
+        for (int i = 0; i < docs.length; i++) {
+            VariableElement param = params.get(i);
+            String paramType = types.erasure(param.asType()).toString();
+            Parameter doc = docs[i];
+            String docType = doc.type().qualifiedTypeName() + doc.type().dimension();
 
-        return doc.containingClass().qualifiedName() + "#" + doc.name() + "("  + params + ")";
+            if (!paramType.equals(docType))
+                return false;
+        }
+
+        return true;
     }
 
     Optional<ConstructorDoc> constructorDoc(ExecutableElement method) {
-        String methodKey = methodKey(method);
         TypeElement enclosingClass = (TypeElement) method.getEnclosingElement();
 
         return classDoc(enclosingClass)
-                .flatMap(classDoc -> doConstructorDoc(classDoc, methodKey));
+                .flatMap(classDoc -> doConstructorDoc(classDoc, method));
     }
 
-    private Optional<ConstructorDoc> doConstructorDoc(ClassDoc classDoc, String methodKey) {
+    private Optional<ConstructorDoc> doConstructorDoc(ClassDoc classDoc, ExecutableElement method) {
         for (ConstructorDoc each : classDoc.constructors(false)) {
-            if (constructorMatches(methodKey, each))
+            if (constructorMatches(method, each))
                 return Optional.of(each);
         }
 
         return Optional.empty();
     }
 
-    private boolean constructorMatches(String methodKey, ConstructorDoc doc) {
-        String docSignature = erasedConstructorSignature(doc);
-
-        return docSignature.equals(methodKey);
-    }
-
-    private String erasedConstructorSignature(ConstructorDoc doc) {
-        String params = Arrays.stream(doc.parameters())
-                .map(param -> param.type().toString())
-                .collect(Collectors.joining(","));
-
-        return doc.containingClass().qualifiedName() + "#<init>("  + params + ")";
+    private boolean constructorMatches(ExecutableElement method, ConstructorDoc doc) {
+        return paramsMatch(method.getParameters(), doc.parameters());
     }
 
     Optional<ClassDoc> classDoc(TypeElement type) {

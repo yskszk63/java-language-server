@@ -137,6 +137,7 @@ class Completions {
             }
             case Other:
             default: {
+                // TODO this is not always a DeclaredType
                 DeclaredType type = (DeclaredType) trees.getTypeMirror(expression);
 
                 return allMembers(expression, partialIdentifier, from)

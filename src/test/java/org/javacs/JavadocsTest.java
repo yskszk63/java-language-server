@@ -15,6 +15,9 @@ import static org.junit.Assert.*;
 
 public class JavadocsTest {
 
+    private final Javadocs docs = new Javadocs(Collections.singleton(Paths.get("src/test/resources")));
+    private final JavacHolder compiler = newCompiler();
+
     private static JavacHolder newCompiler() {
         return JavacHolder.createWithoutIndex(
                 Collections.emptySet(),
@@ -25,8 +28,6 @@ public class JavadocsTest {
 
     @Test
     public void findSystemDoc() throws IOException {
-        Javadocs docs = new Javadocs(Collections.emptySet());
-
         docs.force("java.util.ArrayList");
 
         RootDoc root = docs.index("java.util.ArrayList");
@@ -36,18 +37,31 @@ public class JavadocsTest {
 
     @Test
     public void findMethodDoc() {
-        Javadocs docs = new Javadocs(Collections.singleton(Paths.get("src/test/resources")));
-        JavacHolder compiler = newCompiler();
         FocusedResult compile = compiler.compileFocused(
-            Paths.get("src/test/resources/org/javacs/docs/TrickyDocstring.java").toUri(),
-            Optional.empty(), 
-            8, 16, 
-            false
+                Paths.get("src/test/resources/org/javacs/docs/TrickyDocstring.java").toUri(),
+                Optional.empty(),
+                8, 16,
+                false
         );
         ExecutableElement method = (ExecutableElement) Trees.instance(compile.task).getElement(compile.cursor.get());
 
         docs.update(compile.compilationUnit.getSourceFile());
 
-        assertTrue(docs.methodDoc(method).isPresent());
+        assertTrue("Found method", docs.methodDoc(method).isPresent());
+    }
+
+    @Test
+    public void findParameterizedDoc() {
+        FocusedResult compile = compiler.compileFocused(
+                Paths.get("src/test/resources/org/javacs/docs/TrickyDocstring.java").toUri(),
+                Optional.empty(),
+                9, 22,
+                false
+        );
+        ExecutableElement method = (ExecutableElement) Trees.instance(compile.task).getElement(compile.cursor.get());
+
+        docs.update(compile.compilationUnit.getSourceFile());
+
+        assertTrue("Found method", docs.methodDoc(method).isPresent());
     }
 }
