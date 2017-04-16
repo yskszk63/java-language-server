@@ -111,7 +111,7 @@ public class JavacHolder {
      *
      * If these files reference un-compiled dependencies, those dependencies will also be parsed and compiled.
      */
-    public BatchResult compileBatch(Map<URI, Optional<String>> files) {
+    public synchronized BatchResult compileBatch(Map<URI, Optional<String>> files) {
         initialIndexComplete.join();
 
         return doCompile(files);

@@ -318,6 +318,8 @@ class JavaLanguageServer implements LanguageServer {
                     }
 
                     activeDocuments.put(uri, new VersionedContent(newText, document.getVersion()));
+                    
+                    doIndexAsync(uri);
                 }
                 else LOG.warning("Ignored change with version " + document.getVersion() + " <= " + existing.version);
             }
@@ -381,6 +383,23 @@ class JavaLanguageServer implements LanguageServer {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * In order to avoid generating a huge number of queued index operations when the user is typing furiously,
+     * only execute a single lint per-file at a time.
+     */
+    private final Map<URI, EvictingExecutor> indexPool = new HashMap<>();
+
+    private void doIndexAsync(URI uri) {
+        indexPool.computeIfAbsent(uri, newUri -> new EvictingExecutor())
+            .submit(() -> doIndex(uri));
+    }
+
+    private void doIndex(URI uri) {
+        LOG.info("Index " + uri);
+        
+        findCompiler(uri).ifPresent(c -> c.compileBatch(Collections.singletonMap(uri, activeContent(uri))));
     }
 
     private void doLint(Collection<URI> paths) {
