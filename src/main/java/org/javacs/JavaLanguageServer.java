@@ -139,6 +139,8 @@ class JavaLanguageServer implements LanguageServer {
                         return unresolved;
                     
                     String key = (String) unresolved.getData();
+                    
+                    LOG.info("Resolve javadoc for " + key);
 
                     // my.package.MyClass#myMethod
                     if (key.contains("#")) {
@@ -155,8 +157,6 @@ class JavaLanguageServer implements LanguageServer {
             }
 
             private CompletionItem resolveMethodDoc(CompletionItem unresolved, MethodDoc doc) {
-                LOG.info("Resolve javadoc for " + unresolved.getData());
-
                 unresolved.setDetail(doc.returnType().typeName() + " " + doc.flatSignature());
                 unresolved.setDocumentation(doc.commentText());
 
@@ -164,8 +164,6 @@ class JavaLanguageServer implements LanguageServer {
             }
 
             private CompletionItem resolveClassDoc(CompletionItem unresolved, ClassDoc doc) {
-                LOG.info("Resolve javadoc for " + unresolved.getData());
-                
                 unresolved.setDocumentation(doc.commentText());
 
                 return unresolved;
