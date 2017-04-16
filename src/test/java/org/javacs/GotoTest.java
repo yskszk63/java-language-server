@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 
-import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
 public class GotoTest {
@@ -96,6 +96,14 @@ public class GotoTest {
         List<? extends Location> suggestions = doGoto(file, 45, 11);
 
         assertThat(suggestions, contains(location(uri, 2, 18, 2, 23)));
+    }
+
+    @Test
+    public void gotoEnum() throws IOException {
+        String file = "/org/javacs/example/GotoEnum.java";
+        
+        assertThat(doGoto(file, 5, 30), not(empty()));
+        assertThat(doGoto(file, 5, 35), not(empty()));
     }
 
     private Location location(URI uri, int startRow, int startColumn, int endRow, int endColumn) {
