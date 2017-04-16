@@ -1,14 +1,14 @@
 package org.javacs;
 
-import java.time.temporal.ChronoUnit;
+import org.junit.Test;
+
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.junit.Test;
 
-import static org.junit.Assert.*;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.equalTo;
+import static org.junit.Assert.assertThat;
 
 public class EvictingExecutorTest {
     @Test
@@ -20,10 +20,16 @@ public class EvictingExecutorTest {
             sleep(10);
             tasks[0]++;
         });
+
+        sleep(1); // gives one a chance to start
+
         Future<?> two = exec.submit(() -> {
             sleep(10);
             tasks[1]++;
         });
+
+        sleep(1); // Not long enough for one to finish
+
         Future<?> three = exec.submit(() -> {
             sleep(10);
             tasks[2]++;
