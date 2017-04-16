@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.google.common.util.concurrent.RateLimiter;
 import java.util.Optional;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.Executor;
@@ -13,7 +14,19 @@ import java.util.concurrent.Future;
  * When a new task is submitted, the queued task is evicted.
  */
 class EvictingExecutor {
+    private final Optional<RateLimiter> rateLimiter;
     private volatile Optional<Runnable> queued = Optional.empty();
+
+    EvictingExecutor() {
+        this.rateLimiter = Optional.empty();
+    }
+
+    /**
+     * Limit the frequency of execution
+     */
+    EvictingExecutor(RateLimiter limit) {
+        this.rateLimiter = Optional.of(limit);
+    }
 
     public Future<?> submit(Runnable task) {
         queued = Optional.of(task);
@@ -28,6 +41,10 @@ class EvictingExecutor {
 
         queued = Optional.empty();
 
-        todo.ifPresent(Runnable::run);
+        todo.ifPresent(task -> {
+            rateLimiter.ifPresent(limit -> limit.acquire(1));
+
+            task.run();
+        });
     }
 }

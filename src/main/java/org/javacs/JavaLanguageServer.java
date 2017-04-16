@@ -2,6 +2,7 @@ package org.javacs;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.RateLimiter;
 import com.sun.javadoc.ClassDoc;
 import com.sun.javadoc.ConstructorDoc;
 import com.sun.javadoc.MethodDoc;
@@ -391,8 +392,13 @@ class JavaLanguageServer implements LanguageServer {
     private final Map<URI, EvictingExecutor> indexPool = new HashMap<>();
 
     private void doIndexAsync(URI uri) {
-        indexPool.computeIfAbsent(uri, newUri -> new EvictingExecutor())
+        indexPool.computeIfAbsent(uri, this::newIndexExecutor)
             .submit(() -> doIndex(uri));
+    }
+
+    private EvictingExecutor newIndexExecutor(URI ignored) {
+        // Index each file at most every 5s
+        return new EvictingExecutor(RateLimiter.create(0.2));
     }
 
     private void doIndex(URI uri) {
