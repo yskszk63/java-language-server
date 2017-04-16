@@ -157,7 +157,7 @@ class JavaLanguageServer implements LanguageServer {
             private CompletionItem resolveMethodDoc(CompletionItem unresolved, MethodDoc doc) {
                 LOG.info("Resolve javadoc for " + unresolved.getData());
 
-                unresolved.setDetail(doc.flatSignature());
+                unresolved.setDetail(doc.returnType().typeName() + " " + doc.flatSignature());
                 unresolved.setDocumentation(doc.commentText());
 
                 return unresolved;
