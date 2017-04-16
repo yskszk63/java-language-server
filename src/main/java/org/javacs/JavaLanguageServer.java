@@ -153,14 +153,12 @@ class JavaLanguageServer implements LanguageServer {
             }
 
             private CompletionItem resolveConstructorDoc(CompletionItem unresolved, ConstructorDoc doc) {
-                unresolved.setDetail(doc.flatSignature());
                 unresolved.setDocumentation(doc.commentText());
 
                 return unresolved;
             }
 
             private CompletionItem resolveMethodDoc(CompletionItem unresolved, MethodDoc doc) {
-                unresolved.setDetail(doc.returnType().typeName() + " " + doc.flatSignature());
                 unresolved.setDocumentation(doc.commentText());
 
                 return unresolved;

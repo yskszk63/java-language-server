@@ -570,6 +570,7 @@ class Completions {
 
                     item.setKind(classKind(e.getKind()));
                     item.setLabel(name);
+                    item.setDetail(type.getQualifiedName().toString());
                     item.setInsertText(name);
 
                     PackageElement classPackage = elements.getPackageOf(e);
@@ -627,6 +628,7 @@ class Completions {
 
                     item.setKind(CompletionItemKind.Method);
                     item.setLabel(name);
+                    item.setDetail(Hovers.methodSignature(method, true, false));
                     item.setInsertText(name); // TODO
                     item.setSortText(name);
                     item.setFilterText(name);
@@ -649,6 +651,7 @@ class Completions {
 
                     item.setKind(CompletionItemKind.Constructor);
                     item.setLabel(name);
+                    item.setDetail(Hovers.methodSignature(method, false, false));
                     item.setInsertText(insertText);
                     item.setSortText(name);
                     item.setFilterText(name);

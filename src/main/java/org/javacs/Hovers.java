@@ -100,9 +100,6 @@ public class Hovers {
             .map(p -> p.asType().toString())
             .collect(Collectors.joining(", "));
     }
-
-
-    // TODO delete below after Signature no longer depends on it
     
     public static String methodSignature(ExecutableElement e, boolean showReturn, boolean showMethodName) {
         String name = e.getKind() == ElementKind.CONSTRUCTOR ? constructorName(e) : e.getSimpleName().toString();
