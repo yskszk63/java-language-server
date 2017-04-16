@@ -50,7 +50,7 @@ public class Hovers {
             return String.format(
                 "```java\n%s\n```\n%s", 
                 method.returnType().toString() + " " + method.name() + "(" + docParams(method.parameters()) + ")",
-                doc.commentText()
+                Javadocs.commentText(method).orElse("")
             );
         }
         else return String.format(

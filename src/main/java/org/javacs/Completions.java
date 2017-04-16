@@ -638,7 +638,8 @@ class Completions {
                     item.setFilterText(name);
                     item.setSortText("0/" + name);
                     Javadocs.global().methodDoc(method)
-                        .ifPresent(doc -> item.setDocumentation(doc.commentText()));
+                        .flatMap(Javadocs::commentText)
+                        .ifPresent(item::setDocumentation);
 
                     return Stream.of(item);
                 }

@@ -1,7 +1,9 @@
 package org.javacs;
 
+import com.sun.javadoc.MethodDoc;
 import com.sun.javadoc.RootDoc;
 import com.sun.source.util.Trees;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import javax.lang.model.element.ExecutableElement;
@@ -63,5 +65,52 @@ public class JavadocsTest {
         docs.update(compile.compilationUnit.getSourceFile());
 
         assertTrue("Found method", docs.methodDoc(method).isPresent());
+    }
+
+    @Test 
+    public void findInheritedDoc() {
+        FocusedResult compile = compiler.compileFocused(
+                Paths.get("src/test/resources/org/javacs/docs/TrickyDocstring.java").toUri(),
+                Optional.empty(),
+                10, 28,
+                false
+        );
+        ExecutableElement method = (ExecutableElement) Trees.instance(compile.task).getElement(compile.cursor.get());
+
+        docs.update(compile.compilationUnit.getSourceFile());
+        docs.force("org.javacs.docs.SubDoc");
+
+        Optional<MethodDoc> found = docs.methodDoc(method);
+
+        assertTrue("Found method", found.isPresent());
+
+        Optional<String> docstring = found.flatMap(Javadocs::commentText);
+
+        assertTrue("Has inherited doc", docstring.isPresent());
+        assertThat("Inherited doc is not empty", docstring.get(), not(isEmptyOrNullString()));
+    }
+
+    @Test
+    @Ignore // Doesn't work yet
+    public void findInterfaceDoc() {
+        FocusedResult compile = compiler.compileFocused(
+                Paths.get("src/test/resources/org/javacs/docs/TrickyDocstring.java").toUri(),
+                Optional.empty(),
+                11, 37,
+                false
+        );
+        ExecutableElement method = (ExecutableElement) Trees.instance(compile.task).getElement(compile.cursor.get());
+
+        docs.update(compile.compilationUnit.getSourceFile());
+        docs.force("org.javacs.docs.SubDoc");
+
+        Optional<MethodDoc> found = docs.methodDoc(method);
+
+        assertTrue("Found method", found.isPresent());
+
+        Optional<String> docstring = found.flatMap(Javadocs::commentText);
+
+        assertTrue("Has inherited doc", docstring.isPresent());
+        assertThat("Inherited doc is not empty", docstring.get(), not(isEmptyOrNullString()));
     }
 }

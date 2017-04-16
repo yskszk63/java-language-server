@@ -1,12 +1,14 @@
 package org.javacs.docs;
 
-import java.util.*;
+import java.util.*; 
 
 class TrickyDocstring {
 
     void test() {
         example("foo", new String[] { "foo" }, null);
         parameterized("foo");
+        new SubDoc().method();
+        new SubDoc().interfaceMethod();
     }
 
     /**

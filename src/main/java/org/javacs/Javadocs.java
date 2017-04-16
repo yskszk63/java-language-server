@@ -1,6 +1,7 @@
 package org.javacs;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.sun.javadoc.*;
 import com.sun.source.util.JavacTask;
@@ -127,6 +128,21 @@ public class Javadocs {
         return new Javadocs(all);
     }
 
+    /**
+     * Get docstring for method, using inherited method if necessary
+     */
+    static Optional<String> commentText(MethodDoc doc) {
+        // TODO search interfaces as well
+        
+        while (doc != null && Strings.isNullOrEmpty(doc.commentText()))
+            doc = doc.overriddenMethod();
+        
+        if (doc == null || Strings.isNullOrEmpty(doc.commentText()))
+            return Optional.empty();
+        else 
+            return Optional.of(doc.commentText());
+    }
+
     Optional<? extends ProgramElementDoc> doc(Element el) {
         if (el instanceof ExecutableElement) {
             ExecutableElement method = (ExecutableElement) el;
@@ -167,16 +183,22 @@ public class Javadocs {
             return false;
         
         for (int i = 0; i < docs.length; i++) {
-            VariableElement param = params.get(i);
-            String paramType = types.erasure(param.asType()).toString();
-            Parameter doc = docs[i];
-            String docType = doc.type().qualifiedTypeName() + doc.type().dimension();
+            String paramType = paramType(params.get(i));
+            String docType = docType(docs[i]);
 
             if (!paramType.equals(docType))
                 return false;
         }
 
         return true;
+    }
+
+    private String paramType(VariableElement param) {
+        return types.erasure(param.asType()).toString();
+    }
+
+    private String docType(Parameter doc) {
+        return doc.type().qualifiedTypeName() + doc.type().dimension();
     }
 
     Optional<ConstructorDoc> constructorDoc(ExecutableElement method) {
