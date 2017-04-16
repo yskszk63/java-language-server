@@ -10,6 +10,7 @@ import org.eclipse.lsp4j.Range;
 
 import javax.tools.JavaFileObject;
 import java.util.Optional;
+import sun.rmi.transport.Endpoint;
 
 class Lints {
 
@@ -49,15 +50,19 @@ class Lints {
 
         JCDiagnostic diagnostic = (JCDiagnostic) error;
         DiagnosticSource source = diagnostic.getDiagnosticSource();
+        long start = error.getStartPosition(), end = error.getEndPosition();
+
+        if (end == start)
+            end = start + 1;
 
         return new Range(
             new Position(
-                    source.getLineNumber((int) error.getStartPosition()) - 1,
-                    source.getColumnNumber((int) error.getStartPosition(), true) - 1
+                    source.getLineNumber((int) start) - 1,
+                    source.getColumnNumber((int) start, true) - 1
             ),
             new Position(
-                    source.getLineNumber((int) error.getEndPosition()) - 1,
-                    source.getColumnNumber((int) error.getEndPosition(), true) - 1
+                    source.getLineNumber((int) end) - 1,
+                    source.getColumnNumber((int) end, true) - 1
             )
         );
     }
