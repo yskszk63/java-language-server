@@ -167,6 +167,17 @@
                             <outputFile>test-classpath.txt</outputFile>
                         </configuration>
                     </execution>
+                    <execution>
+                        <id>docpath</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>build-classpath</goal>
+                        </goals>
+                        <configuration>
+                            <outputFile>docpath.txt</outputFile>
+                            <classifier>sources</classifier>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
         </plugins>
