@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.sun.javadoc.*;
 import com.sun.source.util.JavacTask;
@@ -7,6 +8,7 @@ import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javadoc.api.JavadocTool;
 
+import java.util.concurrent.CompletableFuture;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -15,6 +17,7 @@ import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import javax.tools.DocumentationTool;
+import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.File;
@@ -55,7 +58,12 @@ public class Javadocs {
     /**
      * Cache for performance reasons
      */
-    private final JavacFileManager fileManager;
+    private final JavacFileManager actualFileManager;
+
+    /**
+     * Empty file manager we pass to javadoc to prevent it from roaming all over the place
+     */
+    private final JavacFileManager emptyFileManager = JavacTool.create().getStandardFileManager(Javadocs::onDiagnostic, null, null);
 
     /**
      * All the classes we have indexed so far
@@ -68,29 +76,47 @@ public class Javadocs {
 
     Javadocs(Set<Path> sourcePath) {
         this.userSourcePath = sourcePath;
+        this.actualFileManager = createFileManager(allSourcePaths(sourcePath));
 
-        Set<File> allSourcePaths = new HashSet<>();
-
-        sourcePath.stream()
-                .map(Path::toFile)
-                .forEach(allSourcePaths::add);
-        findSrcZip().ifPresent(allSourcePaths::add);
-
-        fileManager = JavacTool.create().getStandardFileManager(Javadocs::onDiagnostic, null, null);
-
-        try {
-            fileManager.setLocation(StandardLocation.SOURCE_PATH, allSourcePaths);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        JavacTask task = JavacTool.create().getTask(null, fileManager, Javadocs::onDiagnostic, null, null, null);
+        JavacTask task = JavacTool.create().getTask(
+                null,
+                emptyFileManager, 
+                Javadocs::onDiagnostic,
+                null,
+                null,
+                null
+        );
 
         types = task.getTypes();
         elements = task.getElements();
     }
 
-    Javadocs withSourcePath(Set<Path> additionalSourcePath) {
+    private static Set<File> allSourcePaths(Set<Path> userSourcePath) {
+        Set<File> allSourcePaths = new HashSet<>();
+
+        // Add userSourcePath
+        for (Path each : userSourcePath) 
+            allSourcePaths.add(each.toFile());
+
+        // Add src.zip from JDK
+        findSrcZip().ifPresent(allSourcePaths::add);
+
+        return allSourcePaths;
+    }
+
+    private static JavacFileManager createFileManager(Set<File> allSourcePaths) {
+        JavacFileManager actualFileManager = JavacTool.create().getStandardFileManager(Javadocs::onDiagnostic, null, null);
+
+        try {
+            actualFileManager.setLocation(StandardLocation.SOURCE_PATH, allSourcePaths);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        return actualFileManager;
+    }
+
+    private Javadocs withSourcePath(Set<Path> additionalSourcePath) {
         Set<Path> all = new HashSet<>();
 
         all.addAll(userSourcePath);
@@ -198,7 +224,7 @@ public class Javadocs {
 
         DocumentationTool.DocumentationTask task = new JavadocTool().getTask(
             null,
-            fileManager,
+            emptyFileManager,
             Javadocs::onDiagnostic,
             Javadocs.class,
             null,
@@ -232,7 +258,7 @@ public class Javadocs {
      */
     private RootDoc doIndex(String className) {
         try {
-            JavaFileObject source = fileManager.getJavaFileForInput(StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
+            JavaFileObject source = actualFileManager.getJavaFileForInput(StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
 
             if (source == null) {
                 LOG.warning("No source file for " + className);
@@ -244,7 +270,7 @@ public class Javadocs {
 
             DocumentationTool.DocumentationTask task = new JavadocTool().getTask(
                     null,
-                    fileManager,
+                    emptyFileManager,
                     Javadocs::onDiagnostic,
                     Javadocs.class,
                     null,
