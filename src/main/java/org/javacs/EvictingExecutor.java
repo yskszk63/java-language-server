@@ -5,6 +5,7 @@ import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 
 /**
@@ -12,13 +13,14 @@ import java.util.concurrent.Future;
  * When a new task is submitted, the queued task is evicted.
  */
 class EvictingExecutor {
-    private final ExecutorService delegate = Executors.newSingleThreadExecutor();
     private volatile Optional<Runnable> queued = Optional.empty();
 
     public Future<?> submit(Runnable task) {
         queued = Optional.of(task);
 
-        return delegate.submit(this::take);
+        // Don't use your own thread for this
+        // We would like to be able to run MANY EvictingExecutors so they need to be lightweight
+        return ForkJoinPool.commonPool().submit(this::take);
     }
 
     private synchronized void take() {
