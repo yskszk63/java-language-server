@@ -49,7 +49,7 @@ public class Hovers {
 
             return String.format(
                 "```java\n%s\n```\n%s", 
-                method.returnType().simpleTypeName() + " " + method.name() + "(" + docParams(method.parameters()) + ")",
+                method.returnType().toString() + " " + method.name() + "(" + docParams(method.parameters()) + ")",
                 doc.commentText()
             );
         }
@@ -67,7 +67,7 @@ public class Hovers {
     }
 
     private static String docParam(Parameter param) {
-        return param.typeName() + " " + param.name();
+        return param.type().toString() + " " + param.name();
     }
 
     /**
