@@ -296,7 +296,7 @@ class JavaLanguageServer implements LanguageServer {
 
                     activeDocuments.put(uri, new VersionedContent(document.getText(), document.getVersion()));
 
-                    doLint(Collections.singleton(uri));
+                    doLintAndIndex(Collections.singleton(uri));
                 } catch (NoJavaConfigException e) {
                     throw ShowMessageException.warning(e.getMessage(), e);
                 }
@@ -318,7 +318,7 @@ class JavaLanguageServer implements LanguageServer {
                     }
 
                     activeDocuments.put(uri, new VersionedContent(newText, document.getVersion()));
-                    
+
                     doIndexAsync(uri);
                 }
                 else LOG.warning("Ignored change with version " + document.getVersion() + " <= " + existing.version);
@@ -336,13 +336,12 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public void didSave(DidSaveTextDocumentParams params) {
                 // Re-lint all active documents
-                doLint(activeDocuments.keySet());
+                doLintAndIndex(activeDocuments.keySet());
 
                 // Re-index javadocs of saved document
                 URI uri = URI.create(params.getTextDocument().getUri());
+                
                 activeContent(uri).ifPresent(content -> doJavadoc(new StringFileObject(content, uri)));
-
-                params.getText();
             }
         };
     }
@@ -402,7 +401,7 @@ class JavaLanguageServer implements LanguageServer {
         findCompiler(uri).ifPresent(c -> c.compileBatch(Collections.singletonMap(uri, activeContent(uri))));
     }
 
-    private void doLint(Collection<URI> paths) {
+    private void doLintAndIndex(Collection<URI> paths) {
         LOG.info("Lint " + Joiner.on(", ").join(paths));
 
         Map<JavacConfig, Map<URI, Optional<String>>> files = new HashMap<>();
