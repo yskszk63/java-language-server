@@ -1,21 +1,22 @@
 package org.javacs;
 
-import com.google.common.base.Joiner;
-import com.sun.javadoc.*;
 import com.google.common.collect.ImmutableList;
-import com.sun.source.tree.CompilationUnitTree;
+import com.sun.javadoc.*;
 import com.sun.source.util.JavacTask;
-import com.sun.source.util.Trees;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javadoc.api.JavadocTool;
 
-import java.net.URI;
-import java.util.stream.Collectors;
-import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import javax.tools.*;
+import javax.tools.Diagnostic;
+import javax.tools.DocumentationTool;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardLocation;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -23,7 +24,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.tools.JavaFileObject.Kind;
+import java.util.stream.Collectors;
 
 public class Javadocs {
 
@@ -130,7 +131,7 @@ public class Javadocs {
         String className = methodKey.substring(0, methodKey.indexOf('#'));
 
         return classDoc(className)
-            .flatMap(classDoc -> doMethodDoc(classDoc, methodKey));
+                .flatMap(classDoc -> doMethodDoc(classDoc, methodKey));
     }
 
     private Optional<MethodDoc> doMethodDoc(ClassDoc classDoc, String methodKey) {
@@ -154,6 +155,36 @@ public class Javadocs {
                 .collect(Collectors.joining(","));
 
         return doc.containingClass().qualifiedName() + "#" + doc.name() + "("  + params + ")";
+    }
+
+    Optional<ConstructorDoc> constructorDoc(String methodKey) {
+        String className = methodKey.substring(0, methodKey.indexOf('#'));
+
+        return classDoc(className)
+                .flatMap(classDoc -> doConstructorDoc(classDoc, methodKey));
+    }
+
+    private Optional<ConstructorDoc> doConstructorDoc(ClassDoc classDoc, String methodKey) {
+        for (ConstructorDoc each : classDoc.constructors(false)) {
+            if (constructorMatches(methodKey, each))
+                return Optional.of(each);
+        }
+
+        return Optional.empty();
+    }
+
+    private boolean constructorMatches(String methodKey, ConstructorDoc doc) {
+        String docSignature = erasedConstructorSignature(doc);
+
+        return docSignature.equals(methodKey);
+    }
+
+    private String erasedConstructorSignature(ConstructorDoc doc) {
+        String params = Arrays.stream(doc.parameters())
+                .map(param -> param.type().toString())
+                .collect(Collectors.joining(","));
+
+        return doc.containingClass().qualifiedName() + "#<init>("  + params + ")";
     }
 
     Optional<ClassDoc> classDoc(String className) {

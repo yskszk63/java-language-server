@@ -3,8 +3,8 @@ package org.javacs;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.sun.javadoc.ClassDoc;
+import com.sun.javadoc.ConstructorDoc;
 import com.sun.javadoc.MethodDoc;
-import com.sun.javadoc.ProgramElementDoc;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 import org.eclipse.lsp4j.*;
@@ -14,19 +14,11 @@ import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.eclipse.lsp4j.services.TextDocumentService;
 import org.eclipse.lsp4j.services.WorkspaceService;
-import org.w3c.dom.Document;
-import org.xml.sax.SAXException;
 
 import javax.lang.model.element.Element;
 import javax.tools.JavaFileObject;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.xpath.XPathExpressionException;
-import javax.xml.xpath.XPathFactory;
 import java.io.*;
 import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -40,8 +32,6 @@ import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.javacs.Main.JSON;
 
 class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
@@ -142,8 +132,14 @@ class JavaLanguageServer implements LanguageServer {
                     
                     LOG.info("Resolve javadoc for " + key);
 
-                    // my.package.MyClass#myMethod
-                    if (key.contains("#")) {
+                    // my.package.MyClass#<init>()
+                    if (key.contains("<init>")) {
+                        return Javadocs.global().constructorDoc(key)
+                                .map(doc -> resolveConstructorDoc(unresolved, doc))
+                                .orElse(unresolved);
+                    }
+                    // my.package.MyClass#myMethod()
+                    else if (key.contains("#")) {
                         return Javadocs.global().methodDoc(key)
                             .map(doc -> resolveMethodDoc(unresolved, doc))
                             .orElse(unresolved);
@@ -154,6 +150,13 @@ class JavaLanguageServer implements LanguageServer {
                             .orElse(unresolved);
                     }
                 });
+            }
+
+            private CompletionItem resolveConstructorDoc(CompletionItem unresolved, ConstructorDoc doc) {
+                unresolved.setDetail(doc.flatSignature());
+                unresolved.setDocumentation(doc.commentText());
+
+                return unresolved;
             }
 
             private CompletionItem resolveMethodDoc(CompletionItem unresolved, MethodDoc doc) {
