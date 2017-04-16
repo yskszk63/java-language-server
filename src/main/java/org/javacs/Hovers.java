@@ -30,57 +30,31 @@ import java.util.function.Function;
 public class Hovers {
     
     public static Hover hoverText(Element el) {
-        String content = Javadocs.global().doc(el)
-            .map(Hovers::javadocHover)
-            .orElseGet(() -> fallbackHover(el));
+        Optional<String> doc = Javadocs.global().doc(el).map(Hovers::commentText);
+        String sig = signature(el);
+        String result = doc.map(text -> String.format("```java\n%s\n```\n%s", sig, text)).orElse(sig);
 
         return new Hover(
-                Collections.singletonList(Either.forLeft(content)),
+                Collections.singletonList(Either.forLeft(result)),
                 null
         );
     }
 
-    /**
-     * Hover text if we found element on the source path and we can use the Doclet API
-     */
-    private static String javadocHover(ProgramElementDoc doc) {
+    private static String commentText(ProgramElementDoc doc) {
         if (doc instanceof MethodDoc) {
             MethodDoc method = (MethodDoc) doc;
 
-            return String.format(
-                "```java\n%s\n```\n%s", 
-                method.returnType().toString() + " " + method.name() + "(" + docParams(method.parameters()) + ")",
-                Javadocs.commentText(method).orElse("")
-            );
+            return Javadocs.commentText(method).orElse("");
         }
-        else return String.format(
-            "```java\n%s\n```\n%s", 
-            doc.qualifiedName(),
-            doc.commentText()
-        );
+        else return doc.commentText();
     }
 
-    private static String docParams(Parameter[] params) {
-        return Arrays.stream(params)
-            .map(Hovers::docParam)
-            .collect(Collectors.joining(", "));
-    }
-
-    private static String docParam(Parameter param) {
-        return param.type().toString() + " " + param.name();
-    }
-
-    /**
-     * Hover text if we can't find `el` on the source path
-     */
-    private static String fallbackHover(Element el) {
-        // These strings are intentionally not formatted as ```java name ``, 
-        // so that they appear less "rich" in the UI remind the user know that they could be improved by adding sourcePath
-        
+    private static String signature(Element el) {
         if (el.getKind() == ElementKind.CONSTRUCTOR) {
             ExecutableElement method = (ExecutableElement) el;
+            TypeElement enclosingClass = (TypeElement) method.getEnclosingElement();
 
-            return method.getEnclosingElement().getSimpleName() + "(" + params(method.getParameters()) + ")";
+            return enclosingClass.getQualifiedName() + "(" + params(method.getParameters()) + ")";
         }
         if (el instanceof ExecutableElement) {
             ExecutableElement method = (ExecutableElement) el;
