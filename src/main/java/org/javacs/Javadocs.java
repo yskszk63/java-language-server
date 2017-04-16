@@ -255,7 +255,7 @@ public class Javadocs {
         }
     }
 
-    private final ForkJoinPool indexPool = new ForkJoinPool(1);
+    private final EvictingExecutor indexPool = new EvictingExecutor();
 
     /**
      * Get or compute the javadoc for `className`
@@ -265,10 +265,7 @@ public class Javadocs {
             return topLevelClasses.get(className);
         else {
             // Asynchronously fetch docs
-            if (indexPool.isQuiescent())
-                indexPool.submit(() -> force(className));
-            else
-                LOG.warning("Javadoc is already running, rejecting " + className + " for now");
+            indexPool.submit(() -> force(className));
 
             return EmptyRootDoc.INSTANCE;
         }
