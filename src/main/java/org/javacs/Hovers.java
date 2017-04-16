@@ -89,7 +89,7 @@ public class Hovers {
 
             return type.getQualifiedName().toString();
         }
-        else return el.toString();
+        else return el.asType().toString();
     }
 
     private static String params(List<? extends VariableElement> params) {
