@@ -2,7 +2,7 @@ package org.javacs.example;
 
 public class AutocompleteClasses {
     public static void test() {
-        S; // String
+        S;
     }
     
     public static class SomeInnerClass {

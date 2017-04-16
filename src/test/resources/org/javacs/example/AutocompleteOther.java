@@ -6,5 +6,9 @@ public class AutocompleteOther {
         A;
         AutocompleteMember.;
         AutocompleteOther.class.;
+        ArrayLis;
+        ArrayBlockingQueu;
+        ArrayIndexOutOfBoundsExceptio;
+        Array;
     }
 }

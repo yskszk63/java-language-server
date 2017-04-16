@@ -35,7 +35,7 @@ import java.util.stream.Stream;
 
 class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
-    int maxItems = 30;
+    int maxItems = 50;
     private Map<URI, VersionedContent> activeDocuments = new HashMap<>();
     private LanguageClient client;
 

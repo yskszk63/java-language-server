@@ -285,7 +285,7 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 6, 10);
 
         // String is in root scope, List is in import java.util.*
-        assertThat(suggestions, hasItems("AutocompleteOther", "AutocompleteMember", "ArrayList"));
+        assertThat(suggestions, hasItems("AutocompleteOther", "AutocompleteMember"));
     }
 
     @Test
@@ -293,7 +293,7 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteOther.java";
 
         // Name of class
-        List<? extends CompletionItem> items = items(file, 6, 10);
+        List<? extends CompletionItem> items = items(file, 9, 17);
 
         for (CompletionItem item : items) {
             if ("ArrayList".equals(item.getLabel())) {
@@ -330,7 +330,7 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteOther.java";
 
         // Name of class
-        List<? extends CompletionItem> items = items(file, 6, 10);
+        List<? extends CompletionItem> items = items(file, 11, 38);
 
         for (CompletionItem item : items) {
             if ("ArrayIndexOutOfBoundsException".equals(item.getLabel())) {
@@ -366,7 +366,7 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteOther.java";
 
         // Name of class
-        List<? extends CompletionItem> items = items(file, 6, 10);
+        List<? extends CompletionItem> items = items(file, 12, 14);
 
         for (CompletionItem item : items) {
             if ("Arrays".equals(item.getLabel())) {
@@ -384,7 +384,7 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteOther.java";
 
         // Name of class
-        List<? extends CompletionItem> items = items(file, 6, 10);
+        List<? extends CompletionItem> items = items(file, 10, 26);
 
         for (CompletionItem item : items) {
             if ("ArrayBlockingQueue".equals(item.getLabel())) {
@@ -451,7 +451,7 @@ public class CompletionsTest extends CompletionsBase {
         // Static methods
         Set<String> suggestions = insertText(file, 5, 10);
 
-        assertThat(suggestions, hasItems("String", "SomeInnerClass"));
+        assertThat(suggestions, hasItems("FixParseErrorAfter", "SomeInnerClass"));
     }
 
     @Test
@@ -486,7 +486,7 @@ public class CompletionsTest extends CompletionsBase {
         List<? extends CompletionItem> items = items(file, 5, 14);
         List<String> suggestions = Lists.transform(items, i -> i.getInsertText());
 
-        assertThat(suggestions, hasItems("AutocompleteConstructor<>", "AutocompleteMember", "ArrayList<>"));
+        assertThat(suggestions, hasItems("AutocompleteConstructor<>", "AutocompleteMember"));
 
         for (CompletionItem each : items) {
             if (each.getInsertText().equals("ArrayList"))

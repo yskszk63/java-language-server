@@ -249,6 +249,8 @@ public class Javadocs {
         }
     }
 
+    private final ForkJoinPool indexPool = new ForkJoinPool(1);
+
     /**
      * Get or compute the javadoc for `className`
      */
@@ -257,7 +259,10 @@ public class Javadocs {
             return topLevelClasses.get(className);
         else {
             // Asynchronously fetch docs
-            ForkJoinPool.commonPool().submit(() -> force(className));
+            if (indexPool.isQuiescent())
+                indexPool.submit(() -> force(className));
+            else
+                LOG.warning("Javadoc is already running, rejecting " + className + " for now");
 
             return EmptyRootDoc.INSTANCE;
         }
