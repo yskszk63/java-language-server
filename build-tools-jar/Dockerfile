@@ -30,6 +30,7 @@ RUN apt-get update \
     libfreetype6-dev \
     libasound2-dev \
     openjdk-7-jdk \
+    ant \
     ccache \
     zip \
     wget \
@@ -39,23 +40,15 @@ RUN apt-get update \
 && rm -rf /var/lib/apt/lists/*
 
 # Clone JDK8
-RUN mkdir -p /openjdk/jdk8u
-RUN hg clone http://hg.openjdk.java.net/jdk8u/jdk8u /openjdk/jdk8u
+RUN mkdir -p /langtools
+RUN hg clone http://hg.netbeans.org/main/nb-javac /langtools
 
-WORKDIR /openjdk/jdk8u
-RUN sh ./get_source.sh
-RUN sh ./make/scripts/hgforest.sh pull -u
+WORKDIR /langtools
 
 # Get build script
-COPY build.sh /bin/
-
-ENV JDK_BOOT_DIR=/usr/lib/jvm/java-1.7.0-openjdk-amd64
-
-RUN chmod +x configure \
-    && ./configure --with-target-bits=64 \
-        --with-freetype-include=/usr/include/freetype2/ \
-        --with-freetype-lib=/usr/lib/x86_64-linux-gnu \
-    && make langtools
+RUN hg checkout release801
+COPY build.properties /langtools/make/
+RUN ant -f make/build.xml
 
 # Default actions
 ENTRYPOINT sleep 1000
