@@ -2,6 +2,7 @@
 
 ## Polish
 * Status bar info during indexing
+* Format Javadoc HTML--see what vscode-java does
 
 ## Autocomplete
 * Annotation fields
