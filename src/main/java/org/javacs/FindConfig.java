@@ -185,7 +185,7 @@ class FindConfig {
         return config;
     }
 
-    public static Set<Path> buildClassPath(Path pomXml, boolean testScope, boolean sourceJars) {
+    private static Set<Path> buildClassPath(Path pomXml, boolean testScope, boolean sourceJars) {
         try {
             Objects.requireNonNull(pomXml, "pom.xml path is null");
 

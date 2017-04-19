@@ -1,6 +1,7 @@
 package org.javacs;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
@@ -76,11 +77,28 @@ public class SymbolIndex {
     }
 
     private void updateOpenFiles() {
-        // TODO
+        Map<JavacHolder, Map<URI, String>> open = new HashMap<>();
+
+        languageServer.activeDocuments().forEach((uri, content) -> {
+            languageServer.findCompiler(uri).ifPresent(compiler -> {
+                open.computeIfAbsent(compiler, __ -> new HashMap<>())
+                    .put(uri, content);
+            });
+        });
+
+        open.forEach((compiler, files) -> {
+            LOG.info("Update index for " + files.size() + " source files");
+
+            compiler.compileBatch(Maps.transformValues(files, Optional::of), this::createIndexer);
+        });
     }
 
     private void updateOpenFile(URI file) {
-        // TODO
+        languageServer.findCompiler(file).ifPresent(compiler -> {
+            LOG.info("Update index for " + file);
+
+            BatchResult compiled = compiler.compileBatch(Collections.singletonMap(file, languageServer.activeContent(file)), this::createIndexer);
+        });
     }
 
     /**

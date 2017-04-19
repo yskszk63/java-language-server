@@ -2,6 +2,7 @@ package org.javacs;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.RateLimiter;
 import com.sun.javadoc.ClassDoc;
 import com.sun.javadoc.ConstructorDoc;
@@ -412,6 +413,12 @@ class JavaLanguageServer implements LanguageServer {
                 .map(doc -> doc.content);
     }
 
+    Map<URI, String> activeDocuments() {
+        Map<URI, String> view = Maps.transformValues(activeDocuments, versioned -> versioned.content);
+
+        return Collections.unmodifiableMap(view);
+    }
+
     @Override
     public WorkspaceService getWorkspaceService() {
         return new WorkspaceService() {
@@ -514,7 +521,7 @@ class JavaLanguageServer implements LanguageServer {
     /**
      * Look for a configuration in a parent directory of uri
      */
-    private Optional<JavacHolder> findCompiler(URI uri) {
+    Optional<JavacHolder> findCompiler(URI uri) {
         if (testJavac.isPresent())
             return testJavac;
         else
