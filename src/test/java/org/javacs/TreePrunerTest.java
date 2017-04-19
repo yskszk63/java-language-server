@@ -15,7 +15,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.equalToIgnoringWhiteSpace;
 import static org.junit.Assert.assertThat;
 
-public class TreePrunerSpec {
+public class TreePrunerTest {
     private static final Logger LOG = Logger.getLogger("main");
 
     private JavacTask task(String source) {

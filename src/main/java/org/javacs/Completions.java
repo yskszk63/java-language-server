@@ -23,9 +23,9 @@ import java.util.stream.StreamSupport;
 
 class Completions {
 
-    static Stream<CompletionItem> at(FocusedResult compiled) {
+    static Stream<CompletionItem> at(FocusedResult compiled, SymbolIndex index) {
         return compiled.cursor
-                .map(path -> new Completions(compiled.task, compiled.classPath, compiled.sourcePath, path).get())
+                .map(path -> new Completions(compiled.task, compiled.classPath, index, path).get())
                 .orElseGet(Stream::empty);
     }
 

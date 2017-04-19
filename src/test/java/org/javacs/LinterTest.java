@@ -18,7 +18,7 @@ import static org.junit.Assert.assertThat;
 public class LinterTest {
     private static final Logger LOG = Logger.getLogger("main");
 
-    private static final JavacHolder compiler = JavacHolder.createWithoutIndex(
+    private static final JavacHolder compiler = JavacHolder.create(
             Collections.emptySet(),
             Collections.singleton(Paths.get("src/test/resources")),
             Paths.get("target/test-output")

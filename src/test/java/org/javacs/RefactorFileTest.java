@@ -200,7 +200,7 @@ public class RefactorFileTest {
     }
 
     private ParseResult file(String content) {
-        JavacHolder compiler = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.emptySet(), Paths.get("test-output"));
+        JavacHolder compiler = JavacHolder.create(Collections.emptySet(), Collections.emptySet(), Paths.get("test-output"));
 
         return compiler.parse(FAKE_FILE, Optional.of(content), error -> LOG.warning(error.toString()));
     }

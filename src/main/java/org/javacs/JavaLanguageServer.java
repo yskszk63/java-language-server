@@ -40,7 +40,7 @@ class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
     int maxItems = 50;
     private Map<URI, VersionedContent> activeDocuments = new HashMap<>();
-    private LanguageClient client;
+    private CompletableFuture<LanguageClient> client = new CompletableFuture<>();
 
     private final Map<JavacConfig, JavacHolder> compilerCache = new HashMap<>();
 
@@ -52,24 +52,23 @@ class JavaLanguageServer implements LanguageServer {
 
     private FindConfig findConfig;
 
+    private final SymbolIndex index = new SymbolIndex(this);
+
     JavaLanguageServer() {
         this.testJavac = Optional.empty();
     }
 
     JavaLanguageServer(JavacHolder testJavac) {
         this.testJavac = Optional.of(testJavac);
+
+        index.addConfig(testJavac.config()).join();
     }
 
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
         Path workspaceRoot = Paths.get(params.getRootPath()).toAbsolutePath().normalize();
 
-        findConfig = new FindConfig(workspaceRoot, testJavac.map(j -> new JavacConfig(
-            j.sourcePath, 
-            j.classPath, 
-            j.outputDirectory, 
-            CompletableFuture.completedFuture(Collections.emptySet())
-        )));
+        findConfig = new FindConfig(workspaceRoot, testJavac.map(JavacHolder::config));
 
         InitializeResult result = new InitializeResult();
 
@@ -115,7 +114,7 @@ class JavaLanguageServer implements LanguageServer {
 
                 List<CompletionItem> items = findCompiler(uri)
                         .map(compiler -> compiler.compileFocused(uri, content, line, character, true))
-                        .map(Completions::at)
+                        .map(result -> Completions.at(result, index))
                         .orElseGet(Stream::empty)
                         .limit(maxItems)
                         .collect(Collectors.toList());
@@ -196,13 +195,9 @@ class JavaLanguageServer implements LanguageServer {
                 LOG.info(String.format("definition at %s %d:%d", uri, line, character));
 
                 List<Location> locations = findCompiler(uri)
-                        .flatMap(compiler -> {
-                            FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
-
-                            return References.gotoDefinition(result, compiler.index);
-                        })
+                        .map(compiler -> compiler.compileFocused(uri, content, line, character, false))
+                        .flatMap(result -> References.gotoDefinition(result, index))
                         .map(Collections::singletonList)
-
                         .orElseGet(Collections::emptyList);
                 return CompletableFuture.completedFuture(locations);
             }
@@ -217,11 +212,8 @@ class JavaLanguageServer implements LanguageServer {
                 LOG.info(String.format("references at %s %d:%d", uri, line, character));
 
                 List<Location> locations = findCompiler(uri)
-                        .map(compiler -> {
-                            FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
-
-                            return References.findReferences(result, compiler.index);
-                        })
+                        .map(compiler -> compiler.compileFocused(uri, content, line, character, false))
+                        .map(result -> References.findReferences(result, index))
                         .orElseGet(Stream::empty)
                         .collect(Collectors.toList());
 
@@ -236,10 +228,7 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public CompletableFuture<List<? extends SymbolInformation>> documentSymbol(DocumentSymbolParams params) {
                 URI uri = URI.create(params.getTextDocument().getUri());
-                List<SymbolInformation> symbols = findCompiler(uri)
-                        .map(compiler -> compiler.searchFile(uri))
-                        .orElse(Stream.empty())
-                        .collect(Collectors.toList());
+                List<SymbolInformation> symbols = index.allInFile(uri).collect(Collectors.toList());
 
                 return CompletableFuture.completedFuture(symbols);
             }
@@ -259,7 +248,7 @@ class JavaLanguageServer implements LanguageServer {
                 LOG.info(String.format("codeAction at %s %d:%d", uri, line, character));
 
                 List<? extends Command> commands = findCompiler(uri)
-                        .map(compiler -> new CodeActions(compiler, uri, activeContent(uri), line, character).find(params))
+                        .map(compiler -> new CodeActions(compiler, uri, activeContent(uri), line, character, index).find(params))
                         .orElse(Collections.emptyList());
 
                 return CompletableFuture.completedFuture(commands);
@@ -325,8 +314,6 @@ class JavaLanguageServer implements LanguageServer {
                     }
 
                     activeDocuments.put(uri, new VersionedContent(newText, document.getVersion()));
-
-                    doIndexAsync(uri);
                 }
                 else LOG.warning("Ignored change with version " + document.getVersion() + " <= " + existing.version);
             }
@@ -391,30 +378,6 @@ class JavaLanguageServer implements LanguageServer {
         }
     }
 
-    /**
-     * In order to avoid generating a huge number of queued index operations when the user is typing furiously,
-     * only execute a single lint per-file at a time.
-     */
-    private final Map<URI, EvictingExecutor> indexPool = new HashMap<>();
-
-    private void doIndexAsync(URI uri) {
-        indexPool.computeIfAbsent(uri, this::newIndexExecutor)
-            .submit(() -> doIndex(uri));
-    }
-
-    private final ExecutorService indexExecutor = Executors.newSingleThreadExecutor();
-
-    private EvictingExecutor newIndexExecutor(URI ignored) {
-        // Index each file at most every 5s
-        return new EvictingExecutor(indexExecutor, RateLimiter.create(0.2));
-    }
-
-    private void doIndex(URI uri) {
-        LOG.info("Index " + uri);
-        
-        findCompiler(uri).ifPresent(c -> c.compileBatch(Collections.singletonMap(uri, activeContent(uri))));
-    }
-
     private void doLintAndIndex(Collection<URI> paths) {
         LOG.info("Lint " + Joiner.on(", ").join(paths));
 
@@ -444,7 +407,7 @@ class JavaLanguageServer implements LanguageServer {
     /**
      * Text of file, if it is in the active set
      */
-    private Optional<String> activeContent(URI file) {
+    Optional<String> activeContent(URI file) {
         return Optional.ofNullable(activeDocuments.get(file))
                 .map(doc -> doc.content);
     }
@@ -470,7 +433,7 @@ class JavaLanguageServer implements LanguageServer {
                                 List<TextEdit> edits = new RefactorFile(compiled.task, compiled.compilationUnit)
                                         .addImport(packageName, className);
 
-                                client.applyEdit(new ApplyWorkspaceEditParams(new WorkspaceEdit(
+                                client.join().applyEdit(new ApplyWorkspaceEditParams(new WorkspaceEdit(
                                         Collections.singletonMap(fileString, edits),
                                         null
                                 )));
@@ -490,10 +453,7 @@ class JavaLanguageServer implements LanguageServer {
                 Collection<JavacHolder> compilers = testJavac
                         .map(javac -> (Collection<JavacHolder>) Collections.singleton(javac))
                         .orElseGet(compilerCache::values);
-                List<SymbolInformation> infos = compilers.stream()
-                        .flatMap(compiler -> compiler.searchWorkspace(params.getQuery()))
-                        .limit(maxItems)
-                        .collect(Collectors.toList());
+                List<SymbolInformation> infos = index.search(params.getQuery()).collect(Collectors.toList());
 
                 return CompletableFuture.completedFuture(infos);
             }
@@ -527,7 +487,7 @@ class JavaLanguageServer implements LanguageServer {
         };
     }
     
-    private void publishDiagnostics(Collection<URI> touched, List<javax.tools.Diagnostic<? extends JavaFileObject>> diagnostics) {
+    void publishDiagnostics(Collection<URI> touched, List<javax.tools.Diagnostic<? extends JavaFileObject>> diagnostics) {
         Map<URI, PublishDiagnosticsParams> files = new HashMap<>();
 
         touched.forEach(p -> files.put(p, newPublishDiagnostics(p)));
@@ -539,7 +499,7 @@ class JavaLanguageServer implements LanguageServer {
             Lints.convert(error).ifPresent(publish.getDiagnostics()::add);
         }
 
-        files.values().forEach(d -> client.publishDiagnostics(d));
+        client.thenAccept(resolved -> files.values().forEach(resolved::publishDiagnostics));
     }
 
     private PublishDiagnosticsParams newPublishDiagnostics(URI newUri) {
@@ -584,6 +544,9 @@ class JavaLanguageServer implements LanguageServer {
     private JavacHolder newJavac(JavacConfig c) {
         Javadocs.addSourcePath(c.sourcePath);
 
+        // Add this project directory to SymbolIndex
+        index.addConfig(c);
+
         // When docPath resolves, add it to Javadocs
         c.docPath.thenAccept(Javadocs::addSourcePath);
 
@@ -607,8 +570,8 @@ class JavaLanguageServer implements LanguageServer {
                 });
     }
 
-    public void installClient(LanguageClient client) {
-        this.client = client;
+    void installClient(LanguageClient client) {
+        this.client.complete(client);
 
         Logger.getLogger("").addHandler(new Handler() {
             @Override

@@ -11,13 +11,11 @@ class FocusedResult {
     final Optional<TreePath> cursor;
     final JavacTask task;
     final ClassPathIndex classPath;
-    final SymbolIndex sourcePath;
 
-    FocusedResult(CompilationUnitTree compilationUnit, Optional<TreePath> cursor, JavacTask task, ClassPathIndex classPath, SymbolIndex sourcePath) {
+    FocusedResult(CompilationUnitTree compilationUnit, Optional<TreePath> cursor, JavacTask task, ClassPathIndex classPath) {
         this.compilationUnit = compilationUnit;
         this.cursor = cursor;
         this.task = task;
         this.classPath = classPath;
-        this.sourcePath = sourcePath;
     }
 }

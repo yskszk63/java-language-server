@@ -4,7 +4,10 @@ import com.google.common.collect.ImmutableList;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TaskEvent;
+import com.sun.source.util.TaskEvent.Kind;
+import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.api.JavacTool;
+import java.util.EnumMap;
 import org.junit.Test;
 
 import javax.lang.model.element.Element;
@@ -46,14 +49,14 @@ public class JavaCompilerTest {
 
     @Test
     public void javacHolder() {
-        JavacHolder javac = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target/test-output"));
+        JavacHolder javac = JavacHolder.create(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target/test-output"));
         File file = Paths.get("src/test/resources/org/javacs/example/Bad.java").toFile();
         BatchResult compile = javac.compileBatch(Collections.singletonMap(file.toURI(), Optional.empty()));
     }
 
     @Test
     public void incremental() {
-        JavacHolder javac = JavacHolder.createWithoutIndex(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target/test-output"));
+        JavacHolder javac = JavacHolder.create(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target/test-output"));
 
         // Compile Target to a .class file
         File target = Paths.get("src/test/resources/org/javacs/example/Target.java").toFile();
@@ -61,9 +64,19 @@ public class JavaCompilerTest {
 
         // Incremental compilation should use Target.class, not Target.java
         File dependsOnTarget = Paths.get("src/test/resources/org/javacs/example/DependsOnTarget.java").toFile();
-        FocusedResult incremental = javac.compileFocused(dependsOnTarget.toURI(), Optional.empty(), 5, 27, true);
+        EnumMap<TaskEvent.Kind, Integer> counts = new EnumMap<>(TaskEvent.Kind.class);
+        FocusedResult incremental = javac.compileFocused(dependsOnTarget.toURI(), Optional.empty(), 5, 27, true, task -> new TaskListener() {
+            @Override
+            public void started(TaskEvent event) {
+                counts.put(event.getKind(), counts.getOrDefault(event.getKind(), 0) + 1);
+            }
 
-        assertThat(javac.profile().get(TaskEvent.Kind.PARSE).keySet(), hasSize(1));
+            @Override
+            public void finished(TaskEvent event) {
+            }
+        });
+
+        assertThat(counts.get(TaskEvent.Kind.PARSE), equalTo(1));
 
         // Check that we can find org.javacs.example.Target
         TypeElement targetClass = incremental.task.getElements().getTypeElement("org.javacs.example.Target");

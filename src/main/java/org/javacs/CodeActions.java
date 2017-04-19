@@ -22,8 +22,9 @@ class CodeActions {
     private final Optional<String> textContent;
     private final JavacTask task;
     private final CompilationUnitTree source;
+    private final SymbolIndex index;
 
-    CodeActions(JavacHolder compiler, URI file, Optional<String> textContent, int line, int character) {
+    CodeActions(JavacHolder compiler, URI file, Optional<String> textContent, int line, int character, SymbolIndex index) {
         this.compiler = compiler;
         this.file = file;
         this.textContent = textContent;
@@ -32,6 +33,7 @@ class CodeActions {
 
         this.task = compile.task;
         this.source = compile.compilationUnit;
+        this.index = index;
     }
 
     public List<Command> find(CodeActionParams params) {
@@ -58,7 +60,7 @@ class CodeActions {
      * Search for symbols on the classpath and sourcepath that match name
      */
     private Stream<Command> addImportActions(String name) {
-        Stream<Command> sourcePath = compiler.index.allSymbols(ElementKind.CLASS)
+        Stream<Command> sourcePath = index.allSymbols(ElementKind.CLASS)
                 .filter(symbol -> symbol.getName().equals(name))
                 .map(symbol -> importClassCommand(symbol.getContainerName(), symbol.getName()));
         Stream<Command> classPath = compiler.classPathIndex.topLevelClasses(name, source.getPackageName().toString())

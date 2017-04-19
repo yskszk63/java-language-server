@@ -87,7 +87,7 @@ public class SymbolUnderCursorTest {
     private static JavacHolder compiler = newCompiler();
 
     private static JavacHolder newCompiler() {
-        return JavacHolder.createWithoutIndex(
+        return JavacHolder.create(
                 Collections.emptySet(),
                 Collections.singleton(Paths.get("src/test/resources")),
                 Paths.get("target/test-output")

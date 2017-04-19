@@ -13,6 +13,7 @@ import com.sun.tools.javac.api.JavacTaskImpl;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.util.Options;
+import java.util.function.Function;
 import org.eclipse.lsp4j.SymbolInformation;
 
 import javax.lang.model.element.Element;
@@ -43,29 +44,35 @@ import java.util.stream.Stream;
 public class JavacHolder {
 
     public static JavacHolder create(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
-        return new JavacHolder(classPath, sourcePath, outputDirectory, true);
+        return new JavacHolder(classPath, sourcePath, outputDirectory);
     }
 
-    public static JavacHolder createWithoutIndex(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
-        return new JavacHolder(classPath, sourcePath, outputDirectory, false);
-    }
+    private static final TaskListener EMPTY_TASK_LISTENER = new TaskListener() {
+        @Override
+        public void started(TaskEvent e) {
+        }
 
+        @Override
+        public void finished(TaskEvent e) {
+        }
+    };
+         
     /**
      * Compile a single file, without updating the index.
      *
      * As an optimization, this function may ignore code not accessible to the cursor.
      */
     public FocusedResult compileFocused(URI file, Optional<String> textContent, int line, int column, boolean pruneStatements) {
-        initialIndexComplete.join();
+        return compileFocused(file, textContent, line, column, pruneStatements, __ -> EMPTY_TASK_LISTENER);
+    }
 
-        profile.clear();
-
+    public FocusedResult compileFocused(URI file, Optional<String> textContent, int line, int column, boolean pruneStatements, Function<JavacTask, TaskListener> listener) {
         JavaFileObject fileObject = findFile(file, textContent);
 
         if (pruneStatements)
             fileObject = TreePruner.putSemicolonAfterCursor(fileObject, line, column);
 
-        JavacTask task = createTask(Collections.singleton(fileObject), true);
+        JavacTask task = createTask(Collections.singleton(fileObject), true, listener);
 
         try {
             Iterable<? extends CompilationUnitTree> parse = task.parse();
@@ -87,20 +94,7 @@ public class JavacHolder {
 
             Optional<TreePath> cursor = FindCursor.find(task, compilationUnit, line, column);
 
-            profile.forEach((kind, files) -> {
-                long elapsed = files.values().stream()
-                        .mapToLong(p -> p.elapsed().toMillis())
-                        .sum();
-
-                LOG.info(String.format(
-                        "%s\t%d ms\t%d files",
-                        kind.name(),
-                        elapsed,
-                        files.size()
-                ));
-            });
-
-            return new FocusedResult(compilationUnit, cursor, task, classPathIndex, index);
+            return new FocusedResult(compilationUnit, cursor, task, classPathIndex);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -112,9 +106,11 @@ public class JavacHolder {
      * If these files reference un-compiled dependencies, those dependencies will also be parsed and compiled.
      */
     public BatchResult compileBatch(Map<URI, Optional<String>> files) {
-        initialIndexComplete.join();
+        return compileBatch(files, __ -> EMPTY_TASK_LISTENER);
+    }
 
-        return doCompile(files);
+    public BatchResult compileBatch(Map<URI, Optional<String>> files, Function<JavacTask, TaskListener> listener) {
+        return doCompile(files, listener);
     }
 
     private static final Logger LOG = Logger.getLogger("main");
@@ -165,27 +161,12 @@ public class JavacHolder {
      */
     private DiagnosticListener<JavaFileObject> onErrorDelegate = diagnostic -> {};
 
-    // Set up SymbolIndex
-
-    /**
-     * Index of symbols that gets updated every time you call compileBatch
-     */
-    public final SymbolIndex index;
-
-    // TODO pause indexing rather than waiting for it to finish
-    /**
-     * Completes when initial index is done. Useful for testing.
-     */
-    private final CompletableFuture<Void> initialIndexComplete;
-
     public final ClassPathIndex classPathIndex;
 
-    private JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory, boolean index) {
+    private JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
         this.classPath = Collections.unmodifiableSet(classPath);
         this.sourcePath = Collections.unmodifiableSet(sourcePath);
         this.outputDirectory = outputDirectory;
-        this.index = new SymbolIndex();
-        this.initialIndexComplete = index ? startIndexingSourcePath() : CompletableFuture.completedFuture(null);
         this.classPathIndex = new ClassPathIndex(classPath);
 
         ensureOutputDirectory(outputDirectory);
@@ -221,13 +202,7 @@ public class JavacHolder {
         }
     }
 
-    private final EnumMap<TaskEvent.Kind, Map<URI, Profile>> profile = new EnumMap<>(TaskEvent.Kind.class);
-
-    Map<TaskEvent.Kind, Map<URI, Profile>> profile() {
-        return Collections.unmodifiableMap(profile);
-    }
-
-    private JavacTask createTask(Collection<JavaFileObject> files, boolean incremental) {
+    private JavacTask createTask(Collection<JavaFileObject> files, boolean incremental, Function<JavacTask, TaskListener> createListener) {
         Set<URI> uris = files.stream().map(JavaFileObject::toUri).collect(Collectors.toSet());
         JavaFileManager fileManager = incremental ? incrementalFileManager : batchFileManager;
         JavacTask result = javac.getTask(null, fileManager, this::onError, options(incremental), null, files);
@@ -237,71 +212,40 @@ public class JavacHolder {
         // Better stack traces inside javac
         options.put("dev", "");
 
-        if (incremental) {
-            result.addTaskListener(new TaskListener() {
-                @Override
-                public void started(TaskEvent e) {
-                    profile.computeIfAbsent(e.getKind(), newKind -> new HashMap<>())
-                            .put(e.getSourceFile().toUri(), new Profile());
-                }
+        // Call back on events
+        result.addTaskListener(createListener.apply(result));
 
-                @Override
-                public void finished(TaskEvent e) {
-                    profile.get(e.getKind())
-                            .get(e.getSourceFile().toUri()).finished = Optional.of(Instant.now());
+        // Record timing
+        EnumMap<TaskEvent.Kind, Map<URI, Profile>> profile = new EnumMap<>(TaskEvent.Kind.class);
 
-                    if (!uris.contains(e.getSourceFile().toUri()))
-                        new TreePruner(result).removeNonCursorMethodBodies(e.getCompilationUnit(), 1, 1);
-                }
-            });
-        }
+        result.addTaskListener(new TaskListener() {
+            @Override
+            public void started(TaskEvent e) {
+                profile.computeIfAbsent(e.getKind(), newKind -> new HashMap<>())
+                        .put(e.getSourceFile().toUri(), new Profile());
+            }
+
+            @Override
+            public void finished(TaskEvent e) {
+                profile.get(e.getKind())
+                        .get(e.getSourceFile().toUri()).finished = Optional.of(Instant.now());
+            }
+        });
+
+        profile.forEach((kind, timed) -> {
+            long elapsed = timed.values().stream()
+                    .mapToLong(p -> p.elapsed().toMillis())
+                    .sum();
+
+            LOG.info(String.format(
+                    "%s\t%d ms\t%d files",
+                    kind.name(),
+                    elapsed,
+                    timed.size()
+            ));
+        });
 
         return result;
-    }
-
-    /**
-     * Index exported declarations and references for all files on the source path
-     * This may take a while, so we'll do it on an extra thread
-     */
-    private CompletableFuture<Void> startIndexingSourcePath() {
-        return CompletableFuture.runAsync(new Runnable() {
-            @Override
-            public void run() {
-                List<URI> objects = new ArrayList<>();
-
-                // Parse each file
-                sourcePath.forEach(s -> findAllFiles(s, objects));
-
-                LOG.info("Index " + objects.size() + " source files");
-
-                // Compile all parsed files
-                Map<URI, Optional<String>> files = objects.stream().collect(Collectors.toMap(key -> key, key -> Optional.empty()));
-                BatchResult result = doCompile(files);
-
-                // TODO minimize memory use during this process
-                // Instead of doing parse-all / compileFileObjects-all,
-                // queue all files, then do parse / compileFileObjects on each
-                // If invoked correctly, javac should avoid reparsing the same file twice
-                // Then, use the same mechanism as the desugar / generate phases to remove method bodies,
-                // to reclaim memory as we go
-
-                // TODO verify that compiler and all its resources get destroyed
-            }
-
-            /**
-             * Look for .java files and invalidate them
-             */
-            private void findAllFiles(Path path, List<URI> uris) {
-                if (Files.isDirectory(path)) try {
-                    Files.list(path).forEach(p -> findAllFiles(p, uris));
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-                else if (path.getFileName().toString().endsWith(".java")) {
-                    uris.add(path.toUri());
-                }
-            }
-        }, command -> new Thread(command, "InitialIndex").start());
     }
 
     /** 
@@ -323,33 +267,17 @@ public class JavacHolder {
         return option.map(Stream::of).orElseGet(Stream::empty);
     }
 
-    public Stream<SymbolInformation> searchWorkspace(String query) {
-        initialIndexComplete.join();
-
-        return index.search(query);
-    }
-
-    public Stream<SymbolInformation> searchFile(URI file) {
-        initialIndexComplete.join();
-
-        return index.allInFile(file);
-    }
-
     /**
      * File has been deleted
      */
     // TODO delete multiple objects apply the same time for performance if user does that
     public BatchResult delete(URI uri) {
-        initialIndexComplete.join();
-
         JavaFileObject object = findFile(uri, Optional.empty());
         Map<URI, Optional<String>> deps = dependencies(Collections.singleton(object))
                 .stream()
                 .collect(Collectors.toMap(o -> o.toUri(), o -> Optional.empty()));
 
-        index.clear(uri);
-
-        return compileBatch(deps);
+        return compileBatch(deps, __ -> EMPTY_TASK_LISTENER);
     }
 
     // TODO this should return Optional.empty() file URI is not file: and text is empty
@@ -377,7 +305,7 @@ public class JavacHolder {
 
     public ParseResult parse(URI file, Optional<String> textContent, DiagnosticListener<JavaFileObject> onError) {
         JavaFileObject object = findFile(file, textContent);
-        JavacTask task = createTask(Collections.singleton(object), false);
+        JavacTask task = createTask(Collections.singleton(object), false, __ -> EMPTY_TASK_LISTENER);
         onErrorDelegate = onError;
 
         try {
@@ -396,7 +324,7 @@ public class JavacHolder {
         }
     }
 
-    private BatchResult doCompile(Map<URI, Optional<String>> files) {
+    private BatchResult doCompile(Map<URI, Optional<String>> files, Function<JavacTask, TaskListener> createListener) {
         // TODO remove all URIs from fileManager
         
         List<JavaFileObject> objects = files
@@ -407,16 +335,21 @@ public class JavacHolder {
 
         objects.addAll(dependencies(objects));
 
-        JavacTask task = createTask(objects, false);
+        JavacTask task = createTask(objects, false, createListener);
 
         try {
             DiagnosticCollector<JavaFileObject> errors = startCollectingErrors();
             Iterable<? extends CompilationUnitTree> parse = task.parse();
 
+            // TODO minimize memory use during this process
+            // Instead of doing parse-all / compileFileObjects-all,
+            // queue all files, then do parse / compileFileObjects on each
+            // If invoked correctly, javac should avoid reparsing the same file twice
+            // Then, use the same mechanism as the desugar / generate phases to remove method bodies,
+            // to reclaim memory as we go
+
             try {
                 Iterable<? extends Element> analyze = task.analyze();
-
-                parse.forEach(tree -> index.update(tree, task));
             } catch (AssertionError e) {
                 if (!catchJavacError(e))
                     throw e;
@@ -433,6 +366,7 @@ public class JavacHolder {
         }
     }
 
+    // TODO is this necessary now that we use netbeans javac?
     private boolean catchJavacError(AssertionError e) {
         if (e.getStackTrace().length > 0 && e.getStackTrace()[0].getClassName().startsWith("com.sun.tools.javac")) {
             LOG.log(Level.WARNING, "Failed analyze phase", e);
@@ -445,5 +379,14 @@ public class JavacHolder {
     private Collection<JavaFileObject> dependencies(Collection<JavaFileObject> files) {
         // TODO use index to find dependencies
         return Collections.emptyList();
+    }
+
+    JavacConfig config() {
+        return new JavacConfig(
+            this.sourcePath, 
+            this.classPath, 
+            this.outputDirectory, 
+            CompletableFuture.completedFuture(Collections.emptySet())
+        );
     }
 }

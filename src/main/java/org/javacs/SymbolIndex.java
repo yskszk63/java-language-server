@@ -1,7 +1,17 @@
 package org.javacs;
 
+import com.google.common.base.Joiner;
+import com.google.common.collect.Sets;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
+import com.sun.source.util.TaskEvent.Kind;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 import org.eclipse.lsp4j.*;
 
 import javax.lang.model.element.Element;
@@ -20,15 +30,104 @@ import java.util.stream.Stream;
  * such as classes, methods, and fields.
  */
 public class SymbolIndex {
+
+    /**
+     * Parent language server
+     */
+    private final JavaLanguageServer languageServer;
+
     /**
      * Source path files, for which we support methods and classes
      */
-    private Map<URI, SourceFileIndex> sourcePath = new HashMap<>();
+    private final Map<URI, SourceFileIndex> sourcePathFiles = new HashMap<>();
+
+    SymbolIndex(JavaLanguageServer languageServer) {
+        this.languageServer = languageServer;
+    }
+
+    CompletableFuture<?> addConfig(JavacConfig config) {
+        Set<URI> sources = config.sourcePath.stream()
+            .flatMap(this::findAllSources)
+            .collect(Collectors.toSet());
+
+        return index(sources, config);
+    }
+
+    private CompletableFuture<?> indexQueue = CompletableFuture.completedFuture(null);
+
+    /**
+     * Index exported declarations and references for all files on the source path
+     * This may take a while, so we'll do it on an extra thread
+     */
+    private CompletableFuture<?> index(Set<URI> sources, JavacConfig config) {
+        LOG.info("Index " + sources.size() + " sources in " + Joiner.on(", ").join(config.sourcePath));
+        
+        Map<URI, Optional<String>> active = sources.stream()
+            .collect(Collectors.toMap(key -> key, languageServer::activeContent));
+
+        indexQueue = indexQueue.thenRun(() -> {
+            BatchResult compiled = JavacHolder.create(config.classPath, config.sourcePath, config.outputDirectory)
+                .compileBatch(active, this::createIndexer);
+            
+            languageServer.publishDiagnostics(sources, compiled.errors.getDiagnostics());
+        });
+
+        return indexQueue;
+    }
+
+    private void updateOpenFiles() {
+        // TODO
+    }
+
+    private void updateOpenFile(URI file) {
+        // TODO
+    }
+
+    /**
+     * Look for .java files
+     */
+    private Stream<URI> findAllSources(Path dir) {
+        // TODO make this lazy
+        Set<URI> result = new HashSet<>();
+        
+        doFindAllSources(dir, result);
+        
+        return result.stream();
+    }
+
+    private void doFindAllSources(Path path, Set<URI> uris) {
+        if (Files.isDirectory(path)) try {
+            Files.list(path).forEach(p -> doFindAllSources(p, uris));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        else if (path.getFileName().toString().endsWith(".java")) {
+            uris.add(path.toUri());
+        }
+    }
+
+    private TaskListener createIndexer(JavacTask task) {
+        return new TaskListener() {
+            @Override
+            public void started(TaskEvent event) {
+
+            }
+
+            @Override
+            public void finished(TaskEvent event) {
+                if (event.getKind() == Kind.ENTER) {
+                    update(event.getCompilationUnit(), task);
+                }
+            }
+        };
+    }
 
     /**
      * Search all indexed symbols
      */
     public Stream<SymbolInformation> search(String query) {
+        updateOpenFiles();
+
         Stream<SymbolInformation> classes = allSymbols(ElementKind.CLASS);
         Stream<SymbolInformation> methods = allSymbols(ElementKind.METHOD);
 
@@ -40,7 +139,9 @@ public class SymbolIndex {
      * Get all symbols in an open file
      */
     public Stream<SymbolInformation> allInFile(URI source) {
-        SourceFileIndex index = sourcePath.getOrDefault(source, new SourceFileIndex());
+        updateOpenFile(source);
+
+        SourceFileIndex index = sourcePathFiles.getOrDefault(source, new SourceFileIndex());
 
         return index.declarations.values().stream().flatMap(map -> map.values().stream());
     }
@@ -49,7 +150,9 @@ public class SymbolIndex {
      * All indexed symbols of a kind
      */
     public Stream<SymbolInformation> allSymbols(ElementKind kind) {
-        return sourcePath.values().stream().flatMap(f -> allSymbolsInFile(f, kind));
+        updateOpenFiles();
+
+        return sourcePathFiles.values().stream().flatMap(f -> allSymbolsInFile(f, kind));
     }
 
     private Stream<SymbolInformation> allSymbolsInFile(SourceFileIndex f, ElementKind kind) {
@@ -62,9 +165,11 @@ public class SymbolIndex {
      * Find all references to a symbol
      */
     public Stream<Location> references(Element symbol) {
+        updateOpenFiles();
+
         String key = qualifiedName(symbol);
 
-        return sourcePath.values().stream().flatMap(f -> {
+        return sourcePathFiles.values().stream().flatMap(f -> {
             Map<String, Set<Location>> bySymbol = f.references.getOrDefault(symbol.getKind(), Collections.emptyMap());
             Set<Location> locations = bySymbol.getOrDefault(key, Collections.emptySet());
 
@@ -73,10 +178,12 @@ public class SymbolIndex {
     }
 
     public Optional<SymbolInformation> find(Element symbol) {
+        updateOpenFiles();
+
         ElementKind kind = symbol.getKind();
         String key = qualifiedName(symbol);
 
-        for (SourceFileIndex f : sourcePath.values()) {
+        for (SourceFileIndex f : sourcePathFiles.values()) {
             Map<String, SymbolInformation> withKind = f.declarations.getOrDefault(kind, Collections.emptyMap());
 
             if (withKind.containsKey(key))
@@ -159,7 +266,7 @@ public class SymbolIndex {
     /**
      * Update a file in the index
      */
-    public void update(CompilationUnitTree compilationUnit, JavacTask task) {
+    private void update(CompilationUnitTree compilationUnit, JavacTask task) {
         Trees trees = Trees.instance(task);
         URI file = compilationUnit.getSourceFile().toUri();
         SourceFileIndex index = new SourceFileIndex();
@@ -264,7 +371,7 @@ public class SymbolIndex {
             }
         }.scan(compilationUnit, null);
 
-        sourcePath.put(file, index);
+        sourcePathFiles.put(file, index);
     }
 
     private static Optional<Location> findPath(TreePath path, Trees trees) {
@@ -421,7 +528,7 @@ public class SymbolIndex {
      * Clear a file from the index when it is deleted or is about to be re-indexed
      */
     public void clear(URI file) {
-        sourcePath.remove(file);
+        sourcePathFiles.remove(file);
     }
 
     private static final Logger LOG = Logger.getLogger("main");
