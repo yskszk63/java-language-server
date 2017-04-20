@@ -349,7 +349,7 @@ class Completions {
                 .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
         Stream<TypeElement> sourcePathClasses = sourcePathClasses(partialIdentifier);
         Stream<TypeElement> classPathItems = classPath.topLevelClasses(partialIdentifier, packageOf(scope))
-                .flatMap(this::tryLoad);
+                .flatMap(this::tryLoad); // TODO this takes as much time as compileFocused, try to resolve using Class<?> without converting to TypeElement
 
         return Stream.concat(sourcePathItems, Stream.concat(sourcePathClasses, classPathItems));
     }
