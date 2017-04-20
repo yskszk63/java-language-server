@@ -68,7 +68,7 @@ public class SymbolIndex {
 
         indexQueue = indexQueue.thenRun(() -> {
             BatchResult compiled = JavacHolder.create(config.classPath, config.sourcePath, config.outputDirectory)
-                .compileBatch(active, this::createIndexer);
+                .compileBatch(active, this::update);
             
             languageServer.publishDiagnostics(sources, compiled.errors.getDiagnostics());
         });
@@ -89,7 +89,7 @@ public class SymbolIndex {
         open.forEach((compiler, files) -> {
             LOG.info("Update index for " + files.size() + " source files");
 
-            compiler.compileBatch(Maps.transformValues(files, Optional::of), this::createIndexer);
+            compiler.compileBatch(Maps.transformValues(files, Optional::of), this::update);
         });
     }
 
@@ -97,7 +97,7 @@ public class SymbolIndex {
         languageServer.findCompiler(file).ifPresent(compiler -> {
             LOG.info("Update index for " + file);
 
-            BatchResult compiled = compiler.compileBatch(Collections.singletonMap(file, languageServer.activeContent(file)), this::createIndexer);
+            BatchResult compiled = compiler.compileBatch(Collections.singletonMap(file, languageServer.activeContent(file)), this::update);
         });
     }
 
@@ -122,22 +122,6 @@ public class SymbolIndex {
         else if (path.getFileName().toString().endsWith(".java")) {
             uris.add(path.toUri());
         }
-    }
-
-    private TaskListener createIndexer(JavacTask task) {
-        return new TaskListener() {
-            @Override
-            public void started(TaskEvent event) {
-
-            }
-
-            @Override
-            public void finished(TaskEvent event) {
-                if (event.getKind() == Kind.ENTER) {
-                    update(event.getCompilationUnit(), task);
-                }
-            }
-        };
     }
 
     /**
@@ -284,7 +268,7 @@ public class SymbolIndex {
     /**
      * Update a file in the index
      */
-    private void update(CompilationUnitTree compilationUnit, JavacTask task) {
+    private void update(JavacTask task, CompilationUnitTree compilationUnit) {
         Trees trees = Trees.instance(task);
         URI file = compilationUnit.getSourceFile().toUri();
         SourceFileIndex index = new SourceFileIndex();

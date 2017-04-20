@@ -13,6 +13,7 @@ import com.sun.tools.javac.api.JavacTaskImpl;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.util.Options;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import org.eclipse.lsp4j.SymbolInformation;
 
@@ -46,16 +47,6 @@ public class JavacHolder {
     public static JavacHolder create(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
         return new JavacHolder(classPath, sourcePath, outputDirectory);
     }
-
-    private static final TaskListener EMPTY_TASK_LISTENER = new TaskListener() {
-        @Override
-        public void started(TaskEvent e) {
-        }
-
-        @Override
-        public void finished(TaskEvent e) {
-        }
-    };
          
     /**
      * Compile a single file, without updating the index.
@@ -63,16 +54,29 @@ public class JavacHolder {
      * As an optimization, this function may ignore code not accessible to the cursor.
      */
     public FocusedResult compileFocused(URI file, Optional<String> textContent, int line, int column, boolean pruneStatements) {
-        return compileFocused(file, textContent, line, column, pruneStatements, __ -> EMPTY_TASK_LISTENER);
-    }
-
-    public FocusedResult compileFocused(URI file, Optional<String> textContent, int line, int column, boolean pruneStatements, Function<JavacTask, TaskListener> listener) {
         JavaFileObject fileObject = findFile(file, textContent);
 
         if (pruneStatements)
             fileObject = TreePruner.putSemicolonAfterCursor(fileObject, line, column);
 
-        JavacTask task = createTask(Collections.singleton(fileObject), true, listener);
+        JavacTask task = createTask(Collections.singleton(fileObject), true);
+
+        // Record timing
+        EnumMap<TaskEvent.Kind, Map<URI, Profile>> profile = new EnumMap<>(TaskEvent.Kind.class);
+
+        task.addTaskListener(new TaskListener() {
+            @Override
+            public void started(TaskEvent e) {
+                profile.computeIfAbsent(e.getKind(), newKind -> new HashMap<>())
+                        .put(e.getSourceFile().toUri(), new Profile());
+            }
+
+            @Override
+            public void finished(TaskEvent e) {
+                profile.get(e.getKind())
+                        .get(e.getSourceFile().toUri()).finished = Optional.of(Instant.now());
+            }
+        });
 
         try {
             Iterable<? extends CompilationUnitTree> parse = task.parse();
@@ -92,6 +96,20 @@ public class JavacHolder {
                     throw e;
             }
 
+            // Log timing
+            profile.forEach((kind, timed) -> {
+                long elapsed = timed.values().stream()
+                        .mapToLong(p -> p.elapsed().toMillis())
+                        .sum();
+
+                LOG.info(String.format(
+                        "%s\t%d ms\t%d files",
+                        kind.name(),
+                        elapsed,
+                        timed.size()
+                ));
+            });
+
             Optional<TreePath> cursor = FindCursor.find(task, compilationUnit, line, column);
 
             return new FocusedResult(compilationUnit, cursor, task, classPathIndex);
@@ -106,10 +124,10 @@ public class JavacHolder {
      * If these files reference un-compiled dependencies, those dependencies will also be parsed and compiled.
      */
     public BatchResult compileBatch(Map<URI, Optional<String>> files) {
-        return compileBatch(files, __ -> EMPTY_TASK_LISTENER);
+        return compileBatch(files, (task, tree) -> {});
     }
 
-    public BatchResult compileBatch(Map<URI, Optional<String>> files, Function<JavacTask, TaskListener> listener) {
+    public BatchResult compileBatch(Map<URI, Optional<String>> files, BiConsumer<JavacTask, CompilationUnitTree> listener) {
         return doCompile(files, listener);
     }
 
@@ -202,8 +220,7 @@ public class JavacHolder {
         }
     }
 
-    private JavacTask createTask(Collection<JavaFileObject> files, boolean incremental, Function<JavacTask, TaskListener> createListener) {
-        Set<URI> uris = files.stream().map(JavaFileObject::toUri).collect(Collectors.toSet());
+    private JavacTask createTask(Collection<JavaFileObject> files, boolean incremental) {
         JavaFileManager fileManager = incremental ? incrementalFileManager : batchFileManager;
         JavacTask result = javac.getTask(null, fileManager, this::onError, options(incremental), null, files);
         JavacTaskImpl impl = (JavacTaskImpl) result;
@@ -211,39 +228,6 @@ public class JavacHolder {
 
         // Better stack traces inside javac
         options.put("dev", "");
-
-        // Call back on events
-        result.addTaskListener(createListener.apply(result));
-
-        // Record timing
-        EnumMap<TaskEvent.Kind, Map<URI, Profile>> profile = new EnumMap<>(TaskEvent.Kind.class);
-
-        result.addTaskListener(new TaskListener() {
-            @Override
-            public void started(TaskEvent e) {
-                profile.computeIfAbsent(e.getKind(), newKind -> new HashMap<>())
-                        .put(e.getSourceFile().toUri(), new Profile());
-            }
-
-            @Override
-            public void finished(TaskEvent e) {
-                profile.get(e.getKind())
-                        .get(e.getSourceFile().toUri()).finished = Optional.of(Instant.now());
-            }
-        });
-
-        profile.forEach((kind, timed) -> {
-            long elapsed = timed.values().stream()
-                    .mapToLong(p -> p.elapsed().toMillis())
-                    .sum();
-
-            LOG.info(String.format(
-                    "%s\t%d ms\t%d files",
-                    kind.name(),
-                    elapsed,
-                    timed.size()
-            ));
-        });
 
         return result;
     }
@@ -277,7 +261,7 @@ public class JavacHolder {
                 .stream()
                 .collect(Collectors.toMap(o -> o.toUri(), o -> Optional.empty()));
 
-        return compileBatch(deps, __ -> EMPTY_TASK_LISTENER);
+        return compileBatch(deps);
     }
 
     // TODO this should return Optional.empty() file URI is not file: and text is empty
@@ -305,7 +289,7 @@ public class JavacHolder {
 
     public ParseResult parse(URI file, Optional<String> textContent, DiagnosticListener<JavaFileObject> onError) {
         JavaFileObject object = findFile(file, textContent);
-        JavacTask task = createTask(Collections.singleton(object), false, __ -> EMPTY_TASK_LISTENER);
+        JavacTask task = createTask(Collections.singleton(object), false);
         onErrorDelegate = onError;
 
         try {
@@ -324,7 +308,7 @@ public class JavacHolder {
         }
     }
 
-    private BatchResult doCompile(Map<URI, Optional<String>> files, Function<JavacTask, TaskListener> createListener) {
+    private BatchResult doCompile(Map<URI, Optional<String>> files, BiConsumer<JavacTask, CompilationUnitTree> forEach) {
         // TODO remove all URIs from fileManager
         
         List<JavaFileObject> objects = files
@@ -335,7 +319,7 @@ public class JavacHolder {
 
         objects.addAll(dependencies(objects));
 
-        JavacTask task = createTask(objects, false, createListener);
+        JavacTask task = createTask(objects, false);
 
         try {
             DiagnosticCollector<JavaFileObject> errors = startCollectingErrors();
@@ -354,6 +338,8 @@ public class JavacHolder {
                 if (!catchJavacError(e))
                     throw e;
             }
+
+            parse.forEach(tree -> forEach.accept(task, tree));
 
             // So incremental compile can use these .class files
             Iterable<? extends JavaFileObject> output = task.generate();
