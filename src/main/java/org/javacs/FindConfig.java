@@ -161,7 +161,7 @@ class FindConfig {
         Path effectivePom = generateEffectivePom(originalPom);
 
         // Invoke maven to get classpath
-        Set<Path> classPath = buildClassPath(effectivePom, testScope, false);
+        Set<Path> classPath = buildClassPath(originalPom, testScope, false);
 
         // Get source directory from pom.xml
         Set<Path> sourcePath = sourceDirectories(effectivePom, testScope);
@@ -175,7 +175,7 @@ class FindConfig {
             sourcePath, 
             classPath, 
             outputDirectory,
-            CompletableFuture.supplyAsync(() -> buildClassPath(effectivePom, testScope, true))
+            CompletableFuture.supplyAsync(() -> buildClassPath(originalPom, testScope, true))
         );
 
         LOG.info("Inferred from " + originalPom + ":");
