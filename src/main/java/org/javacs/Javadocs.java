@@ -3,6 +3,8 @@ package org.javacs;
 import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.overzealous.remark.Options;
+import com.overzealous.remark.Remark;
 import com.sun.javadoc.*;
 import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.api.JavacTool;
@@ -127,6 +129,21 @@ public class Javadocs {
         all.addAll(additionalSourcePath);
 
         return new Javadocs(all);
+    }
+
+    /**
+     * Convert Javadoc HTML to Markdown
+     */
+    static String htmlToMarkdown(String commentText) {		
+        Options options = new Options();
+
+		options.tables = Options.Tables.CONVERT_TO_CODE_BLOCK;
+		options.hardwraps = true;
+		options.inlineLinks = true;
+		options.autoLinks = true;
+		options.reverseHtmlSmartPunctuation = true;
+
+        return new Remark(options).convertFragment(commentText);
     }
 
     /**
@@ -394,17 +411,17 @@ public class Javadocs {
         // my.package.MyClass#<init>()
         if (key.contains("<init>")) {
             constructorDoc(key)
-                .ifPresent(doc -> unresolved.setDocumentation(doc.commentText()));
+                .ifPresent(doc -> unresolved.setDocumentation(Javadocs.htmlToMarkdown(doc.commentText())));
         }
         // my.package.MyClass#myMethod()
         else if (key.contains("#")) {
             methodDoc(key)
-                .ifPresent(doc -> unresolved.setDocumentation(doc.commentText()));
+                .ifPresent(doc -> unresolved.setDocumentation(Javadocs.htmlToMarkdown(doc.commentText())));
         }
         // my.package.MyClass
         else {
             classDoc(key)
-                .ifPresent(doc -> unresolved.setDocumentation(doc.commentText()));
+                .ifPresent(doc -> unresolved.setDocumentation(Javadocs.htmlToMarkdown(doc.commentText())));
         }
     }
     

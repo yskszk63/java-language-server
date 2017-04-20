@@ -30,7 +30,9 @@ import java.util.function.Function;
 public class Hovers {
     
     public static Hover hoverText(Element el) {
-        Optional<String> doc = Javadocs.global().doc(el).map(Hovers::commentText);
+        Optional<String> doc = Javadocs.global().doc(el)
+            .map(Hovers::commentText)
+            .map(Javadocs::htmlToMarkdown);
         String sig = signature(el);
         String result = doc.map(text -> String.format("```java\n%s\n```\n%s", sig, text)).orElse(sig);
 

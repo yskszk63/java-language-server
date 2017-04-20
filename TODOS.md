@@ -1,8 +1,11 @@
 # Todo
 
+## Bugs
+* Signature help doesn't show for constructors
+
 ## Polish
 * Status bar info during indexing
-* Format Javadoc HTML--see what vscode-java does
+* Signature help should only show first line
 
 ## Autocomplete
 * Annotation fields
