@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
@@ -156,13 +157,14 @@ class FindConfig {
     }
 
     private JavacConfig readPomXml(Path dir, boolean testScope) {
-        Path pomXml = dir.resolve("pom.xml");
+        Path originalPom = dir.resolve("pom.xml");
+        Path effectivePom = generateEffectivePom(originalPom);
 
         // Invoke maven to get classpath
-        Set<Path> classPath = buildClassPath(pomXml, testScope, false);
+        Set<Path> classPath = buildClassPath(effectivePom, testScope, false);
 
         // Get source directory from pom.xml
-        Set<Path> sourcePath = sourceDirectories(pomXml, testScope);
+        Set<Path> sourcePath = sourceDirectories(effectivePom, testScope);
 
         // Use maven output directory so incremental compilation uses maven-generated .class files
         Path outputDirectory = testScope ? 
@@ -173,16 +175,41 @@ class FindConfig {
             sourcePath, 
             classPath, 
             outputDirectory,
-            CompletableFuture.supplyAsync(() -> buildClassPath(pomXml, testScope, true))
+            CompletableFuture.supplyAsync(() -> buildClassPath(effectivePom, testScope, true))
         );
 
-        LOG.info("Inferred from " + pomXml + ":");
+        LOG.info("Inferred from " + originalPom + ":");
         LOG.info("\tsourcePath: " + Joiner.on(" ").join(sourcePath));
         LOG.info("\tclassPath: " + Joiner.on(" ").join(classPath));
         LOG.info("\tdocPath: (pending)");
         LOG.info("\toutputDirectory: " + outputDirectory);
 
         return config;
+    }
+
+    private static Path generateEffectivePom(Path pomXml) {
+        try {
+            Objects.requireNonNull(pomXml, "pom.xml path is null");
+
+            Path effectivePom = Files.createTempFile("effective-pom", ".xml");
+
+            LOG.info(String.format("Emit effective pom for %s to %s", pomXml, effectivePom));
+
+            String cmd = String.format(
+                "%s help:effective-pom -Doutput=%s",
+                getMvnCommand(),
+                effectivePom
+            );
+            File workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
+            int result = Runtime.getRuntime().exec(cmd, null, workingDirectory).waitFor();
+
+            if (result != 0)
+                throw new RuntimeException("`" + cmd + "` returned " + result);
+
+            return effectivePom;
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static Set<Path> buildClassPath(Path pomXml, boolean testScope, boolean sourceJars) {
@@ -245,11 +272,11 @@ class FindConfig {
 
     private static Set<Path> sourceDirectories(Path pomXml, boolean testScope) {
         return testScope ? 
-            Sets.union(onlySourceDirectories(pomXml, true), onlySourceDirectories(pomXml, false)) : 
-            onlySourceDirectories(pomXml, false);
+            ImmutableSet.of(onlySourceDirectories(pomXml, true), onlySourceDirectories(pomXml, false)) :
+            ImmutableSet.of(onlySourceDirectories(pomXml, false));
     }
 
-    private static Set<Path> onlySourceDirectories(Path pomXml, boolean testScope) {
+    private static Path onlySourceDirectories(Path pomXml, boolean testScope) {
         String defaultSourceDir = testScope ? "src/test/java" : "src/main/java";
         String xPath = testScope ? "/project/build/testSourceDirectory" : "/project/build/sourceDirectory";
         Document doc = parsePomXml(pomXml);
@@ -264,7 +291,7 @@ class FindConfig {
             }
             else LOG.info("Use source directory from pom.xml " + sourceDir);
             
-            return Collections.singleton(pomXml.resolveSibling(sourceDir).toAbsolutePath());
+            return pomXml.resolveSibling(sourceDir).toAbsolutePath();
         } catch (XPathExpressionException e) {
                 throw new RuntimeException(e);
         }
