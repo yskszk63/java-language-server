@@ -5,7 +5,6 @@
 
 ## Polish
 * Status bar info during indexing
-* Signature help should only show first line
 
 ## Autocomplete
 * Annotation fields

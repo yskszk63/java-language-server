@@ -11,6 +11,7 @@ import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javadoc.api.JavadocTool;
 
+import java.text.BreakIterator;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
@@ -423,6 +424,22 @@ public class Javadocs {
             classDoc(key)
                 .ifPresent(doc -> unresolved.setDocumentation(Javadocs.htmlToMarkdown(doc.commentText())));
         }
+    }
+
+    /**
+     * Get the first sentence of a doc-comment.
+     * 
+     * In general, VS Code does a good job of only displaying the beginning of a doc-comment where appropriate.
+     * But if VS Code is displaying too much and you want to only show the first sentence, use this.
+     */
+    public static String firstSentence(String doc) {
+        BreakIterator breaks = BreakIterator.getSentenceInstance();
+
+        breaks.setText(doc.replace('\n', ' '));
+
+        int start = breaks.first(), end = breaks.next();
+
+        return doc.substring(start, end).trim();
     }
     
     private static final Logger LOG = Logger.getLogger("main");

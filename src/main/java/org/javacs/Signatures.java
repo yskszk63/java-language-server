@@ -99,7 +99,7 @@ class Signatures {
         
         return new SignatureInformation(
                 Hovers.methodSignature(method, showReturn, true),
-                doc.flatMap(Javadocs::commentText).map(Javadocs::htmlToMarkdown).orElse(null),
+                doc.flatMap(Javadocs::commentText).map(Javadocs::htmlToMarkdown).map(Javadocs::firstSentence).orElse(null),
                 paramInfo(method)
         );
     }
