@@ -60,7 +60,7 @@ class CodeActions {
      * Search for symbols on the classpath and sourcepath that match name
      */
     private Stream<Command> addImportActions(String name) {
-        Stream<Command> sourcePath = index.allSymbols(ElementKind.CLASS)
+        Stream<Command> sourcePath = index.allSymbols(ElementKind.CLASS, false)
                 .filter(symbol -> symbol.getName().equals(name))
                 .map(symbol -> importClassCommand(symbol.getContainerName(), symbol.getName()));
         Stream<Command> classPath = compiler.classPathIndex.topLevelClasses(name, source.getPackageName().toString())

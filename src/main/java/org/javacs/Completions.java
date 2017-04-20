@@ -193,7 +193,7 @@ class Completions {
     private Stream<? extends Element> packageMembers(String parentPackage, String partialIdentifier, Scope from) {
         // Source-path packages that match parentPackage.partialIdentifier
         Stream<PackageElement> packages = subPackages(parentPackage, partialIdentifier);
-        Stream<TypeElement> sourcePathClasses = sourcePath.allSymbols(ElementKind.CLASS)
+        Stream<TypeElement> sourcePathClasses = sourcePath.allSymbols(ElementKind.CLASS, false)
                 .filter(c -> c.getContainerName().equals(parentPackage))
                 .filter(c -> containsCharactersInOrder(c.getName(), partialIdentifier))
                 .map(c -> elements.getTypeElement(qualifiedName(c.getContainerName(), c.getName())));
@@ -208,7 +208,7 @@ class Completions {
      */
     private Stream<PackageElement> subPackages(String parentPackage, String partialIdentifier) {
         String prefix = parentPackage.isEmpty() ? "" : parentPackage + ".";
-        Stream<String> sourcePathMembers = sourcePath.allSymbols(ElementKind.CLASS)
+        Stream<String> sourcePathMembers = sourcePath.allSymbols(ElementKind.CLASS, false)
                 .map(c -> c.getContainerName())
                 .filter(p -> p.startsWith(prefix));
         Stream<String> classPathMembers = classPath.packagesStartingWith(prefix);
@@ -388,7 +388,7 @@ class Completions {
     }
 
     private Stream<TypeElement> sourcePathClasses(String partialClass) {
-        return sourcePath.allSymbols(ElementKind.CLASS)
+        return sourcePath.allSymbols(ElementKind.CLASS, false)
                 .filter(symbol -> containsCharactersInOrder(symbol.getName(), partialClass))
                 .flatMap(this::typeElementForSymbol)
                 .flatMap(this::topLevelClassElement);

@@ -130,8 +130,8 @@ public class SymbolIndex {
     public Stream<SymbolInformation> search(String query) {
         updateOpenFiles();
 
-        Stream<SymbolInformation> classes = allSymbols(ElementKind.CLASS);
-        Stream<SymbolInformation> methods = allSymbols(ElementKind.METHOD);
+        Stream<SymbolInformation> classes = allSymbols(ElementKind.CLASS, true);
+        Stream<SymbolInformation> methods = allSymbols(ElementKind.METHOD, true);
 
         return Stream.concat(classes, methods)
                      .filter(s -> containsCharsInOrder(s.getName(), query));
@@ -151,8 +151,9 @@ public class SymbolIndex {
     /**
      * All indexed symbols of a kind
      */
-    public Stream<SymbolInformation> allSymbols(ElementKind kind) {
-        updateOpenFiles();
+    public Stream<SymbolInformation> allSymbols(ElementKind kind, boolean updateIndex) {
+        if (updateIndex)
+            updateOpenFiles();
 
         return sourcePathFiles.values().stream().flatMap(f -> allSymbolsInFile(f, kind));
     }
