@@ -67,14 +67,20 @@ public class JavacHolder {
         task.addTaskListener(new TaskListener() {
             @Override
             public void started(TaskEvent e) {
+                if (e.getSourceFile() == null)
+                    return;
+
                 profile.computeIfAbsent(e.getKind(), newKind -> new HashMap<>())
-                        .put(e.getSourceFile().toUri(), new Profile());
+                    .put(e.getSourceFile().toUri(), new Profile());
             }
 
             @Override
             public void finished(TaskEvent e) {
+                if (e.getSourceFile() == null)
+                    return;
+                    
                 profile.get(e.getKind())
-                        .get(e.getSourceFile().toUri()).finished = Optional.of(Instant.now());
+                    .get(e.getSourceFile().toUri()).finished = Optional.of(Instant.now());
             }
         });
 
