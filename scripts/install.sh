@@ -2,6 +2,9 @@
 # You will need java, maven, vsce, and visual studio code to run this script
 set -e
 
+# Needed once
+npm install
+
 # Build fat jar
 mvn package 
 
