@@ -3,6 +3,15 @@
 ## Bugs
 * Signature help doesn't show for constructors
 
+## Default configuration
+* Instead of requiring javaconfig.json / pom.xml, infer a single forgiving configuration:
+  * classpath = entire maven / gradle cache
+  * sourcepath = inferred from package names in workspace
+  * docpath = every .java file in workspace + src.zip + source jars in maven / gradle cache
+  * outputDirectory = project-specific temp directory
+* Instructions for how to download source jars and get javadoc via maven, gradle
+* Support module-info.java as a way to limit autocomplete and provide compile-time 'symbol not found'
+
 ## Polish
 * Status bar info during indexing
 
