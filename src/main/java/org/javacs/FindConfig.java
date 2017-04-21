@@ -212,6 +212,7 @@ class FindConfig {
         }
     }
 
+    // TODO use mvn dependency:list to list the dependencies quickly, then fetch each one lazily using mvn dependency:build-classpath -DincludeGroupIds=? -DincludeArtifactIds=? ...
     private static Set<Path> buildClassPath(Path pomXml, boolean testScope, boolean sourceJars) {
         try {
             Objects.requireNonNull(pomXml, "pom.xml path is null");
