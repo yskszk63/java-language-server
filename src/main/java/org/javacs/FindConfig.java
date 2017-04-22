@@ -129,13 +129,6 @@ class FindConfig {
                 .map(parseJavaConfigJson)
                 .collect(Collectors.toList());
         }
-        else if (Files.exists(dir.resolve("pom.xml"))) {
-            return ImmutableList.of(
-                readPomXml(dir, false), 
-                readPomXml(dir, true)
-            );
-        }
-        // TODO add more file types
         else {
             return Collections.emptyList();
         }
