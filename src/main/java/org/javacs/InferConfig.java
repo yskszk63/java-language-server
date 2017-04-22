@@ -95,6 +95,8 @@ class InferConfig {
         };
 
         try {
+            // TODO instead of looking at EVERY file, once you see a few files with the same source directory,
+            // ignore all subsequent files in the directory
             return Files.walk(workspaceRoot)
                 .filter(java -> match.matches(java.getFileName()))
                 .flatMap(java -> stream(root.apply(java)));
