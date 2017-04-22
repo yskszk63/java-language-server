@@ -14,9 +14,9 @@ import static org.junit.Assert.*;
 import static org.hamcrest.Matchers.*;
 
 public class InferConfigTest {
-    Path workspaceRoot = Paths.get("src/test/resources/workspace");
-    Path mavenHome = Paths.get("src/test/resources/home/.m2");
-    Path gradleHome = Paths.get("src/test/resources/home/.gradle");
+    Path workspaceRoot = Paths.get("src/test/test-project/workspace");
+    Path mavenHome = Paths.get("src/test/test-project/home/.m2");
+    Path gradleHome = Paths.get("src/test/test-project/home/.gradle");
     Path outputDirectory = createOutputDir();
     List<Artifact> externalDependencies = ImmutableList.of(new Artifact("com.external", "external-library", "1.2"));
     InferConfig both = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome, outputDirectory),
