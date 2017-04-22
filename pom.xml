@@ -145,47 +145,6 @@
                     </execution>
                 </executions>
             </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>2.9</version>
-                <executions>
-                    <execution>
-                        <id>build-classpath</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>build-classpath</goal>
-                        </goals>
-                        <configuration>
-                            <includeScope>compile</includeScope>
-                            <outputFile>classpath.txt</outputFile>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>test-classpath</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>build-classpath</goal>
-                        </goals>
-                        <configuration>
-                            <includeScope>test</includeScope>
-                            <outputFile>test-classpath.txt</outputFile>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>docpath</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>build-classpath</goal>
-                        </goals>
-                        <configuration>
-                            <outputFile>docpath.txt</outputFile>
-                            <classifier>sources</classifier>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
 </project>
