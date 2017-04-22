@@ -50,7 +50,20 @@
                 "fileMatch": "javaconfig.json",
                 "url": "./lib/javaconfig.schema.json"
             }
-        ]
+        ],
+        "configuration": {
+            "title": "Java configuration",
+            "properties": {
+                "java.externalDependencies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "pattern": "^[^:]+:[^:]+:[^:]+(:[^:]+:[^:]+)?$",
+                        "description": "External dependencies of the form groupId:artifactId:version or groupId:artifactId:packaging:version:scope"
+                    }
+                }
+            }
+        }
     },
     "scripts": {
         "vscode:prepublish": "tsc -p ./",

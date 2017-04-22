@@ -80,10 +80,10 @@ public class SymbolIndex {
         Map<JavacHolder, Map<URI, String>> open = new HashMap<>();
 
         languageServer.activeDocuments().forEach((uri, content) -> {
-            languageServer.findCompiler(uri).ifPresent(compiler -> {
-                open.computeIfAbsent(compiler, __ -> new HashMap<>())
-                    .put(uri, content);
-            });
+            JavacHolder compiler = languageServer.findCompiler(uri);
+
+            open.computeIfAbsent(compiler, __ -> new HashMap<>())
+                .put(uri, content);
         });
 
         open.forEach((compiler, files) -> {
@@ -94,11 +94,11 @@ public class SymbolIndex {
     }
 
     private void updateOpenFile(URI file) {
-        languageServer.findCompiler(file).ifPresent(compiler -> {
-            LOG.info("Update index for " + file);
+        JavacHolder compiler = languageServer.findCompiler(file);
 
-            BatchResult compiled = compiler.compileBatch(Collections.singletonMap(file, languageServer.activeContent(file)), this::update);
-        });
+        LOG.info("Update index for " + file);
+
+        BatchResult compiled = compiler.compileBatch(Collections.singletonMap(file, languageServer.activeContent(file)), this::update);
     }
 
     /**
