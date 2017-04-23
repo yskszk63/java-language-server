@@ -33,7 +33,7 @@ public class InferConfigTest {
     @Test
     public void workspaceSourcePath() {
         assertThat(
-                both.workspaceSourcePath().collect(Collectors.toSet()),
+                both.workspaceSourcePath(),
                 contains(workspaceRoot.resolve("src"))
         );
     }
@@ -41,7 +41,7 @@ public class InferConfigTest {
     @Test
     public void mavenClassPath() {
         assertThat(
-                both.buildClassPath().collect(Collectors.toSet()),
+                both.buildClassPath(),
                 contains(mavenHome.resolve("repository/com/external/external-library/1.2/external-library-1.2.jar"))
         );
         // v1.1 should be ignored
@@ -50,7 +50,7 @@ public class InferConfigTest {
     @Test
     public void gradleClasspath() {
         assertThat(
-                gradle.buildClassPath().collect(Collectors.toSet()),
+                gradle.buildClassPath(),
                 contains(gradleHome.resolve("caches/modules-2/files-2.1/com.external/external-library/1.2/xxx/external-library-1.2.jar"))
         );
         // v1.1 should be ignored
@@ -59,7 +59,7 @@ public class InferConfigTest {
     @Test
     public void mavenDocPath() {
         assertThat(
-                both.buildDocPath().collect(Collectors.toSet()),
+                both.buildDocPath(),
                 contains(mavenHome.resolve("repository/com/external/external-library/1.2/external-library-1.2-sources.jar"))
         );
         // v1.1 should be ignored
@@ -68,7 +68,7 @@ public class InferConfigTest {
     @Test
     public void gradleDocPath() {
         assertThat(
-                gradle.buildDocPath().collect(Collectors.toSet()),
+                gradle.buildDocPath(),
                 contains(gradleHome.resolve("caches/modules-2/files-2.1/com.external/external-library/1.2/yyy/external-library-1.2-sources.jar"))
         );
         // v1.1 should be ignored

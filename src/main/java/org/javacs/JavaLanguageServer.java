@@ -544,16 +544,27 @@ class JavaLanguageServer implements LanguageServer {
             Path gradleHome = userHome.resolve(".gradle");
             Path outputDirectory = defaultOutputDirectory();
             List<Artifact> externalDependencies = Lists.transform(settings.java.externalDependencies, Artifact::parse);
-            InferConfig infer = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome, outputDirectory);  
-            JavacConfig config = infer.config();
+            InferConfig infer = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome, outputDirectory);
+            Set<Path> classPath = infer.buildClassPath(),
+                    docPath = infer.buildDocPath();
+            Set<Path> sourcePath = settings.java.sourceDirectories.stream()
+                    .map(workspaceRoot::resolve)
+                    .collect(Collectors.toSet());
+
+            if (sourcePath.isEmpty())
+                sourcePath = infer.workspaceSourcePath();
 
             LOG.info("Inferred configuration: ");
-            LOG.info("\tsourcePath:" + Joiner.on(' ').join(config.sourcePath));
-            LOG.info("\tclassPath:" + Joiner.on(' ').join(config.classPath));
-            LOG.info("\tdocPath:" + Joiner.on(' ').join(config.docPath.join()));
-            LOG.info("\toutputDirectory:" + config.outputDirectory);
+            LOG.info("\tsourcePath:" + Joiner.on(' ').join(sourcePath));
+            LOG.info("\tclassPath:" + Joiner.on(' ').join(classPath));
+            LOG.info("\tdocPath:" + Joiner.on(' ').join(docPath));
+            LOG.info("\toutputDirectory:" + outputDirectory);
+
+            // Index source dirs for javadocs
+            Javadocs.addSourcePath(sourcePath);
+            Javadocs.addSourcePath(docPath);
             
-            cacheDefaultCompiler = JavacHolder.create(config.classPath, config.sourcePath, config.outputDirectory);
+            cacheDefaultCompiler = JavacHolder.create(classPath, sourcePath, outputDirectory);
             cacheDefaultCompilerSettings = settings;
         }      
 

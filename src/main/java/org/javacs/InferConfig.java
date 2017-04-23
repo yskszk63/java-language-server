@@ -52,21 +52,9 @@ class InferConfig {
     }
 
     /**
-     * Infer configuration from workspace, maven / gradle repositories, ...
-     */
-    JavacConfig config() {
-        return new JavacConfig(
-            workspaceSourcePath().collect(Collectors.toSet()), 
-            buildClassPath().collect(Collectors.toSet()), 
-            outputDirectory, 
-            CompletableFuture.completedFuture(buildDocPath().collect(Collectors.toSet()))
-        );
-    }
-
-    /**
      * Infer source directories by searching for .java files and examining their package declaration.
      */
-    Stream<Path> workspaceSourcePath() {
+    Set<Path> workspaceSourcePath() {
         JavacHolder parser = JavacHolder.create(Collections.emptySet(), Collections.emptySet(), Paths.get("parser-out-this-should-never-appear"));
         PathMatcher match = FileSystems.getDefault().getPathMatcher("glob:*.java");
         Function<Path, Optional<Path>> root = java -> {
@@ -99,7 +87,8 @@ class InferConfig {
             // ignore all subsequent files in the directory
             return Files.walk(workspaceRoot)
                 .filter(java -> match.matches(java.getFileName()))
-                .flatMap(java -> stream(root.apply(java)));
+                .flatMap(java -> stream(root.apply(java)))
+                .collect(Collectors.toSet());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -108,17 +97,19 @@ class InferConfig {
     /**
      * Find .jar files for `externalDependencies` in local maven / gradle repository.
      */
-    Stream<Path> buildClassPath() {
+    Set<Path> buildClassPath() {
         return externalDependencies.stream()
-            .flatMap(artifact -> stream(findAnyJar(artifact, false)));
+            .flatMap(artifact -> stream(findAnyJar(artifact, false)))
+            .collect(Collectors.toSet());
     }
 
     /**
      * Find source .jar files for `externalDependencies` in local maven / gradle repository.
      */
-    Stream<Path> buildDocPath() {
+    Set<Path> buildDocPath() {
         return externalDependencies.stream()
-            .flatMap(artifact -> stream(findAnyJar(artifact, true)));
+            .flatMap(artifact -> stream(findAnyJar(artifact, true)))
+            .collect(Collectors.toSet());
     }
 
     private Optional<Path> findAnyJar(Artifact artifact, boolean source) {
