@@ -98,7 +98,9 @@ You should use your build tool to download the library *and* source jars of all 
 ## javaconfig.json is depecated
 
 Configuration using a `javaconfig.json` file in your workspace is deprecated; 
-please switch to setting `java.externalDependencies` in `.vscode/settings.json` 
+please switch to [settings.json](#Settings).
+
+If you have a use case that cannot be supported using `settings.json` please [create an issue](https://github.com/georgewfraser/vscode-javac/issues);
 
 ## Directory structure
 
