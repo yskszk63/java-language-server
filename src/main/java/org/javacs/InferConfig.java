@@ -55,7 +55,7 @@ class InferConfig {
      * Infer source directories by searching for .java files and examining their package declaration.
      */
     Set<Path> workspaceSourcePath() {
-        JavacHolder parser = JavacHolder.create(Collections.emptySet(), Collections.emptySet(), Paths.get("parser-out-this-should-never-appear"));
+        JavacHolder parser = JavacHolder.create(Collections.emptySet(), Collections.emptySet(), tempOutputDirectory("parser-out"));
         PathMatcher match = FileSystems.getDefault().getPathMatcher("glob:*.java");
         Function<Path, Optional<Path>> root = java -> {
             CompilationUnitTree tree = parser.parse(java.toUri(), Optional.empty(), __ -> {}).tree;
@@ -89,6 +89,14 @@ class InferConfig {
                 .filter(java -> match.matches(java.getFileName()))
                 .flatMap(java -> stream(root.apply(java)))
                 .collect(Collectors.toSet());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private Path tempOutputDirectory(String name) {
+        try {
+            return Files.createTempDirectory("parser-out");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
