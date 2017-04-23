@@ -40,15 +40,6 @@
 * Extract method, variable
 * Replace for comprehension with loop
 
-### Snippets
-* Collections
-  * Map => Map<$key, $value> $name = new HashMap<>();
-  * List => List<$value> $name = new ArrayList<>();
-  * ...
-* For loops
-  * for => for ($each : $collection) { ... }
-  * fori => for (int $i = 0; i < $until; i++) { ... }
-
 ### Code generation
 * New .java file class boilerplate
 * Missing method definition
