@@ -678,4 +678,13 @@ public class CompletionsTest extends CompletionsBase {
         assertFalse(Completions.containsCharactersInOrder("FooBar", "FooBar1"));
         assertFalse(Completions.containsCharactersInOrder("FooBar", "FB1"));
     }
+
+    @Test
+    public void withinConstructor() throws IOException {
+        String file = "/org/javacs/example/AutocompleteContext.java";
+
+        Set<String> suggestions = insertText(file, 8, 38);
+
+        assertThat("suggests local variable", suggestions, hasItems("length"));
+    }
 }

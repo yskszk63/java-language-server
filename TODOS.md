@@ -5,7 +5,6 @@
 * array.length doesn't auto-complete
 * value.Constructor() is showing
 * Hover doesn't show 'throws ...'
-* Autocomplete only shows constructors inside of constructors
 * Enum const javadocs are not showing
 
 ## Default configuration

@@ -1,5 +1,7 @@
 package org.javacs;
 
+import com.sun.source.tree.ImportTree;
+import com.sun.source.tree.NewClassTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.util.TreePath;
 
@@ -44,11 +46,40 @@ enum CursorContext {
             case MEMBER_SELECT:
             case MEMBER_REFERENCE:
             case IDENTIFIER:
-                return from(path.getParentPath());
+                return fromIdentifier(path.getParentPath(), path.getLeaf());
             case NEW_CLASS:
                 return NewClass;
             case IMPORT:
                 return Import;
+            default:
+                return Other;
+        }
+    }
+
+    private static CursorContext fromIdentifier(TreePath parent, Tree id) {
+        if (parent == null)
+            return Other;
+        else switch (parent.getLeaf().getKind()) {
+            case MEMBER_SELECT:
+            case MEMBER_REFERENCE:
+            case IDENTIFIER:
+                return fromIdentifier(parent.getParentPath(), parent.getLeaf());
+            case NEW_CLASS: {
+                NewClassTree leaf = (NewClassTree) parent.getLeaf();
+
+                if (leaf.getIdentifier() == id)
+                    return NewClass;
+                else
+                    return Other;
+            }
+            case IMPORT: {
+                ImportTree leaf = (ImportTree) parent.getLeaf();
+
+                if (leaf.getQualifiedIdentifier() == id)
+                    return Import;
+                else
+                    return Other;
+            }
             default:
                 return Other;
         }
