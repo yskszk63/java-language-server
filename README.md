@@ -60,37 +60,40 @@ VSCode will provide autocomplete and help text using:
 
 ## Settings
 
-We recommend you set the following in your [workspace settings](https://code.visualstudio.com/docs/getstarted/settings)
-
-### java.externalDependencies
-
-If you are using external dependencies, you should specify them in `.vscode/settings.xml` in the following format:
+We recommend you set the following in your project directory [.vscode/settings.json](https://code.visualstudio.com/docs/getstarted/settings)
 
 ```json
 {
+    "java.sourceDirectories": [
+        "src/main/java",
+        "src/test/java"
+    ],
     "java.externalDependencies": [
-        // Maven format
-        "junit:junit:jar:4.12:test",
-        // Gradle-style format is also allowed
-        "junit:junit:4.12"
+        "junit:junit:jar:4.12:test", // Maven format
+        "junit:junit:4.12" // Gradle-style format is also allowed
     ]
 }
 ```
 
-Your build tools should be able to generate this list for you:
+You can generate a list of external dependencies using your build tool:
+* Maven: `mvn dependency:list` 
+* Gradle: `gradle dependencies`
 
-#### List maven dependencies:
+The Java language server will look for the dependencies you specify in `java.externalDependencies` in your Maven and Gradle caches `~/.m2` and `~/.gradle`.
+You should use your build tool to download the library *and* source jars of all your dependencies so that the Java language server can find them:
+* Maven
+  * `mvn dependency:resolve` for compilation and autocomplete
+  * `mvn dependency:resolve -Dclassifier=sources` for inline Javadoc help
+* Gradle
+  * `gradle dependencies` for compilation and autocomplete
+  * Include `classifier: sources` in your build.gradle for inline Javadoc help, for example:
+    ```
+    dependencies {
+        testCompile group: 'junit', name: 'junit', version: '4.+'
+        testCompile group: 'junit', name: 'junit', version: '4.+', classifier: 'sources'
+    }
+    ```
 
-```mvn dependency:list```
-
-Look for entries like `[INFO]    junit:junit:jar:4.11:test`
-
-#### List gradle dependencies
-
-```gradle dependencies```
-
-Look for entries like `\--- junit:junit:4.+ -> 4.12` or `\--- org.hamcrest:hamcrest-core:1.3`
-You may have to do a little reformatting.
 
 ## javaconfig.json is depecated
 
