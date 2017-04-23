@@ -30,5 +30,10 @@
 		"com.kotcrab.remark:remark:jar:1.0.0:compile",
 		"com.fasterxml.jackson.core:jackson-annotations:jar:2.5.0:compile",
 		"org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:jar:0.2.0-SNAPSHOT:compile"
-	]
+	],
+	"java.sourceDirectories": [
+		"src/main/java",
+		"src/test/java"
+	],
+	"java.home": "/Library/Java/JavaVirtualMachines/jdk1.8.0_131.jdk/Contents/Home"
 }

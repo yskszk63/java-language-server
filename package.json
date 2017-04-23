@@ -68,6 +68,10 @@
                         "type": "string"
                     },
                     "description": "Java source directories in the workspace"
+                },
+                "java.home": {
+                    "type": "string",
+                    "description": "Installation directory of Java 8"
                 }
             }
         }

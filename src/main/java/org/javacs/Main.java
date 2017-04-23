@@ -26,7 +26,9 @@ public class Main {
     public static final ObjectMapper JSON = new ObjectMapper().registerModule(new Jdk8Module())
                                                               .registerModule(new JSR310Module())
                                                               .registerModule(pathAsJson())
-                                                              .configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+                                                              .configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false)
+                                                              .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                                                              .configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
 
     private static final Logger LOG = Logger.getLogger("main");
 

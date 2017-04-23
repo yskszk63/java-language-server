@@ -153,24 +153,39 @@ function isJava8(javaExecutablePath: string): Promise<boolean> {
             resolve(eight);
         });
     });
-} 
+}
 
 function findJavaExecutable(binname: string) {
 	binname = correctBinname(binname);
 
-	// First search each JAVA_HOME bin folder
-	if (process.env['JAVA_HOME']) {
-		let workspaces = process.env['JAVA_HOME'].split(Path.delimiter);
-		for (let i = 0; i < workspaces.length; i++) {
-			let binpath = Path.join(workspaces[i], 'bin', binname);
-			if (FS.existsSync(binpath)) {
-				return binpath;
-			}
-		}
+	// First search java.home setting
+    let userJavaHome = VSCode.workspace.getConfiguration('java').get('home') as string;
+
+	if (userJavaHome != null) {
+        console.log('Looking for java in settings java.home ' + userJavaHome + '...');
+
+        let candidate = findJavaExecutableInJavaHome(userJavaHome, binname);
+
+        if (candidate != null)
+            return candidate;
+	}
+
+	// Then search each JAVA_HOME
+    let envJavaHome = process.env['JAVA_HOME'];
+
+	if (envJavaHome) {
+        console.log('Looking for java in environment variable JAVA_HOME ' + envJavaHome + '...');
+
+        let candidate = findJavaExecutableInJavaHome(envJavaHome, binname);
+
+        if (candidate != null)
+            return candidate;
 	}
 
 	// Then search PATH parts
 	if (process.env['PATH']) {
+        console.log('Looking for java in PATH');
+        
 		let pathparts = process.env['PATH'].split(Path.delimiter);
 		for (let i = 0; i < pathparts.length; i++) {
 			let binpath = Path.join(pathparts[i], binname);
@@ -189,6 +204,17 @@ function correctBinname(binname: string) {
 		return binname + '.exe';
 	else
 		return binname;
+}
+
+function findJavaExecutableInJavaHome(javaHome: string, binname: string) {
+    let workspaces = javaHome.split(Path.delimiter);
+
+    for (let i = 0; i < workspaces.length; i++) {
+        let binpath = Path.join(workspaces[i], 'bin', binname);
+
+        if (FS.existsSync(binpath)) 
+            return binpath;
+    }
 }
 
 // this method is called when your extension is deactivated
