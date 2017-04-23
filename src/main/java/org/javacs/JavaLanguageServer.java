@@ -295,7 +295,7 @@ class JavaLanguageServer implements LanguageServer {
 
                     activeDocuments.put(uri, new VersionedContent(document.getText(), document.getVersion()));
 
-                    doLintAndIndex(Collections.singleton(uri));
+                    doLint(Collections.singleton(uri));
                 } catch (NoJavaConfigException e) {
                     throw ShowMessageException.warning(e.getMessage(), e);
                 }
@@ -333,7 +333,7 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public void didSave(DidSaveTextDocumentParams params) {
                 // Re-lint all active documents
-                doLintAndIndex(activeDocuments.keySet());
+                doLint(activeDocuments.keySet());
 
                 // Re-index javadocs of saved document
                 URI uri = URI.create(params.getTextDocument().getUri());
@@ -381,21 +381,17 @@ class JavaLanguageServer implements LanguageServer {
         }
     }
 
-    private void doLintAndIndex(Collection<URI> paths) {
+    private void doLint(Collection<URI> paths) {
         LOG.info("Lint " + Joiner.on(", ").join(paths));
 
-        Map<JavacConfig, Map<URI, Optional<String>>> files = new HashMap<>();
-
-        for (URI each : paths) {
-            file(each).flatMap(findConfig::forFile).ifPresent(config -> {
-                files.computeIfAbsent(config, newConfig -> new HashMap<>()).put(each, Optional.empty());
-            });
-        }
-
+        Map<JavacHolder, Set<URI>> files = paths.stream()
+            .collect(Collectors.groupingBy(this::findCompiler, Collectors.toSet()));
         List<javax.tools.Diagnostic<? extends JavaFileObject>> errors = new ArrayList<>();
 
-        files.forEach((config, configFiles) -> {
-            BatchResult compile = findCompilerForConfig(config).compileBatch(configFiles);
+        files.forEach((compiler, someFiles) -> {
+            Map<URI, Optional<String>> content = someFiles.stream()
+                .collect(Collectors.toMap(f -> f, this::activeContent));
+            BatchResult compile = compiler.compileBatch(content);
 
             errors.addAll(compile.errors.getDiagnostics());
         });
