@@ -1,7 +1,6 @@
 # Todo
 
 ## Bugs
-* Signature help doesn't show for constructors
 * import static org.| doesn't auto-complete
 * array.length doesn't auto-complete
 * value.Constructor() is showing
@@ -10,7 +9,6 @@
 * Enum const javadocs are not showing
 
 ## Default configuration
-* Instructions for how to download source jars and get javadoc via maven, gradle
 * Alert if we can't find a dependency
 * Support module-info.java as a way to limit autocomplete and provide compile-time 'symbol not found'
 

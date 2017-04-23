@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.sun.javadoc.ConstructorDoc;
 import com.sun.javadoc.MethodDoc;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.MethodInvocationTree;
@@ -61,7 +62,7 @@ class Signatures {
                 .map(method -> (ExecutableElement) method)
                 .collect(Collectors.toList());
         List<SignatureInformation> signatures = candidates.stream()
-                .map(member -> methodInfo(member, false))
+                .map(member -> constructorInfo(member))
                 .collect(Collectors.toList());
         int activeSignature = candidates.indexOf(classElement);
 
@@ -82,7 +83,7 @@ class Signatures {
                 .map(method -> (ExecutableElement) method)
                 .collect(Collectors.toList());
         List<SignatureInformation> signatures = candidates.stream()
-                .map(member -> methodInfo(member, true))
+                .map(member -> methodInfo(member))
                 .collect(Collectors.toList());
         int activeSignature = candidates.indexOf(methodElement);
 
@@ -93,13 +94,30 @@ class Signatures {
         );
     }
 
-    private SignatureInformation methodInfo(ExecutableElement method, boolean showReturn) {
+    private SignatureInformation constructorInfo(ExecutableElement method) {
         Javadocs docs = Javadocs.global();
-        Optional<MethodDoc> doc = docs.methodDoc(docs.methodKey(method));
+        Optional<ConstructorDoc> doc = docs.constructorDoc(docs.methodKey(method));
+        Optional<String> docText = doc.flatMap(constructor -> Optional.ofNullable(constructor.commentText()))
+                    .map(Javadocs::htmlToMarkdown)
+                    .map(Javadocs::firstSentence);
         
         return new SignatureInformation(
-                Hovers.methodSignature(method, showReturn, true),
-                doc.flatMap(Javadocs::commentText).map(Javadocs::htmlToMarkdown).map(Javadocs::firstSentence).orElse(null),
+                Hovers.methodSignature(method, false, true),
+                docText.orElse(null),
+                paramInfo(method)
+        );
+    }
+
+    private SignatureInformation methodInfo(ExecutableElement method) {
+        Javadocs docs = Javadocs.global();
+        Optional<MethodDoc> doc = docs.methodDoc(docs.methodKey(method));
+        Optional<String> docText = doc.flatMap(Javadocs::commentText)
+            .map(Javadocs::htmlToMarkdown)
+            .map(Javadocs::firstSentence);
+        
+        return new SignatureInformation(
+                Hovers.methodSignature(method, true, true),
+                docText.orElse(null),
                 paramInfo(method)
         );
     }

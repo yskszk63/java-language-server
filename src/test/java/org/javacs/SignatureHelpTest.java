@@ -37,6 +37,15 @@ public class SignatureHelpTest {
         assertThat(help.getSignatures().get(0).getLabel(), startsWith("SignatureHelp"));
     }
 
+    @Test
+    public void platformConstructor() throws IOException {
+        SignatureHelp help = doHelp("/org/javacs/example/SignatureHelp.java", 10, 26);
+
+        assertThat(help.getSignatures(), not(empty()));
+        assertThat(help.getSignatures().get(0).getLabel(), startsWith("ArrayList"));
+        assertThat(help.getSignatures().get(0).getDocumentation(), not(nullValue()));
+    }
+
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     private SignatureHelp doHelp(String file, int row, int column) throws IOException {
