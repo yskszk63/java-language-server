@@ -94,6 +94,11 @@ You should use your build tool to download the library *and* source jars of all 
     }
     ```
 
+### Optional settings
+
+Optional user settings. These should be set in global settings `Preferences -> Settings`, not in your project directory.
+
+* `java.home` Installation directory of Java 8
 
 ## javaconfig.json is depecated
 

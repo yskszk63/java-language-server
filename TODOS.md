@@ -7,6 +7,7 @@
 * value.Constructor() is showing
 * Hover doesn't show 'throws ...'
 * Autocomplete only shows constructors inside of constructors
+* Enum const javadocs are not showing
 
 ## Default configuration
 * Instructions for how to download source jars and get javadoc via maven, gradle
