@@ -58,9 +58,16 @@
                     "type": "array",
                     "items": {
                         "type": "string",
-                        "pattern": "^[^:]+:[^:]+:[^:]+(:[^:]+:[^:]+)?$",
-                        "description": "External dependencies of the form groupId:artifactId:version or groupId:artifactId:packaging:version:scope"
-                    }
+                        "pattern": "^[^:]+:[^:]+:[^:]+(:[^:]+:[^:]+)?$"
+                    },
+                    "description": "External dependencies of the form groupId:artifactId:version or groupId:artifactId:packaging:version:scope"
+                },
+                "java.sourceDirectories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Java source directories in the workspace"
                 }
             }
         }
