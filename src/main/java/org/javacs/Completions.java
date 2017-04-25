@@ -141,6 +141,7 @@ class Completions {
                 DeclaredType type = (DeclaredType) trees.getTypeMirror(expression);
 
                 return allMembers(expression, partialIdentifier, from)
+                        .filter(member -> member.getKind() != ElementKind.CONSTRUCTOR)
                         .filter(e -> trees.isAccessible(from, e, type))
                         .flatMap(this::completionItem);
             }

@@ -3,7 +3,6 @@
 ## Bugs
 * import static org.| doesn't auto-complete
 * array.length doesn't auto-complete
-* value.Constructor() is showing
 * Hover doesn't show 'throws ...'
 * Enum const javadocs are not showing
 

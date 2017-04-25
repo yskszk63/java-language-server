@@ -42,11 +42,12 @@ public class CompletionsTest extends CompletionsBase {
     public void member() throws IOException {
         String file = "/org/javacs/example/AutocompleteMember.java";
 
-        // Static methods
+        // Virtual methods
         Set<String> suggestions = insertText(file, 5, 14);
 
-        assertThat(suggestions, not(hasItems("fieldStatic", "methodStatic", "fieldStaticPrivate", "methodStaticPrivate", "class")));
-        assertThat(suggestions, hasItems("fields", "methods", "fieldsPrivate", "methodsPrivate", "getClass"));
+        assertThat("excludes static members", suggestions, not(hasItems("fieldStatic", "methodStatic", "fieldStaticPrivate", "methodStaticPrivate", "class", "AutocompleteMember")));
+        assertThat("includes non-static members", suggestions, hasItems("fields", "methods", "fieldsPrivate", "methodsPrivate", "getClass"));
+        assertThat("excludes constructors", suggestions, not(hasItem(startsWith("AutocompleteMember"))));
     }
 
     @Test
