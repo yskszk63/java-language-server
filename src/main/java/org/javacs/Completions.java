@@ -137,8 +137,7 @@ class Completions {
             }
             case Other:
             default: {
-                // TODO this is not always a DeclaredType
-                DeclaredType type = (DeclaredType) trees.getTypeMirror(expression);
+                DeclaredType type = (DeclaredType) task.getTypes().erasure(trees.getTypeMirror(expression));
 
                 return allMembers(expression, partialIdentifier, from)
                         .filter(member -> member.getKind() != ElementKind.CONSTRUCTOR)
@@ -182,7 +181,7 @@ class Completions {
         }
         // myValue.?
         else {
-            DeclaredType type = (DeclaredType) trees.getTypeMirror(expression);
+            DeclaredType type = (DeclaredType) task.getTypes().erasure(trees.getTypeMirror(expression));
             List<? extends Element> members = elements.getAllMembers((TypeElement) type.asElement());
 
             return members.stream()
