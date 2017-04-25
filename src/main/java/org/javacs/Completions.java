@@ -1,5 +1,7 @@
 package org.javacs;
 
+import com.google.common.reflect.ClassPath;
+import com.google.common.reflect.ClassPath.ClassInfo;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
@@ -354,7 +356,7 @@ class Completions {
         return Stream.concat(sourcePathItems, Stream.concat(sourcePathClasses, classPathItems));
     }
 
-    private Stream<TypeElement> tryLoad(Class<?> c) {
+    private Stream<TypeElement> tryLoad(ClassPath.ClassInfo c) {
         try {
             TypeElement type = elements.getTypeElement(c.getName());
 

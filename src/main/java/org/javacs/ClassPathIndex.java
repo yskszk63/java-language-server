@@ -1,6 +1,7 @@
 package org.javacs;
 
 import com.google.common.reflect.ClassPath;
+import com.google.common.reflect.ClassPath.ClassInfo;
 import sun.misc.Launcher;
 
 import java.io.IOException;
@@ -35,15 +36,6 @@ class ClassPathIndex {
         topLevelClasses = classPath(classPath).getTopLevelClasses().stream()
             .sorted(ClassPathIndex::shortestName)
             .collect(Collectors.toList());
-
-        new Thread(() -> {
-            try {
-                for (ClassPath.ClassInfo each : topLevelClasses)
-                    tryLoad(each);
-            } catch (Throwable e) {
-                LOG.log(Level.SEVERE, e.getMessage(), e);
-            }
-        }, "PrefetchAllClasses").start();
     }
 
     private static int shortestName(ClassPath.ClassInfo left, ClassPath.ClassInfo right) {
@@ -78,24 +70,13 @@ class ClassPathIndex {
         }
     }
 
-    private static Stream<Class<?>> tryLoad(ClassPath.ClassInfo info) {
-        try {
-            return Stream.of(info.load());
-        } catch (LinkageError e) {
-            LOG.warning(e.getMessage());
-
-            return Stream.empty();
-        }
-    }
-
     /**
      * Find all top-level classes accessible from `fromPackage`
      */
-    Stream<Class<?>> topLevelClasses(String partialClass, String fromPackage) {
+    Stream<ClassPath.ClassInfo> topLevelClasses(String partialClass, String fromPackage) {
         return topLevelClasses.stream()
                 .filter(c -> Completions.containsCharactersInOrder(c.getSimpleName(), partialClass))
-                .flatMap(ClassPathIndex::tryLoad)
-                .filter(c -> Modifier.isPublic(c.getModifiers()) || isInPackage(c, fromPackage));
+                .filter(c -> isPublic(c) || isInPackage(c, fromPackage));
     }
 
     /**
@@ -107,44 +88,24 @@ class ClassPathIndex {
                 .map(c -> c.getPackageName());
     }
 
-    Stream<Class<?>> topLevelClassesIn(String parentPackage, String partialClass, String fromPackage) {
+    Stream<ClassPath.ClassInfo> topLevelClassesIn(String parentPackage, String partialClass, String fromPackage) {
         return topLevelClasses.stream()
                 .filter(c -> c.getPackageName().equals(parentPackage) && Completions.containsCharactersInOrder(c.getSimpleName(), partialClass))
-                .flatMap(ClassPathIndex::tryLoad)
-                .filter(c -> Modifier.isPublic(c.getModifiers()) || isInPackage(c, fromPackage));
+                .filter(c -> isPublic(c) || isInPackage(c, fromPackage));
     }
 
-    Optional<Class<?>> loadPackage(String prefix) {
+    Optional<ClassPath.ClassInfo> loadPackage(String prefix) {
         return topLevelClasses.stream()
                 .filter(c -> c.getPackageName().startsWith(prefix))
-                .flatMap(ClassPathIndex::tryLoad)
                 .findAny();
     }
 
-    private boolean isInPackage(Class<?> c, String fromPackage) {
-        return c.getPackage().getName().equals(fromPackage);
+    private boolean isPublic(ClassPath.ClassInfo c) {
+        return true; // TODO
     }
 
-    /**
-     * Find all constructors in top-level classes accessible to any class in `fromPackage`
-     */
-    Stream<Constructor<?>> topLevelConstructors(String partialClass, String fromPackage) {
-        return topLevelClasses(partialClass, fromPackage)
-                .flatMap(this::explodeConstructors);
-    }
-
-    private Stream<Constructor<?>> explodeConstructors(Class<?> c) {
-        return constructors(c).filter(cons -> isAccessible(cons));
-    }
-
-    private Stream<Constructor<?>> constructors(Class<?> c) {
-        try {
-            return Arrays.stream(c.getConstructors());
-        } catch (LinkageError e) {
-            LOG.warning(e.getMessage());
-
-            return Stream.empty();
-        }
+    private boolean isInPackage(ClassPath.ClassInfo c, String fromPackage) {
+        return c.getPackageName().equals(fromPackage);
     }
 
     private boolean isAccessible(Constructor<?> cons) {

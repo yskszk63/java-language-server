@@ -65,7 +65,7 @@ class CodeActions {
                 .map(symbol -> importClassCommand(symbol.getContainerName(), symbol.getName()));
         Stream<Command> classPath = compiler.classPathIndex.topLevelClasses(name, source.getPackageName().toString())
                 .filter(c -> c.getSimpleName().equals(name))
-                .map(c -> importClassCommand(c.getPackage().getName(), c.getSimpleName()));
+                .map(c -> importClassCommand(c.getPackageName(), c.getSimpleName()));
 
         return Stream.concat(sourcePath, classPath);
     }
