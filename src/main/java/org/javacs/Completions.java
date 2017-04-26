@@ -199,7 +199,7 @@ class Completions {
                 .filter(c -> c.getContainerName().equals(parentPackage))
                 .filter(c -> containsCharactersInOrder(c.getName(), partialIdentifier))
                 .map(c -> elements.getTypeElement(qualifiedName(c.getContainerName(), c.getName())));
-        Stream<TypeElement> classPathClasses = classPath.topLevelClassesIn(parentPackage, partialIdentifier, packageOf(from))
+        Stream<TypeElement> classPathClasses = classPath.topLevelClassesIn(parentPackage, partialIdentifier)
                 .map(c -> elements.getTypeElement(c.getName()));
 
         return Stream.concat(packages, Stream.concat(sourcePathClasses, classPathClasses));
@@ -350,8 +350,8 @@ class Completions {
         Stream<? extends Element> sourcePathItems = alreadyImportedSymbols(scope)
                 .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
         Stream<TypeElement> sourcePathClasses = sourcePathClasses(partialIdentifier);
-        Stream<TypeElement> classPathItems = classPath.topLevelClasses(partialIdentifier, packageOf(scope))
-                .flatMap(this::tryLoad); // TODO this takes as much time as compileFocused, try to resolve using Class<?> without converting to TypeElement
+        Stream<TypeElement> classPathItems = classPath.topLevelClasses(partialIdentifier)
+                .flatMap(this::tryLoad);
 
         return Stream.concat(sourcePathItems, Stream.concat(sourcePathClasses, classPathItems));
     }

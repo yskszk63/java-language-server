@@ -63,7 +63,7 @@ class CodeActions {
         Stream<Command> sourcePath = index.allSymbols(ElementKind.CLASS, false)
                 .filter(symbol -> symbol.getName().equals(name))
                 .map(symbol -> importClassCommand(symbol.getContainerName(), symbol.getName()));
-        Stream<Command> classPath = compiler.classPathIndex.topLevelClasses(name, source.getPackageName().toString())
+        Stream<Command> classPath = compiler.classPathIndex.topLevelClasses(name)
                 .filter(c -> c.getSimpleName().equals(name))
                 .map(c -> importClassCommand(c.getPackageName(), c.getSimpleName()));
 

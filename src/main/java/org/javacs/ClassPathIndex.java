@@ -73,10 +73,9 @@ class ClassPathIndex {
     /**
      * Find all top-level classes accessible from `fromPackage`
      */
-    Stream<ClassPath.ClassInfo> topLevelClasses(String partialClass, String fromPackage) {
+    Stream<ClassPath.ClassInfo> topLevelClasses(String partialClass) {
         return topLevelClasses.stream()
-                .filter(c -> Completions.containsCharactersInOrder(c.getSimpleName(), partialClass))
-                .filter(c -> isPublic(c) || isInPackage(c, fromPackage));
+                .filter(c -> Completions.containsCharactersInOrder(c.getSimpleName(), partialClass));
     }
 
     /**
@@ -88,24 +87,15 @@ class ClassPathIndex {
                 .map(c -> c.getPackageName());
     }
 
-    Stream<ClassPath.ClassInfo> topLevelClassesIn(String parentPackage, String partialClass, String fromPackage) {
+    Stream<ClassPath.ClassInfo> topLevelClassesIn(String parentPackage, String partialClass) {
         return topLevelClasses.stream()
-                .filter(c -> c.getPackageName().equals(parentPackage) && Completions.containsCharactersInOrder(c.getSimpleName(), partialClass))
-                .filter(c -> isPublic(c) || isInPackage(c, fromPackage));
+                .filter(c -> c.getPackageName().equals(parentPackage) && Completions.containsCharactersInOrder(c.getSimpleName(), partialClass));
     }
 
     Optional<ClassPath.ClassInfo> loadPackage(String prefix) {
         return topLevelClasses.stream()
                 .filter(c -> c.getPackageName().startsWith(prefix))
                 .findAny();
-    }
-
-    private boolean isPublic(ClassPath.ClassInfo c) {
-        return true; // TODO
-    }
-
-    private boolean isInPackage(ClassPath.ClassInfo c, String fromPackage) {
-        return c.getPackageName().equals(fromPackage);
     }
 
     private boolean isAccessible(Constructor<?> cons) {
