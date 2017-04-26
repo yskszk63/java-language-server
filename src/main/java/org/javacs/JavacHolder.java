@@ -12,6 +12,7 @@ import com.sun.source.util.TreePath;
 import com.sun.tools.javac.api.JavacTaskImpl;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
+import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.util.Options;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -230,10 +231,16 @@ public class JavacHolder {
         JavaFileManager fileManager = incremental ? incrementalFileManager : batchFileManager;
         JavacTask result = javac.getTask(null, fileManager, this::onError, options(incremental), null, files);
         JavacTaskImpl impl = (JavacTaskImpl) result;
-        Options options = Options.instance(impl.getContext());
 
         // Better stack traces inside javac
+        Options options = Options.instance(impl.getContext());
+
         options.put("dev", "");
+
+        // Skip annotation processing
+        JavaCompiler compiler = JavaCompiler.instance(impl.getContext());
+
+        compiler.skipAnnotationProcessing = true;
 
         return result;
     }
