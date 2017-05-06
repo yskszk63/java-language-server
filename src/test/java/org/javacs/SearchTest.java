@@ -25,7 +25,7 @@ public class SearchTest {
 
     @BeforeClass
     public static void openSource() throws URISyntaxException, IOException {
-        URI uri = SearchTest.class.getResource("/org/javacs/example/AutocompleteBetweenLines.java").toURI();
+        URI uri = FindResource.uri("/org/javacs/example/AutocompleteBetweenLines.java");
         String textContent = Joiner.on("\n").join(Files.readAllLines(Paths.get(uri)));
         TextDocumentItem document = new TextDocumentItem();
 

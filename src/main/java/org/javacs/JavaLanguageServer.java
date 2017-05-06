@@ -4,15 +4,8 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.RateLimiter;
-import com.sun.javadoc.ClassDoc;
-import com.sun.javadoc.ConstructorDoc;
-import com.sun.javadoc.MethodDoc;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
-import java.nio.file.Files;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -25,6 +18,7 @@ import javax.lang.model.element.Element;
 import javax.tools.JavaFileObject;
 import java.io.*;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -37,45 +31,24 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
     int maxItems = 50;
     private Map<URI, VersionedContent> activeDocuments = new HashMap<>();
     private CompletableFuture<LanguageClient> client = new CompletableFuture<>();
-
-    // TODO move this to FindConfig
-    private final Map<JavacConfig, JavacHolder> compilerCache = new HashMap<>();
-
-    /**
-     * Instead of looking for javaconfig.json and creating a JavacHolder, just use this.
-     * For testing.
-     */
-    private final Optional<JavacHolder> testJavac;
-
-    private Path workspaceRoot;
-
-    private FindConfig findConfig;
-
+    private Path workspaceRoot = Paths.get(".");
     private JavaSettings settings = new JavaSettings();
-
-    private final SymbolIndex index = new SymbolIndex(this);
+    private SymbolIndex index;
 
     JavaLanguageServer() {
-        this.testJavac = Optional.empty();
-    }
-
-    JavaLanguageServer(JavacHolder testJavac) {
-        this.testJavac = Optional.of(testJavac);
-
-        index.addConfig(testJavac.config()).join();
     }
 
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
         workspaceRoot = Paths.get(params.getRootPath()).toAbsolutePath().normalize();
-        findConfig = new FindConfig(workspaceRoot, testJavac.map(JavacHolder::config));
+
+        createCompiler();
 
         InitializeResult result = new InitializeResult();
 
@@ -119,9 +92,9 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("completion at %s %d:%d", uri, line, character));
 
-                JavacHolder compiler = findCompiler(uri);
+                JavacHolder compiler = compiler();
                 FocusedResult result = compiler.compileFocused(uri, content, line, character, true);
-                List<CompletionItem> items = Completions.at(result, index)
+                List<CompletionItem> items = Completions.at(result, index, docs())
                         .limit(maxItems)
                         .collect(Collectors.toList());
                 CompletionList list = new CompletionList(items.size() == maxItems, items);
@@ -138,7 +111,7 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public CompletableFuture<CompletionItem> resolveCompletionItem(CompletionItem unresolved) {
                 return CompletableFutures.computeAsync(cancel -> {
-                    Javadocs.global().resolveCompletionItem(unresolved);
+                    docs().resolveCompletionItem(unresolved);
 
                     return unresolved;
                 });
@@ -153,10 +126,10 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("hover at %s %d:%d", uri, line, character));
 
-                JavacHolder compiler = findCompiler(uri);
+                JavacHolder compiler = compiler();
                 FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
                 Hover hover = elementAtCursor(result)
-                        .map(Hovers::hoverText)
+                        .map(this::hoverText)
                         .orElseGet(this::emptyHover);
 
                 return CompletableFuture.completedFuture(hover);
@@ -168,6 +141,10 @@ class JavaLanguageServer implements LanguageServer {
 
                     return Optional.ofNullable(el);
                 });
+            }
+
+            private Hover hoverText(Element el) {
+                return Hovers.hoverText(el, docs());
             }
 
             private Hover emptyHover() {
@@ -183,9 +160,9 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("signatureHelp at %s %d:%d", uri, line, character));
 
-                JavacHolder compiler = findCompiler(uri);
+                JavacHolder compiler = compiler();
                 FocusedResult result = compiler.compileFocused(uri, content, line, character, true);
-                SignatureHelp help = Signatures.help(result, line, character).orElseGet(SignatureHelp::new);
+                SignatureHelp help = Signatures.help(result, line, character, docs()).orElseGet(SignatureHelp::new);
 
                 return CompletableFuture.completedFuture(help);
             }
@@ -199,7 +176,7 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("definition at %s %d:%d", uri, line, character));
 
-                JavacHolder compiler = findCompiler(uri);
+                JavacHolder compiler = compiler();
                 FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
                 List<Location> locations = References.gotoDefinition(result, index)
                         .map(Collections::singletonList)
@@ -216,7 +193,7 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("references at %s %d:%d", uri, line, character));
 
-                JavacHolder compiler = findCompiler(uri);
+                JavacHolder compiler = compiler();
                 FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
                 List<Location> locations = References.findReferences(result, index)
                         .collect(Collectors.toList());
@@ -251,7 +228,7 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("codeAction at %s %d:%d", uri, line, character));
 
-                JavacHolder compiler = findCompiler(uri);
+                JavacHolder compiler = compiler();
                 List<Command> commands = new CodeActions(compiler, uri, activeContent(uri), line, character, index).find(params);
 
                 return CompletableFuture.completedFuture(commands);
@@ -384,23 +361,19 @@ class JavaLanguageServer implements LanguageServer {
     private void doLint(Collection<URI> paths) {
         LOG.info("Lint " + Joiner.on(", ").join(paths));
 
-        Map<JavacHolder, Set<URI>> files = paths.stream()
-            .collect(Collectors.groupingBy(this::findCompiler, Collectors.toSet()));
+        JavacHolder compiler = compiler();
         List<javax.tools.Diagnostic<? extends JavaFileObject>> errors = new ArrayList<>();
+        Map<URI, Optional<String>> content = paths.stream()
+            .collect(Collectors.toMap(f -> f, this::activeContent));
+        BatchResult compile = compiler.compileBatch(content);
 
-        files.forEach((compiler, someFiles) -> {
-            Map<URI, Optional<String>> content = someFiles.stream()
-                .collect(Collectors.toMap(f -> f, this::activeContent));
-            BatchResult compile = compiler.compileBatch(content);
-
-            errors.addAll(compile.errors.getDiagnostics());
-        });
+        errors.addAll(compile.errors.getDiagnostics());
 
         publishDiagnostics(paths, errors);
     }
 
     private void doJavadoc(JavaFileObject source) {
-        Javadocs.global().update(source);
+        docs().update(source);
     }
 
     /**
@@ -430,7 +403,7 @@ class JavaLanguageServer implements LanguageServer {
                         URI fileUri = URI.create(fileString);
                         String packageName = (String) params.getArguments().get(1);
                         String className = (String) params.getArguments().get(2);
-                        JavacHolder compiler = findCompiler(fileUri);
+                        JavacHolder compiler = compiler();
                         FocusedResult compiled = compiler.compileFocused(fileUri, activeContent(fileUri), 1, 1, false);
 
                         if (compiled.compilationUnit.getSourceFile().toUri().equals(fileUri)) {
@@ -453,10 +426,6 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
-                // TODO shouldn't this be findCompilerForConfig?
-                Collection<JavacHolder> compilers = testJavac
-                        .map(javac -> (Collection<JavacHolder>) Collections.singleton(javac))
-                        .orElseGet(compilerCache::values);
                 List<SymbolInformation> infos = index.search(params.getQuery()).collect(Collectors.toList());
 
                 return CompletableFuture.completedFuture(infos);
@@ -465,6 +434,8 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public void didChangeConfiguration(DidChangeConfigurationParams change) {
                 settings = Main.JSON.convertValue(change.getSettings(), JavaSettings.class);
+
+                createCompiler();
             }
 
             @Override
@@ -476,7 +447,7 @@ class JavaLanguageServer implements LanguageServer {
 
                             activeDocuments.remove(uri);
 
-                            JavacHolder compiler = findCompiler(uri);
+                            JavacHolder compiler = compiler();
                             BatchResult result = compiler.delete(uri);
 
                             publishDiagnostics(Collections.singleton(uri), result.errors.getDiagnostics());
@@ -514,57 +485,44 @@ class JavaLanguageServer implements LanguageServer {
         return p;
     }
 
-    /**
-     * Look for a configuration in a parent directory of uri
-     */
-    JavacHolder findCompiler(URI uri) {
-        if (testJavac.isPresent())
-            return testJavac.get();
-        else
-            return dir(uri)
-                    .flatMap(findConfig::forFile)
-                    .map(this::findCompilerForConfig)
-                    .orElseGet(this::defaultCompiler);
-    }
-
-    private JavacHolder cacheDefaultCompiler = null;
-    private JavaSettings cacheDefaultCompilerSettings = null;
+    private JavacHolder compiler = null;
+    private Javadocs docs = null;
 
     /**
      * Default compiler generated using InferConfig
      */
-    private JavacHolder defaultCompiler() {
-        if (cacheDefaultCompilerSettings != settings) {
-            Path userHome = Paths.get(System.getProperty("user.home"));
-            Path mavenHome = userHome.resolve(".m2");
-            Path gradleHome = userHome.resolve(".gradle");
-            Path outputDirectory = defaultOutputDirectory();
-            List<Artifact> externalDependencies = Lists.transform(settings.java.externalDependencies, Artifact::parse);
-            InferConfig infer = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome, outputDirectory);
-            Set<Path> classPath = infer.buildClassPath(),
-                    docPath = infer.buildDocPath();
-            Set<Path> sourcePath = settings.java.sourceDirectories.stream()
-                    .map(workspaceRoot::resolve)
-                    .collect(Collectors.toSet());
+    JavacHolder compiler() {
+        return compiler;
+    }
 
-            if (sourcePath.isEmpty())
-                sourcePath = infer.workspaceSourcePath();
+    /**
+     * Default javadocs generated using InferConfig
+     */
+    Javadocs docs() {
+        return docs;
+    }
 
-            LOG.info("Inferred configuration: ");
-            LOG.info("\tsourcePath:" + Joiner.on(' ').join(sourcePath));
-            LOG.info("\tclassPath:" + Joiner.on(' ').join(classPath));
-            LOG.info("\tdocPath:" + Joiner.on(' ').join(docPath));
-            LOG.info("\toutputDirectory:" + outputDirectory);
+    // TODO this function needs to be invoked whenever the user creates a new .java file outside the existing source root
+    private void createCompiler() {
+        Set<Path> sourcePath = InferConfig.workspaceSourcePath(workspaceRoot);
+        Path userHome = Paths.get(System.getProperty("user.home"));
+        Path mavenHome = userHome.resolve(".m2");
+        Path gradleHome = userHome.resolve(".gradle");
+        Path outputDirectory = defaultOutputDirectory();
+        List<Artifact> externalDependencies = Lists.transform(settings.java.externalDependencies, Artifact::parse);
+        InferConfig infer = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome, outputDirectory);
+        Set<Path> classPath = infer.buildClassPath(),
+                docPath = infer.buildDocPath();
 
-            // Index source dirs for javadocs
-            Javadocs.addSourcePath(sourcePath);
-            Javadocs.addSourcePath(docPath);
-            
-            cacheDefaultCompiler = JavacHolder.create(classPath, sourcePath, outputDirectory);
-            cacheDefaultCompilerSettings = settings;
-        }      
+        LOG.info("Inferred configuration: ");
+        LOG.info("\tsourcePath:" + Joiner.on(' ').join(sourcePath));
+        LOG.info("\tclassPath:" + Joiner.on(' ').join(classPath));
+        LOG.info("\tdocPath:" + Joiner.on(' ').join(docPath));
+        LOG.info("\toutputDirectory:" + outputDirectory);
 
-        return cacheDefaultCompiler;
+        this.docs = new Javadocs(sourcePath, docPath, this::activeContent);
+        this.compiler = JavacHolder.create(sourcePath, classPath, outputDirectory);
+        this.index = new SymbolIndex(this);
     }
 
     private Path defaultOutputDirectory() {
@@ -575,43 +533,9 @@ class JavaLanguageServer implements LanguageServer {
         }
     }
 
-    private static Optional<Path> dir(URI uri) {
-        return file(uri).map(path -> path.getParent());
-    }
-
-    private static Optional<Path> file(URI uri) {
-        if (!uri.getScheme().equals("file"))
-            return Optional.empty();
-        else
-            return Optional.of(Paths.get(uri));
-    }
-
-    private JavacHolder findCompilerForConfig(JavacConfig config) {
-        if (testJavac.isPresent())
-            return testJavac.get();
-        else
-            return compilerCache.computeIfAbsent(config, this::newJavac);
-    }
-
-    private JavacHolder newJavac(JavacConfig c) {
-        Javadocs.addSourcePath(c.sourcePath);
-
-        // Add this project directory to SymbolIndex
-        index.addConfig(c);
-
-        // When docPath resolves, add it to Javadocs
-        c.docPath.thenAccept(Javadocs::addSourcePath);
-
-        return JavacHolder.create(
-            c.classPath,
-            c.sourcePath,
-            c.outputDirectory
-        );
-    }
-
     public Optional<Element> findSymbol(URI file, int line, int character) {
         Optional<String> content = activeContent(file);
-        JavacHolder compiler = findCompiler(file);
+        JavacHolder compiler = compiler();
         FocusedResult result = compiler.compileFocused(file, content, line, character, false);
         Trees trees = Trees.instance(result.task);
         Function<TreePath, Optional<Element>> findSymbol = cursor -> Optional.ofNullable(trees.getElement(cursor));
@@ -661,5 +585,11 @@ class JavaLanguageServer implements LanguageServer {
 
             }
         });
+    }
+
+    Path workspaceRoot() {
+        Objects.requireNonNull(workspaceRoot, "Language server has not been initialized");
+
+        return workspaceRoot;
     }
 }

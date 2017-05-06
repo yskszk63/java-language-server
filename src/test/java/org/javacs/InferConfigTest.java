@@ -1,28 +1,27 @@
 package org.javacs;
 
 import com.google.common.collect.ImmutableList;
+import org.junit.Test;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-import org.junit.Test;
 
-import static org.junit.Assert.*;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.contains;
+import static org.junit.Assert.assertThat;
 
 public class InferConfigTest {
-    Path workspaceRoot = Paths.get("src/test/test-project/workspace");
-    Path mavenHome = Paths.get("src/test/test-project/home/.m2");
-    Path gradleHome = Paths.get("src/test/test-project/home/.gradle");
-    Path outputDirectory = createOutputDir();
-    List<Artifact> externalDependencies = ImmutableList.of(new Artifact("com.external", "external-library", "1.2"));
-    InferConfig both = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome, outputDirectory),
+    private Path workspaceRoot = Paths.get("src/test/test-project/workspace");
+    private Path mavenHome = Paths.get("src/test/test-project/home/.m2");
+    private Path gradleHome = Paths.get("src/test/test-project/home/.gradle");
+    private Path outputDirectory = createOutputDir();
+    private List<Artifact> externalDependencies = ImmutableList.of(new Artifact("com.external", "external-library", "1.2"));
+    private InferConfig both = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome, outputDirectory),
         gradle = new InferConfig(workspaceRoot, externalDependencies, Paths.get("nowhere"), gradleHome, outputDirectory);
 
-    Path createOutputDir() {
+    private Path createOutputDir() {
         try {
             return Files.createTempDirectory("output").toAbsolutePath();
         } catch (IOException e) {
@@ -33,7 +32,7 @@ public class InferConfigTest {
     @Test
     public void workspaceSourcePath() {
         assertThat(
-                both.workspaceSourcePath(),
+                InferConfig.workspaceSourcePath(workspaceRoot),
                 contains(workspaceRoot.resolve("src"))
         );
     }

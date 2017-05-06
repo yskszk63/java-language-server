@@ -9,34 +9,34 @@ import com.sun.source.tree.Tree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.SourcePositions;
 import com.sun.source.util.TreePath;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
 import com.sun.source.util.Trees;
 import org.eclipse.lsp4j.ParameterInformation;
 import org.eclipse.lsp4j.SignatureHelp;
 import org.eclipse.lsp4j.SignatureInformation;
 
 import javax.lang.model.element.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 class Signatures {
-    static Optional<SignatureHelp> help(FocusedResult compiled, int line, int column) {
+    static Optional<SignatureHelp> help(FocusedResult compiled, int line, int column, Javadocs docs) {
         long offset = compiled.compilationUnit.getLineMap().getPosition(line, column);
 
-        return compiled.cursor.flatMap(c -> new Signatures(c, offset, compiled.task).get());
+        return compiled.cursor.flatMap(c -> new Signatures(c, offset, compiled.task, docs).get());
     }
 
     private final TreePath cursor;
     private final long cursorOffset;
     private final JavacTask task;
+    private final Javadocs docs;
 
-    private Signatures(TreePath cursor, long cursorOffset, JavacTask task) {
+    private Signatures(TreePath cursor, long cursorOffset, JavacTask task, Javadocs docs) {
         this.cursor = cursor;
         this.cursorOffset = cursorOffset;
         this.task = task;
+        this.docs = docs;
     }
 
 
@@ -95,7 +95,6 @@ class Signatures {
     }
 
     private SignatureInformation constructorInfo(ExecutableElement method) {
-        Javadocs docs = Javadocs.global();
         Optional<ConstructorDoc> doc = docs.constructorDoc(docs.methodKey(method));
         Optional<String> docText = doc.flatMap(constructor -> Optional.ofNullable(constructor.commentText()))
                     .map(Javadocs::htmlToMarkdown)
@@ -109,7 +108,6 @@ class Signatures {
     }
 
     private SignatureInformation methodInfo(ExecutableElement method) {
-        Javadocs docs = Javadocs.global();
         Optional<MethodDoc> doc = docs.methodDoc(docs.methodKey(method));
         Optional<String> docText = doc.flatMap(Javadocs::commentText)
             .map(Javadocs::htmlToMarkdown)

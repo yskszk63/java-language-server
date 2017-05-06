@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.overzealous.remark.Options;
@@ -10,11 +9,8 @@ import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javadoc.api.JavadocTool;
+import org.eclipse.lsp4j.CompletionItem;
 
-import java.text.BreakIterator;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -23,44 +19,22 @@ import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import javax.tools.DocumentationTool;
-import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.BreakIterator;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import org.eclipse.lsp4j.CompletionItem;
 
 public class Javadocs {
-
-    /**
-     * Stores known javadocs across all source paths, including dependencies
-     */
-    private static Javadocs global = new Javadocs(Collections.emptySet());
-
-    /**
-     * Add another source path to global()
-     */
-    public static void addSourcePath(Set<Path> additionalSourcePath) {
-        global = global.withSourcePath(additionalSourcePath);
-    }
-
-    /**
-     * A single global instance of Javadocs that incorporates all source paths
-     */
-    public static Javadocs global() {
-        return global;
-    }
-
-    /**
-     * The indexed source path, not including src.zip
-     */
-    private final Set<Path> userSourcePath;
 
     /**
      * Cache for performance reasons
@@ -81,9 +55,8 @@ public class Javadocs {
 
     private final Elements elements;
 
-    Javadocs(Set<Path> sourcePath) {
-        this.userSourcePath = sourcePath;
-        this.actualFileManager = createFileManager(allSourcePaths(sourcePath));
+    Javadocs(Set<Path> sourcePath, Set<Path> docPath, Function<URI, Optional<String>> activeContent) {
+        actualFileManager = createFileManager(allSourcePaths(sourcePath, docPath));
 
         JavacTask task = JavacTool.create().getTask(
                 null,
@@ -98,12 +71,14 @@ public class Javadocs {
         elements = task.getElements();
     }
 
-    private static Set<File> allSourcePaths(Set<Path> userSourcePath) {
+    private static Set<File> allSourcePaths(Set<Path>... userSourcePath) {
         Set<File> allSourcePaths = new HashSet<>();
 
         // Add userSourcePath
-        for (Path each : userSourcePath) 
-            allSourcePaths.add(each.toFile());
+        for (Set<Path> eachPath : userSourcePath) {
+            for (Path each : eachPath)
+                allSourcePaths.add(each.toFile());
+        }
 
         // Add src.zip from JDK
         findSrcZip().ifPresent(allSourcePaths::add);
@@ -121,15 +96,6 @@ public class Javadocs {
         }
 
         return actualFileManager;
-    }
-
-    private Javadocs withSourcePath(Set<Path> additionalSourcePath) {
-        Set<Path> all = new HashSet<>();
-
-        all.addAll(userSourcePath);
-        all.addAll(additionalSourcePath);
-
-        return new Javadocs(all);
     }
 
     /**

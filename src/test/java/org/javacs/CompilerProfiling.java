@@ -29,7 +29,11 @@ public class CompilerProfiling {
 
     private Duration compileLargeFile(URI file) {
         long start = System.nanoTime();
-        JavacHolder compiler = JavacHolder.create(Collections.emptySet(), Collections.emptySet(), Paths.get("target/test-output"));
+        JavacHolder compiler = JavacHolder.create(
+                Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
+                Collections.emptySet(),
+                Paths.get("target/test-output")
+        );
         BatchResult result = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
         long finish = System.nanoTime();
 

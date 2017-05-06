@@ -5,8 +5,6 @@ import org.eclipse.lsp4j.services.LanguageClient;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 class LanguageServerFixture {
@@ -45,16 +43,12 @@ class LanguageServerFixture {
     }
 
     static JavaLanguageServer getJavaLanguageServer(LanguageClient client) {
-        Set<Path> classPath = Collections.emptySet();
-        Set<Path> sourcePath = Collections.singleton(Paths.get("src/test/resources").toAbsolutePath());
-        Path outputDirectory = Paths.get("target/test-output").toAbsolutePath();
-        JavacHolder javac = JavacHolder.create(classPath, sourcePath, outputDirectory);
-        JavaLanguageServer server = new JavaLanguageServer(javac);
+        Path workspaceRoot = Paths.get("src/test/test-project/workspace").toAbsolutePath();
+        JavaLanguageServer server = new JavaLanguageServer();
 
         InitializeParams init = new InitializeParams();
-        String workspaceRoot = Paths.get(".").toAbsolutePath().toString();
 
-        init.setRootPath(workspaceRoot);
+        init.setRootPath(workspaceRoot.toString());
 
         server.initialize(init);
         server.installClient(client);

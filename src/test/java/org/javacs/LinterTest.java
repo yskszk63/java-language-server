@@ -19,8 +19,8 @@ public class LinterTest {
     private static final Logger LOG = Logger.getLogger("main");
 
     private static final JavacHolder compiler = JavacHolder.create(
+            Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
             Collections.emptySet(),
-            Collections.singleton(Paths.get("src/test/resources")),
             Paths.get("target/test-output")
     );
 

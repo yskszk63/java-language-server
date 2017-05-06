@@ -1,7 +1,6 @@
 package org.javacs;
 
 import com.google.common.reflect.ClassPath;
-import com.google.common.reflect.ClassPath.ClassInfo;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
@@ -25,22 +24,23 @@ import java.util.stream.StreamSupport;
 
 class Completions {
 
-    static Stream<CompletionItem> at(FocusedResult compiled, SymbolIndex index) {
+    static Stream<CompletionItem> at(FocusedResult compiled, SymbolIndex index, Javadocs docs) {
         return compiled.cursor
-                .map(path -> new Completions(compiled.task, compiled.classPath, index, path).get())
+                .map(path -> new Completions(compiled.task, compiled.classPath, index, docs, path).get())
                 .orElseGet(Stream::empty);
     }
 
     private final JavacTask task;
     private final ClassPathIndex classPath;
     private final SymbolIndex sourcePath;
+    private final Javadocs docs;
     private final Trees trees;
     private final Elements elements;
     private final Name thisName, superName;
     private final CompilationUnitTree compilationUnit;
     private final TreePath path;
 
-    private Completions(JavacTask task, ClassPathIndex classPath, SymbolIndex sourcePath, TreePath path) {
+    private Completions(JavacTask task, ClassPathIndex classPath, SymbolIndex sourcePath, Javadocs docs, TreePath path) {
         this.task = task;
         this.trees = Trees.instance(task);
         this.elements = task.getElements();
@@ -48,6 +48,7 @@ class Completions {
         this.superName = task.getElements().getName("super");
         this.classPath = classPath;
         this.sourcePath = sourcePath;
+        this.docs = docs;
         this.compilationUnit = path.getCompilationUnit();
         this.path = path;
     }
@@ -637,7 +638,7 @@ class Completions {
                     item.setSortText(name);
                     item.setFilterText(name);
                     item.setSortText("0/" + name);
-                    item.setData(Javadocs.global().methodKey(method));
+                    item.setData(docs.methodKey(method));
 
                     return Stream.of(item);
                 }
@@ -661,7 +662,7 @@ class Completions {
                     item.setFilterText(name);
                     item.setAdditionalTextEdits(addImport(enclosingClass.getQualifiedName().toString()));
                     item.setSortText(order + "/" + name);
-                    item.setData(Javadocs.global().methodKey(method));
+                    item.setData(docs.methodKey(method));
 
                     return Stream.of(item);
                 }

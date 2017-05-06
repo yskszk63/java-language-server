@@ -1,19 +1,24 @@
 package org.javacs;
 
 import com.google.common.base.Joiner;
-import com.google.common.collect.Sets;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.ExpressionTree;
+import com.sun.source.util.JavacTask;
+import com.sun.tools.javac.api.JavacTool;
+import com.sun.tools.javac.file.JavacFileManager;
+
+import javax.tools.JavaFileObject;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.PathMatcher;
-import java.nio.file.Paths;
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.file.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -54,11 +59,10 @@ class InferConfig {
     /**
      * Infer source directories by searching for .java files and examining their package declaration.
      */
-    Set<Path> workspaceSourcePath() {
-        JavacHolder parser = JavacHolder.create(Collections.emptySet(), Collections.emptySet(), tempOutputDirectory("parser-out"));
+    static Set<Path> workspaceSourcePath(Path workspaceRoot) {
         PathMatcher match = FileSystems.getDefault().getPathMatcher("glob:*.java");
         Function<Path, Optional<Path>> root = java -> {
-            CompilationUnitTree tree = parser.parse(java.toUri(), Optional.empty(), __ -> {}).tree;
+            CompilationUnitTree tree = parse(java.toUri(), Optional.empty()); // TODO get from JavaLanguageServer
             ExpressionTree packageTree = tree.getPackageName();
             Path dir = java.getParent();
 
@@ -74,10 +78,12 @@ class InferConfig {
                 }
                 else {
                     int up = Paths.get(packagePath).getNameCount();
-                    int truncate = dir.getNameCount() - up;
-                    Path src = dir.subpath(0, truncate);
+                    Path truncate = dir;
 
-                    return Optional.of(src);
+                    for (int i = 0; i < up; i++)
+                        truncate = truncate.getParent();
+
+                    return Optional.of(truncate);
                 }
             }
         };
@@ -94,9 +100,33 @@ class InferConfig {
         }
     }
 
-    private Path tempOutputDirectory(String name) {
+    private static final JavacTool parser = JavacTool.create();
+
+    static CompilationUnitTree parse(URI uri, Optional<String> content) {
+        JavacFileManager fileManager = parser.getStandardFileManager(__ -> { }, null, Charset.defaultCharset());
+        JavaFileObject file = content
+                .map(text -> (JavaFileObject) new StringFileObject(text, uri))
+                .orElseGet(() -> fileManager.getRegularFile(new File(uri)));
+        List<String> options = ImmutableList.of("-d", tempOutputDirectory("parser-out").toAbsolutePath().toString());
+        JavacTask task = parser.getTask(null, fileManager, __ -> {}, options, null, ImmutableList.of(file));
+
         try {
-            return Files.createTempDirectory("parser-out");
+            List<CompilationUnitTree> trees = Lists.newArrayList(task.parse());
+
+            if (trees.isEmpty())
+                throw new RuntimeException("Parsing " + file + " produced 0 results");
+            else if (trees.size() == 1)
+                return trees.get(0);
+            else
+                throw new RuntimeException("Parsing " + file + " produced " + trees.size() + " results");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static Path tempOutputDirectory(String name) {
+        try {
+            return Files.createTempDirectory(name);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

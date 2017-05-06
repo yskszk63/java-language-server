@@ -1,36 +1,23 @@
 package org.javacs;
 
 import com.sun.javadoc.MethodDoc;
-import com.sun.javadoc.Parameter;
 import com.sun.javadoc.ProgramElementDoc;
-import com.sun.source.util.JavacTask;
-import com.sun.source.util.TreePath;
-import com.sun.source.util.Trees;
-import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
-import java.util.Arrays;
-import java.util.stream.Collectors;
-import javax.lang.model.element.PackageElement;
-import javax.lang.model.element.TypeElement;
 import org.eclipse.lsp4j.Hover;
-import org.eclipse.lsp4j.MarkedString;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
-import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class Hovers {
     
-    public static Hover hoverText(Element el) {
-        Optional<String> doc = Javadocs.global().doc(el)
+    public static Hover hoverText(Element el, Javadocs docs) {
+        Optional<String> doc = docs.doc(el)
             .map(Hovers::commentText)
             .map(Javadocs::htmlToMarkdown);
         String sig = signature(el);

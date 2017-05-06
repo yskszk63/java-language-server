@@ -1,18 +1,8 @@
 package org.javacs;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
-import com.sun.source.util.TaskEvent.Kind;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 import org.eclipse.lsp4j.*;
 
 import javax.lang.model.element.Element;
@@ -22,8 +12,14 @@ import javax.lang.model.element.PackageElement;
 import javax.tools.Diagnostic;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -32,9 +28,6 @@ import java.util.stream.Stream;
  */
 public class SymbolIndex {
 
-    /**
-     * Parent language server
-     */
     private final JavaLanguageServer languageServer;
 
     /**
@@ -42,16 +35,23 @@ public class SymbolIndex {
      */
     private final Map<URI, SourceFileIndex> sourcePathFiles = new HashMap<>();
 
-    SymbolIndex(JavaLanguageServer languageServer) {
-        this.languageServer = languageServer;
+    SymbolIndex(JavaLanguageServer parent) {
+        this.languageServer = parent;
+
+        index(javaSources(parent.workspaceRoot()));
     }
 
-    CompletableFuture<?> addConfig(JavacConfig config) {
-        Set<URI> sources = config.sourcePath.stream()
-            .flatMap(this::findAllSources)
-            .collect(Collectors.toSet());
+    private static Set<URI> javaSources(Path workspaceRoot) {
+        PathMatcher match = FileSystems.getDefault().getPathMatcher("glob:*.java");
 
-        return index(sources, config);
+        try {
+            return Files.walk(workspaceRoot)
+                .filter(java -> match.matches(java.getFileName()))
+                .map(Path::toUri)
+                .collect(Collectors.toSet());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private CompletableFuture<?> indexQueue = CompletableFuture.completedFuture(null);
@@ -60,14 +60,14 @@ public class SymbolIndex {
      * Index exported declarations and references for all files on the source path
      * This may take a while, so we'll do it on an extra thread
      */
-    private CompletableFuture<?> index(Set<URI> sources, JavacConfig config) {
-        LOG.info("Index " + sources.size() + " sources in " + Joiner.on(", ").join(config.sourcePath));
+    private CompletableFuture<?> index(Set<URI> sources) {
+        LOG.info("Index " + sources.size() + " sources in " + languageServer.workspaceRoot());
         
         Map<URI, Optional<String>> active = sources.stream()
             .collect(Collectors.toMap(key -> key, languageServer::activeContent));
 
         indexQueue = indexQueue.thenRun(() -> {
-            BatchResult compiled = JavacHolder.create(config.classPath, config.sourcePath, config.outputDirectory)
+            BatchResult compiled = languageServer.compiler()
                 .compileBatch(active, this::update);
             
             languageServer.publishDiagnostics(sources, compiled.errors.getDiagnostics());
@@ -77,51 +77,16 @@ public class SymbolIndex {
     }
 
     private void updateOpenFiles() {
-        Map<JavacHolder, Map<URI, String>> open = new HashMap<>();
+        Map<URI, Optional<String>> open = Maps.transformValues(languageServer.activeDocuments(), Optional::of);
 
-        languageServer.activeDocuments().forEach((uri, content) -> {
-            JavacHolder compiler = languageServer.findCompiler(uri);
-
-            open.computeIfAbsent(compiler, __ -> new HashMap<>())
-                .put(uri, content);
-        });
-
-        open.forEach((compiler, files) -> {
-            LOG.info("Update index for " + files.size() + " source files");
-
-            compiler.compileBatch(Maps.transformValues(files, Optional::of), this::update);
-        });
+        languageServer.compiler().compileBatch(open, this::update);
     }
 
     private void updateOpenFile(URI file) {
-        JavacHolder compiler = languageServer.findCompiler(file);
-
         LOG.info("Update index for " + file);
 
-        BatchResult compiled = compiler.compileBatch(Collections.singletonMap(file, languageServer.activeContent(file)), this::update);
-    }
-
-    /**
-     * Look for .java files
-     */
-    private Stream<URI> findAllSources(Path dir) {
-        // TODO make this lazy
-        Set<URI> result = new HashSet<>();
-        
-        doFindAllSources(dir, result);
-        
-        return result.stream();
-    }
-
-    private void doFindAllSources(Path path, Set<URI> uris) {
-        if (Files.isDirectory(path)) try {
-            Files.list(path).forEach(p -> doFindAllSources(p, uris));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-        else if (path.getFileName().toString().endsWith(".java")) {
-            uris.add(path.toUri());
-        }
+        Map<URI, Optional<String>> todo = Collections.singletonMap(file, languageServer.activeContent(file));
+        BatchResult compiled = languageServer.compiler().compileBatch(todo, this::update);
     }
 
     /**

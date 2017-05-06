@@ -5,9 +5,9 @@ import org.eclipse.lsp4j.services.LanguageClient;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URI;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -80,21 +80,27 @@ public class CodeActionsTest {
     private List<? extends Command> commands(String file, int row, int column) {
         URI uri = FindResource.uri(file);
         TextDocumentIdentifier document = new TextDocumentIdentifier(uri.toString());
-        String content = new BufferedReader(new InputStreamReader(FindResource.class.getResourceAsStream(file))).lines()
-                .collect(Collectors.joining("\n"));
-        TextDocumentItem open = new TextDocumentItem();
 
-        open.setText(content);
-        open.setUri(uri.toString());
-        open.setLanguageId("java");
+        try {
+            InputStream in = Files.newInputStream(new File(uri).toPath());
+            String content = new BufferedReader(new InputStreamReader(in)).lines()
+                    .collect(Collectors.joining("\n"));
+            TextDocumentItem open = new TextDocumentItem();
 
-        server.getTextDocumentService().didOpen(new DidOpenTextDocumentParams(open, content));
-        server.getTextDocumentService().didSave(new DidSaveTextDocumentParams(document, content));
+            open.setText(content);
+            open.setUri(uri.toString());
+            open.setLanguageId("java");
 
-        return diagnostics.stream()
-                .filter(diagnostic -> includes(diagnostic.getRange(), row - 1, column - 1))
-                .flatMap(diagnostic -> codeActionsAt(document, diagnostic))
-                .collect(Collectors.toList());
+            server.getTextDocumentService().didOpen(new DidOpenTextDocumentParams(open, content));
+            server.getTextDocumentService().didSave(new DidSaveTextDocumentParams(document, content));
+
+            return diagnostics.stream()
+                    .filter(diagnostic -> includes(diagnostic.getRange(), row - 1, column - 1))
+                    .flatMap(diagnostic -> codeActionsAt(document, diagnostic))
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private boolean includes(Range range, int line, int character) {

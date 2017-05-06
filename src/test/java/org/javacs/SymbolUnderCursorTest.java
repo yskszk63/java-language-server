@@ -4,8 +4,6 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import javax.lang.model.element.Element;
-import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.Optional;
 
 import static org.junit.Assert.assertEquals;
@@ -78,19 +76,11 @@ public class SymbolUnderCursorTest {
         assertEquals("localVariable", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 10, 16));
     }
 
+    private final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
+
     private String symbolAt(String file, int line, int character) {
-        Optional<Element> symbol = new JavaLanguageServer(compiler).findSymbol(FindResource.uri(file), line, character);
+        Optional<Element> symbol = server.findSymbol(FindResource.uri(file), line, character);
 
         return symbol.map(s -> s.getSimpleName().toString()).orElse(null);
-    }
-
-    private static JavacHolder compiler = newCompiler();
-
-    private static JavacHolder newCompiler() {
-        return JavacHolder.create(
-                Collections.emptySet(),
-                Collections.singleton(Paths.get("src/test/resources")),
-                Paths.get("target/test-output")
-        );
     }
 }

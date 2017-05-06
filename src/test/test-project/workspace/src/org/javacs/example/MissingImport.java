@@ -1,4 +1,4 @@
-package org.javacs;
+package org.javacs.example;
 
 class MissingImport {
     void test() {

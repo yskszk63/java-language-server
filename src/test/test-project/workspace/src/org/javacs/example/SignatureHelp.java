@@ -1,4 +1,4 @@
-package org.javacs;
+package org.javacs.example;
 
 import java.util.concurrent.CompletableFuture; import java.util.ArrayList;
 

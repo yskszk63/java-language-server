@@ -6,14 +6,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * Represents a java source on the system resource path.
+ * Find java sources in test-project/workspace/src
  */
 public class FindResource {
     public static URI uri(String resourcePath) {
         if (resourcePath.startsWith("/"))
             resourcePath = resourcePath.substring(1);
 
-        Path path = Paths.get("./src/test/resources").resolve(resourcePath).normalize();
+        Path path = Paths.get("./src/test/test-project/workspace/src").resolve(resourcePath).normalize();
         File file = path.toFile();
 
         if (!file.exists())

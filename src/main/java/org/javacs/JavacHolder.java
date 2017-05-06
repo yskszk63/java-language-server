@@ -14,15 +14,11 @@ import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.util.Options;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
-import org.eclipse.lsp4j.SymbolInformation;
 
 import javax.lang.model.element.Element;
 import javax.tools.*;
 import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -31,11 +27,10 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Maintains a reference to a Java compiler, 
@@ -45,8 +40,8 @@ import java.util.stream.Stream;
  */
 public class JavacHolder {
 
-    public static JavacHolder create(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
-        return new JavacHolder(classPath, sourcePath, outputDirectory);
+    public static JavacHolder create(Set<Path> sourcePath, Set<Path> classPath, Path outputDirectory) {
+        return new JavacHolder(sourcePath, classPath, outputDirectory);
     }
          
     /**
@@ -188,9 +183,9 @@ public class JavacHolder {
 
     public final ClassPathIndex classPathIndex;
 
-    private JavacHolder(Set<Path> classPath, Set<Path> sourcePath, Path outputDirectory) {
+    private JavacHolder(Set<Path> sourcePath, Set<Path> classPath, Path outputDirectory) {
+        this.sourcePath = sourcePath;
         this.classPath = Collections.unmodifiableSet(classPath);
-        this.sourcePath = Collections.unmodifiableSet(sourcePath);
         this.outputDirectory = outputDirectory;
         this.classPathIndex = new ClassPathIndex(classPath);
 
@@ -258,10 +253,6 @@ public class JavacHolder {
         }
         else if (!Files.isDirectory(dir))
             throw ShowMessageException.error("Output directory " + dir + " is not a directory", null);
-    }
-
-    private static <T> Stream<T> stream(Optional<T> option) {
-        return option.map(Stream::of).orElseGet(Stream::empty);
     }
 
     /**
@@ -378,14 +369,5 @@ public class JavacHolder {
     private Collection<JavaFileObject> dependencies(Collection<JavaFileObject> files) {
         // TODO use index to find dependencies
         return Collections.emptyList();
-    }
-
-    JavacConfig config() {
-        return new JavacConfig(
-            this.sourcePath, 
-            this.classPath, 
-            this.outputDirectory, 
-            CompletableFuture.completedFuture(Collections.emptySet())
-        );
     }
 }

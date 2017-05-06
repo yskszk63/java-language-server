@@ -3,15 +3,10 @@ package org.javacs;
 import com.google.common.collect.ImmutableList;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
-import com.sun.source.util.TaskEvent;
-import com.sun.source.util.TaskEvent.Kind;
-import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.api.JavacTool;
-import java.util.EnumMap;
 import org.junit.Test;
 
 import javax.lang.model.element.Element;
-import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
@@ -24,9 +19,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.logging.Logger;
-
-import static org.hamcrest.Matchers.*;
-import static org.junit.Assert.assertThat;
 
 public class JavaCompilerTest {
     private static final Logger LOG = Logger.getLogger("main");
@@ -49,8 +41,12 @@ public class JavaCompilerTest {
 
     @Test
     public void javacHolder() {
-        JavacHolder javac = JavacHolder.create(Collections.emptySet(), Collections.singleton(Paths.get("src/test/resources")), Paths.get("target/test-output"));
-        File file = Paths.get("src/test/resources/org/javacs/example/Bad.java").toFile();
+        JavacHolder javac = JavacHolder.create(
+                Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
+                Collections.emptySet(),
+                Paths.get("target/test-output")
+        );
+        File file = Paths.get("src/test/test-project/workspace/src/org/javacs/example/Bad.java").toFile();
         BatchResult compile = javac.compileBatch(Collections.singletonMap(file.toURI(), Optional.empty()));
     }
 
