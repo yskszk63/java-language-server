@@ -51,14 +51,13 @@ public class Javadocs {
      */
     private final Map<String, RootDoc> topLevelClasses = new ConcurrentHashMap<>();
 
-    private final Types types;
+    private final JavacTask task;
 
-    private final Elements elements;
+    private final Function<URI, Optional<String>> activeContent;
 
     Javadocs(Set<Path> sourcePath, Set<Path> docPath, Function<URI, Optional<String>> activeContent) {
-        actualFileManager = createFileManager(allSourcePaths(sourcePath, docPath));
-
-        JavacTask task = JavacTool.create().getTask(
+        this.actualFileManager = createFileManager(allSourcePaths(sourcePath, docPath));
+        this.task = JavacTool.create().getTask(
                 null,
                 emptyFileManager, 
                 Javadocs::onDiagnostic,
@@ -66,9 +65,7 @@ public class Javadocs {
                 null,
                 null
         );
-
-        types = task.getTypes();
-        elements = task.getElements();
+        this.activeContent = activeContent;
     }
 
     private static Set<File> allSourcePaths(Set<Path>... userSourcePath) {
@@ -193,7 +190,7 @@ public class Javadocs {
     }
 
     private String paramType(VariableElement param) {
-        return types.erasure(param.asType()).toString();
+        return task.getTypes().erasure(param.asType()).toString();
     }
 
     private String docType(Parameter doc) {
@@ -271,13 +268,15 @@ public class Javadocs {
      */
     private RootDoc doIndex(String className) {
         try {
-            JavaFileObject source = actualFileManager.getJavaFileForInput(StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
+            JavaFileObject fromDisk = actualFileManager.getJavaFileForInput(StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
 
-            if (source == null) {
+            if (fromDisk == null) {
                 LOG.warning("No source file for " + className);
 
                 return EmptyRootDoc.INSTANCE;
             }
+
+            JavaFileObject source = activeFile(fromDisk);
             
             LOG.info("Found " + source.toUri() + " for " + className);
 
@@ -296,6 +295,12 @@ public class Javadocs {
         }
 
         return getSneakyReturn().orElse(EmptyRootDoc.INSTANCE);
+    }
+
+    private JavaFileObject activeFile(JavaFileObject file) {
+        return activeContent.apply(file.toUri())
+                .map(content -> (JavaFileObject) new StringFileObject(content, file.toUri()))
+                .orElse(file);
     }
 
     private Optional<RootDoc> getSneakyReturn() {
