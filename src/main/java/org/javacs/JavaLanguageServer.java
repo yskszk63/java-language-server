@@ -424,7 +424,7 @@ class JavaLanguageServer implements LanguageServer {
     }
     
     private void publishDiagnostics(Collection<URI> touched, List<javax.tools.Diagnostic<? extends JavaFileObject>> diagnostics) {
-        Map<URI, PublishDiagnosticsParams> files = new HashMap<>();
+        Map<URI, PublishDiagnosticsParams> files = touched.stream().collect(Collectors.toMap(uri -> uri, this::newPublishDiagnostics));
         
         for (javax.tools.Diagnostic<? extends JavaFileObject> error : diagnostics) {
             URI uri = error.getSource().toUri();
