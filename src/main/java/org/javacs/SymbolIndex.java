@@ -35,23 +35,17 @@ public class SymbolIndex {
      */
     private final Map<URI, SourceFileIndex> sourcePathFiles = new HashMap<>();
 
-    SymbolIndex(JavaLanguageServer parent) {
+    SymbolIndex(JavaLanguageServer parent, Set<Path> sourcePath) {
         this.languageServer = parent;
 
-        index(javaSources(parent.workspaceRoot()));
+        index(javaSources(sourcePath));
     }
 
-    private static Set<URI> javaSources(Path workspaceRoot) {
-        PathMatcher match = FileSystems.getDefault().getPathMatcher("glob:*.java");
-
-        try {
-            return Files.walk(workspaceRoot)
-                .filter(java -> match.matches(java.getFileName()))
+    private static Set<URI> javaSources(Set<Path> sourcePath) {
+        return sourcePath.stream()
+                .flatMap(InferConfig::allJavaFiles)
                 .map(Path::toUri)
                 .collect(Collectors.toSet());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private CompletableFuture<?> indexQueue = CompletableFuture.completedFuture(null);

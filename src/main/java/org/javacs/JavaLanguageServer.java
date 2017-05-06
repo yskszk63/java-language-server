@@ -511,7 +511,7 @@ class JavaLanguageServer implements LanguageServer {
 
         this.docs = new Javadocs(sourcePath, docPath, this::activeContent);
         this.compiler = JavacHolder.create(sourcePath, classPath, outputDirectory);
-        this.index = new SymbolIndex(this);
+        this.index = new SymbolIndex(this, sourcePath);
     }
 
     private void clearDiagnostics() {
