@@ -307,11 +307,6 @@ class JavaLanguageServer implements LanguageServer {
             public void didSave(DidSaveTextDocumentParams params) {
                 // Re-lint all active documents
                 doLint(activeDocuments.keySet());
-
-                // Re-index javadocs of saved document
-                URI uri = URI.create(params.getTextDocument().getUri());
-                
-                activeContent(uri).ifPresent(content -> doJavadoc(new StringFileObject(content, uri)));
             }
         };
     }
@@ -366,10 +361,6 @@ class JavaLanguageServer implements LanguageServer {
         errors.addAll(compile.errors.getDiagnostics());
 
         publishDiagnostics(paths, errors);
-    }
-
-    private void doJavadoc(JavaFileObject source) {
-        docs().update(source);
     }
 
     /**

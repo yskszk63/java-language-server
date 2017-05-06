@@ -9,6 +9,7 @@ import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javadoc.api.JavadocTool;
+import java.time.Instant;
 import org.eclipse.lsp4j.CompletionItem;
 
 import javax.lang.model.element.Element;
@@ -49,7 +50,17 @@ public class Javadocs {
     /**
      * All the classes we have indexed so far
      */
-    private final Map<String, RootDoc> topLevelClasses = new ConcurrentHashMap<>();
+    private final Map<String, IndexedDoc> topLevelClasses = new ConcurrentHashMap<>();
+
+    private static class IndexedDoc {
+        final RootDoc doc;
+        final Instant updated;
+
+        IndexedDoc(RootDoc doc, Instant updated) {
+            this.doc = doc;
+            this.updated = updated;
+        }
+    }
 
     private final JavacTask task;
 
@@ -229,53 +240,44 @@ public class Javadocs {
         return Optional.ofNullable(index.classNamed(className));
     }
 
-    void update(JavaFileObject source) {
-        LOG.info("Update javadocs for " + source.toUri());
-
-        DocumentationTool.DocumentationTask task = new JavadocTool().getTask(
-            null,
-            emptyFileManager,
-            Javadocs::onDiagnostic,
-            Javadocs.class,
-            ImmutableList.of("-private"),
-            ImmutableList.of(source)
-        );
-
-        task.call();
-
-        getSneakyReturn().ifPresent(root -> updateCache(root, source));
-    }
-
-    private void updateCache(RootDoc root, JavaFileObject source) {
-        for (ClassDoc each : root.classes()) {
-            if (source.isNameCompatible(each.simpleTypeName(), JavaFileObject.Kind.SOURCE)) {
-                topLevelClasses.put(each.qualifiedName(), root);
-
-                return;
-            }
-        }
-    }
-
     /**
      * Get or compute the javadoc for `className`
      */
     RootDoc index(String className) {
-        return topLevelClasses.computeIfAbsent(className, this::doIndex);
+        if (needsUpdate(className))
+            topLevelClasses.put(className, doIndex(className));
+
+        return topLevelClasses.get(className).doc;
+    }
+
+    private boolean needsUpdate(String className) {
+        if (!topLevelClasses.containsKey(className))
+            return true;
+
+        IndexedDoc indexed = topLevelClasses.get(className);
+        
+        try {
+            JavaFileObject fromDisk = actualFileManager.getJavaFileForInput(StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
+            Instant modified = Instant.ofEpochMilli(fromDisk.getLastModified());
+
+            return indexed.updated.isBefore(modified);
+        } catch (IOException e) {
+            throw new RuntimeException();
+        }
     }
 
     /**
      * Read all the Javadoc for `className`
      */
-    private RootDoc doIndex(String className) {
+    private IndexedDoc doIndex(String className) {
         try {
             JavaFileObject fromDisk = actualFileManager.getJavaFileForInput(StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
 
             if (fromDisk == null) {
                 LOG.warning("No source file for " + className);
 
-                return EmptyRootDoc.INSTANCE;
+                return new IndexedDoc(EmptyRootDoc.INSTANCE, Instant.EPOCH);
             }
-
             JavaFileObject source = activeFile(fromDisk);
             
             LOG.info("Found " + source.toUri() + " for " + className);
@@ -290,11 +292,11 @@ public class Javadocs {
             );
 
             task.call();
+
+            return new IndexedDoc(getSneakyReturn().orElse(EmptyRootDoc.INSTANCE), Instant.ofEpochMilli(fromDisk.getLastModified()));
         } catch (IOException e) {
             throw new RuntimeException();
         }
-
-        return getSneakyReturn().orElse(EmptyRootDoc.INSTANCE);
     }
 
     private JavaFileObject activeFile(JavaFileObject file) {
