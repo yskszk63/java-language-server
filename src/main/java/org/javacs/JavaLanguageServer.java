@@ -491,7 +491,7 @@ class JavaLanguageServer implements LanguageServer {
 
     // TODO this function needs to be invoked whenever the user creates a new .java file outside the existing source root
     private void createCompiler() {
-        Set<Path> sourcePath = InferConfig.workspaceSourcePath(workspaceRoot);
+        Set<Path> sourcePath = settings.java.sourceDirectories.orElseGet(() -> InferConfig.workspaceSourcePath(workspaceRoot));
         Path userHome = Paths.get(System.getProperty("user.home"));
         Path mavenHome = userHome.resolve(".m2");
         Path gradleHome = userHome.resolve(".gradle");
