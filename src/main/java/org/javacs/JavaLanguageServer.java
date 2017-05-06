@@ -93,9 +93,8 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("completion at %s %d:%d", uri, line, character));
 
-                JavacHolder compiler = compiler();
                 FocusedResult result = compiler.compileFocused(uri, content, line, character, true);
-                List<CompletionItem> items = Completions.at(result, index, docs())
+                List<CompletionItem> items = Completions.at(result, index, docs)
                         .limit(maxItems)
                         .collect(Collectors.toList());
                 CompletionList list = new CompletionList(items.size() == maxItems, items);
@@ -112,7 +111,7 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public CompletableFuture<CompletionItem> resolveCompletionItem(CompletionItem unresolved) {
                 return CompletableFutures.computeAsync(cancel -> {
-                    docs().resolveCompletionItem(unresolved);
+                    docs.resolveCompletionItem(unresolved);
 
                     return unresolved;
                 });
@@ -127,7 +126,6 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("hover at %s %d:%d", uri, line, character));
 
-                JavacHolder compiler = compiler();
                 FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
                 Hover hover = elementAtCursor(result)
                         .map(this::hoverText)
@@ -145,7 +143,7 @@ class JavaLanguageServer implements LanguageServer {
             }
 
             private Hover hoverText(Element el) {
-                return Hovers.hoverText(el, docs());
+                return Hovers.hoverText(el, docs);
             }
 
             private Hover emptyHover() {
@@ -161,9 +159,8 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("signatureHelp at %s %d:%d", uri, line, character));
 
-                JavacHolder compiler = compiler();
                 FocusedResult result = compiler.compileFocused(uri, content, line, character, true);
-                SignatureHelp help = Signatures.help(result, line, character, docs()).orElseGet(SignatureHelp::new);
+                SignatureHelp help = Signatures.help(result, line, character, docs).orElseGet(SignatureHelp::new);
 
                 return CompletableFuture.completedFuture(help);
             }
@@ -177,7 +174,6 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("definition at %s %d:%d", uri, line, character));
 
-                JavacHolder compiler = compiler();
                 FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
                 List<Location> locations = References.gotoDefinition(result, index)
                         .map(Collections::singletonList)
@@ -194,7 +190,6 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("references at %s %d:%d", uri, line, character));
 
-                JavacHolder compiler = compiler();
                 FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
                 List<Location> locations = References.findReferences(result, index)
                         .collect(Collectors.toList());
@@ -229,7 +224,6 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("codeAction at %s %d:%d", uri, line, character));
 
-                JavacHolder compiler = compiler();
                 List<Command> commands = new CodeActions(compiler, uri, activeContent(uri), line, character, index).find(params);
 
                 return CompletableFuture.completedFuture(commands);
@@ -353,7 +347,6 @@ class JavaLanguageServer implements LanguageServer {
     private void doLint(Collection<URI> paths) {
         LOG.info("Lint " + Joiner.on(", ").join(paths));
 
-        JavacHolder compiler = compiler();
         List<javax.tools.Diagnostic<? extends JavaFileObject>> errors = new ArrayList<>();
         Map<URI, Optional<String>> content = paths.stream()
             .collect(Collectors.toMap(f -> f, this::activeContent));
@@ -391,7 +384,6 @@ class JavaLanguageServer implements LanguageServer {
                         URI fileUri = URI.create(fileString);
                         String packageName = (String) params.getArguments().get(1);
                         String className = (String) params.getArguments().get(2);
-                        JavacHolder compiler = compiler();
                         FocusedResult compiled = compiler.compileFocused(fileUri, activeContent(fileUri), 1, 1, false);
 
                         if (compiled.compilationUnit.getSourceFile().toUri().equals(fileUri)) {
@@ -464,20 +456,6 @@ class JavaLanguageServer implements LanguageServer {
     private JavacHolder compiler = null;
     private Javadocs docs = null;
 
-    /**
-     * Default compiler generated using InferConfig
-     */
-    JavacHolder compiler() {
-        return compiler;
-    }
-
-    /**
-     * Default javadocs generated using InferConfig
-     */
-    Javadocs docs() {
-        return docs;
-    }
-
     // TODO this function needs to be invoked whenever the user creates a new .java file outside the existing source root
     private void createCompiler() {
         Set<Path> sourcePath = settings.java.sourceDirectories.orElseGet(() -> InferConfig.workspaceSourcePath(workspaceRoot));
@@ -520,7 +498,6 @@ class JavaLanguageServer implements LanguageServer {
 
     public Optional<Element> findSymbol(URI file, int line, int character) {
         Optional<String> content = activeContent(file);
-        JavacHolder compiler = compiler();
         FocusedResult result = compiler.compileFocused(file, content, line, character, false);
         Trees trees = Trees.instance(result.task);
         Function<TreePath, Optional<Element>> findSymbol = cursor -> Optional.ofNullable(trees.getElement(cursor));
