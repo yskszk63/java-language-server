@@ -40,7 +40,6 @@ class JavaLanguageServer implements LanguageServer {
     private CompletableFuture<LanguageClient> client = new CompletableFuture<>();
     private Path workspaceRoot = Paths.get(".");
     private JavaSettings settings = new JavaSettings();
-    private SymbolIndex index;
 
     JavaLanguageServer() {
     }
@@ -48,8 +47,6 @@ class JavaLanguageServer implements LanguageServer {
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
         workspaceRoot = Paths.get(params.getRootPath()).toAbsolutePath().normalize();
-
-        createCompiler();
 
         InitializeResult result = new InitializeResult();
 
@@ -93,8 +90,8 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("completion at %s %d:%d", uri, line, character));
 
-                FocusedResult result = compiler.compileFocused(uri, content, line, character, true);
-                List<CompletionItem> items = Completions.at(result, index, docs)
+                FocusedResult result = configured().compiler.compileFocused(uri, content, line, character, true);
+                List<CompletionItem> items = Completions.at(result, configured().index, configured().docs)
                         .limit(maxItems)
                         .collect(Collectors.toList());
                 CompletionList list = new CompletionList(items.size() == maxItems, items);
@@ -111,7 +108,7 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public CompletableFuture<CompletionItem> resolveCompletionItem(CompletionItem unresolved) {
                 return CompletableFutures.computeAsync(cancel -> {
-                    docs.resolveCompletionItem(unresolved);
+                    configured().docs.resolveCompletionItem(unresolved);
 
                     return unresolved;
                 });
@@ -126,7 +123,7 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("hover at %s %d:%d", uri, line, character));
 
-                FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
+                FocusedResult result = configured().compiler.compileFocused(uri, content, line, character, false);
                 Hover hover = elementAtCursor(result)
                         .map(this::hoverText)
                         .orElseGet(this::emptyHover);
@@ -143,7 +140,7 @@ class JavaLanguageServer implements LanguageServer {
             }
 
             private Hover hoverText(Element el) {
-                return Hovers.hoverText(el, docs);
+                return Hovers.hoverText(el, configured().docs);
             }
 
             private Hover emptyHover() {
@@ -159,8 +156,8 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("signatureHelp at %s %d:%d", uri, line, character));
 
-                FocusedResult result = compiler.compileFocused(uri, content, line, character, true);
-                SignatureHelp help = Signatures.help(result, line, character, docs).orElseGet(SignatureHelp::new);
+                FocusedResult result = configured().compiler.compileFocused(uri, content, line, character, true);
+                SignatureHelp help = Signatures.help(result, line, character, configured().docs).orElseGet(SignatureHelp::new);
 
                 return CompletableFuture.completedFuture(help);
             }
@@ -174,8 +171,8 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("definition at %s %d:%d", uri, line, character));
 
-                FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
-                List<Location> locations = References.gotoDefinition(result, index)
+                FocusedResult result = configured().compiler.compileFocused(uri, content, line, character, false);
+                List<Location> locations = References.gotoDefinition(result, configured().index)
                         .map(Collections::singletonList)
                         .orElseGet(Collections::emptyList);
                 return CompletableFuture.completedFuture(locations);
@@ -190,8 +187,8 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("references at %s %d:%d", uri, line, character));
 
-                FocusedResult result = compiler.compileFocused(uri, content, line, character, false);
-                List<Location> locations = References.findReferences(result, index)
+                FocusedResult result = configured().compiler.compileFocused(uri, content, line, character, false);
+                List<Location> locations = References.findReferences(result, configured().index)
                         .collect(Collectors.toList());
 
                 return CompletableFuture.completedFuture(locations);
@@ -205,7 +202,7 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public CompletableFuture<List<? extends SymbolInformation>> documentSymbol(DocumentSymbolParams params) {
                 URI uri = URI.create(params.getTextDocument().getUri());
-                List<SymbolInformation> symbols = index.allInFile(uri).collect(Collectors.toList());
+                List<SymbolInformation> symbols = configured().index.allInFile(uri).collect(Collectors.toList());
 
                 return CompletableFuture.completedFuture(symbols);
             }
@@ -224,7 +221,7 @@ class JavaLanguageServer implements LanguageServer {
 
                 LOG.info(String.format("codeAction at %s %d:%d", uri, line, character));
 
-                List<Command> commands = new CodeActions(compiler, uri, activeContent(uri), line, character, index).find(params);
+                List<Command> commands = new CodeActions(configured().compiler, uri, activeContent(uri), line, character, configured().index).find(params);
 
                 return CompletableFuture.completedFuture(commands);
             }
@@ -353,7 +350,7 @@ class JavaLanguageServer implements LanguageServer {
         List<javax.tools.Diagnostic<? extends JavaFileObject>> errors = new ArrayList<>();
         Map<URI, Optional<String>> content = paths.stream()
             .collect(Collectors.toMap(f -> f, this::activeContent));
-        BatchResult compile = compiler.compileBatch(content);
+        BatchResult compile = configured().compiler.compileBatch(content);
 
         errors.addAll(compile.errors.getDiagnostics());
 
@@ -387,7 +384,7 @@ class JavaLanguageServer implements LanguageServer {
                         URI fileUri = URI.create(fileString);
                         String packageName = (String) params.getArguments().get(1);
                         String className = (String) params.getArguments().get(2);
-                        FocusedResult compiled = compiler.compileFocused(fileUri, activeContent(fileUri), 1, 1, false);
+                        FocusedResult compiled = configured().compiler.compileFocused(fileUri, activeContent(fileUri), 1, 1, false);
 
                         if (compiled.compilationUnit.getSourceFile().toUri().equals(fileUri)) {
                             List<TextEdit> edits = new RefactorFile(compiled.task, compiled.compilationUnit)
@@ -409,7 +406,7 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public CompletableFuture<List<? extends SymbolInformation>> symbol(WorkspaceSymbolParams params) {
-                List<SymbolInformation> infos = index.search(params.getQuery()).collect(Collectors.toList());
+                List<SymbolInformation> infos = configured().index.search(params.getQuery()).collect(Collectors.toList());
 
                 return CompletableFuture.completedFuture(infos);
             }
@@ -417,8 +414,6 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public void didChangeConfiguration(DidChangeConfigurationParams change) {
                 settings = Main.JSON.convertValue(change.getSettings(), JavaSettings.class);
-
-                createCompiler();
             }
 
             @Override
@@ -430,21 +425,19 @@ class JavaLanguageServer implements LanguageServer {
     
     private void publishDiagnostics(Collection<URI> touched, List<javax.tools.Diagnostic<? extends JavaFileObject>> diagnostics) {
         Map<URI, PublishDiagnosticsParams> files = new HashMap<>();
-
-        touched.forEach(p -> files.put(p, newPublishDiagnostics(p)));
         
         for (javax.tools.Diagnostic<? extends JavaFileObject> error : diagnostics) {
             URI uri = error.getSource().toUri();
-
-            if (!files.containsKey(uri))
-                break;
-
-            PublishDiagnosticsParams publish = files.get(uri);
-
+            PublishDiagnosticsParams publish = files.computeIfAbsent(uri, this::newPublishDiagnostics);
             Lints.convert(error).ifPresent(publish.getDiagnostics()::add);
         }
 
-        client.thenAccept(resolved -> files.values().forEach(resolved::publishDiagnostics));
+        files.forEach((file, errors) -> {
+            if (touched.contains(file))
+                client.join().publishDiagnostics(errors);
+            else 
+                LOG.info("Ignored " + errors.getDiagnostics().size() + " errors from not-open file " + file);
+        });
     }
 
     private PublishDiagnosticsParams newPublishDiagnostics(URI newUri) {
@@ -456,11 +449,36 @@ class JavaLanguageServer implements LanguageServer {
         return p;
     }
 
-    private JavacHolder compiler = null;
-    private Javadocs docs = null;
+    private static class Configured {
+        final JavacHolder compiler;
+        final Javadocs docs;
+        final SymbolIndex index;
+
+        Configured(JavacHolder compiler, Javadocs docs, SymbolIndex index) {
+            this.compiler = compiler;
+            this.docs = docs;
+            this.index = index;
+        }
+    }
+
+    private Configured cacheConfigured;
+    private JavaSettings cacheSettings;
+    private Path cacheWorkspaceRoot;
+
+    private Configured configured() {
+        if (cacheConfigured == null || !Objects.equals(settings, cacheSettings) || !Objects.equals(workspaceRoot, cacheWorkspaceRoot)) {
+            cacheConfigured = createCompiler(settings, workspaceRoot);
+            cacheSettings = settings;
+            cacheWorkspaceRoot = workspaceRoot;
+
+            clearDiagnostics();
+        }
+
+        return cacheConfigured;
+    }
 
     // TODO this function needs to be invoked whenever the user creates a new .java file outside the existing source root
-    private void createCompiler() {
+    private Configured createCompiler(JavaSettings settings, Path workspaceRoot) {
         Set<Path> sourcePath = settings.java.sourceDirectories.isEmpty() ? 
             InferConfig.workspaceSourcePath(workspaceRoot) : 
             settings.java.sourceDirectories.stream().collect(Collectors.toSet());
@@ -479,11 +497,11 @@ class JavaLanguageServer implements LanguageServer {
         LOG.info("\tdocPath:" + Joiner.on(' ').join(docPath));
         LOG.info("\toutputDirectory:" + outputDirectory);
 
-        clearDiagnostics();
+        JavacHolder compiler = JavacHolder.create(sourcePath, classPath, outputDirectory);
+        Javadocs docs = new Javadocs(sourcePath, docPath, this::activeContent);
+        SymbolIndex index = new SymbolIndex(sourcePath, activeDocuments::keySet, this::activeContent, compiler);
 
-        this.docs = new Javadocs(sourcePath, docPath, this::activeContent);
-        this.compiler = JavacHolder.create(sourcePath, classPath, outputDirectory);
-        this.index = new SymbolIndex(sourcePath, activeDocuments::keySet, this::activeContent, this.compiler);
+        return new Configured(compiler, docs, index);
     }
 
     private void clearDiagnostics() {
@@ -493,7 +511,7 @@ class JavaLanguageServer implements LanguageServer {
         });
     }
 
-    private Path defaultOutputDirectory() {
+    private static Path defaultOutputDirectory() {
         try {
             return Files.createTempDirectory("vscode-javac-output"); // TODO this should be consistent within a project
         } catch (IOException e) {
@@ -503,7 +521,7 @@ class JavaLanguageServer implements LanguageServer {
 
     public Optional<Element> findSymbol(URI file, int line, int character) {
         Optional<String> content = activeContent(file);
-        FocusedResult result = compiler.compileFocused(file, content, line, character, false);
+        FocusedResult result = configured().compiler.compileFocused(file, content, line, character, false);
         Trees trees = Trees.instance(result.task);
         Function<TreePath, Optional<Element>> findSymbol = cursor -> Optional.ofNullable(trees.getElement(cursor));
 
