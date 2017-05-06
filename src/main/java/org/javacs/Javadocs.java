@@ -258,6 +258,10 @@ public class Javadocs {
         
         try {
             JavaFileObject fromDisk = actualFileManager.getJavaFileForInput(StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
+
+            if (fromDisk == null)
+                return true;
+                
             Instant modified = Instant.ofEpochMilli(fromDisk.getLastModified());
 
             return indexed.updated.isBefore(modified);
