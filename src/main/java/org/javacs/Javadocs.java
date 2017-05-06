@@ -45,7 +45,7 @@ public class Javadocs {
     /**
      * Empty file manager we pass to javadoc to prevent it from roaming all over the place
      */
-    private final JavacFileManager emptyFileManager = JavacTool.create().getStandardFileManager(Javadocs::onDiagnostic, null, null);
+    private final JavacFileManager emptyFileManager = JavacTool.create().getStandardFileManager(JavaLanguageServer::onDiagnostic, null, null);
 
     /**
      * All the classes we have indexed so far
@@ -71,7 +71,7 @@ public class Javadocs {
         this.task = JavacTool.create().getTask(
                 null,
                 emptyFileManager, 
-                Javadocs::onDiagnostic,
+                JavaLanguageServer::onDiagnostic,
                 null,
                 null,
                 null
@@ -95,7 +95,7 @@ public class Javadocs {
     }
 
     private static JavacFileManager createFileManager(Set<File> allSourcePaths) {
-        JavacFileManager actualFileManager = JavacTool.create().getStandardFileManager(Javadocs::onDiagnostic, null, null);
+        JavacFileManager actualFileManager = JavacTool.create().getStandardFileManager(JavaLanguageServer::onDiagnostic, null, null);
 
         try {
             actualFileManager.setLocation(StandardLocation.SOURCE_PATH, allSourcePaths);
@@ -289,7 +289,7 @@ public class Javadocs {
             DocumentationTool.DocumentationTask task = new JavadocTool().getTask(
                     null,
                     emptyFileManager,
-                    Javadocs::onDiagnostic,
+                    JavaLanguageServer::onDiagnostic,
                     Javadocs.class,
                     null,
                     ImmutableList.of(source)
@@ -354,28 +354,6 @@ public class Javadocs {
             return Optional.of(file);
         else
             return Optional.empty();
-    }
-
-    private static void onDiagnostic(Diagnostic<? extends JavaFileObject> diagnostic) {
-        Level level = level(diagnostic.getKind());
-        String message = diagnostic.getMessage(null);
-
-        LOG.log(level, message);
-    }
-
-    private static Level level(Diagnostic.Kind kind) {
-        switch (kind) {
-            case ERROR:
-                return Level.SEVERE;
-            case WARNING:
-            case MANDATORY_WARNING:
-                return Level.WARNING;
-            case NOTE:
-                return Level.INFO;
-            case OTHER:
-            default:
-                return Level.FINE;
-        }
     }
 
     public void resolveCompletionItem(CompletionItem unresolved) {

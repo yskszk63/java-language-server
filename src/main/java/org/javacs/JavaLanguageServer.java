@@ -16,6 +16,7 @@ import org.eclipse.lsp4j.services.WorkspaceService;
 
 import javax.lang.model.element.Element;
 import javax.tools.JavaFileObject;
+import javax.tools.Diagnostic;
 import java.io.*;
 import java.net.URI;
 import java.nio.file.Files;
@@ -511,7 +512,7 @@ class JavaLanguageServer implements LanguageServer {
 
         this.docs = new Javadocs(sourcePath, docPath, this::activeContent);
         this.compiler = JavacHolder.create(sourcePath, classPath, outputDirectory);
-        this.index = new SymbolIndex(this, sourcePath);
+        this.index = new SymbolIndex(sourcePath, activeDocuments::keySet, this::activeContent, this.compiler);
     }
 
     private void clearDiagnostics() {
@@ -587,5 +588,27 @@ class JavaLanguageServer implements LanguageServer {
         Objects.requireNonNull(workspaceRoot, "Language server has not been initialized");
 
         return workspaceRoot;
+    }
+
+    static void onDiagnostic(Diagnostic<? extends JavaFileObject> diagnostic) {
+        Level level = level(diagnostic.getKind());
+        String message = diagnostic.getMessage(null);
+
+        LOG.log(level, message);
+    }
+
+    private static Level level(Diagnostic.Kind kind) {
+        switch (kind) {
+            case ERROR:
+                return Level.SEVERE;
+            case WARNING:
+            case MANDATORY_WARNING:
+                return Level.WARNING;
+            case NOTE:
+                return Level.INFO;
+            case OTHER:
+            default:
+                return Level.FINE;
+        }
     }
 }

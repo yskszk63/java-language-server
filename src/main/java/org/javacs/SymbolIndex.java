@@ -3,6 +3,18 @@ package org.javacs;
 import com.google.common.collect.Maps;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
+import com.sun.tools.javac.api.JavacTool;
+import com.sun.tools.javac.file.JavacFileManager;
+import java.io.File;
+import java.nio.file.Paths;
+import java.time.Instant;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardLocation;
 import org.eclipse.lsp4j.*;
 
 import javax.lang.model.element.Element;
@@ -18,6 +30,7 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -28,66 +41,91 @@ import java.util.stream.Stream;
  */
 public class SymbolIndex {
 
-    private final JavaLanguageServer languageServer;
+    private final Set<Path> sourcePath;
+
+    private final Supplier<Collection<URI>> openFiles;
+
+    private final Function<URI, Optional<String>> activeContent;
+
+    private final JavacHolder compiler;
+
+    private final JavacFileManager fileManager;
 
     /**
      * Source path files, for which we support methods and classes
      */
-    private final Map<URI, SourceFileIndex> sourcePathFiles = new HashMap<>();
+    private final Map<URI, SourceFileIndex> sourcePathFiles = new ConcurrentHashMap<>();
 
-    SymbolIndex(JavaLanguageServer parent, Set<Path> sourcePath) {
-        this.languageServer = parent;
+    private final CompletableFuture<?> finishedInitialIndex = new CompletableFuture<>();
 
-        index(javaSources(sourcePath));
+    SymbolIndex(Set<Path> sourcePath, Supplier<Collection<URI>> openFiles, Function<URI, Optional<String>> activeContent, JavacHolder compiler) {
+        this.sourcePath = sourcePath;
+        this.openFiles = openFiles;
+        this.activeContent = activeContent;
+        this.compiler = compiler;
+        this.fileManager = createFileManager(sourcePath);
+
+        new Thread(() -> {
+            updateIndex(allJavaSources());
+
+            finishedInitialIndex.complete(null);
+        }, "Initial-Index").start();
     }
 
-    private static Set<URI> javaSources(Set<Path> sourcePath) {
+    private static JavacFileManager createFileManager(Set<Path> sourcePath) {
+        Set<File> files = sourcePath.stream()
+            .map(Path::toFile)
+            .collect(Collectors.toSet());
+        JavacFileManager actualFileManager = JavacTool.create().getStandardFileManager(JavaLanguageServer::onDiagnostic, null, null);
+
+        try {
+            actualFileManager.setLocation(StandardLocation.SOURCE_PATH, files);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        return actualFileManager;
+    }
+
+    private Set<URI> allJavaSources() {
         return sourcePath.stream()
                 .flatMap(InferConfig::allJavaFiles)
                 .map(Path::toUri)
                 .collect(Collectors.toSet());
     }
 
-    private CompletableFuture<?> indexQueue = CompletableFuture.completedFuture(null);
-
-    /**
-     * Index exported declarations and references for all files on the source path
-     * This may take a while, so we'll do it on an extra thread
-     */
-    private CompletableFuture<?> index(Set<URI> sources) {
-        LOG.info("Index " + sources.size() + " sources in " + languageServer.workspaceRoot());
+    private void updateIndex(Collection<URI> files) {
+        Map<URI, Optional<String>> outOfDate = files.stream()
+            .filter(this::needsUpdate)
+            .collect(Collectors.toMap(key -> key, activeContent));
         
-        Map<URI, Optional<String>> active = sources.stream()
-            .collect(Collectors.toMap(key -> key, languageServer::activeContent));
+        LOG.info("Index " + outOfDate.size() + " sources");
 
-        indexQueue = indexQueue.thenRun(() -> {
-            BatchResult compiled = languageServer.compiler()
-                .compileBatch(active, this::update);
-            
-            languageServer.publishDiagnostics(sources, compiled.errors.getDiagnostics());
-        });
-
-        return indexQueue;
+        compiler.compileBatch(outOfDate, this::update);
     }
 
-    private void updateOpenFiles() {
-        Map<URI, Optional<String>> open = Maps.transformValues(languageServer.activeDocuments(), Optional::of);
+    private boolean needsUpdate(URI file) {
+        Path path = Paths.get(file);
+        
+        if (!sourcePathFiles.containsKey(file))
+            return true;
+        else try {
+            Instant updated = sourcePathFiles.get(file).updated;
+            Instant modified = Files.getLastModifiedTime(path).toInstant();
 
-        languageServer.compiler().compileBatch(open, this::update);
-    }
-
-    private void updateOpenFile(URI file) {
-        LOG.info("Update index for " + file);
-
-        Map<URI, Optional<String>> todo = Collections.singletonMap(file, languageServer.activeContent(file));
-        BatchResult compiled = languageServer.compiler().compileBatch(todo, this::update);
+            return updated.isBefore(modified);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
      * Search all indexed symbols
      */
     public Stream<SymbolInformation> search(String query) {
-        updateOpenFiles();
+        finishedInitialIndex.join();
+
+        updateIndex(openFiles.get());
 
         Stream<SymbolInformation> classes = allSymbols(ElementKind.CLASS, true);
         Stream<SymbolInformation> methods = allSymbols(ElementKind.METHOD, true);
@@ -100,7 +138,7 @@ public class SymbolIndex {
      * Get all symbols in an open file
      */
     public Stream<SymbolInformation> allInFile(URI source) {
-        updateOpenFile(source);
+        updateIndex(Collections.singleton(source));
 
         SourceFileIndex index = sourcePathFiles.getOrDefault(source, new SourceFileIndex());
 
@@ -111,8 +149,10 @@ public class SymbolIndex {
      * All indexed symbols of a kind
      */
     public Stream<SymbolInformation> allSymbols(ElementKind kind, boolean updateIndex) {
+        finishedInitialIndex.join();
+
         if (updateIndex)
-            updateOpenFiles();
+            updateIndex(openFiles.get());
 
         return sourcePathFiles.values().stream().flatMap(f -> allSymbolsInFile(f, kind));
     }
@@ -127,7 +167,9 @@ public class SymbolIndex {
      * Find all references to a symbol
      */
     public Stream<Location> references(Element symbol) {
-        updateOpenFiles();
+        finishedInitialIndex.join();
+
+        updateIndex(openFiles.get());
 
         String key = qualifiedName(symbol);
 
@@ -140,8 +182,18 @@ public class SymbolIndex {
     }
 
     public Optional<SymbolInformation> find(Element symbol) {
-        updateOpenFiles();
+        topLevelClass(symbol).ifPresent(c -> {
+            try {
+                String className = c.getQualifiedName().toString();
+                JavaFileObject file = fileManager.getJavaFileForInput(StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
 
+                if (file != null)
+                    updateIndex(Collections.singleton(file.toUri()));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        
         ElementKind kind = symbol.getKind();
         String key = qualifiedName(symbol);
 
@@ -153,6 +205,19 @@ public class SymbolIndex {
         }
 
         return Optional.empty();
+    }
+
+    private Optional<TypeElement> topLevelClass(Element symbol) {
+        TypeElement found = null;
+
+        while (symbol != null) {
+            if (symbol instanceof TypeElement)
+                found = (TypeElement) symbol;
+
+            symbol = symbol.getEnclosingElement();
+        }
+
+        return Optional.ofNullable(found);
     }
 
     private static String qualifiedName(Element s) {
@@ -484,13 +549,6 @@ public class SymbolIndex {
             default:
                 return SymbolKind.String;
         }
-    }
-
-    /**
-     * Clear a file from the index when it is deleted or is about to be re-indexed
-     */
-    public void clear(URI file) {
-        sourcePathFiles.remove(file);
     }
 
     private static final Logger LOG = Logger.getLogger("main");
