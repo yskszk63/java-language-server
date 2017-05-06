@@ -60,7 +60,6 @@ class InferConfig {
      * Infer source directories by searching for .java files and examining their package declaration.
      */
     static Set<Path> workspaceSourcePath(Path workspaceRoot) {
-        PathMatcher match = FileSystems.getDefault().getPathMatcher("glob:*.java");
         Function<Path, Optional<Path>> root = java -> {
             CompilationUnitTree tree = parse(java.toUri(), Optional.empty()); // TODO get from JavaLanguageServer
             ExpressionTree packageTree = tree.getPackageName();
@@ -88,13 +87,19 @@ class InferConfig {
             }
         };
 
+        return allJavaFiles(workspaceRoot)
+            .flatMap(java -> stream(root.apply(java)))
+            .collect(Collectors.toSet());
+    }
+
+    static Stream<Path> allJavaFiles(Path workspaceRoot) {
+        PathMatcher match = FileSystems.getDefault().getPathMatcher("glob:*.java");
+
         try {
             // TODO instead of looking at EVERY file, once you see a few files with the same source directory,
             // ignore all subsequent files in the directory
             return Files.walk(workspaceRoot)
-                .filter(java -> match.matches(java.getFileName()))
-                .flatMap(java -> stream(root.apply(java)))
-                .collect(Collectors.toSet());
+                .filter(java -> match.matches(java.getFileName()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

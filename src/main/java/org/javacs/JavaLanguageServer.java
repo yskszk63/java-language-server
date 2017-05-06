@@ -507,9 +507,18 @@ class JavaLanguageServer implements LanguageServer {
         LOG.info("\tdocPath:" + Joiner.on(' ').join(docPath));
         LOG.info("\toutputDirectory:" + outputDirectory);
 
+        clearDiagnostics();
+
         this.docs = new Javadocs(sourcePath, docPath, this::activeContent);
         this.compiler = JavacHolder.create(sourcePath, classPath, outputDirectory);
         this.index = new SymbolIndex(this);
+    }
+
+    private void clearDiagnostics() {
+        client.thenAccept(languageClient -> {
+            InferConfig.allJavaFiles(workspaceRoot)
+                .forEach(file -> languageClient.publishDiagnostics(newPublishDiagnostics(file.toUri())));
+        });
     }
 
     private Path defaultOutputDirectory() {
