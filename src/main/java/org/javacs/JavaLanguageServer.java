@@ -296,6 +296,9 @@ class JavaLanguageServer implements LanguageServer {
 
                 // Remove from source cache
                 activeDocuments.remove(uri);
+
+                // Clear diagnostics
+                client.join().publishDiagnostics(newPublishDiagnostics(uri));
             }
 
             @Override
