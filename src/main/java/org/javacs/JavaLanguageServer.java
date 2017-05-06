@@ -266,16 +266,12 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public void didOpen(DidOpenTextDocumentParams params) {
-                try {
-                    TextDocumentItem document = params.getTextDocument();
-                    URI uri = URI.create(document.getUri());
+                TextDocumentItem document = params.getTextDocument();
+                URI uri = URI.create(document.getUri());
 
-                    activeDocuments.put(uri, new VersionedContent(document.getText(), document.getVersion()));
+                activeDocuments.put(uri, new VersionedContent(document.getText(), document.getVersion()));
 
-                    doLint(Collections.singleton(uri));
-                } catch (NoJavaConfigException e) {
-                    throw ShowMessageException.warning(e.getMessage(), e);
-                }
+                doLint(Collections.singleton(uri));
             }
 
             @Override
