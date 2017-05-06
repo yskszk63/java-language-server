@@ -5,6 +5,7 @@
 * array.length doesn't auto-complete
 * Hover doesn't show 'throws ...'
 * Enum const javadocs are not showing
+* TypeElement::getQualifiedName not auto-completing
 
 ## Default configuration
 * Alert if we can't find a dependency
