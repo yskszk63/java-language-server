@@ -428,35 +428,23 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
-                for (FileEvent event : params.getChanges()) {
-                    if (event.getUri().endsWith(".java")) {
-                        if (event.getType() == FileChangeType.Deleted) {
-                            URI uri = URI.create(event.getUri());
-
-                            activeDocuments.remove(uri);
-
-                            JavacHolder compiler = compiler();
-                            BatchResult result = compiler.delete(uri);
-
-                            publishDiagnostics(Collections.singleton(uri), result.errors.getDiagnostics());
-                        }
-                    }
-                    else if (event.getUri().endsWith("javaconfig.json")) {
-                        // TODO invalidate caches when javaconfig.json changes
-                    }
-                }
+                doLint(activeDocuments.keySet());
             }
         };
     }
     
-    void publishDiagnostics(Collection<URI> touched, List<javax.tools.Diagnostic<? extends JavaFileObject>> diagnostics) {
+    private void publishDiagnostics(Collection<URI> touched, List<javax.tools.Diagnostic<? extends JavaFileObject>> diagnostics) {
         Map<URI, PublishDiagnosticsParams> files = new HashMap<>();
 
         touched.forEach(p -> files.put(p, newPublishDiagnostics(p)));
         
         for (javax.tools.Diagnostic<? extends JavaFileObject> error : diagnostics) {
             URI uri = error.getSource().toUri();
-            PublishDiagnosticsParams publish = files.computeIfAbsent(uri, this::newPublishDiagnostics);
+
+            if (!files.containsKey(uri))
+                break;
+
+            PublishDiagnosticsParams publish = files.get(uri);
 
             Lints.convert(error).ifPresent(publish.getDiagnostics()::add);
         }

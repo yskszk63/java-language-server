@@ -255,19 +255,6 @@ public class JavacHolder {
             throw ShowMessageException.error("Output directory " + dir + " is not a directory", null);
     }
 
-    /**
-     * File has been deleted
-     */
-    // TODO delete multiple objects apply the same time for performance if user does that
-    public BatchResult delete(URI uri) {
-        JavaFileObject object = findFile(uri, Optional.empty());
-        Map<URI, Optional<String>> deps = dependencies(Collections.singleton(object))
-                .stream()
-                .collect(Collectors.toMap(o -> o.toUri(), o -> Optional.empty()));
-
-        return compileBatch(deps);
-    }
-
     // TODO this should return Optional.empty() file URI is not file: and text is empty
     private JavaFileObject findFile(URI file, Optional<String> text) {
         return text
@@ -321,8 +308,6 @@ public class JavacHolder {
                 .map(e -> findFile(e.getKey(), e.getValue()))
                 .collect(Collectors.toList());
 
-        objects.addAll(dependencies(objects));
-
         JavacTask task = createTask(objects, false);
 
         try {
@@ -364,10 +349,5 @@ public class JavacHolder {
             return true;
         }
         else return false;
-    }
-
-    private Collection<JavaFileObject> dependencies(Collection<JavaFileObject> files) {
-        // TODO use index to find dependencies
-        return Collections.emptyList();
     }
 }
