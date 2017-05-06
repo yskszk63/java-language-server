@@ -34,8 +34,8 @@ public class CompletionsTest extends CompletionsBase {
         // Static methods
         Set<String> suggestions = insertText(file, 7, 44);
 
-        assertThat(suggestions, hasItems("methodStatic"));
-        assertThat(suggestions, not(hasItems( "methods", "new")));
+        assertThat(suggestions, hasItems("methods", "methodStatic"));
+        assertThat(suggestions, not(hasItems("new")));
     }
 
     @Test
@@ -94,19 +94,6 @@ public class CompletionsTest extends CompletionsBase {
 
         assertThat(suggestions, hasItems("fieldStatic", "methodStatic"));
         assertThat(suggestions, not(hasItems("fields", "methods")));
-
-        // TODO
-//        // this::m
-//        suggestions = insertText(file, 10, 15);
-//
-//        assertThat(suggestions, hasItems("methods"));
-//        assertThat(suggestions, not(hasItems("fields", "fieldStatic", "methodStatic")));
-//
-//        // AutocompleteMembers::m
-//        suggestions = insertText(file, 11, 30);
-//
-//        assertThat(suggestions, hasItems("methodStatic"));
-//        assertThat(suggestions, not(hasItems("fields", "fieldStatic", "methods")));
     }
 
     @Test
@@ -159,8 +146,8 @@ public class CompletionsTest extends CompletionsBase {
         // AutocompleteMembers::m
         Set<String> suggestions = insertText(file, 26, 74);
 
-        assertThat(suggestions, hasItems("methodStatic"));
-        assertThat(suggestions, not(hasItems("fields", "fieldStatic", "methods")));
+        assertThat(suggestions, hasItems("methodStatic", "methods"));
+        assertThat(suggestions, not(hasItems("fields", "fieldStatic")));
     }
 
     @Test

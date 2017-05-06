@@ -8,6 +8,7 @@ import com.sun.source.util.TreePath;
 enum CursorContext {
     NewClass(Tree.Kind.NEW_CLASS),
     Import(Tree.Kind.IMPORT),
+    Reference(Tree.Kind.MEMBER_REFERENCE),
     Other(null);
 
     final Tree.Kind kind;
@@ -43,8 +44,9 @@ enum CursorContext {
         if (path == null)
             return Other;
         else switch (path.getLeaf().getKind()) {
-            case MEMBER_SELECT:
             case MEMBER_REFERENCE:
+                return Reference;
+            case MEMBER_SELECT:
             case IDENTIFIER:
                 return fromIdentifier(path.getParentPath(), path.getLeaf());
             case NEW_CLASS:

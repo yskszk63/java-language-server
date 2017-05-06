@@ -98,7 +98,6 @@ class Completions {
                         .flatMap(this::explodeConstructors)
                         .filter(init -> trees.isAccessible(from, init, (DeclaredType) init.getEnclosingElement().asType()))
                         .flatMap(this::completionItem);
-            case Other:
             default: {
                 Predicate<Element> accessible = e -> {
                     if (e == null)
@@ -129,20 +128,19 @@ class Completions {
     private Stream<CompletionItem> completeMembers(TreePath expression, String partialIdentifier, Scope from, CursorContext context) {
         switch (context) {
             case NewClass:
-                return allMembers(expression, partialIdentifier, from)
+                return allMembers(expression, partialIdentifier, from, false)
                         .flatMap(this::explodeConstructors)
                         .filter(init -> trees.isAccessible(from, init, (DeclaredType) init.getEnclosingElement().asType()))
                         .flatMap(this::completionItem);
             case Import: {
-                return allMembers(expression, partialIdentifier, from)
+                return allMembers(expression, partialIdentifier, from, false)
                         .filter(member -> !(member instanceof TypeElement) || trees.isAccessible(from, (TypeElement) member))
                         .flatMap(this::completionItem);
             }
-            case Other:
             default: {
                 DeclaredType type = (DeclaredType) task.getTypes().erasure(trees.getTypeMirror(expression));
 
-                return allMembers(expression, partialIdentifier, from)
+                return allMembers(expression, partialIdentifier, from, context == CursorContext.Reference)
                         .filter(member -> member.getKind() != ElementKind.CONSTRUCTOR)
                         .filter(e -> trees.isAccessible(from, e, type))
                         .flatMap(this::completionItem);
@@ -150,7 +148,7 @@ class Completions {
         }
     }
 
-    private Stream<? extends Element> allMembers(TreePath expression, String partialIdentifier, Scope from) {
+    private Stream<? extends Element> allMembers(TreePath expression, String partialIdentifier, Scope from, boolean isMethodReference) {
         Element element = trees.getElement(expression);
 
         if (element == null)
@@ -170,7 +168,7 @@ class Completions {
                     .flatMap(this::thisAndSuper);
             // MyClass.?
             Stream<? extends Element> members = elements.getAllMembers((TypeElement) element).stream()
-                    .filter(e -> e.getModifiers().contains(Modifier.STATIC));
+                    .filter(e -> (isMethodReference && e.getKind() == ElementKind.METHOD) || e.getModifiers().contains(Modifier.STATIC));
             // MyClass.class
             Element dotClass = new Symbol.VarSymbol(
                     Flags.PUBLIC | Flags.STATIC | Flags.FINAL,
