@@ -40,36 +40,8 @@ public class References {
 
         if (symbol == null)
             return Stream.empty();
-
-        if (SymbolIndex.shouldIndex(symbol))
-            return index.references(symbol);
         else
-            return nonIndexedReferences(symbol, trees).stream();
-    }
-
-    /**
-     * References to things where SymbolIndex.shouldIndex(symbol) is false
-     */
-    public static List<Location> nonIndexedReferences(final Element symbol, final Trees trees) {
-        List<Location> result = new ArrayList<>();
-
-        new TreePathScanner<Void, Void>() {
-            @Override
-            public Void visitIdentifier(IdentifierTree node, Void aVoid) {
-                checkForReference();
-
-                return super.visitIdentifier(node, aVoid);
-            }
-
-            private void checkForReference() {
-                Element element = trees.getElement(getCurrentPath());
-
-                if (SymbolIndex.sameSymbol(symbol, element))
-                    SymbolIndex.findElementName(element, trees).ifPresent(result::add);
-            }
-        }.scan(trees.getTree(symbol), null);
-
-        return result;
+            return index.references(symbol);
     }
 
     private Optional<Location> doGotoDefinition(TreePath cursor) {
