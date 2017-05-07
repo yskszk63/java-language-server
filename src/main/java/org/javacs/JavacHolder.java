@@ -341,7 +341,6 @@ public class JavacHolder {
         }
     }
 
-    // TODO is this necessary now that we use netbeans javac?
     private boolean catchJavacError(AssertionError e) {
         if (e.getStackTrace().length > 0 && e.getStackTrace()[0].getClassName().startsWith("com.sun.tools.javac")) {
             LOG.log(Level.WARNING, "Failed analyze phase", e);

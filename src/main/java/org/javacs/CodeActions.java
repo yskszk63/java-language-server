@@ -7,7 +7,6 @@ import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.Command;
 import org.eclipse.lsp4j.Diagnostic;
 
-import javax.lang.model.element.ElementKind;
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
@@ -60,9 +59,9 @@ class CodeActions {
      * Search for symbols on the classpath and sourcepath that match name
      */
     private Stream<Command> addImportActions(String name) {
-        Stream<Command> sourcePath = index.allSymbols(ElementKind.CLASS, false)
-                .filter(symbol -> symbol.getName().equals(name))
-                .map(symbol -> importClassCommand(symbol.getContainerName(), symbol.getName()));
+        Stream<Command> sourcePath = index.allTopLevelClasses()
+                .filter(symbol -> Completions.lastId(symbol).equals(name))
+                .map(symbol -> importClassCommand(Completions.mostIds(symbol), Completions.lastId(symbol)));
         Stream<Command> classPath = compiler.classPathIndex.topLevelClasses(name)
                 .filter(c -> c.getSimpleName().equals(name))
                 .map(c -> importClassCommand(c.getPackageName(), c.getSimpleName()));

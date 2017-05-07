@@ -1,20 +1,12 @@
 package org.javacs;
 
+import com.google.common.base.Predicate;
 import com.google.common.collect.Maps;
 import com.sun.source.tree.*;
-import com.sun.source.util.*;
-import com.sun.tools.javac.api.JavacTool;
-import com.sun.tools.javac.file.JavacFileManager;
-import java.io.File;
-import java.nio.file.Paths;
-import java.time.Instant;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.util.Elements;
-import javax.lang.model.util.Types;
-import javax.tools.JavaFileObject;
-import javax.tools.StandardLocation;
+import com.sun.source.util.SourcePositions;
+import com.sun.source.util.TreePath;
+import com.sun.source.util.TreePathScanner;
+import com.sun.source.util.Trees;
 import org.eclipse.lsp4j.*;
 
 import javax.lang.model.element.Element;
@@ -24,12 +16,14 @@ import javax.lang.model.element.PackageElement;
 import javax.tools.Diagnostic;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.PathMatcher;
+import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -49,7 +43,7 @@ public class SymbolIndex {
 
     private final JavacHolder compiler;
 
-    private final JavacFileManager fileManager;
+    private final JavacParserHolder parser;
 
     /**
      * Source path files, for which we support methods and classes
@@ -63,28 +57,13 @@ public class SymbolIndex {
         this.openFiles = openFiles;
         this.activeContent = activeContent;
         this.compiler = compiler;
-        this.fileManager = createFileManager(sourcePath);
+        this.parser = new JavacParserHolder();
 
         new Thread(() -> {
             updateIndex(allJavaSources());
 
             finishedInitialIndex.complete(null);
         }, "Initial-Index").start();
-    }
-
-    private static JavacFileManager createFileManager(Set<Path> sourcePath) {
-        Set<File> files = sourcePath.stream()
-            .map(Path::toFile)
-            .collect(Collectors.toSet());
-        JavacFileManager actualFileManager = JavacTool.create().getStandardFileManager(JavaLanguageServer::onDiagnostic, null, null);
-
-        try {
-            actualFileManager.setLocation(StandardLocation.SOURCE_PATH, files);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        return actualFileManager;
     }
 
     private Set<URI> allJavaSources() {
@@ -95,13 +74,13 @@ public class SymbolIndex {
     }
 
     private void updateIndex(Collection<URI> files) {
-        Map<URI, Optional<String>> outOfDate = files.stream()
-            .filter(this::needsUpdate)
-            .collect(Collectors.toMap(key -> key, activeContent));
-        
-        LOG.info("Index " + outOfDate.size() + " sources");
+        for (URI each : files) {
+            if (needsUpdate(each)) {
+                CompilationUnitTree tree = parser.parse(each, activeContent.apply(each));
 
-        compiler.compileBatch(outOfDate, this::update);
+                update(tree);
+            }
+        }
     }
 
     private boolean needsUpdate(URI file) {
@@ -127,40 +106,82 @@ public class SymbolIndex {
 
         updateIndex(openFiles.get());
 
-        Stream<SymbolInformation> classes = allSymbols(ElementKind.CLASS, true);
-        Stream<SymbolInformation> methods = allSymbols(ElementKind.METHOD, true);
+        Predicate<SourceFileIndex> matchesQuery = index ->
+                index != null && index.declarations.stream().anyMatch(name -> containsCharsInOrder(name, query));
+        Map<URI, SourceFileIndex> candidateFiles = Maps.filterValues(sourcePathFiles, matchesQuery);
 
-        return Stream.concat(classes, methods)
-                     .filter(s -> containsCharsInOrder(s.getName(), query));
+        return candidateFiles.keySet().stream()
+                .flatMap(this::allInFile)
+                .filter(info -> containsCharsInOrder(info.getName(), query));
     }
 
     /**
-     * Get all symbols in an open file
+     * Get all declarations in an open file
      */
     public Stream<SymbolInformation> allInFile(URI source) {
-        updateIndex(Collections.singleton(source));
+        List<SymbolInformation> result = new ArrayList<>();
+        Map<URI, Optional<String>> todo = Collections.singletonMap(source, activeContent.apply(source));
 
-        SourceFileIndex index = sourcePathFiles.getOrDefault(source, new SourceFileIndex());
+        compiler.compileBatch(todo, (task, compilationUnit) -> {
+            Trees trees = Trees.instance(task);
 
-        return index.declarations.values().stream().flatMap(map -> map.values().stream());
+            new TreePathScanner<Void, Void>() {
+                @Override
+                public Void visitClass(ClassTree node, Void aVoid) {
+                    addDeclaration();
+
+                    return super.visitClass(node, aVoid);
+                }
+
+                @Override
+                public Void visitMethod(MethodTree node, Void aVoid) {
+                    addDeclaration();
+
+                    return super.visitMethod(node, aVoid);
+                }
+
+                @Override
+                public Void visitVariable(VariableTree node, Void aVoid) {
+                    addDeclaration();
+
+                    return super.visitVariable(node, aVoid);
+                }
+
+                private void addDeclaration() {
+                    Element symbol = trees.getElement(getCurrentPath());
+
+                    if (shouldIndex(symbol)) 
+                        symbolInformation(symbol).ifPresent(result::add);
+                }
+
+                private Optional<SymbolInformation> symbolInformation(Element symbol) {
+                    return findElementName(symbol, trees).map(location -> {
+                        SymbolInformation info = new SymbolInformation();
+
+                        info.setContainerName(qualifiedName(symbol.getEnclosingElement()));
+                        info.setKind(symbolInformationKind(symbol.getKind()));
+
+                        // Constructors have name <init>, use class name instead
+                        if (symbol.getKind() == ElementKind.CONSTRUCTOR)
+                            info.setName(symbol.getEnclosingElement().getSimpleName().toString());
+                        else
+                            info.setName(symbol.getSimpleName().toString());
+
+                        info.setLocation(location);
+
+                        return info;
+                    });
+                }
+            }.scan(compilationUnit, null);
+        });
+
+        return result.stream();
     }
 
-    /**
-     * All indexed symbols of a kind
-     */
-    public Stream<SymbolInformation> allSymbols(ElementKind kind, boolean updateIndex) {
+    public Stream<String> allTopLevelClasses() {
         finishedInitialIndex.join();
 
-        if (updateIndex)
-            updateIndex(openFiles.get());
-
-        return sourcePathFiles.values().stream().flatMap(f -> allSymbolsInFile(f, kind));
-    }
-
-    private Stream<SymbolInformation> allSymbolsInFile(SourceFileIndex f, ElementKind kind) {
-        return f.declarations.getOrDefault(kind, Collections.emptyMap())
-                             .values()
-                             .stream();
+        return sourcePathFiles.values().stream().flatMap(index -> index.topLevelClasses.stream());
     }
 
     /**
@@ -171,53 +192,10 @@ public class SymbolIndex {
 
         updateIndex(openFiles.get());
 
-        String key = qualifiedName(symbol);
+        String name = symbol.getSimpleName().toString();
+        Map<URI, SourceFileIndex> hasName = Maps.filterValues(sourcePathFiles, index -> index.references.contains(name));
 
-        return sourcePathFiles.values().stream().flatMap(f -> {
-            Map<String, Set<Location>> bySymbol = f.references.getOrDefault(symbol.getKind(), Collections.emptyMap());
-            Set<Location> locations = bySymbol.getOrDefault(key, Collections.emptySet());
-
-            return locations.stream();
-        });
-    }
-
-    public Optional<SymbolInformation> find(Element symbol) {
-        topLevelClass(symbol).ifPresent(c -> {
-            try {
-                String className = c.getQualifiedName().toString();
-                JavaFileObject file = fileManager.getJavaFileForInput(StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
-
-                if (file != null)
-                    updateIndex(Collections.singleton(file.toUri()));
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        });
-        
-        ElementKind kind = symbol.getKind();
-        String key = qualifiedName(symbol);
-
-        for (SourceFileIndex f : sourcePathFiles.values()) {
-            Map<String, SymbolInformation> withKind = f.declarations.getOrDefault(kind, Collections.emptyMap());
-
-            if (withKind.containsKey(key))
-                return Optional.of(withKind.get(key));
-        }
-
-        return Optional.empty();
-    }
-
-    private Optional<TypeElement> topLevelClass(Element symbol) {
-        TypeElement found = null;
-
-        while (symbol != null) {
-            if (symbol instanceof TypeElement)
-                found = (TypeElement) symbol;
-
-            symbol = symbol.getEnclosingElement();
-        }
-
-        return Optional.ofNullable(found);
+        return findReferences(hasName.keySet(), symbol).stream();
     }
 
     private static String qualifiedName(Element s) {
@@ -293,112 +271,134 @@ public class SymbolIndex {
     /**
      * Update a file in the index
      */
-    private void update(JavacTask task, CompilationUnitTree compilationUnit) {
-        Trees trees = Trees.instance(task);
+    private void update(CompilationUnitTree compilationUnit) {
         URI file = compilationUnit.getSourceFile().toUri();
         SourceFileIndex index = new SourceFileIndex();
 
         new TreePathScanner<Void, Void>() {
+            int classDepth = 0;
 
             @Override
             public Void visitClass(ClassTree node, Void aVoid) {
-                addDeclaration();
+                // If this is a top-level class, add qualified name to special topLevelClasses index
+                if (classDepth == 0)
+                    index.topLevelClasses.add(qualifiedName(node, compilationUnit));
 
-                return super.visitClass(node, aVoid);
+                // Add simple name to declarations
+                index.declarations.add(node.getSimpleName().toString());
+
+                // Recurse, but remember that anything inside isn't a top-level class
+                classDepth++;
+                super.visitClass(node, aVoid);
+                classDepth--;
+
+                return null;
             }
 
             @Override
             public Void visitMethod(MethodTree node, Void aVoid) {
-                addDeclaration();
+                index.declarations.add(node.getName().toString());
 
                 return super.visitMethod(node, aVoid);
             }
 
             @Override
             public Void visitVariable(VariableTree node, Void aVoid) {
-                addDeclaration();
+                if (getCurrentPath().getParentPath().getLeaf().getKind() == Tree.Kind.CLASS)
+                    index.declarations.add(node.getName().toString());
 
                 return super.visitVariable(node, aVoid);
             }
 
             @Override
             public Void visitMemberSelect(MemberSelectTree node, Void aVoid) {
-                addReference();
+                index.references.add(node.getIdentifier().toString());
 
                 return super.visitMemberSelect(node, aVoid);
             }
 
             @Override
             public Void visitMemberReference(MemberReferenceTree node, Void aVoid) {
-                addReference();
+                index.references.add(node.getName().toString());
 
                 return super.visitMemberReference(node, aVoid);
             }
 
             @Override
-            public Void visitNewClass(NewClassTree node, Void aVoid) {
-                addReference();
-
-                return super.visitNewClass(node, aVoid);
-            }
-
-            @Override
             public Void visitIdentifier(IdentifierTree node, Void aVoid) {
-                addReference();
+                index.references.add(node.getName().toString());
 
                 return super.visitIdentifier(node, aVoid);
-            }
-
-            private void addDeclaration() {
-                Element symbol = trees.getElement(getCurrentPath());
-
-                if (symbol != null && onSourcePath(symbol) && shouldIndex(symbol)) {
-                    symbolInformation(symbol).ifPresent(info -> {
-                        String key = qualifiedName(symbol);
-                        Map<String, SymbolInformation> withKind = index.declarations.computeIfAbsent(symbol.getKind(), newKind -> new HashMap<>());
-
-                        withKind.put(key, info);
-                    });
-                }
-            }
-
-            private void addReference() {
-                Element symbol = trees.getElement(getCurrentPath());
-
-                if (symbol != null && onSourcePath(symbol) && shouldIndex(symbol)) {
-                    String key = qualifiedName(symbol);
-                    Map<String, Set<Location>> withKind = index.references.computeIfAbsent(symbol.getKind(), newKind -> new HashMap<>());
-                    Set<Location> locations = withKind.computeIfAbsent(key, newName -> new HashSet<>());
-
-                    findPath(getCurrentPath(), trees).ifPresent(locations::add);
-                }
-            }
-
-            private Optional<SymbolInformation> symbolInformation(Element symbol) {
-                return findElementName(symbol, trees).map(location -> {
-                    SymbolInformation info = new SymbolInformation();
-
-                    info.setContainerName(qualifiedName(symbol.getEnclosingElement()));
-                    info.setKind(symbolInformationKind(symbol.getKind()));
-
-                    // Constructors have name <init>, use class name instead
-                    if (symbol.getKind() == ElementKind.CONSTRUCTOR)
-                        info.setName(symbol.getEnclosingElement().getSimpleName().toString());
-                    else
-                        info.setName(symbol.getSimpleName().toString());
-
-                    info.setLocation(location);
-
-                    return info;
-                });
-            }
-
-            private boolean onSourcePath(Element symbol) {
-                return true; // TODO
             }
         }.scan(compilationUnit, null);
 
         sourcePathFiles.put(file, index);
+    }
+
+    private String qualifiedName(ClassTree node, CompilationUnitTree compilationUnit) {
+        String packageName = Objects.toString(compilationUnit.getPackageName(), "");
+        Name className = node.getSimpleName();
+        StringJoiner qualifiedName = new StringJoiner(".");
+
+        if (!packageName.isEmpty())
+            qualifiedName.add(packageName);
+        qualifiedName.add(className);
+        return qualifiedName.toString();
+    }
+
+    private List<Location> findReferences(Collection<URI> files, Element target) {
+        List<Location> found = new ArrayList<>();
+        Map<URI, Optional<String>> todo = files.stream().collect(Collectors.toMap(uri -> uri, activeContent));
+
+        compiler.compileBatch(todo, (task, compilationUnit) -> {
+            Trees trees = Trees.instance(task);
+
+            new TreePathScanner<Void, Void>() {
+                @Override
+                public Void visitMemberSelect(MemberSelectTree node, Void aVoid) {
+                    addReference();
+
+                    return super.visitMemberSelect(node, aVoid);
+                }
+
+                @Override
+                public Void visitMemberReference(MemberReferenceTree node, Void aVoid) {
+                    addReference();
+
+                    return super.visitMemberReference(node, aVoid);
+                }
+
+                @Override
+                public Void visitNewClass(NewClassTree node, Void aVoid) {
+                    addReference();
+
+                    return super.visitNewClass(node, aVoid);
+                }
+
+                @Override
+                public Void visitIdentifier(IdentifierTree node, Void aVoid) {
+                    addReference();
+
+                    return super.visitIdentifier(node, aVoid);
+                }
+
+                private void addReference() {
+                    Element symbol = trees.getElement(getCurrentPath());
+                    boolean same = symbol != null &&
+                            toStringEquals(symbol.getEnclosingElement(), target.getEnclosingElement()) &&
+                            toStringEquals(symbol, target);
+
+                    if (same)
+                        findPath(getCurrentPath(), trees).ifPresent(found::add);
+                }
+            }.scan(compilationUnit, null);
+        });
+
+        return found;
+    }
+
+    private boolean toStringEquals(Object left, Object right) {
+        return Objects.equals(Objects.toString(left, ""), Objects.toString(right, ""));
     }
 
     private static Optional<Location> findPath(TreePath path, Trees trees) {
@@ -426,7 +426,7 @@ public class SymbolIndex {
         ));
     }
 
-    private static Optional<Location> findElementName(Element symbol, Trees trees) {
+    public static Optional<Location> findElementName(Element symbol, Trees trees) {
         try {
             TreePath path = trees.getPath(symbol);
 

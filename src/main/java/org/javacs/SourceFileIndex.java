@@ -1,19 +1,26 @@
 package org.javacs;
 
 import java.time.Instant;
-import org.eclipse.lsp4j.Location;
-import org.eclipse.lsp4j.SymbolInformation;
-
-import javax.lang.model.element.ElementKind;
-import java.util.EnumMap;
-import java.util.Map;
+import java.util.HashSet;
 import java.util.Set;
 
-/**
- * Contains all symbol declarations and references in a single source file
- */
 class SourceFileIndex {
-    final EnumMap<ElementKind, Map<String, SymbolInformation>> declarations = new EnumMap<>(ElementKind.class);
-    final EnumMap<ElementKind, Map<String, Set<Location>>> references = new EnumMap<>(ElementKind.class);
+    /**
+     * Fully qualified names of classes declared in this file
+     */
+    final Set<String> topLevelClasses = new HashSet<>();
+
+    /**
+     * Simple name of declarations in this file, including classes, methods, and fields
+     */
+    final Set<String> declarations = new HashSet<>();
+
+    /**
+     * Simple names of reference appearing in this file.
+     * 
+     * This is fast to compute and provides a useful starting point for find-references operations.
+     */
+    final Set<String> references = new HashSet<>();
+
     final Instant updated = Instant.now();
 }

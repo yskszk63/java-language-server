@@ -9,7 +9,6 @@ import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
-import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextEdit;
 
 import javax.lang.model.element.*;
@@ -91,7 +90,7 @@ class Completions {
     private Stream<CompletionItem> completeIdentifier(String partialIdentifier, Scope from, CursorContext context) {
         switch (context) {
             case Import:
-                return packageMembers("", partialIdentifier, from)
+                return packageMembers("", partialIdentifier)
                         .flatMap(this::completionItem);
             case NewClass:
                 return allSymbols(partialIdentifier, from)
@@ -158,7 +157,7 @@ class Completions {
         if (element instanceof PackageElement) {
             PackageElement packageElement = (PackageElement) element;
 
-            return packageMembers(packageElement.getQualifiedName().toString(), partialIdentifier, from);
+            return packageMembers(packageElement.getQualifiedName().toString(), partialIdentifier);
         }
         // MyClass.?
         else if (element instanceof TypeElement) {
@@ -191,13 +190,10 @@ class Completions {
         }
     }
 
-    private Stream<? extends Element> packageMembers(String parentPackage, String partialIdentifier, Scope from) {
+    private Stream<? extends Element> packageMembers(String parentPackage, String partialIdentifier) {
         // Source-path packages that match parentPackage.partialIdentifier
         Stream<PackageElement> packages = subPackages(parentPackage, partialIdentifier);
-        Stream<TypeElement> sourcePathClasses = sourcePath.allSymbols(ElementKind.CLASS, false)
-                .filter(c -> c.getContainerName().equals(parentPackage))
-                .filter(c -> containsCharactersInOrder(c.getName(), partialIdentifier))
-                .map(c -> elements.getTypeElement(qualifiedName(c.getContainerName(), c.getName())));
+        Stream<TypeElement> sourcePathClasses = sourcePathClasses(Optional.of(parentPackage), partialIdentifier);
         Stream<TypeElement> classPathClasses = classPath.topLevelClassesIn(parentPackage, partialIdentifier)
                 .map(c -> elements.getTypeElement(c.getName()));
 
@@ -209,9 +205,9 @@ class Completions {
      */
     private Stream<PackageElement> subPackages(String parentPackage, String partialIdentifier) {
         String prefix = parentPackage.isEmpty() ? "" : parentPackage + ".";
-        Stream<String> sourcePathMembers = sourcePath.allSymbols(ElementKind.CLASS, false)
-                .map(c -> c.getContainerName())
-                .filter(p -> p.startsWith(prefix));
+        Stream<String> sourcePathMembers = sourcePath.allTopLevelClasses()
+                .map(Completions::mostIds)
+                .filter(packageName -> packageName.startsWith(prefix));
         Stream<String> classPathMembers = classPath.packagesStartingWith(prefix);
         Set<String> next = Stream.concat(sourcePathMembers, classPathMembers)
                 .map(p -> p.substring(prefix.length()))
@@ -227,43 +223,7 @@ class Completions {
 
         return next.stream()
                 .map(last -> elements.getPackageElement(prefix + last))
-                .filter(sym -> sym != null);
-    }
-
-    private static String qualifiedName(String parentPackage, String partialIdentifier) {
-        if (parentPackage.isEmpty())
-            return partialIdentifier;
-        else if (partialIdentifier.isEmpty())
-            return parentPackage;
-        else
-            return parentPackage + "." + partialIdentifier;
-    }
-
-    private String packageOf(Scope from) {
-        TypeElement enclosingClass = from.getEnclosingClass();
-
-        if (enclosingClass == null)
-            return "";
-
-        PackageElement enclosingPackage = elements.getPackageOf(enclosingClass);
-
-        if (enclosingPackage == null)
-            return "";
-
-        return enclosingPackage.getQualifiedName().toString();
-    }
-
-    private Stream<TypeElement> topLevelClassElement(Element e) {
-        if (e == null || e.getKind() != ElementKind.CLASS)
-            return Stream.empty();
-
-        TypeElement candidate = (TypeElement) e;
-        Element parent = candidate.getEnclosingElement();
-
-        if (parent == null || parent.getKind() == ElementKind.PACKAGE)
-            return Stream.of(candidate);
-
-        return Stream.empty();
+                .filter(Objects::nonNull);
     }
 
     private boolean isAlreadyImported(String qualifiedName) {
@@ -300,7 +260,7 @@ class Completions {
         return tree.getQualifiedIdentifier().toString();
     }
 
-    private static String firstId(String qualifiedName) {
+    static String firstId(String qualifiedName) {
         int firstDot = qualifiedName.indexOf('.');
 
         if (firstDot == -1)
@@ -309,16 +269,16 @@ class Completions {
             return qualifiedName.substring(0, firstDot);
     }
 
-    private static String mostIds(String qualifiedName) {
+    static String mostIds(String qualifiedName) {
         int lastDot = qualifiedName.lastIndexOf('.');
 
         if (lastDot == -1)
-            return qualifiedName;
+            return "";
         else
             return qualifiedName.substring(0, lastDot);
     }
 
-    private static String lastId(String qualifiedName) {
+    static String lastId(String qualifiedName) {
         int lastDot = qualifiedName.lastIndexOf('.');
 
         if (lastDot == -1)
@@ -348,7 +308,7 @@ class Completions {
     private Stream<? extends Element> allSymbols(String partialIdentifier, Scope scope) {
         Stream<? extends Element> sourcePathItems = alreadyImportedSymbols(scope)
                 .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
-        Stream<TypeElement> sourcePathClasses = sourcePathClasses(partialIdentifier);
+        Stream<TypeElement> sourcePathClasses = sourcePathClasses(Optional.empty(), partialIdentifier);
         Stream<TypeElement> classPathItems = classPath.topLevelClasses(partialIdentifier)
                 .flatMap(this::tryLoad);
 
@@ -388,20 +348,12 @@ class Completions {
         return elements;
     }
 
-    private Stream<TypeElement> sourcePathClasses(String partialClass) {
-        return sourcePath.allSymbols(ElementKind.CLASS, false)
-                .filter(symbol -> containsCharactersInOrder(symbol.getName(), partialClass))
-                .flatMap(this::typeElementForSymbol)
-                .flatMap(this::topLevelClassElement);
-    }
-
-    private Stream<TypeElement> typeElementForSymbol(SymbolInformation symbol) {
-        TypeElement result = elements.getTypeElement(qualifiedName(symbol.getContainerName(), symbol.getName()));
-
-        if (result != null)
-            return Stream.of(result);
-        else 
-            return Stream.empty();
+    private Stream<TypeElement> sourcePathClasses(Optional<String> packageName, String partialClass) {
+        return sourcePath.allTopLevelClasses()
+                .filter(name -> packageName.map(check -> mostIds(name).equals(check)).orElse(true))
+                .filter(name -> containsCharactersInOrder(lastId(name), partialClass))
+                .map(elements::getTypeElement)
+                .filter(Objects::nonNull);
     }
 
     private Stream<? extends Element> staticImports(ImportTree tree) {

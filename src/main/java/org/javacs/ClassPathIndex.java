@@ -1,21 +1,16 @@
 package org.javacs;
 
 import com.google.common.reflect.ClassPath;
-import com.google.common.reflect.ClassPath.ClassInfo;
 import sun.misc.Launcher;
 
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -96,10 +91,6 @@ class ClassPathIndex {
         return topLevelClasses.stream()
                 .filter(c -> c.getPackageName().startsWith(prefix))
                 .findAny();
-    }
-
-    private boolean isAccessible(Constructor<?> cons) {
-        return !Modifier.isPrivate(cons.getModifiers()) && !Modifier.isProtected(cons.getModifiers());
     }
 
     private static final Logger LOG = Logger.getLogger("main");

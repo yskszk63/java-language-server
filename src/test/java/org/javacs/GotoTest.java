@@ -24,7 +24,7 @@ public class GotoTest {
     public void localVariable() throws IOException {
         List<? extends Location> suggestions = doGoto(file, 9, 8);
 
-        assertThat(suggestions, contains(location(uri, 4, 8, 4, 21)));
+        assertThat(suggestions, contains(location(uri, 4, 15, 4, 20)));
     }
 
     @Test

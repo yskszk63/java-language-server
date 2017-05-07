@@ -1,19 +1,13 @@
 package org.javacs;
 
-import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.IdentifierTree;
-import com.sun.source.tree.LineMap;
-import com.sun.source.tree.Tree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.Trees;
 import org.eclipse.lsp4j.Location;
-import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.Range;
 
 import javax.lang.model.element.Element;
-import javax.tools.Diagnostic;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -71,7 +65,7 @@ public class References {
                 Element element = trees.getElement(getCurrentPath());
 
                 if (element.equals(symbol))
-                    findTree(getCurrentPath(), trees).ifPresent(result::add);
+                    SymbolIndex.findElementName(element, trees).ifPresent(result::add);
             }
         }.scan(trees.getTree(symbol), null);
 
@@ -87,39 +81,6 @@ public class References {
         Trees trees = Trees.instance(task);
         Element symbol = trees.getElement(cursor);
 
-        if (SymbolIndex.shouldIndex(symbol))
-            return index.find(symbol).map(info -> info.getLocation());
-        else {
-            TreePath path = trees.getPath(symbol);
-
-            return findTree(path, trees);
-        }
-    }
-
-    /**
-     * Find the location of the tree pointed to by path.
-     */
-    private static Optional<Location> findTree(TreePath path, Trees trees) {
-        if (path == null)
-            return Optional.empty();
-
-        CompilationUnitTree compilationUnit = path.getCompilationUnit();
-        Tree leaf = path.getLeaf();
-        long start = trees.getSourcePositions().getStartPosition(compilationUnit, leaf);
-        long end = trees.getSourcePositions().getEndPosition(compilationUnit, leaf);
-
-        if (start != Diagnostic.NOPOS && end != Diagnostic.NOPOS) {
-            LineMap lineMap = compilationUnit.getLineMap();
-
-            return Optional.of(new Location(
-                    compilationUnit.getSourceFile().toUri().toString(),
-                    new Range(
-                            new Position((int) lineMap.getLineNumber(start) - 1, (int) lineMap.getColumnNumber(start) - 1),
-                            new Position((int) lineMap.getLineNumber(end) - 1, (int) lineMap.getColumnNumber(end) - 1)
-                    )
-            ));
-        }
-
-        return Optional.empty();
+        return SymbolIndex.findElementName(symbol, trees);
     }
 }
