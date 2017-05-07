@@ -384,11 +384,8 @@ public class SymbolIndex {
 
                 private void addReference() {
                     Element symbol = trees.getElement(getCurrentPath());
-                    boolean same = symbol != null &&
-                            toStringEquals(symbol.getEnclosingElement(), target.getEnclosingElement()) &&
-                            toStringEquals(symbol, target);
 
-                    if (same)
+                    if (sameSymbol(target, symbol))
                         findPath(getCurrentPath(), trees).ifPresent(found::add);
                 }
             }.scan(compilationUnit, null);
@@ -397,7 +394,13 @@ public class SymbolIndex {
         return found;
     }
 
-    private boolean toStringEquals(Object left, Object right) {
+    static boolean sameSymbol(Element target, Element symbol) {
+        return symbol != null && target != null &&
+            toStringEquals(symbol.getEnclosingElement(), target.getEnclosingElement()) &&
+            toStringEquals(symbol, target);
+    }
+
+    private static boolean toStringEquals(Object left, Object right) {
         return Objects.equals(Objects.toString(left, ""), Objects.toString(right, ""));
     }
 

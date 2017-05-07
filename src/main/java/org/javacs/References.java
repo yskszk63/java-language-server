@@ -64,7 +64,7 @@ public class References {
             private void checkForReference() {
                 Element element = trees.getElement(getCurrentPath());
 
-                if (element.equals(symbol))
+                if (SymbolIndex.sameSymbol(symbol, element))
                     SymbolIndex.findElementName(element, trees).ifPresent(result::add);
             }
         }.scan(trees.getTree(symbol), null);
