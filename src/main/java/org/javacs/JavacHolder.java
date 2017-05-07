@@ -83,13 +83,12 @@ public class JavacHolder {
         try {
             Iterable<? extends CompilationUnitTree> parse = task.parse();
             CompilationUnitTree compilationUnit = parse.iterator().next();
+            TreePruner pruner = new TreePruner(task);
 
-            if (pruneStatements) {
-                TreePruner pruner = new TreePruner(task);
+            pruner.removeNonCursorMethodBodies(compilationUnit, line, column);
 
-                pruner.removeNonCursorMethodBodies(compilationUnit, line, column);
+            if (pruneStatements) 
                 pruner.removeStatementsAfterCursor(compilationUnit, line, column);
-            }
 
             try {
                 Iterable<? extends Element> analyze = task.analyze();
