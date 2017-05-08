@@ -34,7 +34,7 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
             return super.getJavaFileForInput(location, className, kind);
     }
 
-    private boolean hasUpToDateClassFile(String qualifiedName) {
+    boolean hasUpToDateClassFile(String qualifiedName) {
         try {
             JavaFileObject sourceFile = super.getJavaFileForInput(StandardLocation.SOURCE_PATH, qualifiedName, JavaFileObject.Kind.SOURCE),
                 outputFile = super.getJavaFileForInput(StandardLocation.CLASS_OUTPUT, qualifiedName, JavaFileObject.Kind.CLASS);
@@ -42,7 +42,7 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
                 outputModified = outputFile == null ? 0 : outputFile.getLastModified();
             boolean hidden = outputModified >= sourceModified;
 
-            if (hidden && !warnedHidden.contains(sourceFile.toUri())) {
+            if (hidden && sourceFile != null && outputFile != null && !warnedHidden.contains(sourceFile.toUri())) {
                 LOG.warning("Hiding " + sourceFile.toUri() + " in favor of " + outputFile.toUri());
 
                 warnedHidden.add(sourceFile.toUri());

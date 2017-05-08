@@ -56,13 +56,13 @@ public class SymbolIndex {
         this.parser = new JavacParserHolder();
 
         new Thread(() -> {
-            updateIndex(allJavaSources());
+            updateIndex(allJavaSources(sourcePath));
 
             finishedInitialIndex.complete(null);
         }, "Initial-Index").start();
     }
 
-    private Set<URI> allJavaSources() {
+    static Set<URI> allJavaSources(Set<Path> sourcePath) {
         return sourcePath.stream()
                 .flatMap(InferConfig::allJavaFiles)
                 .map(Path::toUri)
@@ -70,6 +70,7 @@ public class SymbolIndex {
     }
 
     private void updateIndex(Collection<URI> files) {
+        // TODO send a progress bar to the user
         for (URI each : files) {
             if (needsUpdate(each)) {
                 CompilationUnitTree tree = parser.parse(each, activeContent.apply(each));

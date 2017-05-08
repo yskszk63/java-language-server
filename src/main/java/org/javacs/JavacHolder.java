@@ -191,7 +191,7 @@ public class JavacHolder {
         ensureOutputDirectory(outputDirectory);
     }
 
-    private List<String> options(boolean incremental) {
+    static List<String> options(Set<Path> sourcePath, Set<Path> classPath, Path outputDirectory, boolean incremental) {
         Iterable<Path> incrementalClassPath = incremental ? Iterables.concat(classPath, Collections.singleton(outputDirectory)) : classPath;
 
         return ImmutableList.of(
@@ -223,7 +223,7 @@ public class JavacHolder {
 
     private JavacTask createTask(Collection<JavaFileObject> files, boolean incremental) {
         JavaFileManager fileManager = incremental ? incrementalFileManager : batchFileManager;
-        JavacTask result = javac.getTask(null, fileManager, this::onError, options(incremental), null, files);
+        JavacTask result = javac.getTask(null, fileManager, this::onError, options(sourcePath, classPath, outputDirectory, incremental), null, files);
         JavacTaskImpl impl = (JavacTaskImpl) result;
 
         // Better stack traces inside javac

@@ -453,11 +453,13 @@ class JavaLanguageServer implements LanguageServer {
         final JavacHolder compiler;
         final Javadocs docs;
         final SymbolIndex index;
+        final Precompile precompile;
 
-        Configured(JavacHolder compiler, Javadocs docs, SymbolIndex index) {
+        Configured(JavacHolder compiler, Javadocs docs, SymbolIndex index, Precompile precompile) {
             this.compiler = compiler;
             this.docs = docs;
             this.index = index;
+            this.precompile = precompile;
         }
     }
 
@@ -485,7 +487,8 @@ class JavaLanguageServer implements LanguageServer {
         Path userHome = Paths.get(System.getProperty("user.home"));
         Path mavenHome = userHome.resolve(".m2");
         Path gradleHome = userHome.resolve(".gradle");
-        Path outputDirectory = defaultOutputDirectory();
+        Path workspaceRootLike = workspaceRoot.subpath(0, workspaceRoot.getNameCount());
+        Path outputDirectory = userHome.resolve(".vscode-javac").resolve(workspaceRootLike).resolve("cache");
         List<Artifact> externalDependencies = Lists.transform(settings.java.externalDependencies, Artifact::parse);
         InferConfig infer = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome, outputDirectory);
         Set<Path> classPath = infer.buildClassPath(),
@@ -500,8 +503,9 @@ class JavaLanguageServer implements LanguageServer {
         JavacHolder compiler = JavacHolder.create(sourcePath, classPath, outputDirectory);
         Javadocs docs = new Javadocs(sourcePath, docPath, this::activeContent);
         SymbolIndex index = new SymbolIndex(sourcePath, activeDocuments::keySet, this::activeContent, compiler);
+        Precompile precompile = new Precompile(sourcePath, classPath, outputDirectory);
 
-        return new Configured(compiler, docs, index);
+        return new Configured(compiler, docs, index, precompile);
     }
 
     private void clearDiagnostics() {
