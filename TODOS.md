@@ -5,6 +5,7 @@
 * array.length doesn't auto-complete
 * Hover doesn't show 'throws ...'
 * Enum const javadocs are not showing
+* Missing ; lint has no width
 
 ## Default configuration
 * Alert if we can't find a dependency
@@ -14,6 +15,7 @@
 * Status bar info during indexing
 * Sort local variables first
 * Convert {@tag ...} to `<tag>...</tag>` (see vscode-java)
+* Search for symbol is too slow
 
 ## Autocomplete
 * Annotation fields
