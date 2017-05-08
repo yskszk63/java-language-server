@@ -1,13 +1,19 @@
 package org.javacs;
 
+import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.IdentifierTree;
+import com.sun.source.tree.LineMap;
+import com.sun.source.tree.Tree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.Trees;
 import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 
 import javax.lang.model.element.Element;
+import javax.tools.Diagnostic;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -53,6 +59,6 @@ public class References {
         Trees trees = Trees.instance(task);
         Element symbol = trees.getElement(cursor);
 
-        return SymbolIndex.findElementName(symbol, trees);
+        return index.find(symbol);
     }
 }

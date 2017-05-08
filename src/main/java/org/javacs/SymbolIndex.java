@@ -3,16 +3,10 @@ package org.javacs;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Maps;
 import com.sun.source.tree.*;
-import com.sun.source.util.SourcePositions;
-import com.sun.source.util.TreePath;
-import com.sun.source.util.TreePathScanner;
-import com.sun.source.util.Trees;
+import com.sun.source.util.*;
 import org.eclipse.lsp4j.*;
 
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.Name;
-import javax.lang.model.element.PackageElement;
+import javax.lang.model.element.*;
 import javax.tools.Diagnostic;
 import java.io.IOException;
 import java.net.URI;
@@ -23,6 +17,8 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
@@ -120,6 +116,32 @@ public class SymbolIndex {
      */
     public Stream<SymbolInformation> allInFile(URI source) {
         List<SymbolInformation> result = new ArrayList<>();
+
+        visitElements(source, (task, symbol) -> {
+            if (shouldIndex(symbol)) {
+                findElementName(symbol, Trees.instance(task)).ifPresent(location -> {
+                    SymbolInformation info = new SymbolInformation();
+
+                    info.setContainerName(qualifiedName(symbol.getEnclosingElement()));
+                    info.setKind(symbolInformationKind(symbol.getKind()));
+
+                    // Constructors have name <init>, use class name instead
+                    if (symbol.getKind() == ElementKind.CONSTRUCTOR)
+                        info.setName(symbol.getEnclosingElement().getSimpleName().toString());
+                    else
+                        info.setName(symbol.getSimpleName().toString());
+
+                    info.setLocation(location);
+
+                    result.add(info);
+                });
+            }
+        });
+
+        return result.stream();
+    }
+
+    private void visitElements(URI source, BiConsumer<JavacTask, Element> forEach) {
         Map<URI, Optional<String>> todo = Collections.singletonMap(source, activeContent.apply(source));
 
         compiler.compileBatch(todo, (task, compilationUnit) -> {
@@ -148,34 +170,12 @@ public class SymbolIndex {
                 }
 
                 private void addDeclaration() {
-                    Element symbol = trees.getElement(getCurrentPath());
+                    Element el = trees.getElement(getCurrentPath());
 
-                    if (shouldIndex(symbol)) 
-                        symbolInformation(symbol).ifPresent(result::add);
-                }
-
-                private Optional<SymbolInformation> symbolInformation(Element symbol) {
-                    return findElementName(symbol, trees).map(location -> {
-                        SymbolInformation info = new SymbolInformation();
-
-                        info.setContainerName(qualifiedName(symbol.getEnclosingElement()));
-                        info.setKind(symbolInformationKind(symbol.getKind()));
-
-                        // Constructors have name <init>, use class name instead
-                        if (symbol.getKind() == ElementKind.CONSTRUCTOR)
-                            info.setName(symbol.getEnclosingElement().getSimpleName().toString());
-                        else
-                            info.setName(symbol.getSimpleName().toString());
-
-                        info.setLocation(location);
-
-                        return info;
-                    });
+                    forEach.accept(task, el);
                 }
             }.scan(compilationUnit, null);
         });
-
-        return result.stream();
     }
 
     public Stream<String> allTopLevelClasses() {
@@ -196,6 +196,58 @@ public class SymbolIndex {
         Map<URI, SourceFileIndex> hasName = Maps.filterValues(sourcePathFiles, index -> index.references.contains(name));
 
         return findReferences(hasName.keySet(), symbol).stream();
+    }
+
+    /**
+     * Find a symbol in its file.
+     * 
+     * It's possible that `symbol` comes from a .class file where the corresponding .java file was not visited during incremental compilation.
+     * In order to be sure we have access to the source positions, we will recompile the .java file where `symbol` was declared.
+     */
+    public Optional<Location> find(Element symbol) {
+        finishedInitialIndex.join();
+
+        updateIndex(openFiles.get());
+
+        return findFile(symbol).flatMap(file -> findIn(symbol, file));
+    }
+
+    private Optional<Location> findIn(Element symbol, URI file) {
+        List<Location> result = new ArrayList<>();
+
+        visitElements(file, (task, found) -> {
+            if (sameSymbol(symbol, found)) {
+                findElementName(found, Trees.instance(task)).ifPresent(result::add);
+            }
+        });
+
+        if (!result.isEmpty())
+            return Optional.of(result.get(0));
+        else
+            return Optional.empty();
+    }
+
+    private Optional<URI> findFile(Element symbol) {
+        return topLevelClass(symbol).flatMap(this::findDeclaringFile);
+    }
+
+    private Optional<URI> findDeclaringFile(TypeElement topLevelClass) {
+        String name = topLevelClass.getQualifiedName().toString();
+
+        return Maps.filterValues(sourcePathFiles, index -> index.topLevelClasses.contains(name)).keySet().stream().findFirst();
+    }
+
+    private Optional<TypeElement> topLevelClass(Element symbol) {
+        TypeElement result = null;
+
+        while (symbol != null) {
+            if (symbol instanceof TypeElement)
+                result = (TypeElement) symbol;
+
+            symbol = symbol.getEnclosingElement();
+        }
+
+        return Optional.ofNullable(result);
     }
 
     private static String qualifiedName(Element s) {
@@ -394,7 +446,7 @@ public class SymbolIndex {
         return found;
     }
 
-    static boolean sameSymbol(Element target, Element symbol) {
+    private static boolean sameSymbol(Element target, Element symbol) {
         return symbol != null && target != null &&
             toStringEquals(symbol.getEnclosingElement(), target.getEnclosingElement()) &&
             toStringEquals(symbol, target);
@@ -429,7 +481,12 @@ public class SymbolIndex {
         ));
     }
 
-    public static Optional<Location> findElementName(Element symbol, Trees trees) {
+    /**
+     * Find a more accurate position for symbol than the one offered by javac, by searching for its name.
+     * 
+     * `trees` must be from a compilation that includes the declaration of `symbol`; incremental compilation may not always have this.
+     */
+    private static Optional<Location> findElementName(Element symbol, Trees trees) {
         try {
             TreePath path = trees.getPath(symbol);
 

@@ -16,7 +16,7 @@ import static org.junit.Assert.assertThat;
 public class GotoTest {
     private static final Logger LOG = Logger.getLogger("main");
     private static final String file = "/org/javacs/example/Goto.java";
-    private static final URI uri = FindResource.uri(file);
+    private static final URI uri = FindResource.uri(file), other = FindResource.uri("/org/javacs/example/GotoOther.java");
     private static final String defaultConstructorFile = "/org/javacs/example/GotoDefaultConstructor.java";
     private static final URI defaultConstructorUri = FindResource.uri(defaultConstructorFile);
 
@@ -88,6 +88,29 @@ public class GotoTest {
         List<? extends Location> suggestions = doGoto(file, 19, 26);
 
         assertThat(suggestions, contains(location(uri, 40, 18, 40, 24)));
+    }
+
+    @Test
+    public void otherStaticMethod() throws IOException {
+        List<? extends Location> suggestions = doGoto(file, 28, 24);
+
+        assertThat(suggestions, contains(hasProperty("uri", equalTo(other.toString()))));
+    }
+
+    @Test
+    public void otherMethod() throws IOException {
+        List<? extends Location> suggestions = doGoto(file, 29, 17);
+
+        assertThat(suggestions, contains(hasProperty("uri", equalTo(other.toString()))));
+    }
+
+    @Test
+    public void otherCompiledFile() throws IOException {
+        server.compile(other);
+
+        List<? extends Location> suggestions = doGoto(file, 28, 24);
+
+        assertThat(suggestions, contains(hasProperty("uri", equalTo(other.toString()))));
     }
 
     @Test

@@ -599,4 +599,15 @@ class JavaLanguageServer implements LanguageServer {
                 return Level.FINE;
         }
     }
+
+    /**
+     * Compile a .java source and emit a .class file.
+     * 
+     * Useful for testing that the language server works when driven by .class files.
+     */
+    void compile(URI file) {
+        Objects.requireNonNull(file, "file is null");
+        
+        configured().compiler.compileBatch(Collections.singletonMap(file, activeContent(file)));
+    }
 }
