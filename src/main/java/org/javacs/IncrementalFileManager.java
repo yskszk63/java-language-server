@@ -1,8 +1,10 @@
 package org.javacs;
 
+import java.time.Instant;
 import javax.tools.ForwardingJavaFileManager;
 import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
+import javax.tools.JavaFileObject.Kind;
 import javax.tools.StandardLocation;
 import java.io.IOException;
 import java.net.URI;
@@ -25,25 +27,20 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
     }
 
     @Override
-    public Iterable<JavaFileObject> list(Location location,
-                                         String packageName,
-                                         Set<JavaFileObject.Kind> kinds,
-                                         boolean recurse) throws IOException {
-        Iterable<JavaFileObject> files = super.list(location, packageName, kinds, recurse);
-
-        if (location == StandardLocation.SOURCE_PATH) {
-            return StreamSupport.stream(files.spliterator(), false)
-                    .filter(sourceFile -> !hasUpToDateClassFile(packageName, sourceFile))
-                    .collect(Collectors.toList());
-        }
-        else return files;
+    public JavaFileObject getJavaFileForInput(Location location, String className, JavaFileObject.Kind kind) throws IOException {
+        if (location == StandardLocation.SOURCE_PATH && hasUpToDateClassFile(className)) 
+            return null;
+        else
+            return super.getJavaFileForInput(location, className, kind);
     }
 
-    private boolean hasUpToDateClassFile(String packageName, JavaFileObject sourceFile) {
+    private boolean hasUpToDateClassFile(String qualifiedName) {
         try {
-            String qualifiedName = className(packageName, sourceFile);
-            JavaFileObject outputFile = getJavaFileForInput(StandardLocation.CLASS_OUTPUT, qualifiedName, JavaFileObject.Kind.CLASS);
-            boolean hidden = outputFile != null && outputFile.getLastModified() >= sourceFile.getLastModified();
+            JavaFileObject sourceFile = super.getJavaFileForInput(StandardLocation.SOURCE_PATH, qualifiedName, JavaFileObject.Kind.SOURCE),
+                outputFile = super.getJavaFileForInput(StandardLocation.CLASS_OUTPUT, qualifiedName, JavaFileObject.Kind.CLASS);
+            long sourceModified = sourceFile == null ? 0 : sourceFile.getLastModified(),
+                outputModified = outputFile == null ? 0 : outputFile.getLastModified();
+            boolean hidden = outputModified >= sourceModified;
 
             if (hidden && !warnedHidden.contains(sourceFile.toUri())) {
                 LOG.warning("Hiding " + sourceFile.toUri() + " in favor of " + outputFile.toUri());
