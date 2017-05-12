@@ -33,12 +33,14 @@ class Precompile {
     private final JavacTool javac = JavacTool.create();
     private final JavacFileManager fileManager;
     private final IncrementalFileManager incremental;
+    private final Progress reportProgress;
 
-    Precompile(Set<Path> sourcePath, Set<Path> classPath, Path outputDirectory) {
+    Precompile(Set<Path> sourcePath, Set<Path> classPath, Path outputDirectory, Progress reportProgress) {
         this.sourcePath = sourcePath;
         this.classPath = classPath;
         this.outputDirectory = outputDirectory;
         this.fileManager = javac.getStandardFileManager(this::onError, Locale.getDefault(), Charset.defaultCharset());
+        this.reportProgress = reportProgress;
 
         Set<File> sourcePathFiles = sourcePath.stream().map(Path::toFile).collect(Collectors.toSet());
 
@@ -56,13 +58,23 @@ class Precompile {
             try {
                 // TODO send a progress bar to the user
                 Set<URI> all = SymbolIndex.allJavaSources(sourcePath);
+                int completed = 0;
 
                 for (URI each : all) {
-                    if (needsCompile(each)) 
+                    if (needsCompile(each)) {
+                        String fileName = Paths.get(each.getPath()).getFileName().toString();
+
+                        reportProgress.report(fileName, completed, all.size());
+
                         precompile(each);
+                    }
+
+                    completed++;
                 }
             } catch (Exception e) {
                 LOG.log(Level.SEVERE, "Uncaught exception in precompile thread", e);
+            } finally {
+                reportProgress.done();
             }
         };
 
@@ -123,4 +135,13 @@ class Precompile {
     }
 
     private static Logger LOG = Logger.getLogger("main");
+
+    interface Progress {
+        /**
+         * Report progress on precompiling files back to the UI
+         */
+        void report(String currentFileName, int completed, int total);
+
+        void done();
+    }
 }

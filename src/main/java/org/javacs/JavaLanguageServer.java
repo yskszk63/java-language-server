@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -503,7 +504,23 @@ class JavaLanguageServer implements LanguageServer {
         JavacHolder compiler = JavacHolder.create(sourcePath, classPath, outputDirectory);
         Javadocs docs = new Javadocs(sourcePath, docPath, this::activeContent);
         SymbolIndex index = new SymbolIndex(sourcePath, activeDocuments::keySet, this::activeContent, compiler);
-        Precompile precompile = new Precompile(sourcePath, classPath, outputDirectory);
+        Precompile precompile = new Precompile(sourcePath, classPath, outputDirectory, new Precompile.Progress() {
+            public void report(String currentFileName, int completed, int total) {
+                String json = jsonStringify(new Object() {
+                    public String event = "Progress", file = currentFileName;
+                });
+
+                client.join().telemetryEvent(json);
+            }
+
+            public void done() {
+                String json = jsonStringify(new Object() {
+                    public String event = "Done";
+                });
+
+                client.join().telemetryEvent(json);
+            }
+        });
 
         return new Configured(compiler, docs, index, precompile);
     }
@@ -613,5 +630,13 @@ class JavaLanguageServer implements LanguageServer {
         Objects.requireNonNull(file, "file is null");
         
         configured().compiler.compileBatch(Collections.singletonMap(file, activeContent(file)));
+    }
+
+    private static String jsonStringify(Object value) {
+        try {
+            return Main.JSON.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
