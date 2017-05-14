@@ -1,6 +1,7 @@
 package org.javacs;
 
 import com.google.common.reflect.ClassPath;
+import com.google.common.reflect.ClassPath.ClassInfo;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
@@ -195,9 +196,18 @@ class Completions {
         Stream<PackageElement> packages = subPackages(parentPackage, partialIdentifier);
         Stream<TypeElement> sourcePathClasses = sourcePathClasses(Optional.of(parentPackage), partialIdentifier);
         Stream<TypeElement> classPathClasses = classPath.topLevelClassesIn(parentPackage, partialIdentifier)
-                .map(c -> elements.getTypeElement(c.getName()));
+                .flatMap(this::loadFromClassPath);
 
         return Stream.concat(packages, Stream.concat(sourcePathClasses, classPathClasses));
+    }
+
+    private Stream<TypeElement> loadFromClassPath(ClassPath.ClassInfo info) {
+        TypeElement found = elements.getTypeElement(info.getName());
+
+        if (found == null)
+            return Stream.empty();
+        else
+            return Stream.of(found);
     }
 
     /**
@@ -352,8 +362,16 @@ class Completions {
         return sourcePath.allTopLevelClasses()
                 .filter(name -> packageName.map(check -> mostIds(name).equals(check)).orElse(true))
                 .filter(name -> containsCharactersInOrder(lastId(name), partialClass))
-                .map(elements::getTypeElement)
-                .filter(Objects::nonNull);
+                .flatMap(this::loadFromSourcePath);
+    }
+
+    private Stream<TypeElement> loadFromSourcePath(String name) {
+        TypeElement found = elements.getTypeElement(name);
+
+        if (found == null)
+            return Stream.empty();
+        else
+            return Stream.of(found);
     }
 
     private Stream<? extends Element> staticImports(ImportTree tree) {
