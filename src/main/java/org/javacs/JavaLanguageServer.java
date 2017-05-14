@@ -427,11 +427,16 @@ class JavaLanguageServer implements LanguageServer {
     private void publishDiagnostics(Collection<URI> touched, List<javax.tools.Diagnostic<? extends JavaFileObject>> diagnostics) {
         Map<URI, PublishDiagnosticsParams> files = touched.stream().collect(Collectors.toMap(uri -> uri, this::newPublishDiagnostics));
         
+        // Organize diagnostics by file
         for (javax.tools.Diagnostic<? extends JavaFileObject> error : diagnostics) {
             URI uri = error.getSource().toUri();
             PublishDiagnosticsParams publish = files.computeIfAbsent(uri, this::newPublishDiagnostics);
             Lints.convert(error).ifPresent(publish.getDiagnostics()::add);
         }
+
+        // If there are no errors in a file, put an empty PublishDiagnosticsParams
+        for (URI each : touched)
+            files.putIfAbsent(each, new PublishDiagnosticsParams());
 
         files.forEach((file, errors) -> {
             if (touched.contains(file))
