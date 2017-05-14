@@ -66,7 +66,9 @@ class Precompile {
                 int completed = 0, total = javaSourcesBySourceRoot.values().stream().mapToInt(files -> files.size()).sum();
 
                 // Try to compile each source root in 1 operation
-                for (Path sourceRoot : javaSourcesBySourceRoot.keySet()) {
+                List<Path> order = javaSourcesBySourceRoot.keySet().stream().sorted().collect(Collectors.toList());
+
+                for (Path sourceRoot : order) {
                     Set<Path> allInRoot = javaSourcesBySourceRoot.get(sourceRoot);
                     Set<Path> todo = allInRoot.stream().filter(Precompile.this::needsCompile).collect(Collectors.toSet());
 
@@ -75,7 +77,7 @@ class Precompile {
                             reportProgress.report(workspaceRoot.relativize(sourceRoot).toString(), completed, total);
                             precompile(todo);
                         }
-                        
+
                         completed += allInRoot.size();
                     } catch (Exception e) {
                         LOG.log(Level.SEVERE, "Uncaught exception precompiling " + sourceRoot, e);
