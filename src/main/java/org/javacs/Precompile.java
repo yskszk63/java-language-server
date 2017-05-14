@@ -70,10 +70,12 @@ class Precompile {
                     Set<Path> allInRoot = javaSourcesBySourceRoot.get(sourceRoot);
                     Set<Path> todo = allInRoot.stream().filter(Precompile.this::needsCompile).collect(Collectors.toSet());
 
-                    reportProgress.report(workspaceRoot.relativize(sourceRoot).toString(), completed, total);
-
                     try {
-                        precompile(todo);
+                        if (!todo.isEmpty()) {
+                            reportProgress.report(workspaceRoot.relativize(sourceRoot).toString(), completed, total);
+                            precompile(todo);
+                        }
+                        
                         completed += allInRoot.size();
                     } catch (Exception e) {
                         LOG.log(Level.SEVERE, "Uncaught exception precompiling " + sourceRoot, e);
