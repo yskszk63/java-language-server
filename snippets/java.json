@@ -17,26 +17,5 @@
             "}"
         ],
         "description": "For Comprehension"
-    },
-    "Map": {
-        "prefix": "Map<",
-        "body": [
-            "Map<${1:K}, ${2:V}> ${3:name} = ${4:new HashMap<>()};"
-        ],
-        "description": "New Map"
-    },
-    "List": {
-        "prefix": "List<",
-        "body": [
-            "List<${1:T}> ${2:name} = ${3:new ArrayList<>()};"
-        ],
-        "description": "New List"
-    },
-    "Set": {
-        "prefix": "Set<",
-        "body": [
-            "Set<${1:T}> ${2:name} = ${3:new HashSet<>()};"
-        ],
-        "description": "New Set"
     }
 }
