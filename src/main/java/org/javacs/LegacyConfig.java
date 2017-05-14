@@ -8,6 +8,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
+import java.util.regex.Pattern;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -43,18 +44,18 @@ import java.util.stream.Stream;
 
 import static org.javacs.Main.JSON;
 
-class FindConfig {
+class LegacyConfig {
     private final Path workspaceRoot;
 
-    FindConfig(Path workspaceRoot) {
+    LegacyConfig(Path workspaceRoot) {
         this.workspaceRoot = workspaceRoot;
     }
 
-    private Optional<JavacConfig> readJavaConfig(Path dir) {
+    Optional<JavacConfig> readJavaConfig(Path dir) {
         Function<JavaConfigJson, JavacConfig> parseJavaConfigJson = json -> {
             Set<Path> classPath = readClassPath(dir, json.classPath, json.classPathFile),
-                      docPath = readClassPath(dir, json.docPath, json.docPathFile);
-            Set<Path> sourcePath = json.sourcePath.stream().map(dir::resolve).collect(Collectors.toSet());
+                      docPath = readClassPath(dir, json.docPath, json.docPathFile),
+                      sourcePath = json.sourcePath.stream().map(dir::resolve).collect(Collectors.toSet());
             Path outputDirectory = dir.resolve(json.outputDirectory);
 
             return new JavacConfig(classPath, outputDirectory, docPath);
@@ -62,9 +63,6 @@ class FindConfig {
         if (Files.exists(dir.resolve("javaconfig.json"))) {
             return readJavaConfigJson(dir.resolve("javaconfig.json"))
                 .map(parseJavaConfigJson);
-        }
-        else if (Files.exists(dir.resolve("pom.xml"))) {
-            return Optional.of(readPomXml(dir, true));
         }
         else return Optional.empty();
     }
@@ -127,7 +125,7 @@ class FindConfig {
 
             String cmd = String.format(
                 "%s help:effective-pom -Doutput=%s",
-                getMvnCommand(),
+                InferConfig.getMvnCommand(),
                 effectivePom
             );
             File workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
@@ -161,7 +159,7 @@ class FindConfig {
 
             String cmd = String.format(
                 "%s dependency:build-classpath -DincludeScope=%s -Dmdep.outputFile=%s %s",
-                getMvnCommand(),
+                InferConfig.getMvnCommand(),
                 testScope ? "test" : "compile",
                 classPathTxt,
                 sourceJars ? "-Dclassifier=sources" : ""
@@ -180,27 +178,6 @@ class FindConfig {
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    private static String getMvnCommand() {
-        String mvnCommand = "mvn";
-        if (File.separatorChar == '\\') {
-            mvnCommand = findExecutableOnPath("mvn.cmd");
-            if (mvnCommand == null) {
-                mvnCommand = findExecutableOnPath("mvn.bat");
-            }
-        }
-        return mvnCommand;
-    }
-
-    private static String findExecutableOnPath(String name) {
-        for (String dirname : System.getenv("PATH").split(File.pathSeparator)) {
-            File file = new File(dirname, name);
-            if (file.isFile() && file.canExecute()) {
-                return file.getAbsolutePath();
-            }
-        }
-        return null;
     }
 
     private static Set<Path> sourceDirectories(Path pomXml, boolean testScope) {

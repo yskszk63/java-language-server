@@ -4,14 +4,20 @@ import com.google.common.base.Joiner;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.ExpressionTree;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.file.*;
 import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -194,6 +200,65 @@ class InferConfig {
 
     private static <T> Stream<T> stream(Optional<T> option) {
         return option.map(Stream::of).orElseGet(Stream::empty);
+    }
+
+    static List<Artifact> dependencyList(Path pomXml) {
+        Objects.requireNonNull(pomXml, "pom.xml path is null");
+
+        try {
+            // Tell maven to output deps to a temporary file
+            Path outputFile = Files.createTempFile("deps", ".txt");
+
+            String cmd = String.format(
+                "%s dependency:list -DincludeScope=test -DoutputFile=%s",
+                getMvnCommand(),
+                outputFile
+            );
+            File workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
+            int result = Runtime.getRuntime().exec(cmd, null, workingDirectory).waitFor();
+
+            if (result != 0)
+                throw new RuntimeException("`" + cmd + "` returned " + result);
+
+            return readDependencyList(outputFile);
+        } catch (InterruptedException | IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static List<Artifact> readDependencyList(Path outputFile) {
+        Pattern artifact = Pattern.compile(".*:.*:.*:.*:.*");
+
+        try(InputStream in = Files.newInputStream(outputFile)) {
+            return new BufferedReader(new InputStreamReader(in)).lines()
+                .map(String::trim)
+                .filter(line -> artifact.matcher(line).matches())
+                .map(Artifact::parse)
+                .collect(Collectors.toList());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static String getMvnCommand() {
+        String mvnCommand = "mvn";
+        if (File.separatorChar == '\\') {
+            mvnCommand = findExecutableOnPath("mvn.cmd");
+            if (mvnCommand == null) {
+                mvnCommand = findExecutableOnPath("mvn.bat");
+            }
+        }
+        return mvnCommand;
+    }
+
+    private static String findExecutableOnPath(String name) {
+        for (String dirname : System.getenv("PATH").split(File.pathSeparator)) {
+            File file = new File(dirname, name);
+            if (file.isFile() && file.canExecute()) {
+                return file.getAbsolutePath();
+            }
+        }
+        return null;
     }
 
     private static final Logger LOG = Logger.getLogger("main");

@@ -488,15 +488,32 @@ class JavaLanguageServer implements LanguageServer {
     // TODO this function needs to be invoked whenever the user creates a new .java file outside the existing source root
     private Configured createCompiler(JavaSettings settings, Path workspaceRoot) {
         Set<Path> sourcePath = InferConfig.workspaceSourcePath(workspaceRoot);
-        Path userHome = Paths.get(System.getProperty("user.home"));
-        Path mavenHome = userHome.resolve(".m2");
-        Path gradleHome = userHome.resolve(".gradle");
-        Path workspaceRootLike = workspaceRoot.subpath(0, workspaceRoot.getNameCount());
-        Path outputDirectory = userHome.resolve(".vscode-javac").resolve(workspaceRootLike).resolve("cache");
+        Path userHome = Paths.get(System.getProperty("user.home")),
+             mavenHome = userHome.resolve(".m2"),
+             gradleHome = userHome.resolve(".gradle"),
+             workspaceRootLike = workspaceRoot.subpath(0, workspaceRoot.getNameCount()),
+             outputDirectory = userHome.resolve(".vscode-javac").resolve(workspaceRootLike).resolve("cache");
         List<Artifact> externalDependencies = Lists.transform(settings.java.externalDependencies, Artifact::parse);
+
+        // If user does not specify java.externalDependencies, look for pom.xml
+        Path pomXml = workspaceRoot.resolve("pom.xml");
+
+        if (settings.java.externalDependencies.isEmpty() && Files.exists(pomXml)) 
+            externalDependencies = InferConfig.dependencyList(pomXml);
+
         InferConfig infer = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome, outputDirectory);
         Set<Path> classPath = infer.buildClassPath(),
-                docPath = infer.buildDocPath();
+                  docPath = infer.buildDocPath();
+
+        // If user does not specify java.externalDependencies, look for javaconfig.json
+        // This is for compatibility with the old behavior and should eventually be removed
+        if (settings.java.externalDependencies.isEmpty() && Files.exists(workspaceRoot.resolve("javaconfig.json"))) {
+            LegacyConfig legacy = new LegacyConfig(workspaceRoot);
+            Optional<JavacConfig> found = legacy.readJavaConfig(workspaceRoot);
+
+            classPath = found.map(c -> c.classPath).orElse(classPath);
+            docPath = found.map(c -> c.docPath).orElse(docPath);
+        }
 
         LOG.info("Inferred configuration: ");
         LOG.info("\tsourcePath:" + Joiner.on(' ').join(sourcePath));

@@ -64,10 +64,6 @@ We recommend you set the following in your project directory [.vscode/settings.j
 
 ```json
 {
-    "java.sourceDirectories": [
-        "src/main/java",
-        "src/test/java"
-    ],
     "java.externalDependencies": [
         "junit:junit:jar:4.12:test", // Maven format
         "junit:junit:4.12" // Gradle-style format is also allowed
