@@ -394,6 +394,9 @@ public class Javadocs {
 
         int start = breaks.first(), end = breaks.next();
 
+        if (start == -1 || end == -1)
+            return doc;
+
         return doc.substring(start, end).trim();
     }
     
