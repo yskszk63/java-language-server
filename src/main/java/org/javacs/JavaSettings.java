@@ -11,7 +11,6 @@ public class JavaSettings {
 
     public static class Java {
         public List<String> externalDependencies = new ArrayList<>();
-        public List<Path> sourceDirectories = new ArrayList<>();
         public Optional<String> javaHome = Optional.empty();
     }
 }
