@@ -509,7 +509,7 @@ class JavaLanguageServer implements LanguageServer {
         JavacHolder compiler = JavacHolder.create(sourcePath, classPath, outputDirectory);
         Javadocs docs = new Javadocs(sourcePath, docPath, this::activeContent);
         SymbolIndex index = new SymbolIndex(sourcePath, activeDocuments::keySet, this::activeContent, compiler);
-        Precompile precompile = new Precompile(sourcePath, classPath, outputDirectory, new Precompile.Progress() {
+        Precompile precompile = new Precompile(workspaceRoot, sourcePath, classPath, outputDirectory, new Precompile.Progress() {
             public void report(String currentFileName, int completed, int total) {
                 String json = jsonStringify(new Object() {
                     public String event = "Progress", file = currentFileName;

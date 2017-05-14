@@ -62,7 +62,7 @@ public class SymbolIndex {
         }, "Initial-Index").start();
     }
 
-    static Set<URI> allJavaSources(Set<Path> sourcePath) {
+    private static Set<URI> allJavaSources(Set<Path> sourcePath) {
         return sourcePath.stream()
                 .flatMap(InferConfig::allJavaFiles)
                 .map(Path::toUri)

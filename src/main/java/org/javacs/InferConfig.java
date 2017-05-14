@@ -85,13 +85,13 @@ class InferConfig {
             .collect(Collectors.toSet());
     }
 
-    static Stream<Path> allJavaFiles(Path workspaceRoot) {
+    static Stream<Path> allJavaFiles(Path dir) {
         PathMatcher match = FileSystems.getDefault().getPathMatcher("glob:*.java");
 
         try {
             // TODO instead of looking at EVERY file, once you see a few files with the same source directory,
             // ignore all subsequent files in the directory
-            return Files.walk(workspaceRoot)
+            return Files.walk(dir)
                 .filter(java -> match.matches(java.getFileName()));
         } catch (IOException e) {
             throw new RuntimeException(e);

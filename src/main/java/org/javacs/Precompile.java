@@ -9,13 +9,17 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -35,7 +39,7 @@ class Precompile {
     private final IncrementalFileManager incremental;
     private final Progress reportProgress;
 
-    Precompile(Set<Path> sourcePath, Set<Path> classPath, Path outputDirectory, Progress reportProgress) {
+    Precompile(Path workspaceRoot, Set<Path> sourcePath, Set<Path> classPath, Path outputDirectory, Progress reportProgress) {
         this.sourcePath = sourcePath;
         this.classPath = classPath;
         this.outputDirectory = outputDirectory;
@@ -56,20 +60,40 @@ class Precompile {
 
         Runnable precompileAll = () -> {
             try {
-                // TODO send a progress bar to the user
-                Set<URI> all = SymbolIndex.allJavaSources(sourcePath);
-                int completed = 0;
+                Function<Path, Set<Path>> javaSources = dir -> InferConfig.allJavaFiles(dir).collect(Collectors.toSet());
+                Map<Path, Set<Path>> javaSourcesBySourceRoot = sourcePath.stream().collect(Collectors.toMap(dir -> dir, javaSources));
+                List<Set<Path>> retry = new ArrayList<>();
+                int completed = 0, total = javaSourcesBySourceRoot.values().stream().mapToInt(files -> files.size()).sum();
 
-                for (URI each : all) {
-                    if (needsCompile(each)) {
-                        String fileName = Paths.get(each.getPath()).getFileName().toString();
+                // Try to compile each source root in 1 operation
+                for (Path sourceRoot : javaSourcesBySourceRoot.keySet()) {
+                    Set<Path> allInRoot = javaSourcesBySourceRoot.get(sourceRoot);
+                    Set<Path> todo = allInRoot.stream().filter(Precompile.this::needsCompile).collect(Collectors.toSet());
 
-                        reportProgress.report(fileName, completed, all.size());
+                    reportProgress.report(workspaceRoot.relativize(sourceRoot).toString(), completed, total);
 
-                        precompile(each);
+                    try {
+                        precompile(todo);
+                        completed += allInRoot.size();
+                    } catch (Exception e) {
+                        LOG.log(Level.SEVERE, "Uncaught exception precompiling " + sourceRoot, e);
+
+                        // If compilation fails, we will retry each .java file individually
+                        retry.add(allInRoot);
                     }
+                }
 
-                    completed++;
+                // When compiling the entire source root fails, try to compile each .java file individually
+                for (Set<Path> retryDir : retry) {
+                    for (Path retryFile : retryDir) {
+                        reportProgress.report(retryFile.getFileName().toString(), completed, total);
+
+                        try {
+                            precompile(Collections.singleton(retryFile));
+                        } catch (Exception e) {
+                            LOG.log(Level.SEVERE, "Uncaught exception precompiling " + retryFile, e);
+                        }
+                    }
                 }
             } catch (Exception e) {
                 LOG.log(Level.SEVERE, "Uncaught exception in precompile thread", e);
@@ -81,15 +105,13 @@ class Precompile {
         new Thread(precompileAll, "Precompile").start();
     }
 
-    private boolean needsCompile(URI file) {
-        return qualifiedName(file)
+    private boolean needsCompile(Path path) {
+        return qualifiedName(path)
             .map(name -> !incremental.hasUpToDateClassFile(name))
             .orElse(true);
     }
 
-    private Optional<String> qualifiedName(URI file) {
-        Path path = Paths.get(file);
-
+    private Optional<String> qualifiedName(Path path) {
         return sourcePath.stream()
             .filter(dir -> path.startsWith(dir))
             .map(dir -> dir.relativize(path))
@@ -116,17 +138,15 @@ class Precompile {
         return Stream.of(result.toString());
     }
 
-    private void precompile(URI file) {
-        LOG.info("Precompile " + file);
-        
+    private void precompile(Set<Path> files) {
         try {
-            JavaFileObject fileObject = fileManager.getRegularFile(Paths.get(file).toFile());
+            List<JavaFileObject> fileObjects = files.stream().map(file -> fileManager.getRegularFile(file.toFile())).collect(Collectors.toList());
             List<String> options = JavacHolder.options(sourcePath, classPath, outputDirectory, true);
-            JavacTask task = javac.getTask(null, fileManager, this::onError, options, null, Collections.singletonList(fileObject));
+            JavacTask task = javac.getTask(null, fileManager, this::onError, options, null, fileObjects);
 
             task.call();
         } catch (Exception e) {
-            LOG.warning("Failed to compile " + file + " with " + e.getMessage());
+            LOG.warning("Failed to compile " + files.size() + " files with " + e.getMessage());
         }
     }
 
