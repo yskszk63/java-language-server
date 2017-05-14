@@ -25,6 +25,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.tools.Diagnostic;
+import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 
@@ -152,6 +153,7 @@ class Precompile {
             List<String> options = JavacHolder.options(sourcePath, classPath, outputDirectory, true);
             JavacTask task = javac.getTask(null, fileManager, this::onError, options, null, fileObjects);
 
+            // TODO prune all method bodies after parse, before compile, to make it go faster
             return task.call();
         } catch (Exception e) {
             LOG.warning("Failed to compile " + files.size() + " files with " + e.getMessage());
@@ -161,7 +163,8 @@ class Precompile {
     }
 
     private void onError(Diagnostic<? extends JavaFileObject> err) {
-        LOG.warning(err.getMessage(Locale.getDefault()));
+        if (err.getKind() == Diagnostic.Kind.ERROR)
+            LOG.warning(err.getMessage(Locale.getDefault()));
     }
 
     private static Logger LOG = Logger.getLogger("main");
