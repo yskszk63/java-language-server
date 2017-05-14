@@ -542,6 +542,8 @@ class JavaLanguageServer implements LanguageServer {
             }
         });
 
+        precompile.start();
+
         return new Configured(compiler, docs, index, precompile);
     }
 

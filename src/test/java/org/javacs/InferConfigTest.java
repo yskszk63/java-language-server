@@ -22,7 +22,7 @@ public class InferConfigTest {
     private InferConfig both = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome, outputDirectory),
         gradle = new InferConfig(workspaceRoot, externalDependencies, Paths.get("nowhere"), gradleHome, outputDirectory);
 
-    private Path createOutputDir() {
+    static Path createOutputDir() {
         try {
             return Files.createTempDirectory("output").toAbsolutePath();
         } catch (IOException e) {

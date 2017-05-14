@@ -33,13 +33,14 @@ import javax.tools.StandardLocation;
  */
 class Precompile {
     private final Set<Path> sourcePath, classPath;
-    private final Path outputDirectory;
+    private final Path workspaceRoot, outputDirectory;
     private final JavacTool javac = JavacTool.create();
     private final JavacFileManager fileManager;
     private final IncrementalFileManager incremental;
     private final Progress reportProgress;
 
     Precompile(Path workspaceRoot, Set<Path> sourcePath, Set<Path> classPath, Path outputDirectory, Progress reportProgress) {
+        this.workspaceRoot = workspaceRoot;
         this.sourcePath = sourcePath;
         this.classPath = classPath;
         this.outputDirectory = outputDirectory;
@@ -57,56 +58,59 @@ class Precompile {
             throw new RuntimeException(e);
         }
         this.incremental = new IncrementalFileManager(fileManager);
+    }
 
-        Runnable precompileAll = () -> {
-            try {
-                Function<Path, Set<Path>> javaSources = dir -> InferConfig.allJavaFiles(dir).collect(Collectors.toSet());
-                Map<Path, Set<Path>> javaSourcesBySourceRoot = sourcePath.stream().collect(Collectors.toMap(dir -> dir, javaSources));
-                List<Set<Path>> retry = new ArrayList<>();
-                int completed = 0, total = javaSourcesBySourceRoot.values().stream().mapToInt(files -> files.size()).sum();
+    /**
+     * Precompile all files on a new thread
+     */
+    void start() {
+        new Thread(this::run, "Precompile").start();
+    }
 
-                // Try to compile each source root in 1 operation
-                List<Path> order = javaSourcesBySourceRoot.keySet().stream().sorted().collect(Collectors.toList());
+    /**
+     * Precompile all files synchronously, blocking the current thread.
+     * 
+     * Useful for testing.
+     */
+    void run() {
+        try {
+            Function<Path, Set<Path>> javaSources = dir -> InferConfig.allJavaFiles(dir).collect(Collectors.toSet());
+            Map<Path, Set<Path>> javaSourcesBySourceRoot = sourcePath.stream().collect(Collectors.toMap(dir -> dir, javaSources));
+            List<Set<Path>> retry = new ArrayList<>();
+            int completed = 0, total = javaSourcesBySourceRoot.values().stream().mapToInt(files -> files.size()).sum();
 
-                for (Path sourceRoot : order) {
-                    Set<Path> allInRoot = javaSourcesBySourceRoot.get(sourceRoot);
-                    Set<Path> todo = allInRoot.stream().filter(Precompile.this::needsCompile).collect(Collectors.toSet());
+            // Try to compile each source root in 1 operation
+            List<Path> order = javaSourcesBySourceRoot.keySet().stream().sorted().collect(Collectors.toList());
 
-                    try {
-                        if (!todo.isEmpty()) {
-                            reportProgress.report(workspaceRoot.relativize(sourceRoot).toString(), completed, total);
-                            precompile(todo);
-                        }
+            for (Path sourceRoot : order) {
+                Set<Path> allInRoot = javaSourcesBySourceRoot.get(sourceRoot);
+                Set<Path> todo = allInRoot.stream().filter(Precompile.this::needsCompile).collect(Collectors.toSet());
 
+                if (!todo.isEmpty()) {
+                    LOG.info("Precompile " + todo.size() + " files in " + sourceRoot);
+
+                    reportProgress.report(workspaceRoot.relativize(sourceRoot).toString(), completed, total);
+
+                    if (precompile(todo))
                         completed += allInRoot.size();
-                    } catch (Exception e) {
-                        LOG.log(Level.SEVERE, "Uncaught exception precompiling " + sourceRoot, e);
-
-                        // If compilation fails, we will retry each .java file individually
+                    else // If compilation fails, we will retry each .java file individually
                         retry.add(allInRoot);
-                    }
                 }
-
-                // When compiling the entire source root fails, try to compile each .java file individually
-                for (Set<Path> retryDir : retry) {
-                    for (Path retryFile : retryDir) {
-                        reportProgress.report(retryFile.getFileName().toString(), completed, total);
-
-                        try {
-                            precompile(Collections.singleton(retryFile));
-                        } catch (Exception e) {
-                            LOG.log(Level.SEVERE, "Uncaught exception precompiling " + retryFile, e);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                LOG.log(Level.SEVERE, "Uncaught exception in precompile thread", e);
-            } finally {
-                reportProgress.done();
             }
-        };
 
-        new Thread(precompileAll, "Precompile").start();
+            // When compiling the entire source root fails, try to compile each .java file individually
+            for (Set<Path> retryDir : retry) {
+                for (Path retryFile : retryDir) {
+                    reportProgress.report(retryFile.getFileName().toString(), completed, total);
+
+                    precompile(Collections.singleton(retryFile));
+                }
+            }
+        } catch (Exception e) {
+            LOG.log(Level.SEVERE, "Uncaught exception in precompile thread", e);
+        } finally {
+            reportProgress.done();
+        }
     }
 
     private boolean needsCompile(Path path) {
@@ -142,20 +146,22 @@ class Precompile {
         return Stream.of(result.toString());
     }
 
-    private void precompile(Set<Path> files) {
+    private boolean precompile(Set<Path> files) {
         try {
             List<JavaFileObject> fileObjects = files.stream().map(file -> fileManager.getRegularFile(file.toFile())).collect(Collectors.toList());
             List<String> options = JavacHolder.options(sourcePath, classPath, outputDirectory, true);
             JavacTask task = javac.getTask(null, fileManager, this::onError, options, null, fileObjects);
 
-            task.call();
+            return task.call();
         } catch (Exception e) {
             LOG.warning("Failed to compile " + files.size() + " files with " + e.getMessage());
+
+            return false;
         }
     }
 
     private void onError(Diagnostic<? extends JavaFileObject> err) {
-        // Ignore all errors
+        LOG.warning(err.getMessage(Locale.getDefault()));
     }
 
     private static Logger LOG = Logger.getLogger("main");
@@ -167,5 +173,15 @@ class Precompile {
         void report(String currentFileName, int completed, int total);
 
         void done();
+
+        static Progress EMPTY = new Progress() {
+            public void report(String currentFileName, int completed, int total) {
+
+            }
+
+            public void done() {
+                
+            }
+        };
     }
 }
