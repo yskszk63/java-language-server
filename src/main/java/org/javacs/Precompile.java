@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.google.common.base.Joiner;
 import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
@@ -152,9 +153,13 @@ class Precompile {
             List<JavaFileObject> fileObjects = files.stream().map(file -> fileManager.getRegularFile(file.toFile())).collect(Collectors.toList());
             List<String> options = JavacHolder.options(sourcePath, classPath, outputDirectory, true);
             JavacTask task = javac.getTask(null, fileManager, this::onError, options, null, fileObjects);
-
             // TODO prune all method bodies after parse, before compile, to make it go faster
-            return task.call();
+            boolean succeeded = task.call();
+
+            if (!succeeded)
+                LOG.warning("Failed: javac " + Joiner.on(" ").join(options) + " " + Joiner.on(" ").join(files));
+            
+            return succeeded;
         } catch (Exception e) {
             LOG.warning("Failed to compile " + files.size() + " files with " + e.getMessage());
 
