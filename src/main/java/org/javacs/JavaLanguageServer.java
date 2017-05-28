@@ -5,6 +5,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 import org.eclipse.lsp4j.*;
@@ -459,13 +460,11 @@ class JavaLanguageServer implements LanguageServer {
         final JavacHolder compiler;
         final Javadocs docs;
         final SymbolIndex index;
-        final Precompile precompile;
 
-        Configured(JavacHolder compiler, Javadocs docs, SymbolIndex index, Precompile precompile) {
+        Configured(JavacHolder compiler, Javadocs docs, SymbolIndex index) {
             this.compiler = compiler;
             this.docs = docs;
             this.index = index;
-            this.precompile = precompile;
         }
     }
 
@@ -492,7 +491,7 @@ class JavaLanguageServer implements LanguageServer {
              mavenHome = userHome.resolve(".m2"),
              gradleHome = userHome.resolve(".gradle"),
              workspaceRootLike = workspaceRoot.subpath(0, workspaceRoot.getNameCount()),
-             outputDirectory = userHome.resolve(".vscode-javac").resolve(workspaceRootLike).resolve("cache");
+             outputDirectory = defaultOutputDirectory();
         List<Artifact> externalDependencies = Lists.transform(settings.java.externalDependencies, Artifact::parse);
 
         // If user does not specify java.externalDependencies, look for pom.xml
@@ -503,6 +502,7 @@ class JavaLanguageServer implements LanguageServer {
 
         InferConfig infer = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome, outputDirectory);
         Set<Path> classPath = infer.buildClassPath(),
+                  workspaceClassPath = infer.workspaceClassPath(),
                   docPath = infer.buildDocPath();
 
         // If user does not specify java.externalDependencies, look for javaconfig.json
@@ -512,39 +512,22 @@ class JavaLanguageServer implements LanguageServer {
             Optional<JavacConfig> found = legacy.readJavaConfig(workspaceRoot);
 
             classPath = found.map(c -> c.classPath).orElse(classPath);
+            workspaceClassPath = found.map(c -> c.workspaceClassPath).orElse(workspaceClassPath);
             docPath = found.map(c -> c.docPath).orElse(docPath);
         }
 
         LOG.info("Inferred configuration: ");
         LOG.info("\tsourcePath:" + Joiner.on(' ').join(sourcePath));
         LOG.info("\tclassPath:" + Joiner.on(' ').join(classPath));
+        LOG.info("\tworkspaceClassPath:" + Joiner.on(' ').join(workspaceClassPath));
         LOG.info("\tdocPath:" + Joiner.on(' ').join(docPath));
         LOG.info("\toutputDirectory:" + outputDirectory);
 
-        JavacHolder compiler = JavacHolder.create(sourcePath, classPath, outputDirectory);
+        JavacHolder compiler = JavacHolder.create(sourcePath, Sets.union(classPath, workspaceClassPath), outputDirectory);
         Javadocs docs = new Javadocs(sourcePath, docPath, this::activeContent);
         SymbolIndex index = new SymbolIndex(sourcePath, activeDocuments::keySet, this::activeContent, compiler);
-        Precompile precompile = new Precompile(workspaceRoot, sourcePath, classPath, outputDirectory, new Precompile.Progress() {
-            public void report(String currentFileName, int completed, int total) {
-                String json = jsonStringify(new Object() {
-                    public String event = "Progress", file = currentFileName;
-                });
 
-                client.join().telemetryEvent(json);
-            }
-
-            public void done() {
-                String json = jsonStringify(new Object() {
-                    public String event = "Done";
-                });
-
-                client.join().telemetryEvent(json);
-            }
-        });
-
-        precompile.start();
-
-        return new Configured(compiler, docs, index, precompile);
+        return new Configured(compiler, docs, index);
     }
 
     private void clearDiagnostics() {
@@ -556,7 +539,7 @@ class JavaLanguageServer implements LanguageServer {
 
     private static Path defaultOutputDirectory() {
         try {
-            return Files.createTempDirectory("vscode-javac-output"); // TODO this should be consistent within a project
+            return Files.createTempDirectory("vscode-javac-output");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

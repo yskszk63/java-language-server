@@ -58,7 +58,7 @@ class LegacyConfig {
                       sourcePath = json.sourcePath.stream().map(dir::resolve).collect(Collectors.toSet());
             Path outputDirectory = dir.resolve(json.outputDirectory);
 
-            return new JavacConfig(classPath, outputDirectory, docPath);
+            return new JavacConfig(classPath, Collections.singleton(outputDirectory), docPath);
         };
         if (Files.exists(dir.resolve("javaconfig.json"))) {
             return readJavaConfigJson(dir.resolve("javaconfig.json"))
@@ -96,21 +96,22 @@ class LegacyConfig {
         Set<Path> docPath = buildClassPath(originalPom, testScope, true);
 
         // Use maven output directory so incremental compilation uses maven-generated .class files
-        Path outputDirectory = testScope ? 
-            Paths.get("target/test-classes").toAbsolutePath() : 
-            Paths.get("target/classes").toAbsolutePath();
+        Set<Path> workspaceClassPath = ImmutableSet.of(
+            Paths.get("target/test-classes").toAbsolutePath(),
+            Paths.get("target/classes").toAbsolutePath()
+        );
 
         JavacConfig config = new JavacConfig(
             classPath, 
-            outputDirectory,
+            workspaceClassPath,
             docPath
         );
 
         LOG.info("Inferred from " + originalPom + ":");
         LOG.info("\tsourcePath: " + Joiner.on(" ").join(sourcePath));
         LOG.info("\tclassPath: " + Joiner.on(" ").join(classPath));
-        LOG.info("\tdocPath: (pending)");
-        LOG.info("\toutputDirectory: " + outputDirectory);
+        LOG.info("\tworkspaceClassPath: " + Joiner.on(" ").join(workspaceClassPath));
+        LOG.info("\tdocPath: " + Joiner.on(" ").join(docPath));
 
         return config;
     }

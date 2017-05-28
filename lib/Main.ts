@@ -143,26 +143,6 @@ export function activate(context: VSCode.ExtensionContext) {
             //     docComment: { scope: 'comment.documentation', open: '/**', lineStart: ' * ', close: ' */' }
             // }
         });
-
-        // Show progress of pre-compiling each .java source
-        VSCode.window.withProgress({location: VSCode.ProgressLocation.Window, title: 'Indexing'}, progress => {
-            return new Promise((resolve, reject) => {
-                languageClient.onTelemetry((eventJson: string) => {
-                    let event = JSON.parse(eventJson) as CustomTelemetryEvent;
-                    
-                    switch (event.event) {
-                        case 'Progress':
-                            progress.report({message: event.file});
-
-                            break;
-                        case 'Done':
-                            resolve();
-
-                            break;
-                    }
-                });
-            });
-        });
     });
 }
 
