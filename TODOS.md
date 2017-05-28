@@ -6,6 +6,7 @@
 * Hover doesn't show 'throws ...'
 * Enum const javadocs are not showing
 * Missing ; lint has no width
+* Autocomplete new MethodScopeClass| adds 'import .MethodScopeClass'
 
 ## Default configuration
 * Alert if we can't find a dependency
