@@ -26,7 +26,7 @@ public class LinterTest {
     @Test
     public void compile() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/HelloWorld.java");
-        DiagnosticCollector<JavaFileObject> errors = compiler.compileBatch(Collections.singletonMap(file, Optional.empty())).errors;
+        DiagnosticCollector<JavaFileObject> errors = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
 
         assertThat(errors.getDiagnostics(), empty());
     }
@@ -34,27 +34,27 @@ public class LinterTest {
     @Test
     public void missingMethodBody() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/MissingMethodBody.java");
-        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
+        DiagnosticCollector<JavaFileObject> compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
 
-        assertThat(compile.errors.getDiagnostics(), not(empty()));
+        assertThat(compile.getDiagnostics(), not(empty()));
     }
 
     @Test
     public void incompleteAssignment() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/IncompleteAssignment.java");
-        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
+        DiagnosticCollector<JavaFileObject> compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
 
-        assertThat(compile.errors.getDiagnostics(), not(empty()));
+        assertThat(compile.getDiagnostics(), not(empty()));
     }
 
     @Test
     public void undefinedSymbol() throws IOException {
         URI file = FindResource.uri("/org/javacs/example/UndefinedSymbol.java");
-        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
+        DiagnosticCollector<JavaFileObject> compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
 
-        assertThat(compile.errors.getDiagnostics(), not(empty()));
+        assertThat(compile.getDiagnostics(), not(empty()));
 
-        Diagnostic<? extends JavaFileObject> d = compile.errors.getDiagnostics().get(0);
+        Diagnostic<? extends JavaFileObject> d = compile.getDiagnostics().get(0);
 
         // Error position should span entire 'foo' symbol
         assertThat(d.getLineNumber(), greaterThan(0L));
@@ -65,23 +65,23 @@ public class LinterTest {
     @Test(expected = IllegalArgumentException.class)
     public void notJava() {
         URI file = FindResource.uri("/org/javacs/example/NotJava.java.txt");
-        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
+        DiagnosticCollector<JavaFileObject> compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
     }
 
     @Test
     public void errorInDependency() {
         URI file = FindResource.uri("/org/javacs/example/ErrorInDependency.java");
-        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
+        DiagnosticCollector<JavaFileObject> compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
 
-        assertThat(compile.errors.getDiagnostics(), not(empty()));
+        assertThat(compile.getDiagnostics(), not(empty()));
     }
     
     @Test
     public void deprecationWarning() {
         URI file = FindResource.uri("/org/javacs/example/DeprecationWarning.java");
-        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
+        DiagnosticCollector<JavaFileObject> compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
 
-        assertThat(compile.errors.getDiagnostics(), not(empty()));
+        assertThat(compile.getDiagnostics(), not(empty()));
     }
 
     @Test
@@ -100,9 +100,9 @@ public class LinterTest {
                 "        };\n" +
                 "    }\n" +
                 "}";
-        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.of(source)));
+        DiagnosticCollector<JavaFileObject> compile = compiler.compileBatch(Collections.singletonMap(file, Optional.of(source)));
 
-        assertThat(compile.errors.getDiagnostics(), not(empty()));
+        assertThat(compile.getDiagnostics(), not(empty()));
 
     }
 

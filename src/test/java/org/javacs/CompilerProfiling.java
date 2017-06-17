@@ -1,5 +1,7 @@
 package org.javacs;
 
+import javax.tools.DiagnosticCollector;
+import javax.tools.JavaFileObject;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -33,7 +35,7 @@ public class CompilerProfiling {
                 Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
                 Collections.emptySet()
         );
-        BatchResult result = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
+        DiagnosticCollector<JavaFileObject> result = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
         long finish = System.nanoTime();
 
         return Duration.ofNanos(finish - start);

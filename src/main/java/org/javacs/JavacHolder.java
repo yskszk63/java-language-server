@@ -125,11 +125,11 @@ public class JavacHolder {
      *
      * If these files reference un-compiled dependencies, those dependencies will also be parsed and compiled.
      */
-    public BatchResult compileBatch(Map<URI, Optional<String>> files) {
+    public DiagnosticCollector<JavaFileObject> compileBatch(Map<URI, Optional<String>> files) {
         return compileBatch(files, (task, tree) -> {});
     }
 
-    public BatchResult compileBatch(Map<URI, Optional<String>> files, BiConsumer<JavacTask, CompilationUnitTree> listener) {
+    public DiagnosticCollector<JavaFileObject> compileBatch(Map<URI, Optional<String>> files, BiConsumer<JavacTask, CompilationUnitTree> listener) {
         return doCompile(files, listener);
     }
 
@@ -289,7 +289,7 @@ public class JavacHolder {
         }
     }
 
-    private BatchResult doCompile(Map<URI, Optional<String>> files, BiConsumer<JavacTask, CompilationUnitTree> forEach) {
+    private DiagnosticCollector<JavaFileObject> doCompile(Map<URI, Optional<String>> files, BiConsumer<JavacTask, CompilationUnitTree> forEach) {
         // TODO remove all URIs from fileManager
         
         List<JavaFileObject> objects = files
@@ -320,7 +320,7 @@ public class JavacHolder {
 
             parse.forEach(tree -> forEach.accept(task, tree));
 
-            return new BatchResult(task, errors);
+            return errors;
         } catch (IOException e) {
             throw new RuntimeException(e);
         } finally {

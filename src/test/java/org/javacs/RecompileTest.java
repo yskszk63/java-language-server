@@ -19,14 +19,14 @@ public class RecompileTest {
     public void compileTwice() {
         URI file = FindResource.uri("/org/javacs/example/CompileTwice.java");
         JavacHolder compiler = newCompiler();
-        BatchResult compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
+        DiagnosticCollector<JavaFileObject> compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
 
-        assertThat(compile.errors.getDiagnostics(), empty());
+        assertThat(compile.getDiagnostics(), empty());
 
         // Compile again
         compile = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
 
-        assertThat(compile.errors.getDiagnostics(), empty());
+        assertThat(compile.getDiagnostics(), empty());
     }
 
     @Test
@@ -34,13 +34,12 @@ public class RecompileTest {
         URI bad = FindResource.uri("/org/javacs/example/FixParseErrorBefore.java");
         URI good = FindResource.uri("/org/javacs/example/FixParseErrorAfter.java");
         JavacHolder compiler = newCompiler();
-        DiagnosticCollector<JavaFileObject> badErrors = compiler.compileBatch(Collections.singletonMap(bad, Optional.empty())).errors;
+        DiagnosticCollector<JavaFileObject> badErrors = compiler.compileBatch(Collections.singletonMap(bad, Optional.empty()));
 
         assertThat(badErrors.getDiagnostics(), not(empty()));
 
         // Parse again
-        BatchResult goodCompile = compiler.compileBatch(Collections.singletonMap(good, Optional.empty()));
-        DiagnosticCollector<JavaFileObject> goodErrors = goodCompile.errors;
+        DiagnosticCollector<JavaFileObject> goodErrors = compiler.compileBatch(Collections.singletonMap(good, Optional.empty()));
 
         assertThat(goodErrors.getDiagnostics(), empty());
     }
@@ -50,13 +49,12 @@ public class RecompileTest {
         URI bad = FindResource.uri("/org/javacs/example/FixTypeErrorBefore.java");
         URI good = FindResource.uri("/org/javacs/example/FixTypeErrorAfter.java");
         JavacHolder compiler = newCompiler();
-        DiagnosticCollector<JavaFileObject> badErrors = compiler.compileBatch(Collections.singletonMap(bad, Optional.empty())).errors;
+        DiagnosticCollector<JavaFileObject> badErrors = compiler.compileBatch(Collections.singletonMap(bad, Optional.empty()));
 
         assertThat(badErrors.getDiagnostics(), not(empty()));
 
         // Parse again
-        BatchResult goodCompile = compiler.compileBatch(Collections.singletonMap(good, Optional.empty()));
-        DiagnosticCollector<JavaFileObject> goodErrors = goodCompile.errors;
+        DiagnosticCollector<JavaFileObject> goodErrors = compiler.compileBatch(Collections.singletonMap(good, Optional.empty()));
 
         assertThat(goodErrors.getDiagnostics(), empty());
     }
@@ -74,11 +72,11 @@ public class RecompileTest {
         JavacHolder compiler = newCompiler();
 
         // Compile once
-        DiagnosticCollector<JavaFileObject> errors = compiler.compileBatch(Collections.singletonMap(file, Optional.empty())).errors;
+        DiagnosticCollector<JavaFileObject> errors = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
         assertThat(errors.getDiagnostics(), not(empty()));
 
         // Compile twice
-        errors = compiler.compileBatch(Collections.singletonMap(file, Optional.empty())).errors;
+        errors = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
 
         assertThat(errors.getDiagnostics(), not(empty()));
     }

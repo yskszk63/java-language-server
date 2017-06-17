@@ -8,6 +8,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
+import javax.tools.DiagnosticCollector;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -352,9 +353,9 @@ class JavaLanguageServer implements LanguageServer {
         List<javax.tools.Diagnostic<? extends JavaFileObject>> errors = new ArrayList<>();
         Map<URI, Optional<String>> content = paths.stream()
             .collect(Collectors.toMap(f -> f, this::activeContent));
-        BatchResult compile = configured().compiler.compileBatch(content);
+        DiagnosticCollector<JavaFileObject> compile = configured().compiler.compileBatch(content);
 
-        errors.addAll(compile.errors.getDiagnostics());
+        errors.addAll(compile.getDiagnostics());
 
         publishDiagnostics(paths, errors);
     }

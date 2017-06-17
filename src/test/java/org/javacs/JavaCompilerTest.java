@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.api.JavacTool;
+import javax.tools.DiagnosticCollector;
 import org.junit.Test;
 
 import javax.lang.model.element.Element;
@@ -46,7 +47,7 @@ public class JavaCompilerTest {
                 Collections.emptySet()
         );
         File file = Paths.get("src/test/test-project/workspace/src/org/javacs/example/Bad.java").toFile();
-        BatchResult compile = javac.compileBatch(Collections.singletonMap(file.toURI(), Optional.empty()));
+        DiagnosticCollector<JavaFileObject> compile = javac.compileBatch(Collections.singletonMap(file.toURI(), Optional.empty()));
     }
 
     /* It's too hard to keep this test working
@@ -56,7 +57,7 @@ public class JavaCompilerTest {
 
         // Compile Target to a .class file
         File target = Paths.get("src/test/resources/org/javacs/example/Target.java").toFile();
-        BatchResult batch = javac.compileBatch(Collections.singletonMap(target.toURI(), Optional.empty()));
+        DiagnosticCollector<JavaFileObject> batch = javac.compileBatch(Collections.singletonMap(target.toURI(), Optional.empty()));
 
         // Incremental compilation should use Target.class, not Target.java
         File dependsOnTarget = Paths.get("src/test/resources/org/javacs/example/DependsOnTarget.java").toFile();
