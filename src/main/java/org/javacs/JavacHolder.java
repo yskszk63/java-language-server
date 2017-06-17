@@ -149,19 +149,18 @@ public class JavacHolder {
     private final JavacTool javac = JavacTool.create();
 
     /*
-    * JavacFileManager internally caches the location of classpath,
-    * so we need separate file managers for batch and incremental mode.
-    */
+     * JavacFileManager caches classpath internally, so both fileManager and incrementalFileManager will have the same classPath
+     */
 
     /**
-     * File manager that caches classpath = classpath
+     * Direct file manager we use to obtain reference to file we are re-compiling
      */
-    private final JavacFileManager batchFileManager = javac.getStandardFileManager(this::onError, null, Charset.defaultCharset());
+    private final JavacFileManager fileManager = javac.getStandardFileManager(this::onError, null, Charset.defaultCharset());
 
     /**
-     * File manager that caches classpath = (classpath, output-directory)
+     * File manager that hides .java files that have up-to-date sources
      */
-    private final JavaFileManager incrementalFileManager = new IncrementalFileManager(javac.getStandardFileManager(this::onError, null, Charset.defaultCharset()));
+    private final JavaFileManager incrementalFileManager = new IncrementalFileManager(fileManager);
 
     /**
      * javac isn't friendly to swapping out the error-reporting DiagnosticListener,
@@ -213,8 +212,7 @@ public class JavacHolder {
     }
 
     private JavacTask createTask(Collection<JavaFileObject> files, boolean incremental) {
-        JavaFileManager fileManager = incremental ? incrementalFileManager : batchFileManager;
-        JavacTask result = javac.getTask(null, fileManager, this::onError, options(sourcePath, classPath), null, files);
+        JavacTask result = javac.getTask(null, incrementalFileManager, this::onError, options(sourcePath, classPath), null, files);
         JavacTaskImpl impl = (JavacTaskImpl) result;
 
         // Better stack traces inside javac
@@ -249,7 +247,7 @@ public class JavacHolder {
     private JavaFileObject findFile(URI file, Optional<String> text) {
         return text
                 .map(content -> (JavaFileObject) new StringFileObject(content, file))
-                .orElseGet(() -> batchFileManager.getRegularFile(Paths.get(file).toFile()));
+                .orElseGet(() -> fileManager.getRegularFile(Paths.get(file).toFile()));
     }
 
     private DiagnosticCollector<JavaFileObject> startCollectingErrors() {
