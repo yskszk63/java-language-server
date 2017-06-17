@@ -16,19 +16,10 @@ public class InferConfigTest {
     private Path workspaceRoot = Paths.get("src/test/test-project/workspace");
     private Path mavenHome = Paths.get("src/test/test-project/home/.m2");
     private Path gradleHome = Paths.get("src/test/test-project/home/.gradle");
-    private Path outputDirectory = createOutputDir();
     private Artifact externalArtifact = new Artifact("com.external", "external-library", "1.2");
     private List<Artifact> externalDependencies = ImmutableList.of(externalArtifact);
-    private InferConfig both = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome, outputDirectory),
-        gradle = new InferConfig(workspaceRoot, externalDependencies, Paths.get("nowhere"), gradleHome, outputDirectory);
-
-    static Path createOutputDir() {
-        try {
-            return Files.createTempDirectory("output").toAbsolutePath();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    private InferConfig both = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome),
+        gradle = new InferConfig(workspaceRoot, externalDependencies, Paths.get("nowhere"), gradleHome);
 
     @Test
     public void workspaceSourcePath() {

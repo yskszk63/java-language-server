@@ -4,6 +4,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TaskEvent;
@@ -40,8 +41,8 @@ import java.util.stream.Collectors;
  */
 public class JavacHolder {
 
-    public static JavacHolder create(Set<Path> sourcePath, Set<Path> classPath, Path outputDirectory) {
-        return new JavacHolder(sourcePath, classPath, outputDirectory);
+    public static JavacHolder create(Set<Path> sourcePath, Set<Path> classPath) {
+        return new JavacHolder(sourcePath, classPath);
     }
          
     /**
@@ -141,10 +142,6 @@ public class JavacHolder {
      * Where this javac looks for .java source files
      */
     public final Set<Path> sourcePath;
-    /**
-     * Where this javac places generated .class files
-     */
-    public final Path outputDirectory;
 
     /**
      * Javac tool creates a new Context every time we do createTask(...), so maintaining a reference to it doesn't really do anything
@@ -182,22 +179,16 @@ public class JavacHolder {
 
     public final ClassPathIndex classPathIndex;
 
-    private JavacHolder(Set<Path> sourcePath, Set<Path> classPath, Path outputDirectory) {
+    private JavacHolder(Set<Path> sourcePath, Set<Path> classPath) {
         this.sourcePath = sourcePath;
         this.classPath = Collections.unmodifiableSet(classPath);
-        this.outputDirectory = outputDirectory;
         this.classPathIndex = new ClassPathIndex(classPath);
-
-        ensureOutputDirectory(outputDirectory);
     }
 
-    static List<String> options(Set<Path> sourcePath, Set<Path> classPath, Path outputDirectory, boolean incremental) {
-        Iterable<Path> incrementalClassPath = incremental ? Iterables.concat(classPath, Collections.singleton(outputDirectory)) : classPath;
-
+    static List<String> options(Set<Path> sourcePath, Set<Path> classPath) {
         return ImmutableList.of(
-                "-classpath", Joiner.on(File.pathSeparator).join(incrementalClassPath),
+                "-classpath", Joiner.on(File.pathSeparator).join(classPath),
                 "-sourcepath", Joiner.on(File.pathSeparator).join(sourcePath),
-                "-d", outputDirectory.toString(),
                 // You would think we could do -Xlint:all,
                 // but some lints trigger fatal errors in the presence of parse errors
                 "-Xlint:cast",
@@ -223,7 +214,7 @@ public class JavacHolder {
 
     private JavacTask createTask(Collection<JavaFileObject> files, boolean incremental) {
         JavaFileManager fileManager = incremental ? incrementalFileManager : batchFileManager;
-        JavacTask result = javac.getTask(null, fileManager, this::onError, options(sourcePath, classPath, outputDirectory, incremental), null, files);
+        JavacTask result = javac.getTask(null, fileManager, this::onError, options(sourcePath, classPath), null, files);
         JavacTaskImpl impl = (JavacTaskImpl) result;
 
         // Better stack traces inside javac
@@ -328,9 +319,6 @@ public class JavacHolder {
             }
 
             parse.forEach(tree -> forEach.accept(task, tree));
-
-            // So incremental compile can use these .class files
-            Iterable<? extends JavaFileObject> output = task.generate();
 
             return new BatchResult(task, errors);
         } catch (IOException e) {

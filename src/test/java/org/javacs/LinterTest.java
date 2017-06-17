@@ -20,8 +20,7 @@ public class LinterTest {
 
     private static final JavacHolder compiler = JavacHolder.create(
             Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
-            Collections.emptySet(),
-            Paths.get("target/test-output")
+            Collections.emptySet()
     );
 
     @Test

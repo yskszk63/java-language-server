@@ -43,8 +43,7 @@ public class JavaCompilerTest {
     public void javacHolder() {
         JavacHolder javac = JavacHolder.create(
                 Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
-                Collections.emptySet(),
-                Paths.get("target/test-output")
+                Collections.emptySet()
         );
         File file = Paths.get("src/test/test-project/workspace/src/org/javacs/example/Bad.java").toFile();
         BatchResult compile = javac.compileBatch(Collections.singletonMap(file.toURI(), Optional.empty()));

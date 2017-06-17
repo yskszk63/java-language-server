@@ -490,8 +490,7 @@ class JavaLanguageServer implements LanguageServer {
         Path userHome = Paths.get(System.getProperty("user.home")),
              mavenHome = userHome.resolve(".m2"),
              gradleHome = userHome.resolve(".gradle"),
-             workspaceRootLike = workspaceRoot.subpath(0, workspaceRoot.getNameCount()),
-             outputDirectory = defaultOutputDirectory();
+             workspaceRootLike = workspaceRoot.subpath(0, workspaceRoot.getNameCount());
         List<Artifact> externalDependencies = Lists.transform(settings.java.externalDependencies, Artifact::parse);
 
         // If user does not specify java.externalDependencies, look for pom.xml
@@ -500,7 +499,7 @@ class JavaLanguageServer implements LanguageServer {
         if (settings.java.externalDependencies.isEmpty() && Files.exists(pomXml)) 
             externalDependencies = InferConfig.dependencyList(pomXml);
 
-        InferConfig infer = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome, outputDirectory);
+        InferConfig infer = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome);
         Set<Path> classPath = infer.buildClassPath(),
                   workspaceClassPath = infer.workspaceClassPath(),
                   docPath = infer.buildDocPath();
@@ -521,9 +520,8 @@ class JavaLanguageServer implements LanguageServer {
         LOG.info("\tclassPath:" + Joiner.on(' ').join(classPath));
         LOG.info("\tworkspaceClassPath:" + Joiner.on(' ').join(workspaceClassPath));
         LOG.info("\tdocPath:" + Joiner.on(' ').join(docPath));
-        LOG.info("\toutputDirectory:" + outputDirectory);
 
-        JavacHolder compiler = JavacHolder.create(sourcePath, Sets.union(classPath, workspaceClassPath), outputDirectory);
+        JavacHolder compiler = JavacHolder.create(sourcePath, Sets.union(classPath, workspaceClassPath));
         Javadocs docs = new Javadocs(sourcePath, docPath, this::activeContent);
         SymbolIndex index = new SymbolIndex(sourcePath, activeDocuments::keySet, this::activeContent, compiler);
 
@@ -535,14 +533,6 @@ class JavaLanguageServer implements LanguageServer {
             InferConfig.allJavaFiles(workspaceRoot)
                 .forEach(file -> languageClient.publishDiagnostics(newPublishDiagnostics(file.toUri())));
         });
-    }
-
-    private static Path defaultOutputDirectory() {
-        try {
-            return Files.createTempDirectory("vscode-javac-output");
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     public Optional<Element> findSymbol(URI file, int line, int character) {

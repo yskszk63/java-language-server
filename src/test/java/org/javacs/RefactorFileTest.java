@@ -202,8 +202,7 @@ public class RefactorFileTest {
     private ParseResult file(String content) {
         JavacHolder compiler = JavacHolder.create(
                 Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
-                Collections.emptySet(),
-                Paths.get("target/test-output")
+                Collections.emptySet()
         );
 
         return compiler.parse(FAKE_FILE, Optional.of(content), error -> LOG.warning(error.toString()));

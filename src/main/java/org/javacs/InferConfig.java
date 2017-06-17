@@ -38,19 +38,12 @@ class InferConfig {
      * Location of the gradle cache, usually ~/.gradle
      */
     private final Path gradleHome;
-    /**
-     * Where to store generated .class files.
-     * 
-     * We don't want to interfer with the build tool, so we'll use a temporary folder managed by VSCode.
-     */
-    private final Path outputDirectory;
 
-    InferConfig(Path workspaceRoot, Collection<Artifact> externalDependencies, Path mavenHome, Path gradleHome, Path outputDirectory) {
+    InferConfig(Path workspaceRoot, Collection<Artifact> externalDependencies, Path mavenHome, Path gradleHome) {
         this.workspaceRoot = workspaceRoot;
         this.externalDependencies = externalDependencies;
         this.mavenHome = mavenHome;
         this.gradleHome = gradleHome;
-        this.outputDirectory = outputDirectory;
     }
 
     private static final JavacParserHolder parser = new JavacParserHolder();
