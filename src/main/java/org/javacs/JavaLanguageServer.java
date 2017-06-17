@@ -484,7 +484,6 @@ class JavaLanguageServer implements LanguageServer {
         return cacheConfigured;
     }
 
-    // TODO this function needs to be invoked whenever the user creates a new .java file outside the existing source root
     private Configured createCompiler(JavaSettings settings, Path workspaceRoot) {
         Set<Path> sourcePath = InferConfig.workspaceSourcePath(workspaceRoot);
         Path userHome = Paths.get(System.getProperty("user.home")),
