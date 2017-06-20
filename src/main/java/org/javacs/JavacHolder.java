@@ -104,12 +104,26 @@ public class JavacHolder {
                         .mapToLong(p -> p.elapsed().toMillis())
                         .sum();
 
-                LOG.info(String.format(
-                        "%s\t%d ms\t%d files",
-                        kind.name(),
-                        elapsed,
-                        timed.size()
-                ));
+                if (timed.size() > 3) {
+                    LOG.info(String.format(
+                            "%s\t%d ms\t%d files",
+                            kind.name(),
+                            elapsed,
+                            timed.size()
+                    ));
+                }
+                else {
+                    String names = timed.keySet().stream()
+                        .map(uri -> Paths.get(uri).getFileName().toString())
+                        .collect(Collectors.joining(", "));
+
+                    LOG.info(String.format(
+                            "%s\t%d ms\t%s",
+                            kind.name(),
+                            elapsed,
+                            names
+                    ));
+                }
             });
 
             Optional<TreePath> cursor = FindCursor.find(task, compilationUnit, line, column);
