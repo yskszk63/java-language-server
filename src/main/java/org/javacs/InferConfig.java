@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.*;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -28,7 +29,7 @@ class InferConfig {
      */
     private final Path workspaceRoot;
     /**
-     * External dependencies, usually configured with java.externalDependencies
+     * User-specified external dependencies, configured with java.externalDependencies
      */
     private final Collection<Artifact> externalDependencies;
     /**
@@ -103,7 +104,7 @@ class InferConfig {
      */
     Set<Path> buildClassPath() {
         // Settings `externalDependencies`
-        Stream<Path> result = externalDependencies.stream().flatMap(artifact -> stream(findAnyJar(artifact, false)));
+        Stream<Path> result = allExternalDependencies().stream().flatMap(artifact -> stream(findAnyJar(artifact, false)));
 
         // Bazel
         if (Files.exists(workspaceRoot.resolve("WORKSPACE"))) {
@@ -196,7 +197,7 @@ class InferConfig {
      * Find source .jar files for `externalDependencies` in local maven / gradle repository.
      */
     Set<Path> buildDocPath() {
-        return externalDependencies.stream()
+        return allExternalDependencies().stream()
             .flatMap(artifact -> stream(findAnyJar(artifact, true)))
             .collect(Collectors.toSet());
     }
@@ -317,6 +318,23 @@ class InferConfig {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Get external dependencies from this.externalDependencies if available,
+     * or try to infer them.
+     */
+    private Collection<Artifact> allExternalDependencies() {
+        if (!externalDependencies.isEmpty())
+            return externalDependencies;
+        
+        // If user does not specify java.externalDependencies, look for pom.xml
+        Path pomXml = workspaceRoot.resolve("pom.xml");
+
+        if (Files.exists(pomXml)) 
+            return dependencyList(pomXml);
+        
+        return Collections.emptyList();
     }
 
     static String getMvnCommand() {

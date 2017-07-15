@@ -493,12 +493,6 @@ class JavaLanguageServer implements LanguageServer {
              workspaceRootLike = workspaceRoot.subpath(0, workspaceRoot.getNameCount());
         List<Artifact> externalDependencies = Lists.transform(settings.java.externalDependencies, Artifact::parse);
 
-        // If user does not specify java.externalDependencies, look for pom.xml
-        Path pomXml = workspaceRoot.resolve("pom.xml");
-
-        if (settings.java.externalDependencies.isEmpty() && Files.exists(pomXml)) 
-            externalDependencies = InferConfig.dependencyList(pomXml);
-
         InferConfig infer = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome);
         Set<Path> classPath = infer.buildClassPath(),
                   workspaceClassPath = infer.workspaceClassPath(),
