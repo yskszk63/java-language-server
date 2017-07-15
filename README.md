@@ -56,11 +56,12 @@ Requires that you have Java 8 installed on your system.
 VSCode will provide autocomplete and help text using:
 * .java files anywhere in your workspace
 * Java platform classes
-* External dependencies specified using [settings](#Settings)
+* External dependencies specified using `pom.xml`, Bazel, or [settings](#Settings)
 
 ## Settings
 
-We recommend you set the following in your project directory [.vscode/settings.json](https://code.visualstudio.com/docs/getstarted/settings)
+If VSCode doesn't detect your external dependencies automatically, 
+you can specify your external dependencies using [.vscode/settings.json](https://code.visualstudio.com/docs/getstarted/settings)
 
 ```json
 {
