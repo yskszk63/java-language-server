@@ -441,10 +441,13 @@ class JavaLanguageServer implements LanguageServer {
             files.putIfAbsent(each, new PublishDiagnosticsParams());
 
         files.forEach((file, errors) -> {
-            if (touched.contains(file))
+            if (touched.contains(file)) {
                 client.join().publishDiagnostics(errors);
+
+                LOG.info("Published " + errors.getDiagnostics().size() + " errors from " + file);
+            }
             else 
-                LOG.info("Ignored " + errors.getDiagnostics().size() + " errors from not-open file " + file);
+                LOG.info("Ignored " + errors.getDiagnostics().size() + " errors from not-open " + file);
         });
     }
 
