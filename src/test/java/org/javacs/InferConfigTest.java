@@ -22,7 +22,8 @@ public class InferConfigTest {
     private Artifact externalArtifact = new Artifact("com.external", "external-library", "1.2");
     private List<Artifact> externalDependencies = ImmutableList.of(externalArtifact);
     private InferConfig both = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome),
-        gradle = new InferConfig(workspaceRoot, externalDependencies, Paths.get("nowhere"), gradleHome);
+                        gradle = new InferConfig(workspaceRoot, externalDependencies, Paths.get("nowhere"), gradleHome),
+                        onlyPomXml = new InferConfig(Paths.get("src/test/test-project/only-pom-xml"), ImmutableList.of(), mavenHome, Paths.get("nowhere"));
 
     @Test
     public void workspaceSourcePath() {
@@ -73,6 +74,22 @@ public class InferConfigTest {
         assertThat(
             InferConfig.dependencyList(Paths.get("pom.xml")),
             hasItem(new Artifact("com.sun", "tools", "1.8"))
+        );
+    }
+
+    @Test
+    public void onlyPomXmlClassPath() {
+        assertThat(
+            onlyPomXml.buildClassPath(),
+            contains(mavenHome.resolve("repository/com/external/external-library/1.2/external-library-1.2.jar"))
+        );
+    }
+
+    @Test
+    public void onlyPomXmlDocPath() {
+        assertThat(
+            onlyPomXml.buildDocPath(),
+            contains(mavenHome.resolve("repository/com/external/external-library/1.2/external-library-1.2-sources.jar"))
         );
     }
 }
