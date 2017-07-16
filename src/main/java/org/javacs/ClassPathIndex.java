@@ -91,25 +91,27 @@ class ClassPathIndex {
         }
     }
 
-    Stream<Constructor<?>> explodeConstructors(ClassPath.ClassInfo info) {
+    boolean hasAccessibleConstructor(ClassPath.ClassInfo info, String fromPackage) {
         try {
             Class<?> load = classLoader.loadClass(info.getName());
+            boolean isPublicClass = Modifier.isPublic(load.getModifiers()),
+                    isSamePackage = fromPackage.equals(info.getPackageName());
 
-            return Stream.of(load.getDeclaredConstructors());
+            for (Constructor<?> candidate : load.getDeclaredConstructors()) {
+                int modifiers = candidate.getModifiers();
+
+                if (isPublicClass && Modifier.isPublic(modifiers))
+                    return true;
+                else if (isSamePackage && !Modifier.isPrivate(modifiers) && !Modifier.isProtected(modifiers))
+                    return true;
+            }
+
+            return false;
         } catch (ClassNotFoundException e) {
             LOG.warning(e.getMessage());
 
-            return Stream.empty();
+            return false;
         }
-    }
-
-    boolean isConstructorAccessible(Constructor<?> candidate, String fromPackage) {
-        return Modifier.isPublic(candidate.getModifiers()) || 
-               isPackagePrivate(candidate.getModifiers()) && candidate.getDeclaringClass().getPackage().getName().equals(fromPackage);
-    }
-
-    private boolean isPackagePrivate(int modifiers) {
-        return !Modifier.isPublic(modifiers) && !Modifier.isPrivate(modifiers) && !Modifier.isProtected(modifiers);
     }
 
     /**

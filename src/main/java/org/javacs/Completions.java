@@ -325,19 +325,18 @@ class Completions {
     private Stream<CompletionItem> notImportedConstructors(String partialIdentifier, Scope scope) {
         String packageName = packageName(scope);
         Stream<CompletionItem> fromClassPath = accessibleClassPathClasses(partialIdentifier, scope)
-                .flatMap(classPath::explodeConstructors)
-                .filter(c -> classPath.isConstructorAccessible(c, packageName))
-                .map(this::completeConstructorFromClassPath); 
+                .filter(c -> classPath.hasAccessibleConstructor(c, packageName))
+                .map(c -> completeConstructorFromClassPath(c.load())); 
         // TODO sourcePath
 
         return fromClassPath;
     }
 
-    private CompletionItem completeConstructorFromClassPath(Constructor<?> c) {
+    private CompletionItem completeConstructorFromClassPath(Class<?> c) {
         return completeConstructor(
-            c.getDeclaringClass().getPackage().getName(), 
-            c.getDeclaringClass().getSimpleName(), 
-            c.getDeclaringClass().getTypeParameters().length > 0
+            c.getPackage().getName(), 
+            c.getSimpleName(), 
+            c.getTypeParameters().length > 0
         );
     }
 
