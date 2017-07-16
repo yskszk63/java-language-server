@@ -28,32 +28,10 @@ public class CodeActionsTest {
         diagnostics.clear();
     }
 
-    private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer(new LanguageClient() {
-        @Override
-        public void telemetryEvent(Object o) {
-
-        }
-
-        @Override
-        public void publishDiagnostics(PublishDiagnosticsParams publishDiagnosticsParams) {
-            diagnostics.addAll(publishDiagnosticsParams.getDiagnostics());
-        }
-
-        @Override
-        public void showMessage(MessageParams messageParams) {
-
-        }
-
-        @Override
-        public CompletableFuture<MessageActionItem> showMessageRequest(ShowMessageRequestParams showMessageRequestParams) {
-            return null;
-        }
-
-        @Override
-        public void logMessage(MessageParams messageParams) {
-
-        }
-    });
+    private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer(
+        LanguageServerFixture.DEFAULT_WORKSPACE_ROOT, 
+        diagnostics::add
+    );
 
     @Test
     public void addImport() {

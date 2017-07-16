@@ -1,5 +1,7 @@
 package org.javacs;
 
+import java.util.function.Consumer;
+import java.util.logging.Logger;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageClient;
 
@@ -9,12 +11,18 @@ import java.util.concurrent.CompletableFuture;
 
 class LanguageServerFixture {
 
+    public static Path DEFAULT_WORKSPACE_ROOT = Paths.get("src/test/test-project/workspace").toAbsolutePath();
+
     static {
         Main.setRootFormat();
     }
 
     static JavaLanguageServer getJavaLanguageServer() {
-        return getJavaLanguageServer(new LanguageClient() {
+        return getJavaLanguageServer(DEFAULT_WORKSPACE_ROOT, diagnostic -> LOG.info(diagnostic.getMessage()));
+    }
+
+    static JavaLanguageServer getJavaLanguageServer(Path workspaceRoot, Consumer<Diagnostic> onError) {
+        return getJavaLanguageServer(workspaceRoot, new LanguageClient() {
             @Override
             public void telemetryEvent(Object o) {
 
@@ -22,7 +30,7 @@ class LanguageServerFixture {
 
             @Override
             public void publishDiagnostics(PublishDiagnosticsParams publishDiagnosticsParams) {
-
+                publishDiagnosticsParams.getDiagnostics().forEach(onError);
             }
 
             @Override
@@ -42,10 +50,8 @@ class LanguageServerFixture {
         });
     }
 
-    static JavaLanguageServer getJavaLanguageServer(LanguageClient client) {
-        Path workspaceRoot = Paths.get("src/test/test-project/workspace").toAbsolutePath();
+    private static JavaLanguageServer getJavaLanguageServer(Path workspaceRoot, LanguageClient client) {
         JavaLanguageServer server = new JavaLanguageServer();
-
         InitializeParams init = new InitializeParams();
 
         init.setRootPath(workspaceRoot.toString());
@@ -57,4 +63,6 @@ class LanguageServerFixture {
 
         return server;
     }
+    
+    private static final Logger LOG = Logger.getLogger("main");
 }
