@@ -16,10 +16,11 @@ import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.util.Options;
 
+import java.nio.file.OpenOption;
+import java.nio.file.StandardOpenOption;
 import javax.lang.model.element.Element;
 import javax.tools.*;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -190,6 +191,24 @@ public class JavacHolder {
      */
     private DiagnosticListener<JavaFileObject> onErrorDelegate = diagnostic -> {};
 
+    /**
+     * Forward javac logging to file
+     */
+    private Writer logDelegate = createLogDelegate();
+
+    private static Writer createLogDelegate() {
+        try {
+            Path output = Files.createTempFile("javac", ".log");
+            BufferedWriter out = Files.newBufferedWriter(output);
+
+            LOG.info("Forwarding javac log to " + output);
+
+            return out;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public final ClassPathIndex classPathIndex;
 
     private JavacHolder(Set<Path> sourcePath, Set<Path> classPath) {
@@ -202,6 +221,7 @@ public class JavacHolder {
         return ImmutableList.of(
                 "-classpath", Joiner.on(File.pathSeparator).join(classPath),
                 "-sourcepath", Joiner.on(File.pathSeparator).join(sourcePath),
+                "-verbose",
                 // You would think we could do -Xlint:all,
                 // but some lints trigger fatal errors in the presence of parse errors
                 "-Xlint:cast",
@@ -226,7 +246,7 @@ public class JavacHolder {
     }
 
     private JavacTask createTask(Collection<JavaFileObject> files, boolean incremental) {
-        JavacTask result = javac.getTask(null, incrementalFileManager, this::onError, options(sourcePath, classPath), null, files);
+        JavacTask result = javac.getTask(logDelegate, incrementalFileManager, this::onError, options(sourcePath, classPath), null, files);
         JavacTaskImpl impl = (JavacTaskImpl) result;
 
         // Better stack traces inside javac
