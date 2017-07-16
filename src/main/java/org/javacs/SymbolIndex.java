@@ -179,38 +179,20 @@ public class SymbolIndex {
         });
     }
 
-    public Stream<String> accessibleTopLevelClasses(String fromPackage) {
+    public Stream<ReachableClass> accessibleTopLevelClasses(String fromPackage) {
         finishedInitialIndex.join();
 
         return sourcePathFiles.values().stream().flatMap(doAccessibleTopLevelClasses(fromPackage));
     }
 
-    private Function<SourceFileIndex, Stream<String>> doAccessibleTopLevelClasses(String fromPackage) {
-        return index -> {
-            return Stream.concat(
-                index.publicTopLevelClasses.stream(),
-                fromPackage.equals(index.packageName) ? index.packagePrivateTopLevelClasses.stream() : Stream.empty()
-            ).map(addPackageName(index));
-        };
+    private Function<SourceFileIndex, Stream<ReachableClass>> doAccessibleTopLevelClasses(String fromPackage) {
+        return index -> index.topLevelClasses.stream().filter(c -> c.publicClass || c.packageName.equals(fromPackage));
     }
 
-    public Stream<String> allTopLevelClasses() {
+    public Stream<ReachableClass> allTopLevelClasses() {
         finishedInitialIndex.join();
 
-        return sourcePathFiles.values().stream().flatMap(this::doAllTopLevelClasses);
-    }
-
-    private Stream<String> doAllTopLevelClasses(SourceFileIndex index) {
-        return Stream.concat(
-            index.publicTopLevelClasses.stream(), 
-            index.packagePrivateTopLevelClasses.stream()
-        ).map(addPackageName(index));
-    }
-
-    private Function<String, String> addPackageName(SourceFileIndex index) {
-        return index.packageName.isEmpty() ? 
-                    name -> name : 
-                    name -> index.packageName + "." + name;
+        return sourcePathFiles.values().stream().flatMap(index -> index.topLevelClasses.stream());
     }
 
     /**
@@ -266,7 +248,7 @@ public class SymbolIndex {
                className = Completions.lastId(qualifiedName);
         Predicate<SourceFileIndex> containsClass = index -> 
                 index.packageName.equals(packageName) && 
-                (index.publicTopLevelClasses.contains(className) || index.packagePrivateTopLevelClasses.contains(className));
+                index.topLevelClasses.stream().anyMatch(c -> c.className.equals(className));
 
         return Maps.filterValues(sourcePathFiles, containsClass).keySet().stream().findFirst();
     }
@@ -370,12 +352,32 @@ public class SymbolIndex {
             public Void visitClass(ClassTree node, Void aVoid) {
                 // If this is a top-level class, add qualified name to special topLevelClasses index
                 if (classDepth == 0) {
-                    String name = node.getSimpleName().toString();
+                    String className = node.getSimpleName().toString();
+                    Set<Modifier> flags = node.getModifiers().getFlags();
+                    boolean publicClass = flags.contains(Modifier.PUBLIC),
+                            hasTypeParameters = !node.getTypeParameters().isEmpty();
+                    boolean publicConstructor = false, packagePrivateConstructor = false;
 
-                    if (node.getModifiers().getFlags().contains(Modifier.PUBLIC))
-                        index.publicTopLevelClasses.add(name);
-                    else
-                        index.packagePrivateTopLevelClasses.add(name);
+                    for (Tree each : node.getMembers()) {
+                        if (each instanceof MethodTree) {
+                            MethodTree method = (MethodTree) each;
+
+                            if (method.getName().contentEquals("<init>")) {
+                                Set<Modifier> methodFlags = method.getModifiers().getFlags();
+
+                                if (publicClass && methodFlags.contains(Modifier.PUBLIC))
+                                    publicConstructor = true;
+                                else if (!methodFlags.contains(Modifier.PROTECTED) && !methodFlags.contains(Modifier.PRIVATE)) 
+                                    packagePrivateConstructor = true;
+                            }
+                        }
+                    }
+
+                    index.topLevelClasses.add(new ReachableClass(
+                        index.packageName, className, 
+                        publicClass, publicConstructor, packagePrivateConstructor, 
+                        hasTypeParameters
+                    ));
                 }
 
                 // Add simple name to declarations

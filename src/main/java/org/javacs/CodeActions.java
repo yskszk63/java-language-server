@@ -60,8 +60,8 @@ class CodeActions {
      */
     private Stream<Command> addImportActions(String name) {
         Stream<Command> sourcePath = index.allTopLevelClasses()
-                .filter(symbol -> Completions.lastId(symbol).equals(name))
-                .map(symbol -> importClassCommand(Completions.mostIds(symbol), Completions.lastId(symbol)));
+                .filter(c -> c.className.equals(name))
+                .map(c -> importClassCommand(c.packageName, c.className));
         Stream<Command> classPath = compiler.classPathIndex.topLevelClasses()
                 .filter(c -> c.getSimpleName().equals(name))
                 .map(c -> importClassCommand(c.getPackageName(), c.getSimpleName()));

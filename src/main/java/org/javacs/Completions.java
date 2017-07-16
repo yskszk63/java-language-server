@@ -201,7 +201,7 @@ class Completions {
     private Stream<? extends Element> packageMembers(String parentPackage, String partialIdentifier) {
         // Source-path packages that match parentPackage.partialIdentifier
         Stream<PackageElement> packages = subPackages(parentPackage, partialIdentifier);
-        Stream<TypeElement> sourcePathClasses = sourcePathClasses(Optional.of(parentPackage), partialIdentifier);
+        Stream<TypeElement> sourcePathClasses = sourcePathClassesInPackage(parentPackage, partialIdentifier);
         Stream<TypeElement> classPathClasses = classPath.topLevelClassesIn(parentPackage, partialIdentifier)
                 .flatMap(this::loadFromClassPath);
 
@@ -223,7 +223,7 @@ class Completions {
     private Stream<PackageElement> subPackages(String parentPackage, String partialIdentifier) {
         String prefix = parentPackage.isEmpty() ? "" : parentPackage + ".";
         Stream<String> sourcePathMembers = sourcePath.allTopLevelClasses()
-                .map(Completions::mostIds)
+                .map(c -> c.packageName)
                 .filter(packageName -> packageName.startsWith(prefix));
         Stream<String> classPathMembers = classPath.packagesStartingWith(prefix);
         Set<String> next = Stream.concat(sourcePathMembers, classPathMembers)
@@ -337,7 +337,8 @@ class Completions {
      * Suggest classes that haven't yet been imported, but are on the source or class path
      */
     private Stream<CompletionItem> notImportedClasses(String partialIdentifier, Scope scope) {
-        Stream<String> fromSourcePath = accessibleSourcePathClasses(partialIdentifier, scope);
+        Stream<String> fromSourcePath = accessibleSourcePathClasses(partialIdentifier, scope)
+                .map(c -> c.qualifiedName());
         Stream<String> fromClassPath = accessibleClassPathClasses(partialIdentifier, scope)
                 .map(c -> c.getName());
 
@@ -353,11 +354,11 @@ class Completions {
                 .filter(c -> classPath.isAccessibleFromPackage(c, packageName));
     }
 
-    private Stream<String> accessibleSourcePathClasses(String partialIdentifier, Scope scope) {
+    private Stream<ReachableClass> accessibleSourcePathClasses(String partialIdentifier, Scope scope) {
         String packageName = packageName(scope);
 
         return sourcePath.accessibleTopLevelClasses(packageName)
-                .filter(c -> containsCharactersInOrder(lastId(c), partialIdentifier));
+                .filter(c -> containsCharactersInOrder(c.className, partialIdentifier));
     }
 
     private String packageName(Scope scope) {
@@ -407,10 +408,10 @@ class Completions {
         return elements;
     }
 
-    private Stream<TypeElement> sourcePathClasses(Optional<String> packageName, String partialClass) {
+    private Stream<TypeElement> sourcePathClassesInPackage(String packageName, String partialClass) {
         return sourcePath.allTopLevelClasses()
-                .filter(name -> packageName.map(check -> mostIds(name).equals(check)).orElse(true))
-                .filter(name -> containsCharactersInOrder(lastId(name), partialClass))
+                .filter(c -> c.packageName.equals(packageName) && containsCharactersInOrder(c.className, partialClass))
+                .map(ReachableClass::qualifiedName)
                 .flatMap(this::loadFromSourcePath);
     }
 
