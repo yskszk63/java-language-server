@@ -8,6 +8,7 @@ import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
+import java.lang.reflect.Constructor;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.TextEdit;
@@ -93,11 +94,15 @@ class Completions {
             case Import:
                 return packageMembers("", partialIdentifier)
                         .flatMap(this::completionItem);
-            case NewClass:
-                return allSymbols(partialIdentifier, from)
+            case NewClass: {
+                Stream<CompletionItem> alreadyImported = alreadyImportedCompletions(partialIdentifier, from)
                         .flatMap(this::explodeConstructors)
                         .filter(init -> trees.isAccessible(from, init, (DeclaredType) init.getEnclosingElement().asType()))
                         .flatMap(this::completionItem);
+                Stream<CompletionItem> notYetImported = notImportedConstructors(partialIdentifier, from);
+
+                return Stream.concat(alreadyImported, notYetImported);
+            }
             default: {
                 Predicate<Element> accessible = e -> {
                     if (e == null)
@@ -114,10 +119,12 @@ class Completions {
                     else
                         return true;
                 };
-
-                return allSymbols(partialIdentifier, from)
+                Stream<CompletionItem> alreadyImported = alreadyImportedCompletions(partialIdentifier, from)
                         .filter(accessible)
                         .flatMap(this::completionItem);
+                Stream<CompletionItem> notYetImported = notImportedClasses(partialIdentifier, from);
+
+                return Stream.concat(alreadyImported, notYetImported);
             }
         }
     }
@@ -313,16 +320,50 @@ class Completions {
     }
 
     /**
+     * Suggest constructors that haven't yet been imported, but are on the source or class path
+     */
+    private Stream<CompletionItem> notImportedConstructors(String partialIdentifier, Scope scope) {
+        String packageName = packageName(scope);
+        Stream<CompletionItem> fromClassPath = accessibleClassPathClasses(partialIdentifier, scope)
+                .flatMap(classPath::explodeConstructors)
+                .filter(c -> classPath.isConstructorAccessible(c, packageName))
+                .map(this::completeConstructorFromClassPath); 
+        // TODO sourcePath
+
+        return fromClassPath;
+    }
+
+    /**
+     * Suggest classes that haven't yet been imported, but are on the source or class path
+     */
+    private Stream<CompletionItem> notImportedClasses(String partialIdentifier, Scope scope) {
+        Stream<CompletionItem> fromClassPath = accessibleClassPathClasses(partialIdentifier, scope)
+                .map(this::completeClassNameFromClassPath);
+        // TODO sourcePath
+
+        return fromClassPath;
+    }
+
+    private Stream<ClassPath.ClassInfo> accessibleClassPathClasses(String partialIdentifier, Scope scope) {
+        String packageName = packageName(scope);
+
+        return classPath.topLevelClasses()
+                .filter(c -> containsCharactersInOrder(c.getSimpleName(), partialIdentifier))
+                .filter(c -> classPath.isAccessibleFromPackage(c, packageName));
+    }
+
+    private String packageName(Scope scope) {
+        PackageElement packageEl = elements.getPackageOf(scope.getEnclosingClass());
+
+        return packageEl == null ? "" : packageEl.getQualifiedName().toString();
+    }
+
+    /**
      * Suggest all completions that are visible from scope
      */
-    private Stream<? extends Element> allSymbols(String partialIdentifier, Scope scope) {
-        Stream<? extends Element> sourcePathItems = alreadyImportedSymbols(scope)
+    private Stream<? extends Element> alreadyImportedCompletions(String partialIdentifier, Scope scope) {
+        return alreadyImportedSymbols(scope)
                 .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
-        Stream<TypeElement> sourcePathClasses = sourcePathClasses(Optional.empty(), partialIdentifier);
-        Stream<TypeElement> classPathItems = classPath.topLevelClasses(partialIdentifier)
-                .flatMap(this::tryLoad);
-
-        return Stream.concat(sourcePathItems, Stream.concat(sourcePathClasses, classPathItems));
     }
 
     private Stream<TypeElement> tryLoad(ClassPath.ClassInfo c) {
@@ -515,6 +556,40 @@ class Completions {
         return name.equals(thisName) || name.equals(superName);
     }
 
+    private CompletionItem completeConstructorFromClassPath(Constructor<?> c) {
+        String name = c.getDeclaringClass().getSimpleName();
+        CompletionItem item = new CompletionItem();
+        String insertText = name;
+
+        if (c.getDeclaringClass().getTypeParameters().length > 0)
+            insertText += "<>";
+
+        item.setKind(CompletionItemKind.Constructor);
+        item.setLabel(name);
+        item.setInsertText(insertText);
+        item.setFilterText(name);
+        item.setAdditionalTextEdits(addImport(c.getDeclaringClass().getName().toString()));
+        item.setSortText("2/" + name);
+        item.setData(docs.constructorKeyFromClassPath(c));
+
+        return item;
+    }
+
+    private CompletionItem completeClassNameFromClassPath(ClassPath.ClassInfo info) {
+        CompletionItem item = new CompletionItem();
+
+        item.setLabel(info.getSimpleName());
+        item.setDetail(info.getPackageName());
+        item.setInsertText(info.getSimpleName());
+        item.setAdditionalTextEdits(addImport(info.getName()));
+        item.setSortText("2/" + info.getSimpleName());
+        item.setData(info.getName());
+
+        // TODO implement vscode resolve-completion-item
+
+        return item;
+    }
+
     private Stream<CompletionItem> completionItem(Element e) {
         try {
             String name = e.getSimpleName().toString();
@@ -603,7 +678,6 @@ class Completions {
                     item.setLabel(name);
                     item.setDetail(Hovers.methodSignature(method, true, false));
                     item.setInsertText(name); // TODO
-                    item.setSortText(name);
                     item.setFilterText(name);
                     item.setSortText("0/" + name);
                     item.setData(docs.methodKey(method));
@@ -626,7 +700,6 @@ class Completions {
                     item.setLabel(name);
                     item.setDetail(Hovers.methodSignature(method, false, false));
                     item.setInsertText(insertText);
-                    item.setSortText(name);
                     item.setFilterText(name);
                     item.setAdditionalTextEdits(addImport(enclosingClass.getQualifiedName().toString()));
                     item.setSortText(order + "/" + name);

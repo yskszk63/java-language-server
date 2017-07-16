@@ -9,6 +9,7 @@ import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javadoc.api.JavadocTool;
+import java.lang.reflect.Constructor;
 import java.time.Instant;
 import org.eclipse.lsp4j.CompletionItem;
 
@@ -159,6 +160,21 @@ public class Javadocs {
             method.getSimpleName(),
             paramsKey(method.getParameters())
         );
+    }
+
+    // TODO write tests that verify this always matches methodKey
+    String constructorKeyFromClassPath(Constructor<?> method) {
+        return String.format(
+            "%s#<init>(%s)",
+            method.getDeclaringClass().getName(),
+            paramsKeyFromClassPath(method.getParameterTypes())
+        );
+    }
+
+    private String paramsKeyFromClassPath(Class<?>[] params) {
+        return Arrays.stream(params)
+                .map(Class::getName)
+                .collect(Collectors.joining(","));
     }
     
     private String paramsKey(List<? extends VariableElement> params) {

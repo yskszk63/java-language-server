@@ -1,9 +1,11 @@
 package org.javacs;
 
 import com.google.common.reflect.ClassPath;
+import java.lang.reflect.Constructor;
 import sun.misc.Launcher;
 
 import java.io.IOException;
+import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -25,10 +27,12 @@ import java.util.stream.Stream;
  */
 class ClassPathIndex {
 
+    private final URLClassLoader classLoader;
     private final List<ClassPath.ClassInfo> topLevelClasses;
 
     ClassPathIndex(Set<Path> classPath) {
-        topLevelClasses = classPath(classPath).getTopLevelClasses().stream()
+        this.classLoader = classLoader(classPath);
+        this.topLevelClasses = classPath(classLoader).getTopLevelClasses().stream()
             .sorted(ClassPathIndex::shortestName)
             .collect(Collectors.toList());
     }
@@ -43,16 +47,20 @@ class ClassPathIndex {
         return new URLClassLoader(bootstrap, null);
     }
 
-    private static ClassPath classPath(Set<Path> classPath) {
+    private static ClassPath classPath(URLClassLoader classLoader) {
+        try {
+            return ClassPath.from(classLoader);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static URLClassLoader classLoader(Set<Path> classPath) {
         URL[] urls = classPath.stream()
                 .flatMap(ClassPathIndex::url)
                 .toArray(URL[]::new);
 
-        try {
-            return ClassPath.from(new URLClassLoader(urls, parentClassLoader()));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        return new URLClassLoader(urls, parentClassLoader());
     }
 
     private static Stream<URL> url(Path path) {
@@ -65,12 +73,43 @@ class ClassPathIndex {
         }
     }
 
-    /**
-     * Find all top-level classes accessible from `fromPackage`
-     */
-    Stream<ClassPath.ClassInfo> topLevelClasses(String partialClass) {
-        return topLevelClasses.stream()
-                .filter(c -> Completions.containsCharactersInOrder(c.getSimpleName(), partialClass));
+    Stream<ClassPath.ClassInfo> topLevelClasses() {
+        return topLevelClasses.stream();
+    }
+
+    boolean isAccessibleFromPackage(ClassPath.ClassInfo info, String fromPackage) {
+        return info.getPackageName().equals(fromPackage) || isPublic(info);
+    }
+
+    private boolean isPublic(ClassPath.ClassInfo info) {
+        try {
+            return Modifier.isPublic(classLoader.loadClass(info.getName()).getModifiers());
+        } catch (ClassNotFoundException e) {
+            LOG.warning(e.getMessage());
+
+            return false;
+        }
+    }
+
+    Stream<Constructor<?>> explodeConstructors(ClassPath.ClassInfo info) {
+        try {
+            Class<?> load = classLoader.loadClass(info.getName());
+
+            return Stream.of(load.getDeclaredConstructors());
+        } catch (ClassNotFoundException e) {
+            LOG.warning(e.getMessage());
+
+            return Stream.empty();
+        }
+    }
+
+    boolean isConstructorAccessible(Constructor<?> candidate, String fromPackage) {
+        return Modifier.isPublic(candidate.getModifiers()) || 
+               isPackagePrivate(candidate.getModifiers()) && candidate.getDeclaringClass().getPackage().getName().equals(fromPackage);
+    }
+
+    private boolean isPackagePrivate(int modifiers) {
+        return !Modifier.isPublic(modifiers) && !Modifier.isPrivate(modifiers) && !Modifier.isProtected(modifiers);
     }
 
     /**
