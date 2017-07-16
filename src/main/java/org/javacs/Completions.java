@@ -324,12 +324,22 @@ class Completions {
      */
     private Stream<CompletionItem> notImportedConstructors(String partialIdentifier, Scope scope) {
         String packageName = packageName(scope);
+        Stream<CompletionItem> fromSourcePath = accessibleSourcePathClasses(partialIdentifier, scope)
+                .filter(c -> c.hasAccessibleConstructor(packageName))
+                .map(this::completeConstructorFromSourcePath);
         Stream<CompletionItem> fromClassPath = accessibleClassPathClasses(partialIdentifier, scope)
                 .filter(c -> classPath.hasAccessibleConstructor(c, packageName))
-                .map(c -> completeConstructorFromClassPath(c.load())); 
-        // TODO sourcePath
+                .map(c -> completeConstructorFromClassPath(c.load()));
 
-        return fromClassPath;
+        return Stream.concat(fromSourcePath, fromClassPath);
+    }
+
+    private CompletionItem completeConstructorFromSourcePath(ReachableClass c) {
+        return completeConstructor(
+            c.packageName,
+            c.className,
+            c.hasTypeParameters
+        );
     }
 
     private CompletionItem completeConstructorFromClassPath(Class<?> c) {

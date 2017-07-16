@@ -18,4 +18,10 @@ class ReachableClass {
     String qualifiedName() {
         return packageName.isEmpty() ? className : packageName + "." + className;
     }
+
+    boolean hasAccessibleConstructor(String fromPackage) {
+        boolean samePackage = fromPackage.equals(packageName);
+
+        return (publicClass && publicConstructor) || (samePackage && packagePrivateConstructor);
+    }
 }

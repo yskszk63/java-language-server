@@ -471,13 +471,24 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteConstructor.java";
 
         // Static methods
-        List<? extends CompletionItem> items = items(file, 5, 14);
+        List<? extends CompletionItem> items = items(file, 5, 25);
         List<String> suggestions = Lists.transform(items, i -> i.getInsertText());
 
         assertThat(suggestions, hasItems("AutocompleteConstructor<>", "AutocompleteMember"));
+    }
+
+    @Test
+    public void autoImportConstructor() throws IOException {
+        String file = "/org/javacs/example/AutocompleteConstructor.java";
+
+        // Static methods
+        List<? extends CompletionItem> items = items(file, 6, 19);
+        List<String> suggestions = Lists.transform(items, i -> i.getInsertText());
+
+        assertThat(suggestions, hasItems("ArrayList<>"));
 
         for (CompletionItem each : items) {
-            if (each.getInsertText().equals("ArrayList"))
+            if (each.getInsertText().equals("ArrayList<>"))
                 assertThat("new ? auto-imports", each.getAdditionalTextEdits(), both(not(empty())).and(not(nullValue())));
         }
     }

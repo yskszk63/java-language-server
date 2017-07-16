@@ -2,6 +2,7 @@ package org.javacs.example;
 
 public class AutocompleteConstructor<T> {
     public void test() {
-        new A
+        new Autocomplete;
+        new ArrayL;
     }
 }

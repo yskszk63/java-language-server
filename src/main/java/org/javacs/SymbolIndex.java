@@ -357,12 +357,15 @@ public class SymbolIndex {
                     boolean publicClass = flags.contains(Modifier.PUBLIC),
                             hasTypeParameters = !node.getTypeParameters().isEmpty();
                     boolean publicConstructor = false, packagePrivateConstructor = false;
+                    boolean hasExplicitConstructors = false;
 
                     for (Tree each : node.getMembers()) {
                         if (each instanceof MethodTree) {
                             MethodTree method = (MethodTree) each;
 
                             if (method.getName().contentEquals("<init>")) {
+                                hasExplicitConstructors = true;
+
                                 Set<Modifier> methodFlags = method.getModifiers().getFlags();
 
                                 if (publicClass && methodFlags.contains(Modifier.PUBLIC))
@@ -371,6 +374,11 @@ public class SymbolIndex {
                                     packagePrivateConstructor = true;
                             }
                         }
+                    }
+
+                    if (!hasExplicitConstructors) {
+                        publicConstructor = publicClass;
+                        packagePrivateConstructor = !publicClass;
                     }
 
                     index.topLevelClasses.add(new ReachableClass(
