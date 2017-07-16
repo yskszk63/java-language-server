@@ -2,11 +2,15 @@ package org.javacs;
 
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import javax.lang.model.element.Modifier;
 
 class SourceFileIndex {
+    String packageName = "";
+
     /**
-     * Fully qualified names of classes declared in this file
+     * Simple names of classes declared in this file
      */
     final Set<String> publicTopLevelClasses = new HashSet<>(), 
                       packagePrivateTopLevelClasses = new HashSet<>();

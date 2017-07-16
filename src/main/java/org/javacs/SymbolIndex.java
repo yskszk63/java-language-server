@@ -182,20 +182,35 @@ public class SymbolIndex {
     public Stream<String> accessibleTopLevelClasses(String fromPackage) {
         finishedInitialIndex.join();
 
-        return sourcePathFiles.values().stream()
-                .flatMap(index -> {
-                    return Stream.concat(
-                        index.publicTopLevelClasses.stream(), 
-                        index.packagePrivateTopLevelClasses.stream().filter(name -> Completions.mostIds(name).equals(fromPackage))
-                    );
-                });
+        return sourcePathFiles.values().stream().flatMap(doAccessibleTopLevelClasses(fromPackage));
+    }
+
+    private Function<SourceFileIndex, Stream<String>> doAccessibleTopLevelClasses(String fromPackage) {
+        return index -> {
+            return Stream.concat(
+                index.publicTopLevelClasses.stream(),
+                fromPackage.equals(index.packageName) ? index.packagePrivateTopLevelClasses.stream() : Stream.empty()
+            ).map(addPackageName(index));
+        };
     }
 
     public Stream<String> allTopLevelClasses() {
         finishedInitialIndex.join();
 
-        return sourcePathFiles.values().stream()
-                .flatMap(index -> Stream.concat(index.publicTopLevelClasses.stream(), index.packagePrivateTopLevelClasses.stream()));
+        return sourcePathFiles.values().stream().flatMap(this::doAllTopLevelClasses);
+    }
+
+    private Stream<String> doAllTopLevelClasses(SourceFileIndex index) {
+        return Stream.concat(
+            index.publicTopLevelClasses.stream(), 
+            index.packagePrivateTopLevelClasses.stream()
+        ).map(addPackageName(index));
+    }
+
+    private Function<String, String> addPackageName(SourceFileIndex index) {
+        return index.packageName.isEmpty() ? 
+                    name -> name : 
+                    name -> index.packageName + "." + name;
     }
 
     /**
@@ -246,10 +261,14 @@ public class SymbolIndex {
     }
 
     private Optional<URI> findDeclaringFile(TypeElement topLevelClass) {
-        String name = topLevelClass.getQualifiedName().toString();
+        String qualifiedName = topLevelClass.getQualifiedName().toString(),
+               packageName = Completions.mostIds(qualifiedName),
+               className = Completions.lastId(qualifiedName);
+        Predicate<SourceFileIndex> containsClass = index -> 
+                index.packageName.equals(packageName) && 
+                (index.publicTopLevelClasses.contains(className) || index.packagePrivateTopLevelClasses.contains(className));
 
-        return Maps.filterValues(sourcePathFiles, index -> index.publicTopLevelClasses.contains(name) || index.packagePrivateTopLevelClasses.contains(name))
-            .keySet().stream().findFirst();
+        return Maps.filterValues(sourcePathFiles, containsClass).keySet().stream().findFirst();
     }
 
     private Optional<TypeElement> topLevelClass(Element symbol) {
@@ -342,6 +361,8 @@ public class SymbolIndex {
         URI file = compilationUnit.getSourceFile().toUri();
         SourceFileIndex index = new SourceFileIndex();
 
+        index.packageName = Objects.toString(compilationUnit.getPackageName(), "");
+
         new TreePathScanner<Void, Void>() {
             int classDepth = 0;
 
@@ -349,7 +370,7 @@ public class SymbolIndex {
             public Void visitClass(ClassTree node, Void aVoid) {
                 // If this is a top-level class, add qualified name to special topLevelClasses index
                 if (classDepth == 0) {
-                    String name = qualifiedName(node, compilationUnit);
+                    String name = node.getSimpleName().toString();
 
                     if (node.getModifiers().getFlags().contains(Modifier.PUBLIC))
                         index.publicTopLevelClasses.add(name);
@@ -406,17 +427,6 @@ public class SymbolIndex {
         }.scan(compilationUnit, null);
 
         sourcePathFiles.put(file, index);
-    }
-
-    private String qualifiedName(ClassTree node, CompilationUnitTree compilationUnit) {
-        String packageName = Objects.toString(compilationUnit.getPackageName(), "");
-        Name className = node.getSimpleName();
-        StringJoiner qualifiedName = new StringJoiner(".");
-
-        if (!packageName.isEmpty())
-            qualifiedName.add(packageName);
-        qualifiedName.add(className);
-        return qualifiedName.toString();
     }
 
     private List<Location> findReferences(Collection<URI> files, Element target) {
