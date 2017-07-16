@@ -182,7 +182,8 @@ public class SymbolIndex {
     public Stream<String> allTopLevelClasses() {
         finishedInitialIndex.join();
 
-        return sourcePathFiles.values().stream().flatMap(index -> index.topLevelClasses.stream());
+        return sourcePathFiles.values().stream()
+                .flatMap(index -> Stream.concat(index.publicTopLevelClasses.stream(), index.packagePrivateTopLevelClasses.stream()));
     }
 
     /**
@@ -235,7 +236,8 @@ public class SymbolIndex {
     private Optional<URI> findDeclaringFile(TypeElement topLevelClass) {
         String name = topLevelClass.getQualifiedName().toString();
 
-        return Maps.filterValues(sourcePathFiles, index -> index.topLevelClasses.contains(name)).keySet().stream().findFirst();
+        return Maps.filterValues(sourcePathFiles, index -> index.publicTopLevelClasses.contains(name) || index.packagePrivateTopLevelClasses.contains(name))
+            .keySet().stream().findFirst();
     }
 
     private Optional<TypeElement> topLevelClass(Element symbol) {
@@ -334,8 +336,14 @@ public class SymbolIndex {
             @Override
             public Void visitClass(ClassTree node, Void aVoid) {
                 // If this is a top-level class, add qualified name to special topLevelClasses index
-                if (classDepth == 0)
-                    index.topLevelClasses.add(qualifiedName(node, compilationUnit));
+                if (classDepth == 0) {
+                    String name = qualifiedName(node, compilationUnit);
+
+                    if (node.getModifiers().getFlags().contains(Modifier.PUBLIC))
+                        index.publicTopLevelClasses.add(name);
+                    else
+                        index.packagePrivateTopLevelClasses.add(name);
+                }
 
                 // Add simple name to declarations
                 index.declarations.add(node.getSimpleName().toString());

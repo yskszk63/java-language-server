@@ -8,7 +8,8 @@ class SourceFileIndex {
     /**
      * Fully qualified names of classes declared in this file
      */
-    final Set<String> topLevelClasses = new HashSet<>();
+    final Set<String> publicTopLevelClasses = new HashSet<>(), 
+                      packagePrivateTopLevelClasses = new HashSet<>();
 
     /**
      * Simple name of declarations in this file, including classes, methods, and fields
