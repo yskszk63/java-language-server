@@ -555,6 +555,23 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
+    public void otherPackageId() throws IOException {
+        String file = "/org/javacs/example/AutocompleteOtherPackage.java";
+
+        // Static methods
+        List<? extends CompletionItem> items = items(file, 5, 14);
+        List<String> suggestions = Lists.transform(items, i -> i.getLabel());
+
+        assertThat(suggestions, hasItems("OtherPackagePublic"));
+        assertThat(suggestions, not(hasItems("OtherPackagePrivate")));
+
+        for (CompletionItem item : items) {
+            if (item.getLabel().equals("OtherPackagePublic"))
+                assertThat("Auto-import OtherPackagePublic", item.getAdditionalTextEdits(), not(empty()));
+        }
+    }
+
+    @Test
     public void fieldFromStaticInner() throws IOException {
         String file = "/org/javacs/example/AutocompleteOuter.java";
 

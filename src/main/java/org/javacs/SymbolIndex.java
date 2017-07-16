@@ -179,6 +179,18 @@ public class SymbolIndex {
         });
     }
 
+    public Stream<String> accessibleTopLevelClasses(String fromPackage) {
+        finishedInitialIndex.join();
+
+        return sourcePathFiles.values().stream()
+                .flatMap(index -> {
+                    return Stream.concat(
+                        index.publicTopLevelClasses.stream(), 
+                        index.packagePrivateTopLevelClasses.stream().filter(name -> Completions.mostIds(name).equals(fromPackage))
+                    );
+                });
+    }
+
     public Stream<String> allTopLevelClasses() {
         finishedInitialIndex.join();
 

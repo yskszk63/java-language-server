@@ -337,11 +337,12 @@ class Completions {
      * Suggest classes that haven't yet been imported, but are on the source or class path
      */
     private Stream<CompletionItem> notImportedClasses(String partialIdentifier, Scope scope) {
-        Stream<CompletionItem> fromClassPath = accessibleClassPathClasses(partialIdentifier, scope)
-                .map(this::completeClassNameFromClassPath);
-        // TODO sourcePath
+        Stream<String> fromSourcePath = accessibleSourcePathClasses(partialIdentifier, scope);
+        Stream<String> fromClassPath = accessibleClassPathClasses(partialIdentifier, scope)
+                .map(c -> c.getName());
 
-        return fromClassPath;
+        return Stream.concat(fromSourcePath, fromClassPath)
+                .map(this::completeClassNameFromClassPath);
     }
 
     private Stream<ClassPath.ClassInfo> accessibleClassPathClasses(String partialIdentifier, Scope scope) {
@@ -350,6 +351,13 @@ class Completions {
         return classPath.topLevelClasses()
                 .filter(c -> containsCharactersInOrder(c.getSimpleName(), partialIdentifier))
                 .filter(c -> classPath.isAccessibleFromPackage(c, packageName));
+    }
+
+    private Stream<String> accessibleSourcePathClasses(String partialIdentifier, Scope scope) {
+        String packageName = packageName(scope);
+
+        return sourcePath.accessibleTopLevelClasses(packageName)
+                .filter(c -> containsCharactersInOrder(lastId(c), partialIdentifier));
     }
 
     private String packageName(Scope scope) {
@@ -575,15 +583,16 @@ class Completions {
         return item;
     }
 
-    private CompletionItem completeClassNameFromClassPath(ClassPath.ClassInfo info) {
+    private CompletionItem completeClassNameFromClassPath(String qualifiedName) {
         CompletionItem item = new CompletionItem();
+        String packageName = mostIds(qualifiedName), simpleName = lastId(qualifiedName);
 
-        item.setLabel(info.getSimpleName());
-        item.setDetail(info.getPackageName());
-        item.setInsertText(info.getSimpleName());
-        item.setAdditionalTextEdits(addImport(info.getName()));
-        item.setSortText("2/" + info.getSimpleName());
-        item.setData(info.getName());
+        item.setLabel(simpleName);
+        item.setDetail(packageName);
+        item.setInsertText(simpleName);
+        item.setAdditionalTextEdits(addImport(qualifiedName));
+        item.setSortText("2/" + simpleName);
+        item.setData(qualifiedName);
 
         // TODO implement vscode resolve-completion-item
 
