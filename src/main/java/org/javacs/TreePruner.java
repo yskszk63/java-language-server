@@ -23,8 +23,17 @@ class TreePruner {
     }
 
     void removeNonCursorMethodBodies(CompilationUnitTree source, int line, int column) {
-        SourcePositions sourcePositions = Trees.instance(task).getSourcePositions();
         long offset = source.getLineMap().getPosition(line, column);
+
+        doRemoveNonCursorMethodBodies(source, offset);
+    }
+
+    void removeAllMethodBodies(CompilationUnitTree source) {
+        doRemoveNonCursorMethodBodies(source, -1);
+    }
+
+    private void doRemoveNonCursorMethodBodies(CompilationUnitTree source, long offset) {
+        SourcePositions sourcePositions = Trees.instance(task).getSourcePositions();
 
         class Pruner extends TreeScanner<Void, Void> {
             @Override

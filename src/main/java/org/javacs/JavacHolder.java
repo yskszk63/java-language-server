@@ -8,6 +8,7 @@ import com.google.common.collect.Sets;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TaskEvent;
+import com.sun.source.util.TaskEvent.Kind;
 import com.sun.source.util.TaskListener;
 import com.sun.source.util.TreePath;
 import com.sun.tools.javac.api.JavacTaskImpl;
@@ -58,6 +59,7 @@ public class JavacHolder {
             fileObject = TreePruner.putSemicolonAfterCursor(fileObject, line, column);
 
         JavacTask task = createTask(Collections.singleton(fileObject), true);
+        TreePruner pruner = new TreePruner(task);
 
         // Record timing
         EnumMap<TaskEvent.Kind, Map<URI, Profile>> profile = new EnumMap<>(TaskEvent.Kind.class);
@@ -76,6 +78,20 @@ public class JavacHolder {
             public void finished(TaskEvent e) {
                 if (e.getSourceFile() == null)
                     return;
+
+                if (e.getKind() == TaskEvent.Kind.PARSE) {
+                    boolean isCursorInFile = e.getCompilationUnit().getSourceFile().toUri().equals(file);
+
+                    if (isCursorInFile) {
+                        pruner.removeNonCursorMethodBodies(e.getCompilationUnit(), line, column);
+
+                        if (pruneStatements) 
+                            pruner.removeStatementsAfterCursor(e.getCompilationUnit(), line, column);
+                    }
+                    else {
+                        pruner.removeAllMethodBodies(e.getCompilationUnit());
+                    }
+                }
                     
                 profile.get(e.getKind())
                     .get(e.getSourceFile().toUri()).finished = Optional.of(Instant.now());
@@ -85,12 +101,6 @@ public class JavacHolder {
         try {
             Iterable<? extends CompilationUnitTree> parse = task.parse();
             CompilationUnitTree compilationUnit = parse.iterator().next();
-            TreePruner pruner = new TreePruner(task);
-
-            pruner.removeNonCursorMethodBodies(compilationUnit, line, column);
-
-            if (pruneStatements) 
-                pruner.removeStatementsAfterCursor(compilationUnit, line, column);
 
             try {
                 Iterable<? extends Element> analyze = task.analyze();
