@@ -115,7 +115,7 @@ public class JavacHolder {
                         .mapToLong(p -> p.elapsed().toMillis())
                         .sum();
 
-                if (timed.size() > 3) {
+                if (timed.size() > 5) {
                     LOG.info(String.format(
                             "%s\t%d ms\t%d files",
                             kind.name(),
