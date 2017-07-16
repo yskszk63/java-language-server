@@ -161,21 +161,6 @@ public class Javadocs {
             paramsKey(method.getParameters())
         );
     }
-
-    // TODO write tests that verify this always matches methodKey
-    String constructorKeyFromClassPath(Constructor<?> method) {
-        return String.format(
-            "%s#<init>(%s)",
-            method.getDeclaringClass().getName(),
-            paramsKeyFromClassPath(method.getParameterTypes())
-        );
-    }
-
-    private String paramsKeyFromClassPath(Class<?>[] params) {
-        return Arrays.stream(params)
-                .map(Class::getName)
-                .collect(Collectors.joining(","));
-    }
     
     private String paramsKey(List<? extends VariableElement> params) {
         return params.stream()

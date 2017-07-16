@@ -333,6 +333,14 @@ class Completions {
         return fromClassPath;
     }
 
+    private CompletionItem completeConstructorFromClassPath(Constructor<?> c) {
+        return completeConstructor(
+            c.getDeclaringClass().getPackage().getName(), 
+            c.getDeclaringClass().getSimpleName(), 
+            c.getDeclaringClass().getTypeParameters().length > 0
+        );
+    }
+
     /**
      * Suggest classes that haven't yet been imported, but are on the source or class path
      */
@@ -565,21 +573,32 @@ class Completions {
         return name.equals(thisName) || name.equals(superName);
     }
 
-    private CompletionItem completeConstructorFromClassPath(Constructor<?> c) {
-        String name = c.getDeclaringClass().getSimpleName();
+    /**
+     * Complete constructor with minimal type information.
+     * 
+     * This is important when we're autocompleting new ? with a class that we haven't yet imported.
+     * We don't yet have detailed type information or javadocs, and it's expensive to retrieve them.
+     * So we autocomplete a minimal constructor, and let signature-help fill in the details.
+     */
+    private CompletionItem completeConstructor(String packageName, String className, boolean hasTypeParameters) {
         CompletionItem item = new CompletionItem();
-        String insertText = name;
+        String qualifiedName = packageName.isEmpty() ? className : packageName + "." + className;
+        String key = String.format(
+            "%s#<init>",
+            className
+        );
+        String insertText = className;
 
-        if (c.getDeclaringClass().getTypeParameters().length > 0)
+        if (hasTypeParameters)
             insertText += "<>";
 
         item.setKind(CompletionItemKind.Constructor);
-        item.setLabel(name);
+        item.setLabel(className);
         item.setInsertText(insertText);
-        item.setFilterText(name);
-        item.setAdditionalTextEdits(addImport(c.getDeclaringClass().getName().toString()));
-        item.setSortText("2/" + name);
-        item.setData(docs.constructorKeyFromClassPath(c));
+        item.setFilterText(className);
+        item.setAdditionalTextEdits(addImport(qualifiedName));
+        item.setSortText("2/" + className);
+        item.setData(key);
 
         return item;
     }
