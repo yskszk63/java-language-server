@@ -27,12 +27,10 @@ import java.util.stream.Stream;
  */
 class ClassPathIndex {
 
-    private final URLClassLoader classLoader;
     private final List<ClassPath.ClassInfo> topLevelClasses;
 
     ClassPathIndex(Set<Path> classPath) {
-        this.classLoader = classLoader(classPath);
-        this.topLevelClasses = classPath(classLoader).getTopLevelClasses().stream()
+        this.topLevelClasses = classPath(classLoader(classPath)).getTopLevelClasses().stream()
             .sorted(ClassPathIndex::shortestName)
             .collect(Collectors.toList());
     }
@@ -82,36 +80,24 @@ class ClassPathIndex {
     }
 
     private boolean isPublic(ClassPath.ClassInfo info) {
-        try {
-            return Modifier.isPublic(classLoader.loadClass(info.getName()).getModifiers());
-        } catch (ClassNotFoundException e) {
-            LOG.warning(e.getMessage());
-
-            return false;
-        }
+        return Modifier.isPublic(info.load().getModifiers());
     }
 
     boolean hasAccessibleConstructor(ClassPath.ClassInfo info, String fromPackage) {
-        try {
-            Class<?> load = classLoader.loadClass(info.getName());
-            boolean isPublicClass = Modifier.isPublic(load.getModifiers()),
-                    isSamePackage = fromPackage.equals(info.getPackageName());
+        Class<?> load = info.load();
+        boolean isPublicClass = Modifier.isPublic(load.getModifiers()),
+                isSamePackage = fromPackage.equals(info.getPackageName());
 
-            for (Constructor<?> candidate : load.getDeclaredConstructors()) {
-                int modifiers = candidate.getModifiers();
+        for (Constructor<?> candidate : load.getDeclaredConstructors()) {
+            int modifiers = candidate.getModifiers();
 
-                if (isPublicClass && Modifier.isPublic(modifiers))
-                    return true;
-                else if (isSamePackage && !Modifier.isPrivate(modifiers) && !Modifier.isProtected(modifiers))
-                    return true;
-            }
-
-            return false;
-        } catch (ClassNotFoundException e) {
-            LOG.warning(e.getMessage());
-
-            return false;
+            if (isPublicClass && Modifier.isPublic(modifiers))
+                return true;
+            else if (isSamePackage && !Modifier.isPrivate(modifiers) && !Modifier.isProtected(modifiers))
+                return true;
         }
+
+        return false;
     }
 
     /**
