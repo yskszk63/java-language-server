@@ -222,7 +222,7 @@ public class JavacHolder {
     public final ClassPathIndex classPathIndex;
 
     private JavacHolder(Set<Path> sourcePath, Set<Path> classPath) {
-        this.sourcePath = sourcePath;
+        this.sourcePath = Collections.unmodifiableSet(sourcePath);
         this.classPath = Collections.unmodifiableSet(classPath);
         this.classPathIndex = new ClassPathIndex(classPath);
     }
