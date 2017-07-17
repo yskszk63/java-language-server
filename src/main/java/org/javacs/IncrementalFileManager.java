@@ -2,7 +2,9 @@ package org.javacs;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.MethodTree;
@@ -19,12 +21,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import javax.lang.model.element.Modifier;
-import javax.tools.ForwardingJavaFileManager;
-import javax.tools.JavaFileManager;
-import javax.tools.JavaFileObject;
+import javax.lang.model.element.TypeElement;
+import javax.tools.*;
 import javax.tools.JavaFileObject.Kind;
-import javax.tools.StandardLocation;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Paths;
@@ -42,9 +43,46 @@ import org.javacs.IncrementalFileManager.ClassSig;
 class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> {
     private final Set<URI> warnedHidden = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final JavacTool javac = JavacTool.create();
+    private final JavaFileManager classOnlyFileManager;
 
     IncrementalFileManager(JavaFileManager delegate) {
         super(delegate);
+
+        classOnlyFileManager = new ForwardingJavaFileManager<JavaFileManager>(delegate) {
+            @Override
+            public Iterable<JavaFileObject> list(Location location, String packageName, Set<Kind> kinds, boolean recurse) throws IOException {
+                if (location == StandardLocation.SOURCE_PATH)
+                    kinds = Sets.filter(kinds, k -> k != Kind.SOURCE);
+
+                return super.list(location, packageName, kinds, recurse);
+            }
+
+            @Override
+            public JavaFileObject getJavaFileForInput(Location location, String className, JavaFileObject.Kind kind) throws IOException {
+                if (kind == Kind.SOURCE)
+                    return null;
+                else
+                    return super.getJavaFileForInput(location, className, kind);
+            }
+
+            @Override
+            public FileObject getFileForInput(Location location, String packageName, String relativeName) throws IOException {
+                if (location == StandardLocation.SOURCE_PATH)
+                    return null;
+                else
+                    return super.getFileForInput(location, packageName, relativeName);
+            }
+        };
+    }
+
+    @Override
+    public Iterable<JavaFileObject> list(Location location, String packageName, Set<Kind> kinds, boolean recurse) throws IOException {
+        Iterable<JavaFileObject> list = super.list(location, packageName, kinds, recurse);
+
+        if (location == StandardLocation.SOURCE_PATH)
+            return Iterables.filter(list, source -> !hasUpToDateClassFiles(packageName, source));
+        else
+            return list;
     }
 
     @Override
@@ -55,13 +93,89 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
             return super.getJavaFileForInput(location, className, kind);
     }
 
-    boolean hasUpToDateClassFile(String qualifiedName) {
+    @Override
+    public FileObject getFileForInput(Location location, String packageName, String relativeName) throws IOException {
+        String className = packageName.isEmpty() ? relativeName : packageName + "." + relativeName;
+
+        if (location == StandardLocation.SOURCE_PATH && hasUpToDateClassFile(className))
+            return null;
+        else
+            return super.getFileForInput(location, packageName, relativeName);
+    }
+
+    private boolean hasUpToDateClassFiles(String packageName, JavaFileObject sourceFile) {
+        Optional<JavaFileObject> outputFile = primaryClassFile(packageName, sourceFile);
+        boolean hidden = outputFile.isPresent() && outputFile.get().getLastModified() >= sourceFile.getLastModified() || hasUpToDateSignatures(packageName, sourceFile);
+
+        if (hidden && !warnedHidden.contains(sourceFile.toUri())) {
+            LOG.warning("Hiding " + sourceFile.toUri() + " in favor of " + outputFile.get());
+
+            warnedHidden.add(sourceFile.toUri());
+        }
+
+        return hidden;
+    }
+
+    private boolean hasUpToDateSignatures(String packageName, JavaFileObject sourceFile) {
+        try {
+            JavacTask task = javac.getTask(null, classOnlyFileManager, __ -> {}, ImmutableList.of(), null, ImmutableList.of(sourceFile));
+            CompilationUnitTree tree = task.parse().iterator().next();
+
+            for (Tree each : tree.getTypeDecls()) {
+                if (each instanceof ClassTree) {
+                    ClassTree sourceClass = (ClassTree) each;
+                    ClassSig sourceSig = api(sourceClass);
+                    String qualifiedName = packageName.isEmpty() ? sourceClass.getSimpleName().toString() : packageName + "." + sourceClass.getSimpleName();
+                    Optional<ClassSig> classSig = classSignature(qualifiedName);
+
+                    if (!Optional.of(sourceSig).equals(classSig))
+                        return false;
+                }
+            }
+
+            return true;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private Optional<JavaFileObject> primaryClassFile(String packageName, JavaFileObject sourceFile) {
+        String primaryClassName = primaryClassSimpleName(sourceFile);
+        String qualifiedName = packageName.isEmpty() ? primaryClassName : packageName + "." + primaryClassName;
+
+        try {
+            return Optional.ofNullable(super.getJavaFileForInput(StandardLocation.CLASS_PATH, qualifiedName, JavaFileObject.Kind.CLASS));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String primaryClassSimpleName(JavaFileObject sourceFile) {
+        String[] filePath = sourceFile.toUri().getPath().split("/");
+        
+        assert filePath.length > 0 : sourceFile + " has not path";
+
+        String fileName = filePath[filePath.length - 1];
+
+        assert fileName.endsWith(".java") : sourceFile + " does not end with .java";
+
+        return fileName.substring(0, fileName.length() - ".java".length());
+    }
+
+    private boolean hasUpToDateClassFile(String qualifiedName) {
         try {
             JavaFileObject sourceFile = super.getJavaFileForInput(StandardLocation.SOURCE_PATH, qualifiedName, JavaFileObject.Kind.SOURCE),
                            outputFile = super.getJavaFileForInput(StandardLocation.CLASS_PATH, qualifiedName, JavaFileObject.Kind.CLASS);
             long sourceModified = sourceFile == null ? 0 : sourceFile.getLastModified(),
                  outputModified = outputFile == null ? 0 : outputFile.getLastModified();
-            boolean hidden = outputModified >= sourceModified || sourceSignature(qualifiedName).equals(classSignature(qualifiedName));
+            boolean hidden = outputModified >= sourceModified || hasUpToDateSignature(qualifiedName);
+
+            // TODO remove
+            // if (!hidden) {
+            //     LOG.warning("Source and class signatures do not match...");
+            //     LOG.warning("\t" + sourceSignature(qualifiedName));
+            //     LOG.warning("\t" + classSignature(qualifiedName));
+            // }
 
             if (hidden && sourceFile != null && outputFile != null && !warnedHidden.contains(sourceFile.toUri())) {
                 LOG.warning("Hiding " + sourceFile.toUri() + " in favor of " + outputFile.toUri());
@@ -76,6 +190,13 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private boolean hasUpToDateSignature(String qualifiedName) {
+        ClassSig sourceSig = sourceSignature(qualifiedName);
+        Optional<ClassSig> classSig = classSignature(qualifiedName);
+
+        return Optional.of(sourceSig).equals(classSig);
     }
 
     static class ClassSig {
@@ -170,13 +291,17 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
     }
 
     /**
-     * Signatures of all non-private methods and fields in a .java file
+     * Signatures of all non-private methods and fields in a .class file
      */
-    ClassSig classSignature(String qualifiedName) {
-        JavacTask task = javac.getTask(null, fileManager, __ -> {}, ImmutableList.of(), null, ImmutableList.of());
-        ClassTree tree = Trees.instance(task).getTree(task.getElements().getTypeElement(qualifiedName));
+    Optional<ClassSig> classSignature(String qualifiedName) {
+        JavacTask task = javac.getTask(null, classOnlyFileManager, __ -> {}, ImmutableList.of(), null, ImmutableList.of());
+        TypeElement element = task.getElements().getTypeElement(qualifiedName);
+        ClassTree tree = Trees.instance(task).getTree(element);
 
-        return api(tree);
+        if (tree == null)
+            return Optional.empty();
+        else
+            return Optional.of(api(tree));
     }
 
     private ClassSig api(ClassTree enclosingClass) {
@@ -214,16 +339,20 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
             }
         }
 
-        if (hasNoExplicitConstructor)
-            result.methods.computeIfAbsent("<init>", __ -> new HashSet<>()).add(defaultConstructor());
+        if (hasNoExplicitConstructor) {
+            boolean classIsPublic = enclosingClass.getModifiers().getFlags().contains(Modifier.PUBLIC);
+
+            result.methods.computeIfAbsent("<init>", __ -> new HashSet<>()).add(defaultConstructor(classIsPublic));
+        }
 
         return result;
     }
 
-    private MethodSig defaultConstructor() {
+    private MethodSig defaultConstructor(boolean classIsPublic) {
         MethodSig result = new MethodSig();
 
-        result.modifiers = Collections.singleton(Modifier.PUBLIC);
+        if (classIsPublic)
+            result.modifiers = Collections.singleton(Modifier.PUBLIC);
         
         return result;
     }

@@ -35,14 +35,14 @@ public class IncrementalFileManagerTest {
 
     @Test
     public void classFileSignature() {
-        IncrementalFileManager.ClassSig sig = test.classSignature("com.example.Test");
+        IncrementalFileManager.ClassSig sig = test.classSignature("com.example.Test").orElseThrow(() -> new RuntimeException("com.example.Test class not found"));
 
         assertThat(sig.methods, hasKey("test"));
     }
 
     @Test
     public void simpleSignatureEquals() {
-        IncrementalFileManager.ClassSig classSig = test.classSignature("com.example.Test"),
+        IncrementalFileManager.ClassSig classSig = test.classSignature("com.example.Test").orElseThrow(() -> new RuntimeException("com.example.Test class not found")),
                                         sourceSig = test.sourceSignature("com.example.Test");
 
         assertThat(classSig, equalTo(sourceSig));
