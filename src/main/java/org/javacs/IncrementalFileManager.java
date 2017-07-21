@@ -35,7 +35,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
-import org.javacs.IncrementalFileManager.ClassSig;
 
 /**
  * An implementation of JavaFileManager that removes any .java source files where there is an up-to-date .class file
@@ -116,27 +115,76 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
         return hidden;
     }
 
-    private boolean hasUpToDateSignatures(String packageName, JavaFileObject sourceFile) {
-        try {
-            JavacTask task = javac.getTask(null, classOnlyFileManager, __ -> {}, ImmutableList.of(), null, ImmutableList.of(sourceFile));
-            CompilationUnitTree tree = task.parse().iterator().next();
+    /**
+     * Cache of whether a particular source file had up-to-date class files at a particular time.
+     * 
+     * We're going to assume that if there were up-to-date class files, 
+     * and the lastModified time of the source file has not changed,
+     * there are still up-to-date class files.
+     */
+    private Map<CheckedSignature, Boolean> upToDate = new HashMap<>();
 
-            for (Tree each : tree.getTypeDecls()) {
-                if (each instanceof ClassTree) {
-                    ClassTree sourceClass = (ClassTree) each;
-                    ClassSig sourceSig = api(sourceClass);
-                    String qualifiedName = packageName.isEmpty() ? sourceClass.getSimpleName().toString() : packageName + "." + sourceClass.getSimpleName();
-                    Optional<ClassSig> classSig = classSignature(qualifiedName);
+    private static class CheckedSignature {
+        final URI sourceUri;
+        final Instant lastModified;
 
-                    if (!Optional.of(sourceSig).equals(classSig))
-                        return false;
-                }
-            }
-
-            return true;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        public CheckedSignature(URI sourceUri, Instant lastModified) {
+            this.sourceUri = sourceUri;
+            this.lastModified = lastModified;
         }
+
+        @Override
+        public boolean equals(Object maybe) {
+            if (maybe instanceof CheckedSignature) {
+                CheckedSignature that = (CheckedSignature) maybe;
+
+                return this.sourceUri.equals(that.sourceUri) &&
+                       this.lastModified.equals(that.lastModified);
+            }
+            else return false;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(sourceUri, lastModified);
+        }
+    }
+
+    private boolean hasUpToDateSignatures(String packageName, JavaFileObject sourceFile) {
+        CheckedSignature key = new CheckedSignature(sourceFile.toUri(), Instant.ofEpochMilli(sourceFile.getLastModified()));
+
+        return upToDate.computeIfAbsent(key, newKey -> {
+            try {
+                JavacTask task = javac.getTask(null, classOnlyFileManager, __ -> {}, ImmutableList.of(), null, ImmutableList.of(sourceFile));
+                CompilationUnitTree tree = task.parse().iterator().next();
+
+                for (Tree each : tree.getTypeDecls()) {
+                    if (each instanceof ClassTree) {
+                        ClassTree sourceClass = (ClassTree) each;
+                        String qualifiedName = packageName.isEmpty() ? sourceClass.getSimpleName().toString() : packageName + "." + sourceClass.getSimpleName();
+
+                        if (!hasUpToDateSignature(qualifiedName)) {
+                            LOG.warning(String.format(
+                                "%s has a different signature than %s", 
+                                sourceFile.toUri(), 
+                                super.getJavaFileForInput(StandardLocation.CLASS_PATH, qualifiedName, JavaFileObject.Kind.CLASS)
+                            ));
+
+                            return false;
+                        }
+                    }
+                }
+
+                LOG.info(String.format(
+                    "%s appears to be out-of-date but its class files have a matching public API",
+                    sourceFile.toUri()
+                ));
+
+                return true;
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     private Optional<JavaFileObject> primaryClassFile(String packageName, JavaFileObject sourceFile) {
@@ -193,180 +241,36 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
     }
 
     private boolean hasUpToDateSignature(String qualifiedName) {
-        ClassSig sourceSig = sourceSignature(qualifiedName);
-        Optional<ClassSig> classSig = classSignature(qualifiedName);
-
-        return Optional.of(sourceSig).equals(classSig);
+        return sourceSignature(qualifiedName).equals(classSignature(qualifiedName));
     }
 
-    static class ClassSig {
-        Set<Modifier> modifiers = Collections.emptySet();
-        final List<String> typeParameters = new ArrayList<>();
-        final Map<String, Set<Modifier>> fields = new HashMap<>();
-        final Map<String, Set<MethodSig>> methods = new HashMap<>();
-
-        @Override
-        public boolean equals(Object candidate) {
-            if (candidate instanceof ClassSig) {
-                ClassSig that = (ClassSig) candidate;
-
-                return this.modifiers.equals(that.modifiers) &&
-                       this.typeParameters.equals(that.typeParameters) &&
-                       this.fields.equals(that.fields) &&
-                       this.methods.equals(that.methods);
-            }
-            else return false;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(modifiers, typeParameters, fields, methods);
-        }
-
-        @Override
-        public String toString() {
-            return MoreObjects.toStringHelper(this)
-                    .add("modifiers", modifiers)
-                    .add("typeParameters", typeParameters)
-                    .add("fields", fields)
-                    .add("methods", methods)
-                    .toString();
-        }
-    }
-
-    static class MethodSig {
-        Set<Modifier> modifiers = Collections.emptySet();
-        List<String> typeParameters = Collections.emptyList();
-        List<String> parameterTypes = Collections.emptyList();
-
-        @Override
-        public boolean equals(Object candidate) {
-            if (candidate instanceof MethodSig) {
-                MethodSig that = (MethodSig) candidate;
-
-                return this.modifiers.equals(that.modifiers) &&
-                       this.typeParameters.equals(that.typeParameters) &&
-                       this.parameterTypes.equals(that.parameterTypes);
-            }
-            else return false;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(modifiers, typeParameters, parameterTypes);
-        }
-
-        @Override
-        public String toString() {
-            return MoreObjects.toStringHelper(this)
-                    .add("modifiers", modifiers)
-                    .add("typeParameters", typeParameters)
-                    .add("parameterTypes", parameterTypes)
-                    .toString();
-        }
-    }
 
     /**
      * Signatures of all non-private methods and fields in a .java file
      */
-    ClassSig sourceSignature(String qualifiedName) {
-        try {
-            JavaFileObject sourceFile = super.getJavaFileForInput(StandardLocation.SOURCE_PATH, qualifiedName, JavaFileObject.Kind.SOURCE);
-            JavacTask task = javac.getTask(null, fileManager, __ -> {}, ImmutableList.of(), null, ImmutableList.of(sourceFile));
-            CompilationUnitTree tree = task.parse().iterator().next();
+    Optional<String> sourceSignature(String qualifiedName) {
+        JavacTask task = javac.getTask(null, fileManager, __ -> {}, ImmutableList.of(), null, ImmutableList.of());
+        TypeElement element = task.getElements().getTypeElement(qualifiedName);
 
-            for (Tree top : tree.getTypeDecls()) {
-                if (top instanceof ClassTree) {
-                    ClassTree enclosingClass = (ClassTree) top;
-                    
-                    if (Completions.lastId(qualifiedName).contentEquals(enclosingClass.getSimpleName()))
-                        return api(enclosingClass);
-                }
-            }
-
-            throw new RuntimeException(qualifiedName + " not found in " + sourceFile);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        return signature(element);
     }
 
     /**
      * Signatures of all non-private methods and fields in a .class file
      */
-    Optional<ClassSig> classSignature(String qualifiedName) {
+    Optional<String> classSignature(String qualifiedName) {
         JavacTask task = javac.getTask(null, classOnlyFileManager, __ -> {}, ImmutableList.of(), null, ImmutableList.of());
         TypeElement element = task.getElements().getTypeElement(qualifiedName);
-        ClassTree tree = Trees.instance(task).getTree(element);
 
-        if (tree == null)
+        return signature(element);
+    }
+
+    private Optional<String> signature(TypeElement element) {
+        if (element == null)
             return Optional.empty();
         else
-            return Optional.of(api(tree));
+            return Optional.of(new ClassApiVisitor().construct(element));
     }
-
-    private ClassSig api(ClassTree enclosingClass) {
-        ClassSig result = new ClassSig();
-        boolean hasNoExplicitConstructor = true;
-
-        result.modifiers = enclosingClass.getModifiers().getFlags();
-
-        for (Tree member : enclosingClass.getMembers()) {
-            if (member instanceof VariableTree) {
-                VariableTree field = (VariableTree) member;
-                Set<Modifier> flags = field.getModifiers().getFlags();
-
-                if (!flags.contains(Modifier.PRIVATE)) {
-                    result.fields.put(field.getName().toString(), flags);
-                }
-            }
-            else if (member instanceof MethodTree) {
-                MethodTree method = (MethodTree) member;
-                Set<Modifier> flags = method.getModifiers().getFlags();
-
-                if (!flags.contains(Modifier.PRIVATE)) {
-                    String methodName = method.getName().toString();
-                    MethodSig methodApi = new MethodSig();
-
-                    methodApi.modifiers = flags;
-                    methodApi.typeParameters = Lists.transform(method.getTypeParameters(), param -> param.getName().toString());
-                    methodApi.parameterTypes = Lists.transform(method.getParameters(), param -> param.getType().toString());
-                    
-                    result.methods.computeIfAbsent(methodName, __ -> new HashSet<>()).add(methodApi);
-                }
-
-                if (method.getName().contentEquals("<init>"))
-                    hasNoExplicitConstructor = false;
-            }
-        }
-
-        if (hasNoExplicitConstructor) {
-            boolean classIsPublic = enclosingClass.getModifiers().getFlags().contains(Modifier.PUBLIC);
-
-            result.methods.computeIfAbsent("<init>", __ -> new HashSet<>()).add(defaultConstructor(classIsPublic));
-        }
-
-        return result;
-    }
-
-    private MethodSig defaultConstructor(boolean classIsPublic) {
-        MethodSig result = new MethodSig();
-
-        if (classIsPublic)
-            result.modifiers = Collections.singleton(Modifier.PUBLIC);
         
-        return result;
-    }
-
-    // NOTE this only works for regular file objects
-    private String className(String packageName, JavaFileObject file) {
-        String fileName = Paths.get(file.toUri()).getFileName().toString();
-        String className = fileName.substring(0, fileName.indexOf('.'));
-
-        if (packageName.isEmpty())
-            return className;
-        else
-            return packageName + "." + className;
-    }
-
     private static final Logger LOG = Logger.getLogger("main");
 }

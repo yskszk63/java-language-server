@@ -330,6 +330,7 @@ class Completions {
         Stream<CompletionItem> fromClassPath = accessibleClassPathClasses(partialIdentifier, scope)
                 .filter(c -> classPath.hasAccessibleConstructor(c, packageName))
                 .map(c -> completeConstructorFromClassPath(c.load()));
+        // TODO remove class path classes that are also available from source path
 
         return Stream.concat(fromSourcePath, fromClassPath);
     }
@@ -358,6 +359,7 @@ class Completions {
                 .map(c -> c.qualifiedName());
         Stream<String> fromClassPath = accessibleClassPathClasses(partialIdentifier, scope)
                 .map(c -> c.getName());
+        // TODO remove class path classes that are also available from source path
 
         return Stream.concat(fromSourcePath, fromClassPath)
                 .map(this::completeClassNameFromClassPath);
