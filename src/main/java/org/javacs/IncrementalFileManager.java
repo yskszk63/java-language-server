@@ -167,11 +167,15 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
                         String qualifiedName = packageName.isEmpty() ? sourceClass.getSimpleName().toString() : packageName + "." + sourceClass.getSimpleName();
 
                         if (!hasUpToDateSignature(qualifiedName)) {
-                            LOG.warning(String.format(
-                                "%s has a different signature than %s", 
-                                sourceFile.toUri(), 
-                                super.getJavaFileForInput(StandardLocation.CLASS_PATH, qualifiedName, JavaFileObject.Kind.CLASS)
-                            ));
+                            JavaFileObject classFile = super.getJavaFileForInput(StandardLocation.CLASS_PATH, qualifiedName, JavaFileObject.Kind.CLASS);
+
+                            if (classFile != null) {
+                                LOG.warning(String.format(
+                                    "%s has a different signature than %s", 
+                                    sourceFile.toUri(), 
+                                    classFile
+                                ));
+                            }
 
                             return false;
                         }
