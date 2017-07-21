@@ -14,6 +14,7 @@ import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.api.JavacTool;
+import com.sun.tools.sjavac.comp.PubapiVisitor;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -265,11 +266,16 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
         return signature(element);
     }
 
-    private Optional<String> signature(TypeElement element) {
+    private static Optional<String> signature(TypeElement element) {
         if (element == null)
             return Optional.empty();
-        else
-            return Optional.of(new ClassApiVisitor().construct(element));
+        else {
+            StringBuffer buffer = new StringBuffer();
+
+            new PubapiVisitor(buffer).scan(element);
+
+            return Optional.of(buffer.toString());
+        }
     }
         
     private static final Logger LOG = Logger.getLogger("main");
