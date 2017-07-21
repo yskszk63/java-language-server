@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -17,6 +18,7 @@ import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.sjavac.comp.PubapiVisitor;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -274,7 +276,13 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
 
             new PubapiVisitor(buffer).scan(element);
 
-            return Optional.of(buffer.toString());
+            // This is super-hacky and can theoretically fail but it's unlikely
+            // Java 9 has a better implementation of PubApi, switch to that on upgrade
+            String[] sorted = buffer.toString().split("\n");
+
+            Arrays.sort(sorted);
+
+            return Optional.of(Joiner.on("\n").join(sorted));
         }
     }
         
