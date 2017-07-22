@@ -10,23 +10,23 @@ import org.eclipse.lsp4j.Location;
 
 public class References {
 
-    public static Stream<Location> findReferences(FocusedResult compiled, SymbolIndex index) {
+    public static Stream<Location> findReferences(FocusedResult compiled, FindSymbols find) {
         return compiled.cursor
-                .map(cursor -> new References(compiled.task, index).doFindReferences(cursor))
+                .map(cursor -> new References(compiled.task, find).doFindReferences(cursor))
                 .orElseGet(Stream::empty);
     }
 
-    public static Optional<Location> gotoDefinition(FocusedResult compiled, SymbolIndex index) {
+    public static Optional<Location> gotoDefinition(FocusedResult compiled, FindSymbols find) {
         return compiled.cursor.flatMap(
-                cursor -> new References(compiled.task, index).doGotoDefinition(cursor));
+                cursor -> new References(compiled.task, find).doGotoDefinition(cursor));
     }
 
     private final JavacTask task;
-    private final SymbolIndex index;
+    private final FindSymbols find;
 
-    private References(JavacTask task, SymbolIndex index) {
+    private References(JavacTask task, FindSymbols find) {
         this.task = task;
-        this.index = index;
+        this.find = find;
     }
 
     private Stream<Location> doFindReferences(TreePath cursor) {
@@ -34,7 +34,7 @@ public class References {
         Element symbol = trees.getElement(cursor);
 
         if (symbol == null) return Stream.empty();
-        else return index.references(symbol);
+        else return find.references(symbol);
     }
 
     private Optional<Location> doGotoDefinition(TreePath cursor) {
@@ -45,6 +45,6 @@ public class References {
         Trees trees = Trees.instance(task);
         Element symbol = trees.getElement(cursor);
 
-        return index.find(symbol);
+        return find.find(symbol);
     }
 }

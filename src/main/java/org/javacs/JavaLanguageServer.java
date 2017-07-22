@@ -191,7 +191,7 @@ class JavaLanguageServer implements LanguageServer {
                 FocusedResult result =
                         configured().compiler.compileFocused(uri, content, line, character, false);
                 List<Location> locations =
-                        References.gotoDefinition(result, configured().index)
+                        References.gotoDefinition(result, configured().find)
                                 .map(Collections::singletonList)
                                 .orElseGet(Collections::emptyList);
                 return CompletableFuture.completedFuture(locations);
@@ -209,7 +209,7 @@ class JavaLanguageServer implements LanguageServer {
                 FocusedResult result =
                         configured().compiler.compileFocused(uri, content, line, character, false);
                 List<Location> locations =
-                        References.findReferences(result, configured().index)
+                        References.findReferences(result, configured().find)
                                 .collect(Collectors.toList());
 
                 return CompletableFuture.completedFuture(locations);
@@ -519,11 +519,13 @@ class JavaLanguageServer implements LanguageServer {
         final JavacHolder compiler;
         final Javadocs docs;
         final SymbolIndex index;
+        final FindSymbols find;
 
-        Configured(JavacHolder compiler, Javadocs docs, SymbolIndex index) {
+        Configured(JavacHolder compiler, Javadocs docs, SymbolIndex index, FindSymbols find) {
             this.compiler = compiler;
             this.docs = docs;
             this.index = index;
+            this.find = find;
         }
     }
 
@@ -549,8 +551,7 @@ class JavaLanguageServer implements LanguageServer {
         Set<Path> sourcePath = InferConfig.workspaceSourcePath(workspaceRoot);
         Path userHome = Paths.get(System.getProperty("user.home")),
                 mavenHome = userHome.resolve(".m2"),
-                gradleHome = userHome.resolve(".gradle"),
-                workspaceRootLike = workspaceRoot.subpath(0, workspaceRoot.getNameCount());
+                gradleHome = userHome.resolve(".gradle");
         List<Artifact> externalDependencies =
                 Lists.transform(settings.java.externalDependencies, Artifact::parse);
 
@@ -582,10 +583,10 @@ class JavaLanguageServer implements LanguageServer {
                 JavacHolder.create(sourcePath, Sets.union(classPath, workspaceClassPath));
         Javadocs docs = new Javadocs(sourcePath, docPath, this::activeContent);
         SymbolIndex index =
-                new SymbolIndex(
-                        workspaceRoot, activeDocuments::keySet, this::activeContent, compiler);
+                new SymbolIndex(workspaceRoot, activeDocuments::keySet, this::activeContent);
+        FindSymbols find = new FindSymbols(index, compiler, this::activeContent);
 
-        return new Configured(compiler, docs, index);
+        return new Configured(compiler, docs, index, find);
     }
 
     private void clearDiagnostics() {
