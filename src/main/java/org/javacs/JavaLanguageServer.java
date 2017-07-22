@@ -210,6 +210,7 @@ class JavaLanguageServer implements LanguageServer {
                         configured().compiler.compileFocused(uri, content, line, character, false);
                 List<Location> locations =
                         References.findReferences(result, configured().find)
+                                .limit(maxItems)
                                 .collect(Collectors.toList());
 
                 return CompletableFuture.completedFuture(locations);
@@ -453,7 +454,11 @@ class JavaLanguageServer implements LanguageServer {
             public CompletableFuture<List<? extends SymbolInformation>> symbol(
                     WorkspaceSymbolParams params) {
                 List<SymbolInformation> infos =
-                        configured().index.search(params.getQuery()).collect(Collectors.toList());
+                        configured()
+                                .index
+                                .search(params.getQuery())
+                                .limit(maxItems)
+                                .collect(Collectors.toList());
 
                 return CompletableFuture.completedFuture(infos);
             }
