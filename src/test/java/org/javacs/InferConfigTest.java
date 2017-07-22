@@ -15,24 +15,16 @@ public class InferConfigTest {
     private Path gradleHome = Paths.get("src/test/test-project/home/.gradle");
     private Artifact externalArtifact = new Artifact("com.external", "external-library", "1.2");
     private List<Artifact> externalDependencies = ImmutableList.of(externalArtifact);
-    private InferConfig
-            both = new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome),
-            gradle =
-                    new InferConfig(
-                            workspaceRoot, externalDependencies, Paths.get("nowhere"), gradleHome),
-            onlyPomXml =
-                    new InferConfig(
-                            Paths.get("src/test/test-project/only-pom-xml"),
-                            ImmutableList.of(),
-                            mavenHome,
-                            Paths.get("nowhere"));
-
-    @Test
-    public void workspaceSourcePath() {
-        assertThat(
-                InferConfig.workspaceSourcePath(workspaceRoot),
-                contains(workspaceRoot.resolve("src")));
-    }
+    private InferConfig both =
+            new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome);
+    private InferConfig gradle =
+            new InferConfig(workspaceRoot, externalDependencies, Paths.get("nowhere"), gradleHome);
+    private InferConfig onlyPomXml =
+            new InferConfig(
+                    Paths.get("src/test/test-project/only-pom-xml"),
+                    ImmutableList.of(),
+                    mavenHome,
+                    Paths.get("nowhere"));
 
     @Test
     public void mavenClassPath() {

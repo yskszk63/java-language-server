@@ -548,7 +548,9 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private Configured createCompiler(JavaSettings settings, Path workspaceRoot) {
-        Set<Path> sourcePath = InferConfig.workspaceSourcePath(workspaceRoot);
+        SymbolIndex index =
+                new SymbolIndex(workspaceRoot, activeDocuments::keySet, this::activeContent);
+        Set<Path> sourcePath = index.sourcePath();
         Path userHome = Paths.get(System.getProperty("user.home")),
                 mavenHome = userHome.resolve(".m2"),
                 gradleHome = userHome.resolve(".gradle");
@@ -582,8 +584,6 @@ class JavaLanguageServer implements LanguageServer {
         JavacHolder compiler =
                 JavacHolder.create(sourcePath, Sets.union(classPath, workspaceClassPath));
         Javadocs docs = new Javadocs(sourcePath, docPath, this::activeContent);
-        SymbolIndex index =
-                new SymbolIndex(workspaceRoot, activeDocuments::keySet, this::activeContent);
         FindSymbols find = new FindSymbols(index, compiler, this::activeContent);
 
         return new Configured(compiler, docs, index, find);

@@ -87,6 +87,37 @@ public class SymbolIndex {
             }
     }
 
+    /**
+     * Guess the source path by looking at package declarations in .java files.
+     *
+     * <p>For example, if the file src/com/example/Test.java has the package declaration `package
+     * com.example;` then the source root is `src`.
+     */
+    Set<Path> sourcePath() {
+        update();
+
+        Set<Path> result = new HashSet<>();
+
+        sourcePathFiles.forEach(
+                (uri, index) -> {
+                    Path dir = Paths.get(uri).getParent();
+                    String packagePath = index.packageName.replace('.', File.separatorChar);
+
+                    if (!dir.endsWith(packagePath))
+                        LOG.warning("Java source file " + uri + " is not in " + packagePath);
+                    else {
+                        int up = Paths.get(packagePath).getNameCount();
+                        Path truncate = dir;
+
+                        for (int i = 0; i < up; i++) truncate = truncate.getParent();
+
+                        result.add(truncate);
+                    }
+                });
+
+        return result;
+    }
+
     /** Search all indexed symbols */
     public Stream<SymbolInformation> search(String query) {
         finishedInitialIndex.join();
