@@ -60,15 +60,14 @@ public class SymbolIndex {
         this.openFiles = openFiles;
         this.activeContent = activeContent;
         this.compiler = compiler;
+        Runnable doIndex =
+                () -> {
+                    updateIndex(allJavaSources(sourcePath));
 
-        new Thread(
-                        () -> {
-                            updateIndex(allJavaSources(sourcePath));
+                    finishedInitialIndex.complete(null);
+                };
 
-                            finishedInitialIndex.complete(null);
-                        },
-                        "Initial-Index")
-                .start();
+        new Thread(doIndex, "Initial-Index").start();
     }
 
     private static Set<URI> allJavaSources(Set<Path> sourcePath) {
