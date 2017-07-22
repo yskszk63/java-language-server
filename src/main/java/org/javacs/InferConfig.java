@@ -11,9 +11,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -54,36 +58,86 @@ class InferConfig {
      * Infer source directories by searching for .java files and examining their package declaration.
      */
     static Set<Path> workspaceSourcePath(Path workspaceRoot) {
-        Function<Path, Optional<Path>> root = java -> {
-            CompilationUnitTree tree = parser.parse(java.toUri(), Optional.empty()); // TODO get from JavaLanguageServer
-            ExpressionTree packageTree = tree.getPackageName();
-            Path dir = java.getParent();
+        class Walk extends SimpleFileVisitor<Path> {
+            int maxHits = 10;
+            PathMatcher match = FileSystems.getDefault().getPathMatcher("glob:*.java");
+            Map<Path, Integer> sourceRoots = new HashMap<>();
 
-            if (packageTree == null)
-                return Optional.of(dir);
-            else {
-                String packagePath = packageTree.toString().replace('.', File.separatorChar);
-
-                if (!dir.endsWith(packagePath)) {
-                    LOG.warning("Java source file " + java + " is not in " + packagePath);
-
-                    return Optional.empty();
-                }
-                else {
-                    int up = Paths.get(packagePath).getNameCount();
-                    Path truncate = dir;
-
-                    for (int i = 0; i < up; i++)
-                        truncate = truncate.getParent();
-
-                    return Optional.of(truncate);
-                }
+            private Path currentSourceRoot(Path fileOrDir) {
+                return sourceRoots.keySet().stream()
+                    .filter(sourceRoot -> fileOrDir.startsWith(sourceRoot))
+                    .findAny()
+                    .orElse(workspaceRoot);
             }
-        };
 
-        return allJavaFiles(workspaceRoot)
-            .flatMap(java -> stream(root.apply(java)))
-            .collect(Collectors.toSet());
+            @Override 
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                if (sourceRoots.getOrDefault(currentSourceRoot(dir), 0) > maxHits) 
+                    return FileVisitResult.SKIP_SUBTREE;
+                else
+                    return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                if (sourceRoots.getOrDefault(currentSourceRoot(file), 0) > maxHits)
+                    return FileVisitResult.SKIP_SUBTREE;
+
+                if (match.matches(file.getFileName())) {
+                    checkPackageDeclaration(file).ifPresent(sourceRoot -> {
+                        LOG.info(String.format("%s is in source root %s", file, sourceRoot));
+
+                        int hits = sourceRoots.getOrDefault(sourceRoot, 0);
+                        
+                        sourceRoots.put(sourceRoot, hits + 1);
+                    });
+                }
+
+                return FileVisitResult.CONTINUE;
+            }
+        }
+        Walk walk = new Walk();
+
+        try {
+            Files.walkFileTree(workspaceRoot, walk);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        return walk.sourceRoots.keySet();
+    }
+
+    /**
+     * Parse a .java file and return it's source root based on it's package path.
+     * 
+     * For example, if the file src/com/example/Test.java has the package declaration `package com.example;`
+     * then the source root is `src`.
+     */
+    private static Optional<Path> checkPackageDeclaration(Path java) {
+        CompilationUnitTree tree = parser.parse(java.toUri(), Optional.empty()); // TODO get from JavaLanguageServer
+        ExpressionTree packageTree = tree.getPackageName();
+        Path dir = java.getParent();
+
+        if (packageTree == null)
+            return Optional.of(dir);
+        else {
+            String packagePath = packageTree.toString().replace('.', File.separatorChar);
+
+            if (!dir.endsWith(packagePath)) {
+                LOG.warning("Java source file " + java + " is not in " + packagePath);
+
+                return Optional.empty();
+            }
+            else {
+                int up = Paths.get(packagePath).getNameCount();
+                Path truncate = dir;
+
+                for (int i = 0; i < up; i++)
+                    truncate = truncate.getParent();
+
+                return Optional.of(truncate);
+            }
+        }
     }
 
     static Stream<Path> allJavaFiles(Path dir) {
