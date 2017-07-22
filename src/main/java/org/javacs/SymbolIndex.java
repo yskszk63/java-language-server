@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.google.common.base.Predicate;
 import com.google.common.collect.Maps;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
@@ -18,6 +17,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -122,17 +122,18 @@ public class SymbolIndex {
     public Stream<SymbolInformation> search(String query) {
         updateOpenFiles();
 
-        Predicate<SourceFileIndex> matchesQuery =
-                index ->
-                        index != null
-                                && index.declarations
-                                        .stream()
-                                        .anyMatch(name -> containsCharsInOrder(name, query));
-        Map<URI, SourceFileIndex> candidateFiles = Maps.filterValues(sourcePathFiles, matchesQuery);
+        Predicate<Map.Entry<URI, SourceFileIndex>> matchesQuery =
+                each ->
+                        each.getValue()
+                                .declarations
+                                .stream()
+                                .anyMatch(name -> containsCharsInOrder(name, query));
 
-        return candidateFiles
-                .keySet()
+        return sourcePathFiles
+                .entrySet()
                 .stream()
+                .filter(matchesQuery)
+                .map(entry -> entry.getKey())
                 .flatMap(this::allInFile)
                 .filter(info -> containsCharsInOrder(info.getName(), query));
     }
@@ -145,6 +146,8 @@ public class SymbolIndex {
 
     /** Get all declarations in an open file */
     Stream<SymbolInformation> allInFile(URI source) {
+        LOG.info("Search " + source);
+
         JavacTask task = parseTask(source);
         Trees trees = Trees.instance(task);
 
@@ -257,17 +260,27 @@ public class SymbolIndex {
     }
 
     Optional<URI> findDeclaringFile(TypeElement topLevelClass) {
+        updateOpenFiles();
+
         String qualifiedName = topLevelClass.getQualifiedName().toString(),
                 packageName = Completions.mostIds(qualifiedName),
                 className = Completions.lastId(qualifiedName);
-        Predicate<SourceFileIndex> containsClass =
-                index ->
-                        index.packageName.equals(packageName)
-                                && index.topLevelClasses
-                                        .stream()
-                                        .anyMatch(c -> c.className.equals(className));
+        Predicate<Map.Entry<URI, SourceFileIndex>> containsClass =
+                entry -> {
+                    SourceFileIndex index = entry.getValue();
 
-        return Maps.filterValues(sourcePathFiles, containsClass).keySet().stream().findFirst();
+                    return index.packageName.equals(packageName)
+                            && index.topLevelClasses
+                                    .stream()
+                                    .anyMatch(c -> c.className.equals(className));
+                };
+
+        return sourcePathFiles
+                .entrySet()
+                .stream()
+                .filter(containsClass)
+                .map(entry -> entry.getKey())
+                .findFirst();
     }
 
     /**
