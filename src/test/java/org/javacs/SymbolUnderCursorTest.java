@@ -1,18 +1,18 @@
 package org.javacs;
 
+import static org.junit.Assert.assertEquals;
+
+import java.util.Optional;
+import javax.lang.model.element.Element;
 import org.junit.Ignore;
 import org.junit.Test;
-
-import javax.lang.model.element.Element;
-import java.util.Optional;
-
-import static org.junit.Assert.assertEquals;
 
 public class SymbolUnderCursorTest {
 
     @Test
     public void classDeclaration() {
-        assertEquals("SymbolUnderCursor", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 3, 22));
+        assertEquals(
+                "SymbolUnderCursor", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 3, 22));
     }
 
     @Test
@@ -27,22 +27,28 @@ public class SymbolUnderCursorTest {
 
     @Test
     public void methodParameterDeclaration() {
-        assertEquals("methodParameter", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 6, 36));
+        assertEquals(
+                "methodParameter", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 6, 36));
     }
 
     @Test
     public void localVariableDeclaration() {
-        assertEquals("localVariable", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 7, 22));
+        assertEquals(
+                "localVariable", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 7, 22));
     }
 
     @Test
     public void constructorParameterDeclaration() {
-        assertEquals("constructorParameter", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 17, 46));
+        assertEquals(
+                "constructorParameter",
+                symbolAt("/org/javacs/example/SymbolUnderCursor.java", 17, 46));
     }
 
     @Test
     public void classIdentifier() {
-        assertEquals("SymbolUnderCursor", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 12, 23));
+        assertEquals(
+                "SymbolUnderCursor",
+                symbolAt("/org/javacs/example/SymbolUnderCursor.java", 12, 23));
     }
 
     @Test
@@ -68,12 +74,14 @@ public class SymbolUnderCursorTest {
 
     @Test
     public void methodParameterReference() {
-        assertEquals("methodParameter", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 10, 32));
+        assertEquals(
+                "methodParameter", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 10, 32));
     }
 
     @Test
     public void localVariableReference() {
-        assertEquals("localVariable", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 10, 16));
+        assertEquals(
+                "localVariable", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 10, 16));
     }
 
     private final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();

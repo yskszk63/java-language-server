@@ -10,18 +10,18 @@ import com.sun.source.util.JavacTask;
 import com.sun.source.util.SourcePositions;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
-import org.eclipse.lsp4j.ParameterInformation;
-import org.eclipse.lsp4j.SignatureHelp;
-import org.eclipse.lsp4j.SignatureInformation;
-
-import javax.lang.model.element.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.lang.model.element.*;
+import org.eclipse.lsp4j.ParameterInformation;
+import org.eclipse.lsp4j.SignatureHelp;
+import org.eclipse.lsp4j.SignatureInformation;
 
 class Signatures {
-    static Optional<SignatureHelp> help(FocusedResult compiled, int line, int column, Javadocs docs) {
+    static Optional<SignatureHelp> help(
+            FocusedResult compiled, int line, int column, Javadocs docs) {
         long offset = compiled.compilationUnit.getLineMap().getPosition(line, column);
 
         return compiled.cursor.flatMap(c -> new Signatures(c, offset, compiled.task, docs).get());
@@ -39,7 +39,6 @@ class Signatures {
         this.docs = docs;
     }
 
-
     private Optional<SignatureHelp> get() {
         if (cursor.getLeaf().getKind() == Tree.Kind.METHOD_INVOCATION)
             return Optional.of(methodHelp((MethodInvocationTree) cursor.getLeaf()));
@@ -49,28 +48,32 @@ class Signatures {
             return Optional.of(methodHelp((MethodInvocationTree) cursor.getParentPath().getLeaf()));
         if (cursor.getParentPath().getLeaf().getKind() == Tree.Kind.NEW_CLASS)
             return Optional.of(constructorHelp((NewClassTree) cursor.getParentPath().getLeaf()));
-        else
-            return Optional.empty();
+        else return Optional.empty();
     }
 
     private SignatureHelp constructorHelp(NewClassTree leaf) {
         Trees trees = Trees.instance(task);
-        TreePath identifierPath = TreePath.getPath(cursor.getCompilationUnit(), leaf.getIdentifier());
+        TreePath identifierPath =
+                TreePath.getPath(cursor.getCompilationUnit(), leaf.getIdentifier());
         Element classElement = trees.getElement(identifierPath);
-        List<ExecutableElement> candidates = classElement.getEnclosedElements().stream()
-                .filter(member -> member.getKind() == ElementKind.CONSTRUCTOR)
-                .map(method -> (ExecutableElement) method)
-                .collect(Collectors.toList());
-        List<SignatureInformation> signatures = candidates.stream()
-                .map(member -> constructorInfo(member))
-                .collect(Collectors.toList());
+        List<ExecutableElement> candidates =
+                classElement
+                        .getEnclosedElements()
+                        .stream()
+                        .filter(member -> member.getKind() == ElementKind.CONSTRUCTOR)
+                        .map(method -> (ExecutableElement) method)
+                        .collect(Collectors.toList());
+        List<SignatureInformation> signatures =
+                candidates
+                        .stream()
+                        .map(member -> constructorInfo(member))
+                        .collect(Collectors.toList());
         int activeSignature = candidates.indexOf(classElement);
 
         return new SignatureHelp(
                 signatures,
                 activeSignature < 0 ? null : activeSignature,
-                activeParameter(leaf.getArguments())
-        );
+                activeParameter(leaf.getArguments()));
     }
 
     private SignatureHelp methodHelp(MethodInvocationTree leaf) {
@@ -78,46 +81,51 @@ class Signatures {
         TreePath methodPath = TreePath.getPath(cursor.getCompilationUnit(), leaf.getMethodSelect());
         Element methodElement = trees.getElement(methodPath);
         Name name = methodElement.getSimpleName();
-        List<ExecutableElement> candidates = methodElement.getEnclosingElement().getEnclosedElements().stream()
-                .filter(member -> member.getKind() == ElementKind.METHOD && member.getSimpleName().equals(name))
-                .map(method -> (ExecutableElement) method)
-                .collect(Collectors.toList());
-        List<SignatureInformation> signatures = candidates.stream()
-                .map(member -> methodInfo(member))
-                .collect(Collectors.toList());
+        List<ExecutableElement> candidates =
+                methodElement
+                        .getEnclosingElement()
+                        .getEnclosedElements()
+                        .stream()
+                        .filter(
+                                member ->
+                                        member.getKind() == ElementKind.METHOD
+                                                && member.getSimpleName().equals(name))
+                        .map(method -> (ExecutableElement) method)
+                        .collect(Collectors.toList());
+        List<SignatureInformation> signatures =
+                candidates.stream().map(member -> methodInfo(member)).collect(Collectors.toList());
         int activeSignature = candidates.indexOf(methodElement);
 
         return new SignatureHelp(
                 signatures,
                 activeSignature < 0 ? null : activeSignature,
-                activeParameter(leaf.getArguments())
-        );
+                activeParameter(leaf.getArguments()));
     }
 
     private SignatureInformation constructorInfo(ExecutableElement method) {
         Optional<ConstructorDoc> doc = docs.constructorDoc(docs.methodKey(method));
-        Optional<String> docText = doc.flatMap(constructor -> Optional.ofNullable(constructor.commentText()))
-                    .map(Javadocs::htmlToMarkdown)
-                    .map(Javadocs::firstSentence);
-        
+        Optional<String> docText =
+                doc.flatMap(constructor -> Optional.ofNullable(constructor.commentText()))
+                        .map(Javadocs::htmlToMarkdown)
+                        .map(Javadocs::firstSentence);
+
         return new SignatureInformation(
                 Hovers.methodSignature(method, false, true),
                 docText.orElse(null),
-                paramInfo(method)
-        );
+                paramInfo(method));
     }
 
     private SignatureInformation methodInfo(ExecutableElement method) {
         Optional<MethodDoc> doc = docs.methodDoc(docs.methodKey(method));
-        Optional<String> docText = doc.flatMap(Javadocs::commentText)
-            .map(Javadocs::htmlToMarkdown)
-            .map(Javadocs::firstSentence);
-        
+        Optional<String> docText =
+                doc.flatMap(Javadocs::commentText)
+                        .map(Javadocs::htmlToMarkdown)
+                        .map(Javadocs::firstSentence);
+
         return new SignatureInformation(
                 Hovers.methodSignature(method, true, true),
                 docText.orElse(null),
-                paramInfo(method)
-        );
+                paramInfo(method));
     }
 
     private List<ParameterInformation> paramInfo(ExecutableElement method) {
@@ -127,10 +135,9 @@ class Signatures {
         for (VariableElement var : method.getParameters()) {
             boolean varargs = method.isVarArgs() && i == method.getParameters().size() - 1;
 
-            params.add(new ParameterInformation(
-                    Hovers.shortName(var, varargs),
-                    task.getElements().getDocComment(var)
-            ));
+            params.add(
+                    new ParameterInformation(
+                            Hovers.shortName(var, varargs), task.getElements().getDocComment(var)));
 
             i++;
         }
@@ -142,8 +149,7 @@ class Signatures {
 
         int i = 0;
         for (ExpressionTree arg : arguments) {
-            if (pos.getEndPosition(cursor.getCompilationUnit(), arg) >= cursorOffset)
-                return i;
+            if (pos.getEndPosition(cursor.getCompilationUnit(), arg) >= cursorOffset) return i;
 
             i++;
         }

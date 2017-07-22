@@ -1,10 +1,9 @@
 package org.javacs;
 
-import com.google.common.base.Joiner;
-import org.eclipse.lsp4j.*;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import static org.hamcrest.Matchers.*;
+import static org.junit.Assert.assertThat;
 
+import com.google.common.base.Joiner;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -14,9 +13,9 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-
-import static org.hamcrest.Matchers.*;
-import static org.junit.Assert.assertThat;
+import org.eclipse.lsp4j.*;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 public class SearchTest {
     private static final Logger LOG = Logger.getLogger("main");
@@ -38,7 +37,8 @@ public class SearchTest {
     private static Set<String> searchWorkspace(String query) {
         try {
             return server.getWorkspaceService()
-                    .symbol(new WorkspaceSymbolParams(query)).get()
+                    .symbol(new WorkspaceSymbolParams(query))
+                    .get()
                     .stream()
                     .map(result -> result.getName())
                     .collect(Collectors.toSet());
@@ -50,7 +50,9 @@ public class SearchTest {
     private static Set<String> searchFile(URI uri) {
         try {
             return server.getTextDocumentService()
-                    .documentSymbol(new DocumentSymbolParams(new TextDocumentIdentifier(uri.toString()))).get()
+                    .documentSymbol(
+                            new DocumentSymbolParams(new TextDocumentIdentifier(uri.toString())))
+                    .get()
                     .stream()
                     .map(result -> result.getName())
                     .collect(Collectors.toSet());
@@ -85,11 +87,17 @@ public class SearchTest {
         String path = "/org/javacs/example/AutocompleteMemberFixed.java";
         Set<String> all = searchFile(FindResource.uri(path));
 
-        assertThat(all, hasItems("methodStatic", "method",
-                                 "methodStaticPrivate", "methodPrivate"));
+        assertThat(
+                all,
+                hasItems(
+                        "methodStatic", "method",
+                        "methodStaticPrivate", "methodPrivate"));
 
-        assertThat(all, hasItems("fieldStatic", "field",
-                                 "fieldStaticPrivate", "fieldPrivate"));
+        assertThat(
+                all,
+                hasItems(
+                        "fieldStatic", "field",
+                        "fieldStaticPrivate", "fieldPrivate"));
     }
 
     @Test

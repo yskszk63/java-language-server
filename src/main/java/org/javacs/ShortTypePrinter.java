@@ -1,17 +1,15 @@
 package org.javacs;
 
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.type.*;
 import javax.lang.model.util.AbstractTypeVisitor8;
-import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 public class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
     private static final Logger LOG = Logger.getLogger("main");
 
-    private ShortTypePrinter() {
-
-    }
+    private ShortTypePrinter() {}
 
     public static String print(TypeMirror type) {
         return type.accept(new ShortTypePrinter(), null);
@@ -19,12 +17,18 @@ public class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
 
     @Override
     public String visitIntersection(IntersectionType t, Void aVoid) {
-        return t.getBounds().stream().map(ShortTypePrinter::print).collect(Collectors.joining(" & "));
+        return t.getBounds()
+                .stream()
+                .map(ShortTypePrinter::print)
+                .collect(Collectors.joining(" & "));
     }
 
     @Override
     public String visitUnion(UnionType t, Void aVoid) {
-        return t.getAlternatives().stream().map(ShortTypePrinter::print).collect(Collectors.joining(" | "));
+        return t.getAlternatives()
+                .stream()
+                .map(ShortTypePrinter::print)
+                .collect(Collectors.joining(" | "));
     }
 
     @Override
@@ -47,8 +51,8 @@ public class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
         String result = "";
 
         // If type is an inner class, add outer class name
-        if (t.asElement().getKind() == ElementKind.CLASS &&
-            t.getEnclosingType().getKind() == TypeKind.DECLARED) {
+        if (t.asElement().getKind() == ElementKind.CLASS
+                && t.getEnclosingType().getKind() == TypeKind.DECLARED) {
 
             result += print(t.getEnclosingType()) + ".";
         }
@@ -56,10 +60,11 @@ public class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
         result += t.asElement().getSimpleName().toString();
 
         if (!t.getTypeArguments().isEmpty()) {
-            String params = t.getTypeArguments()
-                              .stream()
-                              .map(ShortTypePrinter::print)
-                              .collect(Collectors.joining(", "));
+            String params =
+                    t.getTypeArguments()
+                            .stream()
+                            .map(ShortTypePrinter::print)
+                            .collect(Collectors.joining(", "));
 
             result += "<" + params + ">";
         }
@@ -88,11 +93,9 @@ public class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
     public String visitWildcard(WildcardType t, Void aVoid) {
         String result = "?";
 
-        if (t.getSuperBound() != null)
-            result += " super " + print(t.getSuperBound());
+        if (t.getSuperBound() != null) result += " super " + print(t.getSuperBound());
 
-        if (t.getExtendsBound() != null)
-            result += " extends " + print(t.getExtendsBound());
+        if (t.getExtendsBound() != null) result += " extends " + print(t.getExtendsBound());
 
         return result;
     }

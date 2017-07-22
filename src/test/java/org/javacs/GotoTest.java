@@ -1,23 +1,24 @@
 package org.javacs;
 
-import org.eclipse.lsp4j.*;
-import org.junit.Ignore;
-import org.junit.Test;
+import static org.hamcrest.Matchers.*;
+import static org.junit.Assert.assertThat;
 
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
-
-import static org.hamcrest.Matchers.*;
-import static org.junit.Assert.assertThat;
+import org.eclipse.lsp4j.*;
+import org.junit.Ignore;
+import org.junit.Test;
 
 public class GotoTest {
     private static final Logger LOG = Logger.getLogger("main");
     private static final String file = "/org/javacs/example/Goto.java";
-    private static final URI uri = FindResource.uri(file), other = FindResource.uri("/org/javacs/example/GotoOther.java");
-    private static final String defaultConstructorFile = "/org/javacs/example/GotoDefaultConstructor.java";
+    private static final URI uri = FindResource.uri(file),
+            other = FindResource.uri("/org/javacs/example/GotoOther.java");
+    private static final String defaultConstructorFile =
+            "/org/javacs/example/GotoDefaultConstructor.java";
     private static final URI defaultConstructorUri = FindResource.uri(defaultConstructorFile);
 
     @Test
@@ -124,7 +125,7 @@ public class GotoTest {
     @Test
     public void gotoEnum() throws IOException {
         String file = "/org/javacs/example/GotoEnum.java";
-        
+
         assertThat(doGoto(file, 5, 30), not(empty()));
         assertThat(doGoto(file, 5, 35), not(empty()));
     }
@@ -176,5 +177,4 @@ public class GotoTest {
             throw new RuntimeException(e);
         }
     }
-
 }

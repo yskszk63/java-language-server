@@ -1,23 +1,12 @@
 package org.javacs;
 
-import com.sun.source.tree.CompilationUnitTree;
-import com.sun.source.tree.IdentifierTree;
-import com.sun.source.tree.LineMap;
-import com.sun.source.tree.Tree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
-import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.Trees;
-import org.eclipse.lsp4j.Location;
-import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.Range;
-
-import javax.lang.model.element.Element;
-import javax.tools.Diagnostic;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
+import javax.lang.model.element.Element;
+import org.eclipse.lsp4j.Location;
 
 public class References {
 
@@ -28,8 +17,8 @@ public class References {
     }
 
     public static Optional<Location> gotoDefinition(FocusedResult compiled, SymbolIndex index) {
-        return compiled.cursor
-                .flatMap(cursor -> new References(compiled.task, index).doGotoDefinition(cursor));
+        return compiled.cursor.flatMap(
+                cursor -> new References(compiled.task, index).doGotoDefinition(cursor));
     }
 
     private final JavacTask task;
@@ -44,17 +33,14 @@ public class References {
         Trees trees = Trees.instance(task);
         Element symbol = trees.getElement(cursor);
 
-        if (symbol == null)
-            return Stream.empty();
-        else
-            return index.references(symbol);
+        if (symbol == null) return Stream.empty();
+        else return index.references(symbol);
     }
 
     private Optional<Location> doGotoDefinition(TreePath cursor) {
         CursorContext context = CursorContext.from(cursor);
 
-        if (context == CursorContext.NewClass)
-            cursor = context.find(cursor);
+        if (context == CursorContext.NewClass) cursor = context.find(cursor);
 
         Trees trees = Trees.instance(task);
         Element symbol = trees.getElement(cursor);

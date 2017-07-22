@@ -3,14 +3,12 @@ package org.javacs;
 import com.sun.tools.javac.api.ClientCodeWrapper;
 import com.sun.tools.javac.util.DiagnosticSource;
 import com.sun.tools.javac.util.JCDiagnostic;
+import java.util.Optional;
+import javax.tools.JavaFileObject;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
-
-import javax.tools.JavaFileObject;
-import java.util.Optional;
-import sun.rmi.transport.Endpoint;
 
 class Lints {
 
@@ -26,8 +24,7 @@ class Lints {
             diagnostic.setMessage(error.getMessage(null));
 
             return Optional.of(diagnostic);
-        }
-        else return Optional.empty();
+        } else return Optional.empty();
     }
 
     private static DiagnosticSeverity severity(javax.tools.Diagnostic.Kind kind) {
@@ -52,19 +49,14 @@ class Lints {
         DiagnosticSource source = diagnostic.getDiagnosticSource();
         long start = error.getStartPosition(), end = error.getEndPosition();
 
-        if (end == start)
-            end = start + 1;
+        if (end == start) end = start + 1;
 
         return new Range(
-            new Position(
-                    source.getLineNumber((int) start) - 1,
-                    source.getColumnNumber((int) start, true) - 1
-            ),
-            new Position(
-                    source.getLineNumber((int) end) - 1,
-                    source.getColumnNumber((int) end, true) - 1
-            )
-        );
+                new Position(
+                        source.getLineNumber((int) start) - 1,
+                        source.getColumnNumber((int) start, true) - 1),
+                new Position(
+                        source.getLineNumber((int) end) - 1,
+                        source.getColumnNumber((int) end, true) - 1));
     }
-
 }

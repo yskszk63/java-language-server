@@ -18,9 +18,9 @@ public class JavacConfig {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         JavacConfig that = (JavacConfig) o;
-        return Objects.equals(classPath, that.classPath) &&
-               Objects.equals(workspaceClassPath, that.workspaceClassPath) &&
-               Objects.equals(docPath, that.docPath);
+        return Objects.equals(classPath, that.classPath)
+                && Objects.equals(workspaceClassPath, that.workspaceClassPath)
+                && Objects.equals(docPath, that.docPath);
     }
 
     @Override

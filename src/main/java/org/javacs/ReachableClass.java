@@ -4,9 +4,13 @@ class ReachableClass {
     final String packageName, className;
     final boolean publicClass, publicConstructor, packagePrivateConstructor, hasTypeParameters;
 
-    ReachableClass(String packageName, String className, 
-                   boolean publicClass, boolean publicConstructor, boolean packagePrivateConstructor, 
-                   boolean hasTypeParameters) {
+    ReachableClass(
+            String packageName,
+            String className,
+            boolean publicClass,
+            boolean publicConstructor,
+            boolean packagePrivateConstructor,
+            boolean hasTypeParameters) {
         this.packageName = packageName;
         this.className = className;
         this.publicClass = publicClass;

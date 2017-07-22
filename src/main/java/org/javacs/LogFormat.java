@@ -32,7 +32,8 @@ class LogFormat extends Formatter {
             pw.close();
             throwable = sw.toString();
         }
-        return String.format(format,
+        return String.format(
+                format,
                 dat,
                 source,
                 record.getLoggerName(),

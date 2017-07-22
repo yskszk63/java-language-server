@@ -3,30 +3,25 @@ package org.javacs;
 import com.sun.javadoc.MethodDoc;
 import com.sun.javadoc.ProgramElementDoc;
 import com.sun.tools.javac.code.Type;
-import org.eclipse.lsp4j.Hover;
-import org.eclipse.lsp4j.jsonrpc.messages.Either;
-
-import javax.lang.model.element.*;
-import javax.lang.model.type.TypeMirror;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
+import javax.lang.model.element.*;
+import javax.lang.model.type.TypeMirror;
+import org.eclipse.lsp4j.Hover;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 public class Hovers {
-    
-    public static Hover hoverText(Element el, Javadocs docs) {
-        Optional<String> doc = docs.doc(el)
-            .map(Hovers::commentText)
-            .map(Javadocs::htmlToMarkdown);
-        String sig = signature(el);
-        String result = doc.map(text -> String.format("```java\n%s\n```\n%s", sig, text)).orElse(sig);
 
-        return new Hover(
-                Collections.singletonList(Either.forLeft(result)),
-                null
-        );
+    public static Hover hoverText(Element el, Javadocs docs) {
+        Optional<String> doc = docs.doc(el).map(Hovers::commentText).map(Javadocs::htmlToMarkdown);
+        String sig = signature(el);
+        String result =
+                doc.map(text -> String.format("```java\n%s\n```\n%s", sig, text)).orElse(sig);
+
+        return new Hover(Collections.singletonList(Either.forLeft(result)), null);
     }
 
     private static String commentText(ProgramElementDoc doc) {
@@ -34,8 +29,7 @@ public class Hovers {
             MethodDoc method = (MethodDoc) doc;
 
             return Javadocs.commentText(method).orElse("");
-        }
-        else return doc.commentText();
+        } else return doc.commentText();
     }
 
     private static String signature(Element el) {
@@ -48,24 +42,29 @@ public class Hovers {
         if (el instanceof ExecutableElement) {
             ExecutableElement method = (ExecutableElement) el;
 
-            return method.getReturnType() + " " + method.getSimpleName() + "(" + params(method.getParameters()) + ")";
-        }        
-        else if (el instanceof TypeElement) {
+            return method.getReturnType()
+                    + " "
+                    + method.getSimpleName()
+                    + "("
+                    + params(method.getParameters())
+                    + ")";
+        } else if (el instanceof TypeElement) {
             TypeElement type = (TypeElement) el;
 
             return type.getQualifiedName().toString();
-        }
-        else return el.asType().toString();
+        } else return el.asType().toString();
     }
 
     private static String params(List<? extends VariableElement> params) {
-        return params.stream()
-            .map(p -> p.asType().toString())
-            .collect(Collectors.joining(", "));
+        return params.stream().map(p -> p.asType().toString()).collect(Collectors.joining(", "));
     }
-    
-    public static String methodSignature(ExecutableElement e, boolean showReturn, boolean showMethodName) {
-        String name = e.getKind() == ElementKind.CONSTRUCTOR ? constructorName(e) : e.getSimpleName().toString();
+
+    public static String methodSignature(
+            ExecutableElement e, boolean showReturn, boolean showMethodName) {
+        String name =
+                e.getKind() == ElementKind.CONSTRUCTOR
+                        ? constructorName(e)
+                        : e.getSimpleName().toString();
         boolean varargs = e.isVarArgs();
         StringJoiner params = new StringJoiner(", ");
 
@@ -78,20 +77,17 @@ public class Hovers {
         }
 
         String signature = "";
-        
-        if (showReturn)
-            signature += ShortTypePrinter.print(e.getReturnType()) + " ";
 
-        if (showMethodName)
-            signature += name;
+        if (showReturn) signature += ShortTypePrinter.print(e.getReturnType()) + " ";
+
+        if (showMethodName) signature += name;
 
         signature += "(" + params + ")";
 
         if (!e.getThrownTypes().isEmpty()) {
             StringJoiner thrown = new StringJoiner(", ");
 
-            for (TypeMirror t : e.getThrownTypes())
-                thrown.add(ShortTypePrinter.print(t));
+            for (TypeMirror t : e.getThrownTypes()) thrown.add(ShortTypePrinter.print(t));
 
             signature += " throws " + thrown;
         }
@@ -111,11 +107,9 @@ public class Hovers {
         String acc = shortTypeName(type);
         String name = p.getSimpleName().toString();
 
-        if (varargs)
-            acc += "...";
+        if (varargs) acc += "...";
 
-        if (!name.matches("arg\\d+"))
-            acc += " " + name;
+        if (!name.matches("arg\\d+")) acc += " " + name;
 
         return acc;
     }

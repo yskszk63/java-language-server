@@ -14,12 +14,9 @@ class Artifact {
     static Artifact parse(String id) {
         String[] parts = id.split(":");
 
-        if (parts.length == 3)
-            return new Artifact(parts[0], parts[1], parts[2]);
-        else if (parts.length == 5)
-            return new Artifact(parts[0], parts[1], parts[3]);
-        else
-            throw new IllegalArgumentException(id + " is not properly formatted artifact");
+        if (parts.length == 3) return new Artifact(parts[0], parts[1], parts[2]);
+        else if (parts.length == 5) return new Artifact(parts[0], parts[1], parts[3]);
+        else throw new IllegalArgumentException(id + " is not properly formatted artifact");
     }
 
     @Override
@@ -27,9 +24,9 @@ class Artifact {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Artifact artifact = (Artifact) o;
-        return Objects.equals(groupId, artifact.groupId) &&
-                Objects.equals(artifactId, artifact.artifactId) &&
-                Objects.equals(version, artifact.version);
+        return Objects.equals(groupId, artifact.groupId)
+                && Objects.equals(artifactId, artifact.artifactId)
+                && Objects.equals(version, artifact.version);
     }
 
     @Override

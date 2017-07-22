@@ -1,15 +1,14 @@
 package org.javacs;
 
-import org.eclipse.lsp4j.*;
-import org.junit.Test;
+import static org.hamcrest.Matchers.*;
+import static org.junit.Assert.*;
 
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
-
-import static org.junit.Assert.*;
-import static org.hamcrest.Matchers.*;
+import org.eclipse.lsp4j.*;
+import org.junit.Test;
 
 public class FindReferencesTest {
     private static final Logger LOG = Logger.getLogger("main");

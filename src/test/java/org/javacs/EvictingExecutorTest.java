@@ -1,15 +1,14 @@
 package org.javacs;
 
-import java.util.concurrent.ForkJoinPool;
-import org.junit.Test;
+import static org.hamcrest.Matchers.equalTo;
+import static org.junit.Assert.assertThat;
 
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import static org.hamcrest.Matchers.equalTo;
-import static org.junit.Assert.assertThat;
+import org.junit.Test;
 
 public class EvictingExecutorTest {
     @Test
@@ -17,24 +16,30 @@ public class EvictingExecutorTest {
         EvictingExecutor exec = new EvictingExecutor(ForkJoinPool.commonPool());
         int[] tasks = {0, 0, 0};
 
-        Future<?> one = exec.submit(() -> {
-            sleep(10);
-            tasks[0]++;
-        });
+        Future<?> one =
+                exec.submit(
+                        () -> {
+                            sleep(10);
+                            tasks[0]++;
+                        });
 
         sleep(1); // gives one a chance to start
 
-        Future<?> two = exec.submit(() -> {
-            sleep(10);
-            tasks[1]++;
-        });
+        Future<?> two =
+                exec.submit(
+                        () -> {
+                            sleep(10);
+                            tasks[1]++;
+                        });
 
         sleep(1); // Not long enough for one to finish
 
-        Future<?> three = exec.submit(() -> {
-            sleep(10);
-            tasks[2]++;
-        });
+        Future<?> three =
+                exec.submit(
+                        () -> {
+                            sleep(10);
+                            tasks[2]++;
+                        });
 
         one.get(1, TimeUnit.SECONDS);
         two.get(1, TimeUnit.SECONDS);

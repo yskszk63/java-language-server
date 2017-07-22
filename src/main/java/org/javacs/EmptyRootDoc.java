@@ -5,7 +5,7 @@ import com.sun.javadoc.*;
 class EmptyRootDoc implements RootDoc {
     static final EmptyRootDoc INSTANCE = new EmptyRootDoc();
 
-    private EmptyRootDoc() { }
+    private EmptyRootDoc() {}
 
     @Override
     public String[][] options() {
@@ -73,9 +73,7 @@ class EmptyRootDoc implements RootDoc {
     }
 
     @Override
-    public void setRawCommentText(String rawDocumentation) {
-
-    }
+    public void setRawCommentText(String rawDocumentation) {}
 
     @Override
     public String name() {
@@ -158,32 +156,20 @@ class EmptyRootDoc implements RootDoc {
     }
 
     @Override
-    public void printError(String msg) {
-
-    }
+    public void printError(String msg) {}
 
     @Override
-    public void printError(SourcePosition pos, String msg) {
-
-    }
+    public void printError(SourcePosition pos, String msg) {}
 
     @Override
-    public void printWarning(String msg) {
-
-    }
+    public void printWarning(String msg) {}
 
     @Override
-    public void printWarning(SourcePosition pos, String msg) {
-
-    }
+    public void printWarning(SourcePosition pos, String msg) {}
 
     @Override
-    public void printNotice(String msg) {
-
-    }
+    public void printNotice(String msg) {}
 
     @Override
-    public void printNotice(SourcePosition pos, String msg) {
-
-    }
+    public void printNotice(SourcePosition pos, String msg) {}
 }

@@ -1,10 +1,5 @@
 package org.javacs;
 
-import javax.tools.DiagnosticCollector;
-import javax.tools.JavaFileObject;
-import org.junit.Ignore;
-import org.junit.Test;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -13,6 +8,10 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.logging.Logger;
+import javax.tools.DiagnosticCollector;
+import javax.tools.JavaFileObject;
+import org.junit.Ignore;
+import org.junit.Test;
 
 @Ignore
 public class CompilerProfiling {
@@ -31,11 +30,12 @@ public class CompilerProfiling {
 
     private Duration compileLargeFile(URI file) {
         long start = System.nanoTime();
-        JavacHolder compiler = JavacHolder.create(
-                Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
-                Collections.emptySet()
-        );
-        DiagnosticCollector<JavaFileObject> result = compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
+        JavacHolder compiler =
+                JavacHolder.create(
+                        Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
+                        Collections.emptySet());
+        DiagnosticCollector<JavaFileObject> result =
+                compiler.compileBatch(Collections.singletonMap(file, Optional.empty()));
         long finish = System.nanoTime();
 
         return Duration.ofNanos(finish - start);

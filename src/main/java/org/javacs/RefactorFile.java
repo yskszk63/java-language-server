@@ -14,16 +14,15 @@ import com.sun.tools.javac.tree.Pretty;
 import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Names;
-import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.Range;
-import org.eclipse.lsp4j.TextEdit;
-
-import javax.tools.JavaFileObject;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.util.*;
 import java.util.function.Supplier;
+import javax.tools.JavaFileObject;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.TextEdit;
 
 class RefactorFile {
     private final JavacTask task;
@@ -41,18 +40,20 @@ class RefactorFile {
         Objects.requireNonNull(packageName, "Package name is null");
         Objects.requireNonNull(className, "Class name is null");
 
-        if (alreadyImported(source, packageName, className))
-            return Collections.emptyList();
+        if (alreadyImported(source, packageName, className)) return Collections.emptyList();
 
         return Collections.singletonList(insertSomehow(packageName, className));
     }
 
     private TextEdit insertSomehow(String packageName, String className) {
-        Supplier<TextEdit> 
-          top = () -> insertAtTop(packageName, className),
-          afterPackage = () -> insertAfterPackage(packageName, className).orElseGet(top),
-          afterImports = () -> insertAfterImports(packageName, className).orElseGet(afterPackage),
-          alphabetical = () -> insertInAlphabeticalOrder(packageName, className).orElseGet(afterImports);
+        Supplier<TextEdit> top = () -> insertAtTop(packageName, className),
+                afterPackage = () -> insertAfterPackage(packageName, className).orElseGet(top),
+                afterImports =
+                        () -> insertAfterImports(packageName, className).orElseGet(afterPackage),
+                alphabetical =
+                        () ->
+                                insertInAlphabeticalOrder(packageName, className)
+                                        .orElseGet(afterImports);
 
         return alphabetical.get();
     }
@@ -60,11 +61,12 @@ class RefactorFile {
     private Optional<TextEdit> insertInAlphabeticalOrder(String packageName, String className) {
         String insertLine = String.format("import %s.%s;\n", packageName, className);
 
-        return source.getImports().stream()
-            .filter(i -> qualifiedName(i).compareTo(packageName + "." + className) > 0)
-            .map(this::startPosition)
-            .findFirst()
-            .map(at -> new TextEdit(new Range(at, at), insertLine));
+        return source.getImports()
+                .stream()
+                .filter(i -> qualifiedName(i).compareTo(packageName + "." + className) > 0)
+                .map(this::startPosition)
+                .findFirst()
+                .map(at -> new TextEdit(new Range(at, at), insertLine));
     }
 
     private String qualifiedName(ImportTree tree) {
@@ -74,15 +76,13 @@ class RefactorFile {
     private Optional<TextEdit> insertAfterImports(String packageName, String className) {
         String insertLine = String.format("\nimport %s.%s;", packageName, className);
 
-        return endOfImports()
-            .map(at -> new TextEdit(new Range(at, at), insertLine));
+        return endOfImports().map(at -> new TextEdit(new Range(at, at), insertLine));
     }
 
     private Optional<TextEdit> insertAfterPackage(String packageName, String className) {
         String insertLine = String.format("\n\nimport %s.%s;", packageName, className);
 
-        return endOfPackage()
-            .map(at -> new TextEdit(new Range(at, at), insertLine));
+        return endOfPackage().map(at -> new TextEdit(new Range(at, at), insertLine));
     }
 
     private TextEdit insertAtTop(String packageName, String className) {
@@ -92,14 +92,11 @@ class RefactorFile {
     }
 
     private Optional<Position> endOfImports() {
-        return source.getImports().stream()
-                .max(this::comparePosition)
-                .map(this::endPosition);
+        return source.getImports().stream().max(this::comparePosition).map(this::endPosition);
     }
 
     private Optional<Position> endOfPackage() {
-        return Optional.ofNullable(source.getPackageName())
-                .map(this::endPosition);
+        return Optional.ofNullable(source.getPackageName()).map(this::endPosition);
     }
 
     private Position startPosition(Tree tree) {
@@ -110,9 +107,7 @@ class RefactorFile {
         return findOffset(pos.getEndPosition(source, tree), true);
     }
 
-    /**
-     * Convert on offset-based position to a {@link Position}
-     */
+    /** Convert on offset-based position to a {@link Position} */
     private Position findOffset(long find, boolean endOfLine) {
         JavaFileObject file = source.getSourceFile();
 
@@ -124,8 +119,7 @@ class RefactorFile {
             while (offset < find) {
                 int next = in.read();
 
-                if (next < 0)
-                    break;
+                if (next < 0) break;
                 else {
                     offset++;
                     character++;
@@ -141,8 +135,7 @@ class RefactorFile {
                 while (true) {
                     int next = in.read();
 
-                    if (next < 0 || next == '\n')
-                        break;
+                    if (next < 0 || next == '\n') break;
                     else {
                         offset++;
                         character++;
@@ -156,31 +149,31 @@ class RefactorFile {
         }
     }
 
-    private static boolean alreadyImported(CompilationUnitTree source, String packageName, String className) {
-        return source.getImports()
-                    .stream()
-                    .anyMatch(i -> importEquals(i, packageName, className));
+    private static boolean alreadyImported(
+            CompilationUnitTree source, String packageName, String className) {
+        return source.getImports().stream().anyMatch(i -> importEquals(i, packageName, className));
     }
 
-    private static String organizeImports(CompilationUnitTree source, String packageName, String className) {
+    private static String organizeImports(
+            CompilationUnitTree source, String packageName, String className) {
         Context context = new Context();
         JavacFileManager fileManager = new JavacFileManager(context, true, null);
         Names names = Names.instance(context);
         TreeMaker factory = TreeMaker.instance(context);
         List<ImportTree> imports = Lists.newArrayList(source.getImports());
 
-        imports.add(factory.Import(
-                factory.Select(
-                        factory.Ident(names.fromString(packageName)),
-                        names.fromString(className)),
-                false
-        ));
+        imports.add(
+                factory.Import(
+                        factory.Select(
+                                factory.Ident(names.fromString(packageName)),
+                                names.fromString(className)),
+                        false));
 
-        JCTree.JCCompilationUnit after = factory.TopLevel(
-                list(JCTree.JCAnnotation.class, source.getPackageAnnotations()),
-                (JCTree.JCExpression) source.getPackageName(),
-                list(JCTree.class, imports)
-        );
+        JCTree.JCCompilationUnit after =
+                factory.TopLevel(
+                        list(JCTree.JCAnnotation.class, source.getPackageAnnotations()),
+                        (JCTree.JCExpression) source.getPackageName(),
+                        list(JCTree.class, imports));
         StringWriter buffer = new StringWriter();
         Pretty prettyPrint = new Pretty(buffer, true);
 
@@ -213,6 +206,7 @@ class RefactorFile {
     private static boolean importEquals(ImportTree i, String packageName, String className) {
         MemberSelectTree access = (MemberSelectTree) i.getQualifiedIdentifier();
 
-        return access.getExpression().toString().equals(packageName) && access.getIdentifier().toString().equals(className);
+        return access.getExpression().toString().equals(packageName)
+                && access.getIdentifier().toString().equals(className);
     }
 }

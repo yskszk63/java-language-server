@@ -1,48 +1,27 @@
 package org.javacs;
 
+import static org.javacs.Main.JSON;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
-import com.sun.source.util.TreePath;
-import com.sun.source.util.Trees;
-import java.util.regex.Pattern;
-import org.eclipse.lsp4j.*;
-import org.eclipse.lsp4j.jsonrpc.messages.Either;
-import org.eclipse.lsp4j.services.LanguageClient;
-import org.eclipse.lsp4j.services.LanguageServer;
-import org.eclipse.lsp4j.services.TextDocumentService;
-import org.eclipse.lsp4j.services.WorkspaceService;
-import org.w3c.dom.Document;
-import org.xml.sax.SAXException;
-
-import javax.lang.model.element.Element;
-import javax.tools.JavaFileObject;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.function.Function;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
-import java.io.*;
-import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.javacs.Main.JSON;
+import org.eclipse.lsp4j.*;
+import org.w3c.dom.Document;
+import org.xml.sax.SAXException;
 
 class LegacyConfig {
     private final Path workspaceRoot;
@@ -52,30 +31,36 @@ class LegacyConfig {
     }
 
     Optional<JavacConfig> readJavaConfig(Path dir) {
-        Function<JavaConfigJson, JavacConfig> parseJavaConfigJson = json -> {
-            Set<Path> classPath = readClassPath(dir, json.classPath, json.classPathFile),
-                      docPath = readClassPath(dir, json.docPath, json.docPathFile),
-                      sourcePath = json.sourcePath.stream().map(dir::resolve).collect(Collectors.toSet());
-            Path outputDirectory = dir.resolve(json.outputDirectory);
+        Function<JavaConfigJson, JavacConfig> parseJavaConfigJson =
+                json -> {
+                    Set<Path> classPath = readClassPath(dir, json.classPath, json.classPathFile),
+                            docPath = readClassPath(dir, json.docPath, json.docPathFile),
+                            sourcePath =
+                                    json.sourcePath
+                                            .stream()
+                                            .map(dir::resolve)
+                                            .collect(Collectors.toSet());
+                    Path outputDirectory = dir.resolve(json.outputDirectory);
 
-            return new JavacConfig(classPath, Collections.singleton(outputDirectory), docPath);
-        };
+                    return new JavacConfig(
+                            classPath, Collections.singleton(outputDirectory), docPath);
+                };
         if (Files.exists(dir.resolve("javaconfig.json"))) {
-            return readJavaConfigJson(dir.resolve("javaconfig.json"))
-                .map(parseJavaConfigJson);
-        }
-        else return Optional.empty();
+            return readJavaConfigJson(dir.resolve("javaconfig.json")).map(parseJavaConfigJson);
+        } else return Optional.empty();
     }
 
-    private Set<Path> readClassPath(Path dir, Set<Path> jsonClassPath, Optional<Path> jsonClassPathFile) {
+    private Set<Path> readClassPath(
+            Path dir, Set<Path> jsonClassPath, Optional<Path> jsonClassPathFile) {
         Set<Path> classPath = new HashSet<>();
 
-        jsonClassPathFile.ifPresent(classPathFile -> {
-            Path classPathFilePath = dir.resolve(classPathFile);
-            Set<Path> paths = readClassPathFile(classPathFilePath);
+        jsonClassPathFile.ifPresent(
+                classPathFile -> {
+                    Path classPathFilePath = dir.resolve(classPathFile);
+                    Set<Path> paths = readClassPathFile(classPathFilePath);
 
-            classPath.addAll(paths);
-        });
+                    classPath.addAll(paths);
+                });
 
         jsonClassPath.forEach(entry -> classPath.add(dir.resolve(entry)));
 
@@ -96,16 +81,12 @@ class LegacyConfig {
         Set<Path> docPath = buildClassPath(originalPom, testScope, true);
 
         // Use maven output directory so incremental compilation uses maven-generated .class files
-        Set<Path> workspaceClassPath = ImmutableSet.of(
-            Paths.get("target/test-classes").toAbsolutePath(),
-            Paths.get("target/classes").toAbsolutePath()
-        );
+        Set<Path> workspaceClassPath =
+                ImmutableSet.of(
+                        Paths.get("target/test-classes").toAbsolutePath(),
+                        Paths.get("target/classes").toAbsolutePath());
 
-        JavacConfig config = new JavacConfig(
-            classPath, 
-            workspaceClassPath,
-            docPath
-        );
+        JavacConfig config = new JavacConfig(classPath, workspaceClassPath, docPath);
 
         LOG.info("Inferred from " + originalPom + ":");
         LOG.info("\tsourcePath: " + Joiner.on(" ").join(sourcePath));
@@ -124,16 +105,14 @@ class LegacyConfig {
 
             LOG.info(String.format("Emit effective pom for %s to %s", pomXml, effectivePom));
 
-            String cmd = String.format(
-                "%s help:effective-pom -Doutput=%s",
-                InferConfig.getMvnCommand(),
-                effectivePom
-            );
+            String cmd =
+                    String.format(
+                            "%s help:effective-pom -Doutput=%s",
+                            InferConfig.getMvnCommand(), effectivePom);
             File workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
             int result = Runtime.getRuntime().exec(cmd, null, workingDirectory).waitFor();
 
-            if (result != 0)
-                throw new RuntimeException("`" + cmd + "` returned " + result);
+            if (result != 0) throw new RuntimeException("`" + cmd + "` returned " + result);
 
             return effectivePom;
         } catch (IOException | InterruptedException e) {
@@ -142,7 +121,7 @@ class LegacyConfig {
     }
 
     // TODO For sourceJars = true:
-    // use mvn dependency:list to list the dependencies quickly, 
+    // use mvn dependency:list to list the dependencies quickly,
     // then fetch each one individually using mvn dependency:build-classpath -DincludeGroupIds=? -DincludeArtifactIds=? ...
     private static Set<Path> buildClassPath(Path pomXml, boolean testScope, boolean sourceJars) {
         try {
@@ -150,26 +129,24 @@ class LegacyConfig {
 
             // Tell maven to output classpath to a temporary file
             // TODO if pom.xml already specifies outputFile, use that location
-            Path classPathTxt = Files.createTempFile(sourceJars ? "sourcepath" : "classpath", ".txt");
+            Path classPathTxt =
+                    Files.createTempFile(sourceJars ? "sourcepath" : "classpath", ".txt");
 
-            LOG.info(String.format(
-                "Emit %s to %s",
-                sourceJars ? "docPath" : "classpath",
-                classPathTxt
-            ));
+            LOG.info(
+                    String.format(
+                            "Emit %s to %s", sourceJars ? "docPath" : "classpath", classPathTxt));
 
-            String cmd = String.format(
-                "%s dependency:build-classpath -DincludeScope=%s -Dmdep.outputFile=%s %s",
-                InferConfig.getMvnCommand(),
-                testScope ? "test" : "compile",
-                classPathTxt,
-                sourceJars ? "-Dclassifier=sources" : ""
-            );
+            String cmd =
+                    String.format(
+                            "%s dependency:build-classpath -DincludeScope=%s -Dmdep.outputFile=%s %s",
+                            InferConfig.getMvnCommand(),
+                            testScope ? "test" : "compile",
+                            classPathTxt,
+                            sourceJars ? "-Dclassifier=sources" : "");
             File workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
             int result = Runtime.getRuntime().exec(cmd, null, workingDirectory).waitFor();
 
-            if (result != 0)
-                throw new RuntimeException("`" + cmd + "` returned " + result);
+            if (result != 0) throw new RuntimeException("`" + cmd + "` returned " + result);
 
             Set<Path> found = readClassPathFile(classPathTxt);
 
@@ -182,14 +159,16 @@ class LegacyConfig {
     }
 
     private static Set<Path> sourceDirectories(Path pomXml, boolean testScope) {
-        return testScope ? 
-            ImmutableSet.of(onlySourceDirectories(pomXml, true), onlySourceDirectories(pomXml, false)) :
-            ImmutableSet.of(onlySourceDirectories(pomXml, false));
+        return testScope
+                ? ImmutableSet.of(
+                        onlySourceDirectories(pomXml, true), onlySourceDirectories(pomXml, false))
+                : ImmutableSet.of(onlySourceDirectories(pomXml, false));
     }
 
     private static Path onlySourceDirectories(Path pomXml, boolean testScope) {
         String defaultSourceDir = testScope ? "src/test/java" : "src/main/java";
-        String xPath = testScope ? "/project/build/testSourceDirectory" : "/project/build/sourceDirectory";
+        String xPath =
+                testScope ? "/project/build/testSourceDirectory" : "/project/build/sourceDirectory";
         Document doc = parsePomXml(pomXml);
 
         try {
@@ -199,12 +178,11 @@ class LegacyConfig {
                 LOG.info("Use default source directory " + defaultSourceDir);
 
                 sourceDir = defaultSourceDir;
-            }
-            else LOG.info("Use source directory from pom.xml " + sourceDir);
-            
+            } else LOG.info("Use source directory from pom.xml " + sourceDir);
+
             return pomXml.resolveSibling(sourceDir).toAbsolutePath();
         } catch (XPathExpressionException e) {
-                throw new RuntimeException(e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -224,7 +202,7 @@ class LegacyConfig {
             JsonNode json = JSON.readValue(configFile.toFile(), JsonNode.class);
 
             if (json.isArray())
-                return JSON.convertValue(json, new TypeReference<List<JavaConfigJson>>() { });
+                return JSON.convertValue(json, new TypeReference<List<JavaConfigJson>>() {});
             else {
                 JavaConfigJson one = JSON.convertValue(json, JavaConfigJson.class);
 
@@ -243,14 +221,15 @@ class LegacyConfig {
     private static Set<Path> readClassPathFile(Path classPathFilePath) {
         try {
             InputStream in = Files.newInputStream(classPathFilePath);
-            String text = new BufferedReader(new InputStreamReader(in))
-                    .lines()
-                    .collect(Collectors.joining());
+            String text =
+                    new BufferedReader(new InputStreamReader(in))
+                            .lines()
+                            .collect(Collectors.joining());
             Path dir = classPathFilePath.getParent();
 
             return Arrays.stream(text.split(File.pathSeparator))
-                         .map(dir::resolve)
-                         .collect(Collectors.toSet());
+                    .map(dir::resolve)
+                    .collect(Collectors.toSet());
         } catch (IOException e) {
             MessageParams message = new MessageParams();
 

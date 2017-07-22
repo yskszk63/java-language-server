@@ -2,12 +2,12 @@ package org.javacs;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
-
 import java.util.Optional;
 
 class FindCursor {
-    
-    public static Optional<TreePath> find(JavacTask task, CompilationUnitTree source, int line, int column) {
+
+    public static Optional<TreePath> find(
+            JavacTask task, CompilationUnitTree source, int line, int column) {
         SourcePositions sourcePositions = Trees.instance(task).getSourcePositions();
         long offset = source.getLineMap().getPosition(line, column);
 
@@ -18,7 +18,7 @@ class FindCursor {
                 found = of;
             }
         }
-        
+
         class Search extends TreePathScanner<Void, Void> {
             @Override
             public Void scan(Tree leaf, Void nothing) {
@@ -26,8 +26,7 @@ class FindCursor {
                     super.scan(leaf, nothing);
 
                     throw new Finished(new TreePath(getCurrentPath(), leaf));
-                }
-                else return null;
+                } else return null;
             }
 
             boolean containsCursor(Tree leaf) {

@@ -1,33 +1,38 @@
 package org.javacs;
 
 import com.google.common.reflect.ClassPath;
-import com.google.common.reflect.ClassPath.ClassInfo;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
-import java.lang.reflect.Constructor;
-import org.eclipse.lsp4j.CompletionItem;
-import org.eclipse.lsp4j.CompletionItemKind;
-import org.eclipse.lsp4j.TextEdit;
-
-import javax.lang.model.element.*;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.util.Elements;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import javax.lang.model.element.*;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.util.Elements;
+import org.eclipse.lsp4j.CompletionItem;
+import org.eclipse.lsp4j.CompletionItemKind;
+import org.eclipse.lsp4j.TextEdit;
 
 class Completions {
 
     static Stream<CompletionItem> at(FocusedResult compiled, SymbolIndex index, Javadocs docs) {
         return compiled.cursor
-                .map(path -> new Completions(compiled.task, compiled.classPath, index, docs, path).get())
+                .map(
+                        path ->
+                                new Completions(
+                                                compiled.task,
+                                                compiled.classPath,
+                                                index,
+                                                docs,
+                                                path)
+                                        .get())
                 .orElseGet(Stream::empty);
     }
 
@@ -41,7 +46,12 @@ class Completions {
     private final CompilationUnitTree compilationUnit;
     private final TreePath path;
 
-    private Completions(JavacTask task, ClassPathIndex classPath, SymbolIndex sourcePath, Javadocs docs, TreePath path) {
+    private Completions(
+            JavacTask task,
+            ClassPathIndex classPath,
+            SymbolIndex sourcePath,
+            Javadocs docs,
+            TreePath path) {
         this.task = task;
         this.trees = Trees.instance(task);
         this.elements = task.getElements();
@@ -63,103 +73,126 @@ class Completions {
             MemberSelectTree select = (MemberSelectTree) leaf;
             TreePath expressionPath = new TreePath(path.getParentPath(), select.getExpression());
 
-            return completeMembers(expressionPath, partialIdentifier(select.getIdentifier()), scope, context);
-        }
-        else if (leaf instanceof MemberReferenceTree) {
+            return completeMembers(
+                    expressionPath, partialIdentifier(select.getIdentifier()), scope, context);
+        } else if (leaf instanceof MemberReferenceTree) {
             MemberReferenceTree select = (MemberReferenceTree) leaf;
-            TreePath expressionPath = new TreePath(path.getParentPath(), select.getQualifierExpression());
+            TreePath expressionPath =
+                    new TreePath(path.getParentPath(), select.getQualifierExpression());
 
-            return completeMembers(expressionPath, partialIdentifier(select.getName()), scope, context);
-        }
-        else if (leaf instanceof IdentifierTree) {
+            return completeMembers(
+                    expressionPath, partialIdentifier(select.getName()), scope, context);
+        } else if (leaf instanceof IdentifierTree) {
             IdentifierTree id = (IdentifierTree) leaf;
 
             return completeIdentifier(partialIdentifier(id.getName()), scope, context);
-        }
-        else return Stream.empty();
+        } else return Stream.empty();
     }
 
     private String partialIdentifier(Name name) {
-        if (name.contentEquals("<error>"))
-            return "";
-        else
-            return name.toString();
+        if (name.contentEquals("<error>")) return "";
+        else return name.toString();
     }
 
-    /**
-     * Suggest all available identifiers
-     */
-    private Stream<CompletionItem> completeIdentifier(String partialIdentifier, Scope from, CursorContext context) {
+    /** Suggest all available identifiers */
+    private Stream<CompletionItem> completeIdentifier(
+            String partialIdentifier, Scope from, CursorContext context) {
         switch (context) {
             case Import:
-                return packageMembers("", partialIdentifier)
-                        .flatMap(this::completionItem);
-            case NewClass: {
-                Stream<CompletionItem> alreadyImported = alreadyImportedCompletions(partialIdentifier, from)
-                        .flatMap(this::explodeConstructors)
-                        .filter(init -> trees.isAccessible(from, init, (DeclaredType) init.getEnclosingElement().asType()))
-                        .flatMap(this::completionItem);
-                Stream<CompletionItem> notYetImported = notImportedConstructors(partialIdentifier, from);
+                return packageMembers("", partialIdentifier).flatMap(this::completionItem);
+            case NewClass:
+                {
+                    Stream<CompletionItem> alreadyImported =
+                            alreadyImportedCompletions(partialIdentifier, from)
+                                    .flatMap(this::explodeConstructors)
+                                    .filter(
+                                            init ->
+                                                    trees.isAccessible(
+                                                            from,
+                                                            init,
+                                                            (DeclaredType)
+                                                                    init.getEnclosingElement()
+                                                                            .asType()))
+                                    .flatMap(this::completionItem);
+                    Stream<CompletionItem> notYetImported =
+                            notImportedConstructors(partialIdentifier, from);
 
-                return Stream.concat(alreadyImported, notYetImported);
-            }
-            default: {
-                Predicate<Element> accessible = e -> {
-                    if (e == null)
-                        return false;
-                        // Class names
-                    else if (e instanceof TypeElement)
-                        return trees.isAccessible(from, (TypeElement) e);
-                    else if (e.getEnclosingElement() == null)
-                        return false;
-                        // Members of other classes
-                    else if (e.getEnclosingElement() instanceof DeclaredType)
-                        return trees.isAccessible(from, e, (DeclaredType) e.getEnclosingElement());
-                        // Local variables
-                    else
-                        return true;
-                };
-                Stream<CompletionItem> alreadyImported = alreadyImportedCompletions(partialIdentifier, from)
-                        .filter(accessible)
-                        .flatMap(this::completionItem);
-                Stream<CompletionItem> notYetImported = notImportedClasses(partialIdentifier, from);
+                    return Stream.concat(alreadyImported, notYetImported);
+                }
+            default:
+                {
+                    Predicate<Element> accessible =
+                            e -> {
+                                if (e == null) return false;
+                                // Class names
+                                else if (e instanceof TypeElement)
+                                    return trees.isAccessible(from, (TypeElement) e);
+                                else if (e.getEnclosingElement() == null) return false;
+                                // Members of other classes
+                                else if (e.getEnclosingElement() instanceof DeclaredType)
+                                    return trees.isAccessible(
+                                            from, e, (DeclaredType) e.getEnclosingElement());
+                                // Local variables
+                                else return true;
+                            };
+                    Stream<CompletionItem> alreadyImported =
+                            alreadyImportedCompletions(partialIdentifier, from)
+                                    .filter(accessible)
+                                    .flatMap(this::completionItem);
+                    Stream<CompletionItem> notYetImported =
+                            notImportedClasses(partialIdentifier, from);
 
-                return Stream.concat(alreadyImported, notYetImported);
-            }
+                    return Stream.concat(alreadyImported, notYetImported);
+                }
         }
     }
 
-    /**
-     * Suggest all accessible members of expression
-     */
-    private Stream<CompletionItem> completeMembers(TreePath expression, String partialIdentifier, Scope from, CursorContext context) {
+    /** Suggest all accessible members of expression */
+    private Stream<CompletionItem> completeMembers(
+            TreePath expression, String partialIdentifier, Scope from, CursorContext context) {
         switch (context) {
             case NewClass:
                 return allMembers(expression, partialIdentifier, from, false)
                         .flatMap(this::explodeConstructors)
-                        .filter(init -> trees.isAccessible(from, init, (DeclaredType) init.getEnclosingElement().asType()))
+                        .filter(
+                                init ->
+                                        trees.isAccessible(
+                                                from,
+                                                init,
+                                                (DeclaredType) init.getEnclosingElement().asType()))
                         .flatMap(this::completionItem);
-            case Import: {
-                return allMembers(expression, partialIdentifier, from, false)
-                        .filter(member -> !(member instanceof TypeElement) || trees.isAccessible(from, (TypeElement) member))
-                        .flatMap(this::completionItem);
-            }
-            default: {
-                DeclaredType type = (DeclaredType) task.getTypes().erasure(trees.getTypeMirror(expression));
+            case Import:
+                {
+                    return allMembers(expression, partialIdentifier, from, false)
+                            .filter(
+                                    member ->
+                                            !(member instanceof TypeElement)
+                                                    || trees.isAccessible(
+                                                            from, (TypeElement) member))
+                            .flatMap(this::completionItem);
+                }
+            default:
+                {
+                    DeclaredType type =
+                            (DeclaredType) task.getTypes().erasure(trees.getTypeMirror(expression));
 
-                return allMembers(expression, partialIdentifier, from, context == CursorContext.Reference)
-                        .filter(member -> member.getKind() != ElementKind.CONSTRUCTOR)
-                        .filter(e -> trees.isAccessible(from, e, type))
-                        .flatMap(this::completionItem);
-            }
+                    return allMembers(
+                                    expression,
+                                    partialIdentifier,
+                                    from,
+                                    context == CursorContext.Reference)
+                            .filter(member -> member.getKind() != ElementKind.CONSTRUCTOR)
+                            .filter(e -> trees.isAccessible(from, e, type))
+                            .flatMap(this::completionItem);
+                }
         }
     }
 
-    private Stream<? extends Element> allMembers(TreePath expression, String partialIdentifier, Scope from, boolean isMethodReference) {
+    private Stream<? extends Element> allMembers(
+            TreePath expression, String partialIdentifier, Scope from, boolean isMethodReference) {
         Element element = trees.getElement(expression);
 
-        if (element == null)
-            return Stream.empty();
+        if (element == null) return Stream.empty();
 
         // com.foo.?
         if (element instanceof PackageElement) {
@@ -170,27 +203,36 @@ class Completions {
         // MyClass.?
         else if (element instanceof TypeElement) {
             // OuterClass.this, OuterClass.super
-            Stream<? extends Element> thisAndSuper = thisScopes(from).stream()
-                    .filter(scope -> scope.getEnclosingClass().equals(element))
-                    .flatMap(this::thisAndSuper);
+            Stream<? extends Element> thisAndSuper =
+                    thisScopes(from)
+                            .stream()
+                            .filter(scope -> scope.getEnclosingClass().equals(element))
+                            .flatMap(this::thisAndSuper);
             // MyClass.?
-            Stream<? extends Element> members = elements.getAllMembers((TypeElement) element).stream()
-                    .filter(e -> (isMethodReference && e.getKind() == ElementKind.METHOD) || e.getModifiers().contains(Modifier.STATIC));
+            Stream<? extends Element> members =
+                    elements.getAllMembers((TypeElement) element)
+                            .stream()
+                            .filter(
+                                    e ->
+                                            (isMethodReference && e.getKind() == ElementKind.METHOD)
+                                                    || e.getModifiers().contains(Modifier.STATIC));
             // MyClass.class
-            Element dotClass = new Symbol.VarSymbol(
-                    Flags.PUBLIC | Flags.STATIC | Flags.FINAL,
-                    (com.sun.tools.javac.util.Name) task.getElements().getName("class"),
-                    (com.sun.tools.javac.code.Type) element.asType(),
-                    (Symbol) element
-            );
+            Element dotClass =
+                    new Symbol.VarSymbol(
+                            Flags.PUBLIC | Flags.STATIC | Flags.FINAL,
+                            (com.sun.tools.javac.util.Name) task.getElements().getName("class"),
+                            (com.sun.tools.javac.code.Type) element.asType(),
+                            (Symbol) element);
 
             return Stream.concat(Stream.of(dotClass), Stream.concat(thisAndSuper, members))
                     .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
         }
         // myValue.?
         else {
-            DeclaredType type = (DeclaredType) task.getTypes().erasure(trees.getTypeMirror(expression));
-            List<? extends Element> members = elements.getAllMembers((TypeElement) type.asElement());
+            DeclaredType type =
+                    (DeclaredType) task.getTypes().erasure(trees.getTypeMirror(expression));
+            List<? extends Element> members =
+                    elements.getAllMembers((TypeElement) type.asElement());
 
             return members.stream()
                     .filter(e -> !e.getModifiers().contains(Modifier.STATIC))
@@ -198,12 +240,16 @@ class Completions {
         }
     }
 
-    private Stream<? extends Element> packageMembers(String parentPackage, String partialIdentifier) {
+    private Stream<? extends Element> packageMembers(
+            String parentPackage, String partialIdentifier) {
         // Source-path packages that match parentPackage.partialIdentifier
         Stream<PackageElement> packages = subPackages(parentPackage, partialIdentifier);
-        Stream<TypeElement> sourcePathClasses = sourcePathClassesInPackage(parentPackage, partialIdentifier);
-        Stream<TypeElement> classPathClasses = classPath.topLevelClassesIn(parentPackage, partialIdentifier)
-                .flatMap(this::loadFromClassPath);
+        Stream<TypeElement> sourcePathClasses =
+                sourcePathClassesInPackage(parentPackage, partialIdentifier);
+        Stream<TypeElement> classPathClasses =
+                classPath
+                        .topLevelClassesIn(parentPackage, partialIdentifier)
+                        .flatMap(this::loadFromClassPath);
 
         return Stream.concat(packages, Stream.concat(sourcePathClasses, classPathClasses));
     }
@@ -211,31 +257,29 @@ class Completions {
     private Stream<TypeElement> loadFromClassPath(ClassPath.ClassInfo info) {
         TypeElement found = elements.getTypeElement(info.getName());
 
-        if (found == null)
-            return Stream.empty();
-        else
-            return Stream.of(found);
+        if (found == null) return Stream.empty();
+        else return Stream.of(found);
     }
 
-    /**
-     * All sub-packages of parentPackage that match partialIdentifier
-     */
+    /** All sub-packages of parentPackage that match partialIdentifier */
     private Stream<PackageElement> subPackages(String parentPackage, String partialIdentifier) {
         String prefix = parentPackage.isEmpty() ? "" : parentPackage + ".";
-        Stream<String> sourcePathMembers = sourcePath.allTopLevelClasses()
-                .map(c -> c.packageName)
-                .filter(packageName -> packageName.startsWith(prefix));
+        Stream<String> sourcePathMembers =
+                sourcePath
+                        .allTopLevelClasses()
+                        .map(c -> c.packageName)
+                        .filter(packageName -> packageName.startsWith(prefix));
         Stream<String> classPathMembers = classPath.packagesStartingWith(prefix);
-        Set<String> next = Stream.concat(sourcePathMembers, classPathMembers)
-                .map(p -> p.substring(prefix.length()))
-                .map(Completions::firstId)
-                .filter(p -> containsCharactersInOrder(p, partialIdentifier))
-                .collect(Collectors.toSet());
+        Set<String> next =
+                Stream.concat(sourcePathMembers, classPathMembers)
+                        .map(p -> p.substring(prefix.length()))
+                        .map(Completions::firstId)
+                        .filter(p -> containsCharactersInOrder(p, partialIdentifier))
+                        .collect(Collectors.toSet());
 
         // Load 1 member of package to force javac to recognize that it exists
         for (String part : next) {
-            classPath.loadPackage(prefix + part)
-                    .ifPresent(this::tryLoad);
+            classPath.loadPackage(prefix + part).ifPresent(this::tryLoad);
         }
 
         return next.stream()
@@ -246,22 +290,17 @@ class Completions {
     private boolean isAlreadyImported(String qualifiedName) {
         String packageName = mostIds(qualifiedName);
 
-        if (packageName.equals("java.lang"))
-            return true;
+        if (packageName.equals("java.lang")) return true;
 
-        if (packageName.equals(compilationUnit.getPackageName().toString()))
-            return true;
+        if (packageName.equals(compilationUnit.getPackageName().toString())) return true;
 
         for (ImportTree each : compilationUnit.getImports()) {
-            if (each.isStatic())
-                continue;
+            if (each.isStatic()) continue;
 
             String importName = importId(each);
 
-            if (isStarImport(each) && mostIds(importName).equals(packageName))
-                return true;
-            else if (importName.equals(qualifiedName))
-                return true;
+            if (isStarImport(each) && mostIds(importName).equals(packageName)) return true;
+            else if (importName.equals(qualifiedName)) return true;
         }
 
         return false;
@@ -280,36 +319,30 @@ class Completions {
     static String firstId(String qualifiedName) {
         int firstDot = qualifiedName.indexOf('.');
 
-        if (firstDot == -1)
-            return qualifiedName;
-        else
-            return qualifiedName.substring(0, firstDot);
+        if (firstDot == -1) return qualifiedName;
+        else return qualifiedName.substring(0, firstDot);
     }
 
     static String mostIds(String qualifiedName) {
         int lastDot = qualifiedName.lastIndexOf('.');
 
-        if (lastDot == -1)
-            return "";
-        else
-            return qualifiedName.substring(0, lastDot);
+        if (lastDot == -1) return "";
+        else return qualifiedName.substring(0, lastDot);
     }
 
     static String lastId(String qualifiedName) {
         int lastDot = qualifiedName.lastIndexOf('.');
 
-        if (lastDot == -1)
-            return qualifiedName;
-        else
-            return qualifiedName.substring(lastDot + 1);
+        if (lastDot == -1) return qualifiedName;
+        else return qualifiedName.substring(lastDot + 1);
     }
 
     private Stream<ExecutableElement> explodeConstructors(Element element) {
-        if (element.getKind() != ElementKind.CLASS)
-            return Stream.empty();
+        if (element.getKind() != ElementKind.CLASS) return Stream.empty();
 
         try {
-            return elements.getAllMembers((TypeElement) element).stream()
+            return elements.getAllMembers((TypeElement) element)
+                    .stream()
                     .filter(e -> e.getKind() == ElementKind.CONSTRUCTOR)
                     .map(e -> (ExecutableElement) e);
         } catch (Symbol.CompletionFailure failed) {
@@ -319,64 +352,59 @@ class Completions {
         }
     }
 
-    /**
-     * Suggest constructors that haven't yet been imported, but are on the source or class path
-     */
+    /** Suggest constructors that haven't yet been imported, but are on the source or class path */
     private Stream<CompletionItem> notImportedConstructors(String partialIdentifier, Scope scope) {
         String packageName = packageName(scope);
-        Stream<CompletionItem> fromSourcePath = accessibleSourcePathClasses(partialIdentifier, scope)
-                .filter(c -> c.hasAccessibleConstructor(packageName))
-                .map(this::completeConstructorFromSourcePath);
-        Stream<CompletionItem> fromClassPath = accessibleClassPathClasses(partialIdentifier, scope)
-                .filter(c -> classPath.hasAccessibleConstructor(c, packageName))
-                .map(c -> completeConstructorFromClassPath(c.load()));
+        Stream<CompletionItem> fromSourcePath =
+                accessibleSourcePathClasses(partialIdentifier, scope)
+                        .filter(c -> c.hasAccessibleConstructor(packageName))
+                        .map(this::completeConstructorFromSourcePath);
+        Stream<CompletionItem> fromClassPath =
+                accessibleClassPathClasses(partialIdentifier, scope)
+                        .filter(c -> classPath.hasAccessibleConstructor(c, packageName))
+                        .map(c -> completeConstructorFromClassPath(c.load()));
         // TODO remove class path classes that are also available from source path
 
         return Stream.concat(fromSourcePath, fromClassPath);
     }
 
     private CompletionItem completeConstructorFromSourcePath(ReachableClass c) {
-        return completeConstructor(
-            c.packageName,
-            c.className,
-            c.hasTypeParameters
-        );
+        return completeConstructor(c.packageName, c.className, c.hasTypeParameters);
     }
 
     private CompletionItem completeConstructorFromClassPath(Class<?> c) {
         return completeConstructor(
-            c.getPackage().getName(), 
-            c.getSimpleName(), 
-            c.getTypeParameters().length > 0
-        );
+                c.getPackage().getName(), c.getSimpleName(), c.getTypeParameters().length > 0);
     }
 
-    /**
-     * Suggest classes that haven't yet been imported, but are on the source or class path
-     */
+    /** Suggest classes that haven't yet been imported, but are on the source or class path */
     private Stream<CompletionItem> notImportedClasses(String partialIdentifier, Scope scope) {
-        Stream<String> fromSourcePath = accessibleSourcePathClasses(partialIdentifier, scope)
-                .map(c -> c.qualifiedName());
-        Stream<String> fromClassPath = accessibleClassPathClasses(partialIdentifier, scope)
-                .map(c -> c.getName());
+        Stream<String> fromSourcePath =
+                accessibleSourcePathClasses(partialIdentifier, scope).map(c -> c.qualifiedName());
+        Stream<String> fromClassPath =
+                accessibleClassPathClasses(partialIdentifier, scope).map(c -> c.getName());
         // TODO remove class path classes that are also available from source path
 
         return Stream.concat(fromSourcePath, fromClassPath)
                 .map(this::completeClassNameFromClassPath);
     }
 
-    private Stream<ClassPath.ClassInfo> accessibleClassPathClasses(String partialIdentifier, Scope scope) {
+    private Stream<ClassPath.ClassInfo> accessibleClassPathClasses(
+            String partialIdentifier, Scope scope) {
         String packageName = packageName(scope);
 
-        return classPath.topLevelClasses()
+        return classPath
+                .topLevelClasses()
                 .filter(c -> containsCharactersInOrder(c.getSimpleName(), partialIdentifier))
                 .filter(c -> classPath.isAccessibleFromPackage(c, packageName));
     }
 
-    private Stream<ReachableClass> accessibleSourcePathClasses(String partialIdentifier, Scope scope) {
+    private Stream<ReachableClass> accessibleSourcePathClasses(
+            String partialIdentifier, Scope scope) {
         String packageName = packageName(scope);
 
-        return sourcePath.accessibleTopLevelClasses(packageName)
+        return sourcePath
+                .accessibleTopLevelClasses(packageName)
                 .filter(c -> containsCharactersInOrder(c.className, partialIdentifier));
     }
 
@@ -386,10 +414,9 @@ class Completions {
         return packageEl == null ? "" : packageEl.getQualifiedName().toString();
     }
 
-    /**
-     * Suggest all completions that are visible from scope
-     */
-    private Stream<? extends Element> alreadyImportedCompletions(String partialIdentifier, Scope scope) {
+    /** Suggest all completions that are visible from scope */
+    private Stream<? extends Element> alreadyImportedCompletions(
+            String partialIdentifier, Scope scope) {
         return alreadyImportedSymbols(scope)
                 .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
     }
@@ -398,10 +425,8 @@ class Completions {
         try {
             TypeElement type = elements.getTypeElement(c.getName());
 
-            if (type != null)
-                return Stream.of(type);
-            else
-                return Stream.empty();
+            if (type != null) return Stream.of(type);
+            else return Stream.empty();
         } catch (Symbol.CompletionFailure failed) {
             LOG.warning(failed.getMessage());
 
@@ -413,11 +438,11 @@ class Completions {
         Collection<TypeElement> thisScopes = scopeClasses(thisScopes(scope));
         Collection<TypeElement> classScopes = classScopes(scope);
         List<Scope> methodScopes = methodScopes(scope);
-        Stream<? extends Element> staticImports = compilationUnit.getImports().stream().flatMap(this::staticImports);
+        Stream<? extends Element> staticImports =
+                compilationUnit.getImports().stream().flatMap(this::staticImports);
         Stream<? extends Element> elements = Stream.empty();
 
-        if (!isStaticMethod(scope))
-            elements = Stream.concat(elements, thisAndSuper(scope));
+        if (!isStaticMethod(scope)) elements = Stream.concat(elements, thisAndSuper(scope));
 
         elements = Stream.concat(elements, methodScopes.stream().flatMap(this::locals));
         elements = Stream.concat(elements, thisScopes.stream().flatMap(this::instanceMembers));
@@ -427,9 +452,14 @@ class Completions {
         return elements;
     }
 
-    private Stream<TypeElement> sourcePathClassesInPackage(String packageName, String partialClass) {
-        return sourcePath.allTopLevelClasses()
-                .filter(c -> c.packageName.equals(packageName) && containsCharactersInOrder(c.className, partialClass))
+    private Stream<TypeElement> sourcePathClassesInPackage(
+            String packageName, String partialClass) {
+        return sourcePath
+                .allTopLevelClasses()
+                .filter(
+                        c ->
+                                c.packageName.equals(packageName)
+                                        && containsCharactersInOrder(c.className, partialClass))
                 .map(ReachableClass::qualifiedName)
                 .flatMap(this::loadFromSourcePath);
     }
@@ -437,15 +467,12 @@ class Completions {
     private Stream<TypeElement> loadFromSourcePath(String name) {
         TypeElement found = elements.getTypeElement(name);
 
-        if (found == null)
-            return Stream.empty();
-        else
-            return Stream.of(found);
+        if (found == null) return Stream.empty();
+        else return Stream.of(found);
     }
 
     private Stream<? extends Element> staticImports(ImportTree tree) {
-        if (!tree.isStatic())
-            return Stream.empty();
+        if (!tree.isStatic()) return Stream.empty();
 
         if (isStarImport(tree)) {
             String parentName = mostIds(importId(tree));
@@ -458,8 +485,7 @@ class Completions {
             }
 
             return parentElement.getEnclosedElements().stream();
-        }
-        else {
+        } else {
             String name = importId(tree);
             String className = mostIds(name);
             String memberName = lastId(name);
@@ -472,8 +498,7 @@ class Completions {
             }
 
             for (Element each : classElement.getEnclosedElements()) {
-                if (each.getSimpleName().contentEquals(memberName))
-                    return Stream.of(each);
+                if (each.getSimpleName().contentEquals(memberName)) return Stream.of(each);
             }
 
             LOG.warning("Couldn't find " + memberName + " in " + className);
@@ -492,8 +517,7 @@ class Completions {
             boolean anonymousClass = isAnonymousClass(each);
 
             // If this scope is a static method, terminate
-            if (staticMethod)
-                break;
+            if (staticMethod) break;
             // If the user has indicated this is a static class, it's the last scope in the chain
             else if (staticClass && !anonymousClass) {
                 acc.add(scope);
@@ -527,8 +551,7 @@ class Completions {
         List<Scope> acc = new ArrayList<>();
 
         while (scope != null && scope.getEnclosingClass() != null) {
-            if (scope.getEnclosingMethod() != null)
-                acc.add(scope);
+            if (scope.getEnclosingMethod() != null) acc.add(scope);
 
             scope = scope.getEnclosingScope();
         }
@@ -551,12 +574,14 @@ class Completions {
     }
 
     private Stream<? extends Element> instanceMembers(TypeElement enclosingClass) {
-        return elements.getAllMembers(enclosingClass).stream()
+        return elements.getAllMembers(enclosingClass)
+                .stream()
                 .filter(each -> !each.getModifiers().contains(Modifier.STATIC));
     }
 
     private Stream<? extends Element> staticMembers(TypeElement enclosingClass) {
-        return elements.getAllMembers(enclosingClass).stream()
+        return elements.getAllMembers(enclosingClass)
+                .stream()
                 .filter(each -> each.getModifiers().contains(Modifier.STATIC));
     }
 
@@ -571,11 +596,14 @@ class Completions {
     }
 
     private boolean isStaticMethod(Scope scope) {
-        return scope.getEnclosingMethod() != null && scope.getEnclosingMethod().getModifiers().contains(Modifier.STATIC);
+        return scope.getEnclosingMethod() != null
+                && scope.getEnclosingMethod().getModifiers().contains(Modifier.STATIC);
     }
 
     private boolean isAnonymousClass(Element candidate) {
-        return candidate != null && candidate instanceof TypeElement && ((TypeElement) candidate).getNestingKind() == NestingKind.ANONYMOUS;
+        return candidate != null
+                && candidate instanceof TypeElement
+                && ((TypeElement) candidate).getNestingKind() == NestingKind.ANONYMOUS;
     }
 
     private boolean isThisOrSuper(Element each) {
@@ -586,22 +614,20 @@ class Completions {
 
     /**
      * Complete constructor with minimal type information.
-     * 
-     * This is important when we're autocompleting new ? with a class that we haven't yet imported.
-     * We don't yet have detailed type information or javadocs, and it's expensive to retrieve them.
-     * So we autocomplete a minimal constructor, and let signature-help fill in the details.
+     *
+     * <p>This is important when we're autocompleting new ? with a class that we haven't yet
+     * imported. We don't yet have detailed type information or javadocs, and it's expensive to
+     * retrieve them. So we autocomplete a minimal constructor, and let signature-help fill in the
+     * details.
      */
-    private CompletionItem completeConstructor(String packageName, String className, boolean hasTypeParameters) {
+    private CompletionItem completeConstructor(
+            String packageName, String className, boolean hasTypeParameters) {
         CompletionItem item = new CompletionItem();
         String qualifiedName = packageName.isEmpty() ? className : packageName + "." + className;
-        String key = String.format(
-            "%s#<init>",
-            className
-        );
+        String key = String.format("%s#<init>", className);
         String insertText = className;
 
-        if (hasTypeParameters)
-            insertText += "<>";
+        if (hasTypeParameters) insertText += "<>";
 
         item.setKind(CompletionItemKind.Constructor);
         item.setLabel(className);
@@ -635,118 +661,130 @@ class Completions {
             String name = e.getSimpleName().toString();
 
             switch (e.getKind()) {
-                case PACKAGE: {
-                    PackageElement p = (PackageElement) e;
-                    CompletionItem item = new CompletionItem();
-                    String id = lastId(p.getSimpleName().toString());
+                case PACKAGE:
+                    {
+                        PackageElement p = (PackageElement) e;
+                        CompletionItem item = new CompletionItem();
+                        String id = lastId(p.getSimpleName().toString());
 
-                    item.setKind(CompletionItemKind.Module);
-                    item.setLabel(id);
-                    item.setInsertText(id);
-                    item.setSortText("0/" + id);
+                        item.setKind(CompletionItemKind.Module);
+                        item.setLabel(id);
+                        item.setInsertText(id);
+                        item.setSortText("0/" + id);
 
-                    return Stream.of(item);
-                }
+                        return Stream.of(item);
+                    }
                 case ENUM:
                 case INTERFACE:
                 case ANNOTATION_TYPE:
-                case CLASS: {
-                    TypeElement type = (TypeElement) e;
-                    int order = isAlreadyImported(type.getQualifiedName().toString()) ? 1 : 2;
-                    CompletionItem item = new CompletionItem();
+                case CLASS:
+                    {
+                        TypeElement type = (TypeElement) e;
+                        int order = isAlreadyImported(type.getQualifiedName().toString()) ? 1 : 2;
+                        CompletionItem item = new CompletionItem();
 
-                    item.setKind(classKind(e.getKind()));
-                    item.setLabel(name);
-                    item.setDetail(type.getQualifiedName().toString());
-                    item.setInsertText(name);
+                        item.setKind(classKind(e.getKind()));
+                        item.setLabel(name);
+                        item.setDetail(type.getQualifiedName().toString());
+                        item.setInsertText(name);
 
-                    PackageElement classPackage = elements.getPackageOf(e);
-                    if (classPackage != null)
-                        item.setDetail(classPackage.getQualifiedName().toString());
+                        PackageElement classPackage = elements.getPackageOf(e);
+                        if (classPackage != null)
+                            item.setDetail(classPackage.getQualifiedName().toString());
 
-                    item.setAdditionalTextEdits(addImport(((TypeElement) e).getQualifiedName().toString()));
-                    item.setSortText(order + "/" + name);
-                    item.setData(type.getQualifiedName().toString());
+                        item.setAdditionalTextEdits(
+                                addImport(((TypeElement) e).getQualifiedName().toString()));
+                        item.setSortText(order + "/" + name);
+                        item.setData(type.getQualifiedName().toString());
 
-                    return Stream.of(item);
-                }
-                case TYPE_PARAMETER: {
-                    CompletionItem item = new CompletionItem();
+                        return Stream.of(item);
+                    }
+                case TYPE_PARAMETER:
+                    {
+                        CompletionItem item = new CompletionItem();
 
-                    item.setKind(CompletionItemKind.Reference);
-                    item.setLabel(name);
-                    item.setSortText("0/" + name);
+                        item.setKind(CompletionItemKind.Reference);
+                        item.setLabel(name);
+                        item.setSortText("0/" + name);
 
-                    return Stream.of(item);
-                }
-                case ENUM_CONSTANT: {
-                    CompletionItem item = new CompletionItem();
+                        return Stream.of(item);
+                    }
+                case ENUM_CONSTANT:
+                    {
+                        CompletionItem item = new CompletionItem();
 
-                    item.setKind(CompletionItemKind.Enum);
-                    item.setLabel(name);
-                    item.setDetail(e.getEnclosingElement().getSimpleName().toString());
-                    item.setSortText("0/" + name);
+                        item.setKind(CompletionItemKind.Enum);
+                        item.setLabel(name);
+                        item.setDetail(e.getEnclosingElement().getSimpleName().toString());
+                        item.setSortText("0/" + name);
 
-                    return Stream.of(item);
-                }
-                case FIELD: {
-                    CompletionItem item = new CompletionItem();
+                        return Stream.of(item);
+                    }
+                case FIELD:
+                    {
+                        CompletionItem item = new CompletionItem();
 
-                    item.setKind(CompletionItemKind.Property);
-                    item.setLabel(name);
-                    item.setDetail(ShortTypePrinter.print(e.asType()));
-                    item.setSortText("0/" + name);
+                        item.setKind(CompletionItemKind.Property);
+                        item.setLabel(name);
+                        item.setDetail(ShortTypePrinter.print(e.asType()));
+                        item.setSortText("0/" + name);
 
-                    return Stream.of(item);
-                }
+                        return Stream.of(item);
+                    }
                 case PARAMETER:
                 case LOCAL_VARIABLE:
-                case EXCEPTION_PARAMETER: {
-                    CompletionItem item = new CompletionItem();
+                case EXCEPTION_PARAMETER:
+                    {
+                        CompletionItem item = new CompletionItem();
 
-                    item.setKind(CompletionItemKind.Variable);
-                    item.setLabel(name);
-                    item.setSortText("0/" + name);
+                        item.setKind(CompletionItemKind.Variable);
+                        item.setLabel(name);
+                        item.setSortText("0/" + name);
 
-                    return Stream.of(item);
-                }
-                case METHOD: {
-                    ExecutableElement method = (ExecutableElement) e;
-                    CompletionItem item = new CompletionItem();
+                        return Stream.of(item);
+                    }
+                case METHOD:
+                    {
+                        ExecutableElement method = (ExecutableElement) e;
+                        CompletionItem item = new CompletionItem();
 
-                    item.setKind(CompletionItemKind.Method);
-                    item.setLabel(name);
-                    item.setDetail(Hovers.methodSignature(method, true, false));
-                    item.setInsertText(name); // TODO
-                    item.setFilterText(name);
-                    item.setSortText("0/" + name);
-                    item.setData(docs.methodKey(method));
+                        item.setKind(CompletionItemKind.Method);
+                        item.setLabel(name);
+                        item.setDetail(Hovers.methodSignature(method, true, false));
+                        item.setInsertText(name); // TODO
+                        item.setFilterText(name);
+                        item.setSortText("0/" + name);
+                        item.setData(docs.methodKey(method));
 
-                    return Stream.of(item);
-                }
-                case CONSTRUCTOR: {
-                    TypeElement enclosingClass = (TypeElement) e.getEnclosingElement();
-                    int order = isAlreadyImported(enclosingClass.getQualifiedName().toString()) ? 1 : 2;
-                    name = enclosingClass.getSimpleName().toString();
+                        return Stream.of(item);
+                    }
+                case CONSTRUCTOR:
+                    {
+                        TypeElement enclosingClass = (TypeElement) e.getEnclosingElement();
+                        int order =
+                                isAlreadyImported(enclosingClass.getQualifiedName().toString())
+                                        ? 1
+                                        : 2;
+                        name = enclosingClass.getSimpleName().toString();
 
-                    ExecutableElement method = (ExecutableElement) e;
-                    CompletionItem item = new CompletionItem();
-                    String insertText = name;
+                        ExecutableElement method = (ExecutableElement) e;
+                        CompletionItem item = new CompletionItem();
+                        String insertText = name;
 
-                    if (!enclosingClass.getTypeParameters().isEmpty())
-                        insertText += "<>";
+                        if (!enclosingClass.getTypeParameters().isEmpty()) insertText += "<>";
 
-                    item.setKind(CompletionItemKind.Constructor);
-                    item.setLabel(name);
-                    item.setDetail(Hovers.methodSignature(method, false, false));
-                    item.setInsertText(insertText);
-                    item.setFilterText(name);
-                    item.setAdditionalTextEdits(addImport(enclosingClass.getQualifiedName().toString()));
-                    item.setSortText(order + "/" + name);
-                    item.setData(docs.methodKey(method));
+                        item.setKind(CompletionItemKind.Constructor);
+                        item.setLabel(name);
+                        item.setDetail(Hovers.methodSignature(method, false, false));
+                        item.setInsertText(insertText);
+                        item.setFilterText(name);
+                        item.setAdditionalTextEdits(
+                                addImport(enclosingClass.getQualifiedName().toString()));
+                        item.setSortText(order + "/" + name);
+                        item.setData(docs.methodKey(method));
 
-                    return Stream.of(item);
-                }
+                        return Stream.of(item);
+                    }
                 case STATIC_INIT:
                 case INSTANCE_INIT:
                 case OTHER:
@@ -779,9 +817,9 @@ class Completions {
 
     private List<TextEdit> addImport(String qualifiedName) {
         if (!isAlreadyImported(qualifiedName) && CursorContext.from(path) != CursorContext.Import)
-            return new RefactorFile(task, compilationUnit).addImport(mostIds(qualifiedName), lastId(qualifiedName));
-        else
-            return Collections.emptyList();
+            return new RefactorFile(task, compilationUnit)
+                    .addImport(mostIds(qualifiedName), lastId(qualifiedName));
+        else return Collections.emptyList();
     }
 
     public static boolean containsCharactersInOrder(CharSequence candidate, CharSequence pattern) {
@@ -794,8 +832,7 @@ class Completions {
             if (patternChar == testChar) {
                 iPattern++;
                 iCandidate++;
-            }
-            else iCandidate++;
+            } else iCandidate++;
         }
 
         return iPattern == pattern.length();

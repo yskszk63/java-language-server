@@ -1,10 +1,8 @@
 package org.javacs;
 
 import com.google.common.reflect.ClassPath;
-import java.lang.reflect.Constructor;
-import sun.misc.Launcher;
-
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -16,23 +14,27 @@ import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import sun.misc.Launcher;
 
 /**
- * Index the classpath *without* using the java compiler API.
- * The classpath can contain problematic types, for example references to classes that *aren't* present.
- * So we use reflection to find class names and constructors on the classpath.
+ * Index the classpath *without* using the java compiler API. The classpath can contain problematic
+ * types, for example references to classes that *aren't* present. So we use reflection to find
+ * class names and constructors on the classpath.
  *
- * The isn't the only way we inspect the classpath---when completing members, for example, we use the Javac API.
- * This path is strictly for when we have to search the *entire* classpath.
+ * <p>The isn't the only way we inspect the classpath---when completing members, for example, we use
+ * the Javac API. This path is strictly for when we have to search the *entire* classpath.
  */
 class ClassPathIndex {
 
     private final List<ClassPath.ClassInfo> topLevelClasses;
 
     ClassPathIndex(Set<Path> classPath) {
-        this.topLevelClasses = classPath(classLoader(classPath)).getTopLevelClasses().stream()
-            .sorted(ClassPathIndex::shortestName)
-            .collect(Collectors.toList());
+        this.topLevelClasses =
+                classPath(classLoader(classPath))
+                        .getTopLevelClasses()
+                        .stream()
+                        .sorted(ClassPathIndex::shortestName)
+                        .collect(Collectors.toList());
     }
 
     private static int shortestName(ClassPath.ClassInfo left, ClassPath.ClassInfo right) {
@@ -54,9 +56,7 @@ class ClassPathIndex {
     }
 
     private static URLClassLoader classLoader(Set<Path> classPath) {
-        URL[] urls = classPath.stream()
-                .flatMap(ClassPathIndex::url)
-                .toArray(URL[]::new);
+        URL[] urls = classPath.stream().flatMap(ClassPathIndex::url).toArray(URL[]::new);
 
         return new URLClassLoader(urls, parentClassLoader());
     }
@@ -91,31 +91,36 @@ class ClassPathIndex {
         for (Constructor<?> candidate : load.getDeclaredConstructors()) {
             int modifiers = candidate.getModifiers();
 
-            if (isPublicClass && Modifier.isPublic(modifiers))
-                return true;
-            else if (isSamePackage && !Modifier.isPrivate(modifiers) && !Modifier.isProtected(modifiers))
-                return true;
+            if (isPublicClass && Modifier.isPublic(modifiers)) return true;
+            else if (isSamePackage
+                    && !Modifier.isPrivate(modifiers)
+                    && !Modifier.isProtected(modifiers)) return true;
         }
 
         return false;
     }
 
-    /**
-     * Find all packages in parentPackage
-     */
+    /** Find all packages in parentPackage */
     Stream<String> packagesStartingWith(String partialPackage) {
-        return topLevelClasses.stream()
+        return topLevelClasses
+                .stream()
                 .filter(c -> c.getPackageName().startsWith(partialPackage))
                 .map(c -> c.getPackageName());
     }
 
     Stream<ClassPath.ClassInfo> topLevelClassesIn(String parentPackage, String partialClass) {
-        return topLevelClasses.stream()
-                .filter(c -> c.getPackageName().equals(parentPackage) && Completions.containsCharactersInOrder(c.getSimpleName(), partialClass));
+        return topLevelClasses
+                .stream()
+                .filter(
+                        c ->
+                                c.getPackageName().equals(parentPackage)
+                                        && Completions.containsCharactersInOrder(
+                                                c.getSimpleName(), partialClass));
     }
 
     Optional<ClassPath.ClassInfo> loadPackage(String prefix) {
-        return topLevelClasses.stream()
+        return topLevelClasses
+                .stream()
                 .filter(c -> c.getPackageName().startsWith(prefix))
                 .findAny();
     }

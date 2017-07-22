@@ -1,13 +1,12 @@
 package org.javacs;
 
-import org.junit.Test;
-
-import java.io.IOException;
-import java.util.Set;
-
 import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
+
+import java.io.IOException;
+import java.util.Set;
+import org.junit.Test;
 
 public class CompletionsScopesTest extends CompletionsBase {
     @Test

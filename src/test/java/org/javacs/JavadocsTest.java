@@ -1,26 +1,25 @@
 package org.javacs;
 
-import com.sun.javadoc.MethodDoc;
-import com.sun.javadoc.RootDoc;
-import org.junit.Ignore;
-import org.junit.Test;
-
-import java.io.IOException;
-import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.Optional;
-
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
+import com.sun.javadoc.MethodDoc;
+import com.sun.javadoc.RootDoc;
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.Optional;
+import org.junit.Ignore;
+import org.junit.Test;
+
 public class JavadocsTest {
 
-    private final Javadocs docs = new Javadocs(
-            Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
-            Collections.emptySet(),
-            __ -> Optional.empty()
-    );
+    private final Javadocs docs =
+            new Javadocs(
+                    Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
+                    Collections.emptySet(),
+                    __ -> Optional.empty());
 
     @Test
     public void findSystemDoc() throws IOException {
@@ -31,12 +30,19 @@ public class JavadocsTest {
 
     @Test
     public void findMethodDoc() {
-        assertTrue("Found method", docs.methodDoc("org.javacs.docs.TrickyDocstring#example(java.lang.String,java.lang.String[],java.util.List)").isPresent());
+        assertTrue(
+                "Found method",
+                docs.methodDoc(
+                                "org.javacs.docs.TrickyDocstring#example(java.lang.String,java.lang.String[],java.util.List)")
+                        .isPresent());
     }
 
     @Test
     public void findParameterizedDoc() {
-        assertTrue("Found method", docs.methodDoc("org.javacs.docs.TrickyDocstring#parameterized(java.lang.Object)").isPresent());
+        assertTrue(
+                "Found method",
+                docs.methodDoc("org.javacs.docs.TrickyDocstring#parameterized(java.lang.Object)")
+                        .isPresent());
     }
 
     @Test

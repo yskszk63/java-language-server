@@ -1,8 +1,8 @@
 package org.javacs;
 
-import javax.tools.SimpleJavaFileObject;
 import java.io.IOException;
 import java.net.URI;
+import javax.tools.SimpleJavaFileObject;
 
 public class StringFileObject extends SimpleJavaFileObject {
     public final String content;

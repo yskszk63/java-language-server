@@ -7,14 +7,11 @@ import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.List;
-
-import javax.tools.JavaFileObject;
 import java.io.IOException;
 import java.io.Reader;
+import javax.tools.JavaFileObject;
 
-/**
- * Fix up the tree to make it easier to autocomplete, index
- */
+/** Fix up the tree to make it easier to autocomplete, index */
 class TreePruner {
     private final JavacTask task;
 
@@ -38,8 +35,7 @@ class TreePruner {
         class Pruner extends TreeScanner<Void, Void> {
             @Override
             public Void visitBlock(BlockTree node, Void aVoid) {
-                if (containsCursor(node)) 
-                    super.visitBlock(node, aVoid);
+                if (containsCursor(node)) super.visitBlock(node, aVoid);
                 else {
                     JCTree.JCBlock impl = (JCTree.JCBlock) node;
 
@@ -65,9 +61,7 @@ class TreePruner {
         new Pruner().scan(source, null);
     }
 
-    /**
-     * Remove all statements after the statement the cursor is in
-     */
+    /** Remove all statements after the statement the cursor is in */
     void removeStatementsAfterCursor(CompilationUnitTree source, int line, int column) {
         SourcePositions sourcePositions = Trees.instance(task).getSourcePositions();
         long offset = source.getLineMap().getPosition(line, column);
@@ -108,12 +102,9 @@ class TreePruner {
                 while (countStatements < stats.size()) {
                     T s = stats.get(countStatements);
 
-                    if (containsCursor(s))
-                        foundCursor = true;
-                    else if (foundCursor)
-                        break;
-                    else
-                        this.scan(s, null);
+                    if (containsCursor(s)) foundCursor = true;
+                    else if (foundCursor) break;
+                    else this.scan(s, null);
 
                     countStatements++;
                 }
@@ -139,9 +130,11 @@ class TreePruner {
     }
 
     /**
-     * Insert ';' after the users cursor so we recover from parse errors in a helpful way when doing autocomplete.
+     * Insert ';' after the users cursor so we recover from parse errors in a helpful way when doing
+     * autocomplete.
      */
-    static JavaFileObject putSemicolonAfterCursor(JavaFileObject file, int cursorLine, int cursorCharacter) {
+    static JavaFileObject putSemicolonAfterCursor(
+            JavaFileObject file, int cursorLine, int cursorCharacter) {
         try (Reader reader = file.openReader(true)) {
             StringBuilder acc = new StringBuilder();
             int line = 1, character = 1;
@@ -151,13 +144,17 @@ class TreePruner {
                 int next = reader.read();
 
                 if (next == -1)
-                    throw new RuntimeException("End of file " + file + " before cursor " + cursorLine + ":" + cursorCharacter);
+                    throw new RuntimeException(
+                            "End of file "
+                                    + file
+                                    + " before cursor "
+                                    + cursorLine
+                                    + ":"
+                                    + cursorCharacter);
                 else if (next == '\n') {
                     line++;
                     character = 1;
-                }
-                else
-                    character++;
+                } else character++;
 
                 acc.append((char) next);
             }
@@ -166,8 +163,7 @@ class TreePruner {
             while (true) {
                 int next = reader.read();
 
-                if (next == -1 || next == '\n')
-                    break;
+                if (next == -1 || next == '\n') break;
 
                 acc.append((char) next);
             }

@@ -1,7 +1,7 @@
 package org.javacs;
 
-import org.eclipse.lsp4j.services.*;
 import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.services.*;
 
 public class ShowMessageException extends RuntimeException {
     public final MessageParams message;
@@ -19,7 +19,7 @@ public class ShowMessageException extends RuntimeException {
     public static ShowMessageException warning(String message, Exception cause) {
         return create(MessageType.Warning, message, cause);
     }
-    
+
     private static ShowMessageException create(MessageType type, String message, Exception cause) {
         MessageParams m = new MessageParams(type, message);
 

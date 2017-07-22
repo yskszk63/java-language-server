@@ -4,14 +4,6 @@ import com.google.common.collect.ImmutableList;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.api.JavacTool;
-import javax.tools.DiagnosticCollector;
-import org.junit.Test;
-
-import javax.lang.model.element.Element;
-import javax.tools.Diagnostic;
-import javax.tools.JavaCompiler;
-import javax.tools.JavaFileObject;
-import javax.tools.StandardJavaFileManager;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -20,6 +12,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.logging.Logger;
+import javax.lang.model.element.Element;
+import javax.tools.Diagnostic;
+import javax.tools.DiagnosticCollector;
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardJavaFileManager;
+import org.junit.Test;
 
 public class JavaCompilerTest {
     private static final Logger LOG = Logger.getLogger("main");
@@ -27,12 +26,25 @@ public class JavaCompilerTest {
     @Test
     public void javacTool() throws IOException {
         JavaCompiler javaCompiler = JavacTool.create();
-        StandardJavaFileManager fileManager = javaCompiler.getStandardFileManager(this::reportError, null, Charset.defaultCharset());
-        List<String> options = ImmutableList.of("-sourcepath", Paths.get("src/test/resources").toAbsolutePath().toString());
+        StandardJavaFileManager fileManager =
+                javaCompiler.getStandardFileManager(
+                        this::reportError, null, Charset.defaultCharset());
+        List<String> options =
+                ImmutableList.of(
+                        "-sourcepath", Paths.get("src/test/resources").toAbsolutePath().toString());
         List<String> classes = Collections.emptyList();
         File file = Paths.get("src/test/resources/org/javacs/example/Bad.java").toFile();
-        Iterable<? extends JavaFileObject> compilationUnits = fileManager.getJavaFileObjectsFromFiles(Collections.singleton(file));
-        JavacTask task = (JavacTask) javaCompiler.getTask(null, fileManager, this::reportError, options, classes, compilationUnits);
+        Iterable<? extends JavaFileObject> compilationUnits =
+                fileManager.getJavaFileObjectsFromFiles(Collections.singleton(file));
+        JavacTask task =
+                (JavacTask)
+                        javaCompiler.getTask(
+                                null,
+                                fileManager,
+                                this::reportError,
+                                options,
+                                classes,
+                                compilationUnits);
 
         Iterable<? extends CompilationUnitTree> parsed = task.parse();
         Iterable<? extends Element> typed = task.analyze();
@@ -42,12 +54,15 @@ public class JavaCompilerTest {
 
     @Test
     public void javacHolder() {
-        JavacHolder javac = JavacHolder.create(
-                Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
-                Collections.emptySet()
-        );
-        File file = Paths.get("src/test/test-project/workspace/src/org/javacs/example/Bad.java").toFile();
-        DiagnosticCollector<JavaFileObject> compile = javac.compileBatch(Collections.singletonMap(file.toURI(), Optional.empty()));
+        JavacHolder javac =
+                JavacHolder.create(
+                        Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
+                        Collections.emptySet());
+        File file =
+                Paths.get("src/test/test-project/workspace/src/org/javacs/example/Bad.java")
+                        .toFile();
+        DiagnosticCollector<JavaFileObject> compile =
+                javac.compileBatch(Collections.singletonMap(file.toURI(), Optional.empty()));
     }
 
     /* It's too hard to keep this test working
