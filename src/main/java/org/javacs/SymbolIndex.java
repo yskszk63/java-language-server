@@ -94,7 +94,7 @@ public class SymbolIndex {
      * com.example;` then the source root is `src`.
      */
     Set<Path> sourcePath() {
-        update();
+        updateOpenFiles();
 
         Set<Path> result = new HashSet<>();
 
@@ -120,9 +120,7 @@ public class SymbolIndex {
 
     /** Search all indexed symbols */
     public Stream<SymbolInformation> search(String query) {
-        finishedInitialIndex.join();
-
-        updateIndex(openFiles.get().stream());
+        updateOpenFiles();
 
         Predicate<SourceFileIndex> matchesQuery =
                 index ->
@@ -139,7 +137,7 @@ public class SymbolIndex {
                 .filter(info -> containsCharsInOrder(info.getName(), query));
     }
 
-    void update() {
+    void updateOpenFiles() {
         finishedInitialIndex.join();
 
         updateIndex(openFiles.get().stream());
@@ -401,7 +399,7 @@ public class SymbolIndex {
     }
 
     Collection<URI> potentialReferences(String name) {
-        update();
+        updateOpenFiles();
 
         Map<URI, SourceFileIndex> hasName =
                 Maps.filterValues(sourcePathFiles, index -> index.references.contains(name));

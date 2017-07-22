@@ -39,7 +39,7 @@ class FindSymbols {
      * source positions, we will recompile the .java file where `symbol` was declared.
      */
     Optional<Location> find(Element symbol) {
-        index.update();
+        index.updateOpenFiles();
 
         return findFile(symbol).flatMap(file -> findIn(symbol, file));
     }
