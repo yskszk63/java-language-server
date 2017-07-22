@@ -548,8 +548,7 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     private Configured createCompiler(JavaSettings settings, Path workspaceRoot) {
-        SymbolIndex index =
-                new SymbolIndex(workspaceRoot, activeDocuments::keySet, this::activeContent);
+        SymbolIndex index = new SymbolIndex(workspaceRoot, this::openFiles, this::activeContent);
         Set<Path> sourcePath = index.sourcePath();
         Path userHome = Paths.get(System.getProperty("user.home")),
                 mavenHome = userHome.resolve(".m2"),
@@ -587,6 +586,10 @@ class JavaLanguageServer implements LanguageServer {
         FindSymbols find = new FindSymbols(index, compiler, this::activeContent);
 
         return new Configured(compiler, docs, index, find);
+    }
+
+    private Set<URI> openFiles() {
+        return Sets.filter(activeDocuments.keySet(), uri -> uri.getScheme().equals("file"));
     }
 
     private void clearDiagnostics() {
