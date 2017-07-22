@@ -34,14 +34,10 @@ import org.eclipse.lsp4j.*;
  */
 public class SymbolIndex {
 
-    private final Set<Path> sourcePath;
-
+    private final Path workspaceRoot;
     private final Supplier<Collection<URI>> openFiles;
-
     private final Function<URI, Optional<String>> activeContent;
-
     private final JavacHolder compiler;
-
     private final JavacTool parser = JavacTool.create();
     private final JavacFileManager emptyFileManager =
             parser.getStandardFileManager(__ -> {}, null, Charset.defaultCharset());
@@ -52,17 +48,18 @@ public class SymbolIndex {
     private final CompletableFuture<?> finishedInitialIndex = new CompletableFuture<>();
 
     SymbolIndex(
-            Set<Path> sourcePath,
+            Path workspaceRoot,
             Supplier<Collection<URI>> openFiles,
             Function<URI, Optional<String>> activeContent,
             JavacHolder compiler) {
-        this.sourcePath = sourcePath;
+        this.workspaceRoot = workspaceRoot;
         this.openFiles = openFiles;
         this.activeContent = activeContent;
         this.compiler = compiler;
+
         Runnable doIndex =
                 () -> {
-                    updateIndex(allJavaSources(sourcePath));
+                    updateIndex(InferConfig.allJavaFiles(workspaceRoot).map(Path::toUri));
 
                     finishedInitialIndex.complete(null);
                 };
@@ -70,33 +67,24 @@ public class SymbolIndex {
         new Thread(doIndex, "Initial-Index").start();
     }
 
-    private static Set<URI> allJavaSources(Set<Path> sourcePath) {
-        return sourcePath
-                .stream()
-                .flatMap(InferConfig::allJavaFiles)
-                .map(Path::toUri)
-                .collect(Collectors.toSet());
-    }
-
-    private void updateIndex(Collection<URI> files) {
+    private void updateIndex(Stream<URI> files) {
         // TODO send a progress bar to the user
-        for (URI each : files) {
-            if (needsUpdate(each)) {
-                CompilationUnitTree tree = parse(each);
+        files.forEach(
+                each -> {
+                    if (needsUpdate(each)) {
+                        CompilationUnitTree tree = parse(each);
 
-                update(tree);
-            }
-        }
+                        update(tree);
+                    }
+                });
     }
 
     private boolean needsUpdate(URI file) {
-        Path path = Paths.get(file);
-
         if (!sourcePathFiles.containsKey(file)) return true;
         else
             try {
                 Instant updated = sourcePathFiles.get(file).updated;
-                Instant modified = Files.getLastModifiedTime(path).toInstant();
+                Instant modified = Files.getLastModifiedTime(Paths.get(file)).toInstant();
 
                 return updated.isBefore(modified);
             } catch (IOException e) {
@@ -108,7 +96,7 @@ public class SymbolIndex {
     public Stream<SymbolInformation> search(String query) {
         finishedInitialIndex.join();
 
-        updateIndex(openFiles.get());
+        updateIndex(openFiles.get().stream());
 
         Predicate<SourceFileIndex> matchesQuery =
                 index ->
@@ -282,7 +270,7 @@ public class SymbolIndex {
     public Stream<Location> references(Element symbol) {
         finishedInitialIndex.join();
 
-        updateIndex(openFiles.get());
+        updateIndex(openFiles.get().stream());
 
         String name = symbol.getSimpleName().toString();
         Map<URI, SourceFileIndex> hasName =
@@ -301,7 +289,7 @@ public class SymbolIndex {
     public Optional<Location> find(Element symbol) {
         finishedInitialIndex.join();
 
-        updateIndex(openFiles.get());
+        updateIndex(openFiles.get().stream());
 
         return findFile(symbol).flatMap(file -> findIn(symbol, file));
     }

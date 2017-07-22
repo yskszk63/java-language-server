@@ -582,7 +582,8 @@ class JavaLanguageServer implements LanguageServer {
                 JavacHolder.create(sourcePath, Sets.union(classPath, workspaceClassPath));
         Javadocs docs = new Javadocs(sourcePath, docPath, this::activeContent);
         SymbolIndex index =
-                new SymbolIndex(sourcePath, activeDocuments::keySet, this::activeContent, compiler);
+                new SymbolIndex(
+                        workspaceRoot, activeDocuments::keySet, this::activeContent, compiler);
 
         return new Configured(compiler, docs, index);
     }
