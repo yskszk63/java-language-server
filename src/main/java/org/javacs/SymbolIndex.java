@@ -4,8 +4,12 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Maps;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
+import com.sun.tools.javac.api.JavacTool;
+import com.sun.tools.javac.file.JavacFileManager;
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -21,6 +25,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.lang.model.element.*;
 import javax.tools.Diagnostic;
+import javax.tools.JavaFileObject;
 import org.eclipse.lsp4j.*;
 
 /**
@@ -37,7 +42,9 @@ public class SymbolIndex {
 
     private final JavacHolder compiler;
 
-    private final JavacParserHolder parser;
+    private final JavacTool parser = JavacTool.create();
+    private final JavacFileManager emptyFileManager =
+            parser.getStandardFileManager(__ -> {}, null, Charset.defaultCharset());
 
     /** Source path files, for which we support methods and classes */
     private final Map<URI, SourceFileIndex> sourcePathFiles = new ConcurrentHashMap<>();
@@ -53,7 +60,6 @@ public class SymbolIndex {
         this.openFiles = openFiles;
         this.activeContent = activeContent;
         this.compiler = compiler;
-        this.parser = new JavacParserHolder();
 
         new Thread(
                         () -> {
@@ -77,7 +83,7 @@ public class SymbolIndex {
         // TODO send a progress bar to the user
         for (URI each : files) {
             if (needsUpdate(each)) {
-                CompilationUnitTree tree = parser.parse(each, activeContent.apply(each));
+                CompilationUnitTree tree = parse(each);
 
                 update(tree);
             }
@@ -122,37 +128,95 @@ public class SymbolIndex {
 
     /** Get all declarations in an open file */
     public Stream<SymbolInformation> allInFile(URI source) {
-        List<SymbolInformation> result = new ArrayList<>();
+        JavacTask task = parseTask(source);
+        Trees trees = Trees.instance(task);
 
-        visitElements(
-                source,
-                (task, symbol) -> {
-                    if (shouldIndex(symbol)) {
-                        findElementName(symbol, Trees.instance(task))
-                                .ifPresent(
-                                        location -> {
-                                            SymbolInformation info = new SymbolInformation();
+        class FindDeclarations extends TreePathScanner<Void, Void> {
+            List<SymbolInformation> result = new ArrayList<>();
+            Optional<ClassTree> currentClass = Optional.empty();
 
-                                            info.setContainerName(
-                                                    qualifiedName(symbol.getEnclosingElement()));
-                                            info.setKind(symbolInformationKind(symbol.getKind()));
+            @Override
+            public Void visitClass(ClassTree node, Void aVoid) {
+                String name = node.getSimpleName().toString();
+                SymbolInformation info = new SymbolInformation();
 
-                                            // Constructors have name <init>, use class name instead
-                                            if (symbol.getKind() == ElementKind.CONSTRUCTOR)
-                                                info.setName(
-                                                        symbol.getEnclosingElement()
-                                                                .getSimpleName()
-                                                                .toString());
-                                            else info.setName(symbol.getSimpleName().toString());
+                info.setContainerName(packageName());
+                info.setKind(SymbolKind.Class);
+                info.setName(name);
+                findTreeName(name, getCurrentPath(), trees).ifPresent(info::setLocation);
 
-                                            info.setLocation(location);
+                result.add(info);
 
-                                            result.add(info);
-                                        });
-                    }
-                });
+                // Push current class and continue
+                Optional<ClassTree> previousClass = currentClass;
 
-        return result.stream();
+                currentClass = Optional.of(node);
+                super.visitClass(node, aVoid);
+                currentClass = previousClass;
+
+                return null;
+            }
+
+            @Override
+            public Void visitMethod(MethodTree node, Void aVoid) {
+                boolean constructor = node.getName().contentEquals("<init>");
+                String name =
+                        constructor
+                                ? currentClass.get().getSimpleName().toString()
+                                : node.getName().toString();
+                SymbolInformation info = new SymbolInformation();
+
+                info.setContainerName(qualifiedClassName());
+                info.setKind(constructor ? SymbolKind.Constructor : SymbolKind.Method);
+                info.setName(name);
+                findTreeName(name, getCurrentPath(), trees).ifPresent(info::setLocation);
+
+                result.add(info);
+
+                return super.visitMethod(node, aVoid);
+            }
+
+            @Override
+            public Void visitVariable(VariableTree node, Void aVoid) {
+                // If this is a field
+                if (getCurrentPath().getParentPath().getLeaf().getKind() == Tree.Kind.CLASS) {
+                    String name = node.getName().toString();
+                    SymbolInformation info = new SymbolInformation();
+
+                    info.setContainerName(qualifiedClassName());
+                    info.setName(name);
+                    info.setKind(SymbolKind.Property);
+                    findTreeName(name, getCurrentPath(), trees).ifPresent(info::setLocation);
+
+                    result.add(info);
+                }
+
+                return super.visitVariable(node, aVoid);
+            }
+
+            private String qualifiedClassName() {
+                String packageName = packageName();
+                String className = currentClass.get().getSimpleName().toString();
+
+                return packageName.isEmpty() ? className : packageName + "." + className;
+            }
+
+            private String packageName() {
+                return Objects.toString(getCurrentPath().getCompilationUnit().getPackageName(), "");
+            }
+        }
+
+        FindDeclarations scan = new FindDeclarations();
+
+        try {
+            CompilationUnitTree tree = task.parse().iterator().next();
+
+            scan.scan(tree, null);
+
+            return scan.result.stream();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void visitElements(URI source, BiConsumer<JavacTask, Element> forEach) {
@@ -545,53 +609,46 @@ public class SymbolIndex {
                                 new Position(endLine - 1, endColumn - 1))));
     }
 
-    /**
-     * Find a more accurate position for symbol than the one offered by javac, by searching for its
-     * name.
-     *
-     * <p>`trees` must be from a compilation that includes the declaration of `symbol`; incremental
-     * compilation may not always have this.
-     */
+    /** Find a more accurate position for symbol by searching for its name. */
     private static Optional<Location> findElementName(Element symbol, Trees trees) {
+        TreePath path = trees.getPath(symbol);
+        Name name =
+                symbol.getKind() == ElementKind.CONSTRUCTOR
+                        ? symbol.getEnclosingElement().getSimpleName()
+                        : symbol.getSimpleName();
+
+        return findTreeName(name, path, trees);
+    }
+
+    /** Find a more accurate position for expression tree by searching for its name. */
+    private static Optional<Location> findTreeName(CharSequence name, TreePath path, Trees trees) {
+        if (path == null) return Optional.empty();
+
+        SourcePositions sourcePositions = trees.getSourcePositions();
+        CompilationUnitTree compilationUnit = path.getCompilationUnit();
+        long startExpr = sourcePositions.getStartPosition(compilationUnit, path.getLeaf());
+
+        if (startExpr == Diagnostic.NOPOS) return Optional.empty();
+
+        CharSequence content;
         try {
-            TreePath path = trees.getPath(symbol);
-
-            if (path == null) return Optional.empty();
-
-            SourcePositions sourcePositions = trees.getSourcePositions();
-            CompilationUnitTree compilationUnit = path.getCompilationUnit();
-            Tree tree = path.getLeaf();
-            Name name = symbol.getSimpleName();
-            long startExpr = sourcePositions.getStartPosition(compilationUnit, tree);
-
-            if (startExpr == Diagnostic.NOPOS) {
-                // If default constructor, find class symbol instead
-                if (symbol.getKind() == ElementKind.CONSTRUCTOR)
-                    return findElementName(symbol.getEnclosingElement(), trees);
-                else return Optional.empty();
-            }
-
-            // If normal constructor, search for class name instead of <init>
-            if (symbol.getKind() == ElementKind.CONSTRUCTOR)
-                name = symbol.getEnclosingElement().getSimpleName();
-
-            CharSequence content = compilationUnit.getSourceFile().getCharContent(false);
-            int startSymbol = indexOf(content, name, (int) startExpr);
-
-            if (startSymbol == -1) return Optional.empty();
-
-            int line = (int) compilationUnit.getLineMap().getLineNumber(startSymbol);
-            int column = (int) compilationUnit.getLineMap().getColumnNumber(startSymbol);
-
-            return Optional.of(
-                    new Location(
-                            compilationUnit.getSourceFile().toUri().toString(),
-                            new Range(
-                                    new Position(line - 1, column - 1),
-                                    new Position(line - 1, column + name.length() - 1))));
+            content = compilationUnit.getSourceFile().getCharContent(false);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        int startSymbol = indexOf(content, name, (int) startExpr);
+
+        if (startSymbol == -1) return Optional.empty();
+
+        int line = (int) compilationUnit.getLineMap().getLineNumber(startSymbol);
+        int column = (int) compilationUnit.getLineMap().getColumnNumber(startSymbol);
+
+        return Optional.of(
+                new Location(
+                        compilationUnit.getSourceFile().toUri().toString(),
+                        new Range(
+                                new Position(line - 1, column - 1),
+                                new Position(line - 1, column + name.length() - 1))));
     }
 
     /**
@@ -676,6 +733,29 @@ public class SymbolIndex {
             default:
                 return SymbolKind.String;
         }
+    }
+
+    private CompilationUnitTree parse(URI source) {
+        try {
+            return parseTask(source).parse().iterator().next();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private JavacTask parseTask(URI source) {
+        Optional<String> content = activeContent.apply(source);
+        JavaFileObject file =
+                content.map(text -> (JavaFileObject) new StringFileObject(text, source))
+                        .orElseGet(() -> emptyFileManager.getRegularFile(new File(source)));
+
+        return parser.getTask(
+                null,
+                emptyFileManager,
+                err -> LOG.warning(err.getMessage(Locale.getDefault())),
+                Collections.emptyList(),
+                null,
+                Collections.singletonList(file));
     }
 
     private static final Logger LOG = Logger.getLogger("main");
