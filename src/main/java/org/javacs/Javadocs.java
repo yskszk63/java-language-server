@@ -12,6 +12,7 @@ import com.sun.tools.javadoc.api.JavadocTool;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.BreakIterator;
@@ -313,16 +314,22 @@ public class Javadocs {
     }
 
     /** Find the copy of src.zip that comes with the system-installed JDK */
-    private static Optional<File> findSrcZip() {
+    static Optional<File> findSrcZip() {
         Path path = Paths.get(System.getProperty("java.home"));
 
         if (path.endsWith("jre")) path = path.getParent();
 
         path = path.resolve("src.zip");
 
-        File file = path.toFile();
+        while (Files.isSymbolicLink(path)) {
+            try {
+                path = Files.readSymbolicLink(path);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
 
-        if (file.exists()) return Optional.of(file);
+        if (Files.exists(path)) return Optional.of(path.toFile());
         else {
             LOG.severe(String.format("Could not find src.zip in java.home %s", path));
 

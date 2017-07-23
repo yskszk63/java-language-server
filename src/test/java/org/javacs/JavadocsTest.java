@@ -22,6 +22,11 @@ public class JavadocsTest {
                     __ -> Optional.empty());
 
     @Test
+    public void findSrcZip() {
+        assertTrue("Can find src.zip", Javadocs.findSrcZip().isPresent());
+    }
+
+    @Test
     public void findSystemDoc() throws IOException {
         RootDoc root = docs.index("java.util.ArrayList");
 
