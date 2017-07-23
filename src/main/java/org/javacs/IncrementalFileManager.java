@@ -106,7 +106,7 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
                         || hasUpToDateSignatures(packageName, sourceFile);
 
         if (hidden && !warnedHidden.contains(sourceFile.toUri())) {
-            LOG.warning("Hiding " + sourceFile.toUri() + " in favor of " + outputFile.get());
+            LOG.warning("Hiding " + sourceFile.toUri() + " in favor of " + outputFile.orElse(null));
 
             warnedHidden.add(sourceFile.toUri());
         }
