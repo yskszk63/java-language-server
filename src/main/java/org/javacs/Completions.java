@@ -209,13 +209,13 @@ class Completions {
                             .filter(scope -> scope.getEnclosingClass().equals(element))
                             .flatMap(this::thisAndSuper);
             // MyClass.?
+            Predicate<Element> isAccessible =
+                    e -> {
+                        return (isMethodReference && e.getKind() == ElementKind.METHOD)
+                                || e.getModifiers().contains(Modifier.STATIC);
+                    };
             Stream<? extends Element> members =
-                    elements.getAllMembers((TypeElement) element)
-                            .stream()
-                            .filter(
-                                    e ->
-                                            (isMethodReference && e.getKind() == ElementKind.METHOD)
-                                                    || e.getModifiers().contains(Modifier.STATIC));
+                    elements.getAllMembers((TypeElement) element).stream().filter(isAccessible);
             // MyClass.class
             Element dotClass =
                     new Symbol.VarSymbol(
