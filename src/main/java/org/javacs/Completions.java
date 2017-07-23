@@ -224,11 +224,11 @@ class Completions {
                             (com.sun.tools.javac.code.Type) element.asType(),
                             (Symbol) element);
 
+            Predicate<Element> matchesPartialIdentifier =
+                    e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier, false);
+
             return Stream.concat(Stream.of(dotClass), Stream.concat(thisAndSuper, members))
-                    .filter(
-                            e ->
-                                    containsCharactersInOrder(
-                                            e.getSimpleName(), partialIdentifier, false));
+                    .filter(matchesPartialIdentifier);
         }
         // myValue.?
         else {
