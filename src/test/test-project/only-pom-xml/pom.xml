@@ -8,6 +8,15 @@
     <packaging>jar</packaging>
     <version>0.1-SNAPSHOT</version>
 
+    <repositories>
+        <!-- Local repository with tools.jar -->
+        <repository>
+            <id>jars-repository</id>
+            <name>Local repository for JAR files</name>
+            <url>file://${basedir}/../home/.m2/repository</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>com.external</groupId>
