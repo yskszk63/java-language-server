@@ -323,7 +323,7 @@ public class Javadocs {
 
         while (Files.isSymbolicLink(path)) {
             try {
-                path = Files.readSymbolicLink(path);
+                path = path.resolve(Files.readSymbolicLink(path));
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
