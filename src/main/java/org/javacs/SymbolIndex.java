@@ -30,7 +30,7 @@ import org.eclipse.lsp4j.*;
  * Global index of exported symbol declarations and references. such as classes, methods, and
  * fields.
  */
-public class SymbolIndex {
+class SymbolIndex {
 
     private final Path workspaceRoot;
     private final Supplier<Collection<URI>> openFiles;
@@ -119,7 +119,7 @@ public class SymbolIndex {
     }
 
     /** Search all indexed symbols */
-    public Stream<SymbolInformation> search(String query) {
+    Stream<SymbolInformation> search(String query) {
         updateOpenFiles();
 
         Predicate<CharSequence> nameMatchesQuery =
@@ -239,7 +239,7 @@ public class SymbolIndex {
         }
     }
 
-    public Stream<ReachableClass> accessibleTopLevelClasses(String fromPackage) {
+    Stream<ReachableClass> accessibleTopLevelClasses(String fromPackage) {
         finishedInitialIndex.join();
 
         return sourcePathFiles.values().stream().flatMap(doAccessibleTopLevelClasses(fromPackage));
@@ -253,7 +253,7 @@ public class SymbolIndex {
                         .filter(c -> c.publicClass || c.packageName.equals(fromPackage));
     }
 
-    public Stream<ReachableClass> allTopLevelClasses() {
+    Stream<ReachableClass> allTopLevelClasses() {
         finishedInitialIndex.join();
 
         return sourcePathFiles.values().stream().flatMap(index -> index.topLevelClasses.stream());
