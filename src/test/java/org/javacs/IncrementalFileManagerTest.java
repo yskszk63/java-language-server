@@ -29,12 +29,7 @@ public class IncrementalFileManagerTest {
 
     @Test
     public void sourceFileSignature() {
-        String sig =
-                test.sourceSignature("com.example.Signatures")
-                        .orElseThrow(
-                                () ->
-                                        new RuntimeException(
-                                                "com.example.Signatures class not found"));
+        String sig = test.sourceSignature("com.example.Signatures").get();
 
         assertThat(sig, containsString("public void voidMethod()"));
         assertThat(sig, containsString("public java.lang.String stringMethod()"));
@@ -47,12 +42,7 @@ public class IncrementalFileManagerTest {
 
     @Test
     public void classFileSignature() {
-        String sig =
-                test.classSignature("com.example.Signatures")
-                        .orElseThrow(
-                                () ->
-                                        new RuntimeException(
-                                                "com.example.Signatures class not found"));
+        String sig = test.classSignature("com.example.Signatures").get();
 
         assertThat(sig, containsString("public void voidMethod()"));
         assertThat(sig, containsString("public java.lang.String stringMethod()"));
@@ -65,19 +55,8 @@ public class IncrementalFileManagerTest {
 
     @Test
     public void simpleSignatureEquals() {
-        String
-                classSig =
-                        test.classSignature("com.example.Signatures")
-                                .orElseThrow(
-                                        () ->
-                                                new RuntimeException(
-                                                        "com.example.Signatures class not found")),
-                sourceSig =
-                        test.sourceSignature("com.example.Signatures")
-                                .orElseThrow(
-                                        () ->
-                                                new RuntimeException(
-                                                        "com.example.Signatures class not found"));
+        String classSig = test.classSignature("com.example.Signatures").get(),
+                sourceSig = test.sourceSignature("com.example.Signatures").get();
 
         assertThat(classSig, equalTo(sourceSig));
     }
