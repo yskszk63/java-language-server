@@ -323,7 +323,11 @@ public class Javadocs {
         File file = path.toFile();
 
         if (file.exists()) return Optional.of(file);
-        else return Optional.empty();
+        else {
+            LOG.severe(String.format("Could not find src.zip in java.home %s", path));
+
+            return Optional.empty();
+        }
     }
 
     public void resolveCompletionItem(CompletionItem unresolved) {
