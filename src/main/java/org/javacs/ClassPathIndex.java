@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -109,13 +110,14 @@ class ClassPathIndex {
     }
 
     Stream<ClassPath.ClassInfo> topLevelClassesIn(String parentPackage, String partialClass) {
-        return topLevelClasses
-                .stream()
-                .filter(
-                        c ->
-                                c.getPackageName().equals(parentPackage)
-                                        && Completions.containsCharactersInOrder(
-                                                c.getSimpleName(), partialClass, false));
+        Predicate<ClassPath.ClassInfo> matches =
+                c -> {
+                    return c.getPackageName().equals(parentPackage)
+                            && Completions.containsCharactersInOrder(
+                                    c.getSimpleName(), partialClass, false);
+                };
+
+        return topLevelClasses.stream().filter(matches);
     }
 
     Optional<ClassPath.ClassInfo> loadPackage(String prefix) {
