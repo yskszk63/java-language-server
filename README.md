@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/georgewfraser/vscode-javac.svg?branch=master)](https://travis-ci.org/georgewfraser/vscode-javac)
+
 # VS Code support for Java using the [Java Compiler API](https://docs.oracle.com/javase/7/docs/api/javax/tools/JavaCompiler.html)
 
 Provides Java support using the Java Compiler API.
