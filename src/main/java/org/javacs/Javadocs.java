@@ -323,7 +323,7 @@ public class Javadocs {
 
         while (Files.isSymbolicLink(path)) {
             try {
-                path = path.resolve(Files.readSymbolicLink(path));
+                path = path.getParent().resolve(Files.readSymbolicLink(path));
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -331,7 +331,7 @@ public class Javadocs {
 
         if (Files.exists(path)) return Optional.of(path.toFile());
         else {
-            LOG.severe(String.format("Could not find src.zip in java.home %s", path));
+            LOG.severe(String.format("Could not find %s", path));
 
             return Optional.empty();
         }
