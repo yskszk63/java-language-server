@@ -93,18 +93,9 @@ public class Main {
         InputStream in = socket.getInputStream();
         OutputStream out = socket.getOutputStream();
 
-        OutputStream intercept =
-                new OutputStream() {
-
-                    @Override
-                    public void write(int b) throws IOException {
-                        out.write(b);
-                    }
-                };
-
         LOG.info("Connected to parent using socket on port " + port);
 
-        return new Connection(in, intercept);
+        return new Connection(in, out);
     }
 
     private static class Connection {
