@@ -7,6 +7,8 @@
 * Enum const javadocs are not showing
 * Missing ; lint has no width
 * Autocomplete new MethodScopeClass| adds 'import .MethodScopeClass'
+* implements | doesn't autocomplete
+* super.[protected member] doesn't autocomplete
 
 ## Default configuration
 * Alert if we can't find a dependency
@@ -16,7 +18,7 @@
 * Status bar info during indexing
 * Sort local variables first
 * Convert {@tag ...} to `<tag>...</tag>` (see vscode-java)
-* Search for symbol is too slow
+* Make sure it works when you create a new .java file with no context
 
 ## Autocomplete
 * Annotation fields
