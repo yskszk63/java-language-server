@@ -52,31 +52,31 @@ class SymbolIndex {
         this.openFiles = openFiles;
         this.activeContent = activeContent;
 
-        Runnable doIndex =
-                () -> {
-                    updateIndex(InferConfig.allJavaFiles(workspaceRoot).map(Path::toUri));
+        new Thread(this::initialIndex, "Initial-Index").start();
+    }
 
-                    finishedInitialIndex.complete(null);
-                };
+    private void initialIndex() {
+        // TODO send a progress bar to the user
+        updateIndex(InferConfig.allJavaFiles(workspaceRoot).map(Path::toUri));
 
-        new Thread(doIndex, "Initial-Index").start();
+        finishedInitialIndex.complete(null);
     }
 
     private void updateIndex(Stream<URI> files) {
-        // TODO send a progress bar to the user
-        files.forEach(
-                each -> {
-                    if (needsUpdate(each)) {
-                        CompilationUnitTree tree = parse(each);
+        files.forEach(this::updateFile);
+    }
 
-                        update(tree);
-                    }
-                });
+    private void updateFile(URI each) {
+        if (needsUpdate(each)) {
+            CompilationUnitTree tree = parse(each);
+
+            update(tree);
+        }
     }
 
     private boolean needsUpdate(URI file) {
         if (!sourcePathFiles.containsKey(file)) return true;
-        else
+        else {
             try {
                 Instant updated = sourcePathFiles.get(file).updated;
                 Instant modified = Files.getLastModifiedTime(Paths.get(file)).toInstant();
@@ -85,6 +85,7 @@ class SymbolIndex {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+        }
     }
 
     /**
