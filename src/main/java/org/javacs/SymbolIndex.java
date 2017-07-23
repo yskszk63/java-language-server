@@ -122,18 +122,21 @@ public class SymbolIndex {
     public Stream<SymbolInformation> search(String query) {
         updateOpenFiles();
 
-        Predicate<Map.Entry<URI, SourceFileIndex>> matchesQuery =
-                each ->
-                        each.getValue()
+        Predicate<URI> matchesQuery =
+                uri ->
+                        sourcePathFiles
+                                .get(uri)
                                 .declarations
                                 .stream()
                                 .anyMatch(name -> containsCharsInOrder(name, query));
+        Collection<URI> open = openFiles.get();
+        Stream<URI> openFirst =
+                Stream.concat(
+                        open.stream(),
+                        sourcePathFiles.keySet().stream().filter(uri -> !open.contains(uri)));
 
-        return sourcePathFiles
-                .entrySet()
-                .stream()
+        return openFirst
                 .filter(matchesQuery)
-                .map(entry -> entry.getKey())
                 .flatMap(this::allInFile)
                 .filter(info -> containsCharsInOrder(info.getName(), query));
     }
