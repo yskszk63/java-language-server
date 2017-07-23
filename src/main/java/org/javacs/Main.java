@@ -8,8 +8,6 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -71,7 +69,7 @@ public class Main {
         setRootFormat();
 
         try {
-            Connection connection = connectToNode();
+            Socket connection = connectToNode();
 
             run(connection);
         } catch (Throwable t) {
@@ -81,7 +79,7 @@ public class Main {
         }
     }
 
-    private static Connection connectToNode() throws IOException {
+    private static Socket connectToNode() throws IOException {
         String port = System.getProperty("javacs.port");
 
         Objects.requireNonNull(port, "-Djavacs.port=? is required");
@@ -90,36 +88,24 @@ public class Main {
 
         Socket socket = new Socket("localhost", Integer.parseInt(port));
 
-        InputStream in = socket.getInputStream();
-        OutputStream out = socket.getOutputStream();
-
         LOG.info("Connected to parent using socket on port " + port);
 
-        return new Connection(in, out);
-    }
-
-    private static class Connection {
-        final InputStream in;
-        final OutputStream out;
-
-        private Connection(InputStream in, OutputStream out) {
-            this.in = in;
-            this.out = out;
-        }
+        return socket;
     }
 
     /**
      * Listen for requests from the parent node process. Send replies asynchronously. When the
      * request stream is closed, wait for 5s for all outstanding responses to compute, then return.
      */
-    public static void run(Connection connection) {
+    public static void run(Socket connection) throws IOException {
         JavaLanguageServer server = new JavaLanguageServer();
         Launcher<LanguageClient> launcher =
-                LSPLauncher.createServerLauncher(server, connection.in, connection.out);
+                LSPLauncher.createServerLauncher(
+                        server, connection.getInputStream(), connection.getOutputStream());
 
         server.installClient(launcher.getRemoteProxy());
         launcher.startListening();
 
-        LOG.info("Connection closed");
+        LOG.info("Socket closed");
     }
 }
