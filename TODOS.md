@@ -18,7 +18,6 @@
 * Status bar info during indexing
 * Sort local variables first
 * Convert {@tag ...} to `<tag>...</tag>` (see vscode-java)
-* Make sure it works when you create a new .java file with no context
 
 ## Autocomplete
 * Annotation fields

@@ -88,6 +88,8 @@ class SymbolIndex {
         }
     }
 
+    private final Map<URI, String> warnedPackageDirectoryConflict = new HashMap<>();
+
     /**
      * Guess the source path by looking at package declarations in .java files.
      *
@@ -104,9 +106,14 @@ class SymbolIndex {
                     Path dir = Paths.get(uri).getParent();
                     String packagePath = index.packageName.replace('.', File.separatorChar);
 
-                    if (!dir.endsWith(packagePath))
+                    if (!dir.endsWith(packagePath)
+                            && !warnedPackageDirectoryConflict
+                                    .getOrDefault(uri, "?")
+                                    .equals(packagePath)) {
                         LOG.warning("Java source file " + uri + " is not in " + packagePath);
-                    else {
+
+                        warnedPackageDirectoryConflict.put(uri, packagePath);
+                    } else {
                         int up = Paths.get(packagePath).getNameCount();
                         Path truncate = dir;
 
