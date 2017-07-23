@@ -122,16 +122,10 @@ public class SymbolIndex {
     public Stream<SymbolInformation> search(String query) {
         updateOpenFiles();
 
-        Predicate<URI> matchesQuery =
-                uri ->
-                        sourcePathFiles
-                                .get(uri)
-                                .declarations
-                                .stream()
-                                .anyMatch(
-                                        name ->
-                                                Completions.containsCharactersInOrder(
-                                                        name, query, true));
+        Predicate<CharSequence> nameMatchesQuery =
+                name -> Completions.containsCharactersInOrder(name, query, true);
+        Predicate<URI> fileMatchesQuery =
+                uri -> sourcePathFiles.get(uri).declarations.stream().anyMatch(nameMatchesQuery);
         Collection<URI> open = openFiles.get();
         Stream<URI> openFirst =
                 Stream.concat(
@@ -139,9 +133,9 @@ public class SymbolIndex {
                         sourcePathFiles.keySet().stream().filter(uri -> !open.contains(uri)));
 
         return openFirst
-                .filter(matchesQuery)
+                .filter(fileMatchesQuery)
                 .flatMap(this::allInFile)
-                .filter(info -> Completions.containsCharactersInOrder(info.getName(), query, true));
+                .filter(info -> nameMatchesQuery.test(info.getName()));
     }
 
     void updateOpenFiles() {
