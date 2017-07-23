@@ -152,23 +152,26 @@ class Completions {
             TreePath expression, String partialIdentifier, Scope from, CursorContext context) {
         switch (context) {
             case NewClass:
-                return allMembers(expression, partialIdentifier, from, false)
-                        .flatMap(this::explodeConstructors)
-                        .filter(
-                                init ->
-                                        trees.isAccessible(
-                                                from,
-                                                init,
-                                                (DeclaredType) init.getEnclosingElement().asType()))
-                        .flatMap(this::completionItem);
+                {
+                    Predicate<ExecutableElement> isAccessible =
+                            init ->
+                                    trees.isAccessible(
+                                            from,
+                                            init,
+                                            (DeclaredType) init.getEnclosingElement().asType());
+                    return allMembers(expression, partialIdentifier, from, false)
+                            .flatMap(this::explodeConstructors)
+                            .filter(isAccessible)
+                            .flatMap(this::completionItem);
+                }
             case Import:
                 {
+                    Predicate<Element> isAccessible =
+                            member ->
+                                    !(member instanceof TypeElement)
+                                            || trees.isAccessible(from, (TypeElement) member);
                     return allMembers(expression, partialIdentifier, from, false)
-                            .filter(
-                                    member ->
-                                            !(member instanceof TypeElement)
-                                                    || trees.isAccessible(
-                                                            from, (TypeElement) member))
+                            .filter(isAccessible)
                             .flatMap(this::completionItem);
                 }
             default:
