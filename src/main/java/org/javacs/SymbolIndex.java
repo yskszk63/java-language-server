@@ -128,7 +128,10 @@ public class SymbolIndex {
                                 .get(uri)
                                 .declarations
                                 .stream()
-                                .anyMatch(name -> containsCharsInOrder(name, query));
+                                .anyMatch(
+                                        name ->
+                                                Completions.containsCharactersInOrder(
+                                                        name, query, true));
         Collection<URI> open = openFiles.get();
         Stream<URI> openFirst =
                 Stream.concat(
@@ -138,7 +141,7 @@ public class SymbolIndex {
         return openFirst
                 .filter(matchesQuery)
                 .flatMap(this::allInFile)
-                .filter(info -> containsCharsInOrder(info.getName(), query));
+                .filter(info -> Completions.containsCharactersInOrder(info.getName(), query, true));
     }
 
     void updateOpenFiles() {
@@ -284,29 +287,6 @@ public class SymbolIndex {
                 .filter(containsClass)
                 .map(entry -> entry.getKey())
                 .findFirst();
-    }
-
-    /**
-     * Check if name contains all the characters of query in order. For example, name 'FooBar'
-     * contains query 'FB', but not 'BF'
-     */
-    private boolean containsCharsInOrder(String name, String query) {
-        int iName = 0, iQuery = 0;
-
-        while (iName < name.length() && iQuery < query.length()) {
-            // If query matches name, consume a character of query and of name
-            if (name.charAt(iName) == query.charAt(iQuery)) {
-                iName++;
-                iQuery++;
-            }
-            // Otherwise consume a character of name
-            else {
-                iName++;
-            }
-        }
-
-        // If the entire query was consumed, we found what we were looking for
-        return iQuery == query.length();
     }
 
     /** Update a file in the index */

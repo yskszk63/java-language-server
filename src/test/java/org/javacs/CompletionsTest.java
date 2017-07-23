@@ -731,12 +731,12 @@ public class CompletionsTest extends CompletionsBase {
 
     @Test
     public void containsCharactersInOrder() {
-        assertTrue(Completions.containsCharactersInOrder("FooBar", "FooBar"));
-        assertTrue(Completions.containsCharactersInOrder("FooBar", "foobar"));
-        assertTrue(Completions.containsCharactersInOrder("FooBar", "FB"));
-        assertTrue(Completions.containsCharactersInOrder("FooBar", "fb"));
-        assertFalse(Completions.containsCharactersInOrder("FooBar", "FooBar1"));
-        assertFalse(Completions.containsCharactersInOrder("FooBar", "FB1"));
+        assertTrue(Completions.containsCharactersInOrder("FooBar", "FooBar", false));
+        assertTrue(Completions.containsCharactersInOrder("FooBar", "foobar", false));
+        assertTrue(Completions.containsCharactersInOrder("FooBar", "FB", false));
+        assertTrue(Completions.containsCharactersInOrder("FooBar", "fb", false));
+        assertFalse(Completions.containsCharactersInOrder("FooBar", "FooBar1", false));
+        assertFalse(Completions.containsCharactersInOrder("FooBar", "FB1", false));
     }
 
     @Test

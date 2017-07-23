@@ -115,7 +115,7 @@ class ClassPathIndex {
                         c ->
                                 c.getPackageName().equals(parentPackage)
                                         && Completions.containsCharactersInOrder(
-                                                c.getSimpleName(), partialClass));
+                                                c.getSimpleName(), partialClass, false));
     }
 
     Optional<ClassPath.ClassInfo> loadPackage(String prefix) {

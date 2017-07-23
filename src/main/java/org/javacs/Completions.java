@@ -225,7 +225,10 @@ class Completions {
                             (Symbol) element);
 
             return Stream.concat(Stream.of(dotClass), Stream.concat(thisAndSuper, members))
-                    .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
+                    .filter(
+                            e ->
+                                    containsCharactersInOrder(
+                                            e.getSimpleName(), partialIdentifier, false));
         }
         // myValue.?
         else {
@@ -236,7 +239,10 @@ class Completions {
 
             return members.stream()
                     .filter(e -> !e.getModifiers().contains(Modifier.STATIC))
-                    .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
+                    .filter(
+                            e ->
+                                    containsCharactersInOrder(
+                                            e.getSimpleName(), partialIdentifier, false));
         }
     }
 
@@ -274,7 +280,7 @@ class Completions {
                 Stream.concat(sourcePathMembers, classPathMembers)
                         .map(p -> p.substring(prefix.length()))
                         .map(Completions::firstId)
-                        .filter(p -> containsCharactersInOrder(p, partialIdentifier))
+                        .filter(p -> containsCharactersInOrder(p, partialIdentifier, false))
                         .collect(Collectors.toSet());
 
         // Load 1 member of package to force javac to recognize that it exists
@@ -395,7 +401,7 @@ class Completions {
 
         return classPath
                 .topLevelClasses()
-                .filter(c -> containsCharactersInOrder(c.getSimpleName(), partialIdentifier))
+                .filter(c -> containsCharactersInOrder(c.getSimpleName(), partialIdentifier, false))
                 .filter(c -> classPath.isAccessibleFromPackage(c, packageName));
     }
 
@@ -405,7 +411,7 @@ class Completions {
 
         return sourcePath
                 .accessibleTopLevelClasses(packageName)
-                .filter(c -> containsCharactersInOrder(c.className, partialIdentifier));
+                .filter(c -> containsCharactersInOrder(c.className, partialIdentifier, false));
     }
 
     private String packageName(Scope scope) {
@@ -418,7 +424,10 @@ class Completions {
     private Stream<? extends Element> alreadyImportedCompletions(
             String partialIdentifier, Scope scope) {
         return alreadyImportedSymbols(scope)
-                .filter(e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier));
+                .filter(
+                        e ->
+                                containsCharactersInOrder(
+                                        e.getSimpleName(), partialIdentifier, false));
     }
 
     private Stream<TypeElement> tryLoad(ClassPath.ClassInfo c) {
@@ -459,7 +468,8 @@ class Completions {
                 .filter(
                         c ->
                                 c.packageName.equals(packageName)
-                                        && containsCharactersInOrder(c.className, partialClass))
+                                        && containsCharactersInOrder(
+                                                c.className, partialClass, false))
                 .map(ReachableClass::qualifiedName)
                 .flatMap(this::loadFromSourcePath);
     }
@@ -822,12 +832,18 @@ class Completions {
         else return Collections.emptyList();
     }
 
-    public static boolean containsCharactersInOrder(CharSequence candidate, CharSequence pattern) {
+    public static boolean containsCharactersInOrder(
+            CharSequence candidate, CharSequence pattern, boolean caseSensitive) {
         int iCandidate = 0, iPattern = 0;
 
         while (iCandidate < candidate.length() && iPattern < pattern.length()) {
-            char patternChar = Character.toLowerCase(pattern.charAt(iPattern));
-            char testChar = Character.toLowerCase(candidate.charAt(iCandidate));
+            char patternChar = pattern.charAt(iPattern);
+            char testChar = candidate.charAt(iCandidate);
+
+            if (!caseSensitive) {
+                patternChar = Character.toLowerCase(patternChar);
+                testChar = Character.toLowerCase(testChar);
+            }
 
             if (patternChar == testChar) {
                 iPattern++;
