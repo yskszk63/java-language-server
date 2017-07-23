@@ -343,7 +343,7 @@ class JavaLanguageServer implements LanguageServer {
             @Override
             public void didSave(DidSaveTextDocumentParams params) {
                 // Re-lint all active documents
-                doLint(activeDocuments.keySet());
+                doLint(openFiles());
             }
         };
     }
@@ -470,7 +470,7 @@ class JavaLanguageServer implements LanguageServer {
 
             @Override
             public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
-                doLint(activeDocuments.keySet());
+                doLint(openFiles());
             }
         };
     }
