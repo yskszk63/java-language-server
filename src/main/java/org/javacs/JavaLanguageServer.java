@@ -38,53 +38,14 @@ class JavaLanguageServer implements LanguageServer {
             new JavaWorkspaceService(client, this, textDocuments);
     private Path workspaceRoot = Paths.get(".");
 
-    @Override
-    public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
-        workspaceRoot = Paths.get(params.getRootPath()).toAbsolutePath().normalize();
-
-        InitializeResult result = new InitializeResult();
-        ServerCapabilities c = new ServerCapabilities();
-
-        c.setTextDocumentSync(TextDocumentSyncKind.Incremental);
-        c.setDefinitionProvider(true);
-        c.setCompletionProvider(new CompletionOptions(true, ImmutableList.of(".")));
-        c.setHoverProvider(true);
-        c.setWorkspaceSymbolProvider(true);
-        c.setReferencesProvider(true);
-        c.setDocumentSymbolProvider(true);
-        c.setCodeActionProvider(true);
-        c.setExecuteCommandProvider(
-                new ExecuteCommandOptions(ImmutableList.of("Java.importClass")));
-        c.setSignatureHelpProvider(new SignatureHelpOptions(ImmutableList.of("(", ",")));
-
-        result.setCapabilities(c);
-
-        return CompletableFuture.completedFuture(result);
-    }
-
-    @Override
-    public CompletableFuture<Object> shutdown() {
-        return CompletableFuture.completedFuture(null);
-    }
-
-    @Override
-    public void exit() {}
-
-    @Override
-    public TextDocumentService getTextDocumentService() {
-        return textDocuments;
-    }
-
-    @Override
-    public WorkspaceService getWorkspaceService() {
-        return workspace;
-    }
-
-    // TODO move to top
     private Configured cacheConfigured;
     private JavaSettings cacheSettings;
     private Path cacheWorkspaceRoot;
 
+    /**
+     * Configured java compiler + indices based on workspace settings and inferred source / class
+     * paths
+     */
     Configured configured() {
         if (cacheConfigured == null
                 || !Objects.equals(workspace.settings(), cacheSettings)
@@ -152,6 +113,48 @@ class JavaLanguageServer implements LanguageServer {
                         c.publishDiagnostics(
                                 new PublishDiagnosticsParams(
                                         file.toUri().toString(), new ArrayList<>())));
+    }
+
+    @Override
+    public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
+        workspaceRoot = Paths.get(params.getRootPath()).toAbsolutePath().normalize();
+
+        InitializeResult result = new InitializeResult();
+        ServerCapabilities c = new ServerCapabilities();
+
+        c.setTextDocumentSync(TextDocumentSyncKind.Incremental);
+        c.setDefinitionProvider(true);
+        c.setCompletionProvider(new CompletionOptions(true, ImmutableList.of(".")));
+        c.setHoverProvider(true);
+        c.setWorkspaceSymbolProvider(true);
+        c.setReferencesProvider(true);
+        c.setDocumentSymbolProvider(true);
+        c.setCodeActionProvider(true);
+        c.setExecuteCommandProvider(
+                new ExecuteCommandOptions(ImmutableList.of("Java.importClass")));
+        c.setSignatureHelpProvider(new SignatureHelpOptions(ImmutableList.of("(", ",")));
+
+        result.setCapabilities(c);
+
+        return CompletableFuture.completedFuture(result);
+    }
+
+    @Override
+    public CompletableFuture<Object> shutdown() {
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public void exit() {}
+
+    @Override
+    public TextDocumentService getTextDocumentService() {
+        return textDocuments;
+    }
+
+    @Override
+    public WorkspaceService getWorkspaceService() {
+        return workspace;
     }
 
     public Optional<Element> findSymbol(URI file, int line, int character) {
