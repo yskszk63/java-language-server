@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
 import javax.tools.StandardLocation;
+import org.javacs.pubapi.PubApi;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -29,34 +30,68 @@ public class IncrementalFileManagerTest {
 
     @Test
     public void sourceFileSignature() {
-        String sig = test.sourceSignature("com.example.Signatures").get();
+        PubApi sig = test.sourceSignature("com.example.Signatures").get();
 
-        assertThat(sig, containsString("public void voidMethod()"));
-        assertThat(sig, containsString("public java.lang.String stringMethod()"));
-        assertThat(sig, not(containsString("public void privateMethod()")));
-        assertThat(sig, containsString("Signatures(int)"));
-        assertThat(sig, containsString("StaticInnerClass"));
-        assertThat(sig, containsString("void innerMethod()"));
-        assertThat(sig, containsString("RegularInnerClass"));
+        assertThat(
+                sig.types.get("com.example.Signatures").pubApi.methods.keySet(),
+                hasItems("void voidMethod()", "java.lang.String stringMethod()"));
+        assertThat(
+                sig.types.get("com.example.Signatures").pubApi.methods.keySet(),
+                not(hasItems("void privateMethod()")));
+        assertThat(
+                sig.types.get("com.example.Signatures").pubApi.types.keySet(),
+                hasItems(
+                        "com.example.Signatures$RegularInnerClass",
+                        "com.example.Signatures$StaticInnerClass"));
     }
 
     @Test
     public void classFileSignature() {
-        String sig = test.classSignature("com.example.Signatures").get();
+        PubApi sig = test.classSignature("com.example.Signatures").get();
 
-        assertThat(sig, containsString("public void voidMethod()"));
-        assertThat(sig, containsString("public java.lang.String stringMethod()"));
-        assertThat(sig, not(containsString("public void privateMethod()")));
-        assertThat(sig, containsString("Signatures(int)"));
-        assertThat(sig, containsString("StaticInnerClass"));
-        assertThat(sig, containsString("void innerMethod()"));
-        assertThat(sig, containsString("RegularInnerClass"));
+        assertThat(
+                sig.types.get("com.example.Signatures").pubApi.methods.keySet(),
+                hasItems("void voidMethod()", "java.lang.String stringMethod()"));
+        assertThat(
+                sig.types.get("com.example.Signatures").pubApi.methods.keySet(),
+                not(hasItems("void privateMethod()")));
+        assertThat(
+                sig.types.get("com.example.Signatures").pubApi.types.keySet(),
+                hasItems(
+                        "com.example.Signatures$RegularInnerClass",
+                        "com.example.Signatures$StaticInnerClass"));
     }
 
     @Test
     public void simpleSignatureEquals() {
-        String classSig = test.classSignature("com.example.Signatures").get(),
+        PubApi classSig = test.classSignature("com.example.Signatures").get(),
                 sourceSig = test.sourceSignature("com.example.Signatures").get();
+
+        assertThat(classSig, equalTo(sourceSig));
+    }
+
+    @Test
+    public void packagePrivateSourceSignature() {
+        PubApi sig = test.sourceSignature("com.example.PackagePrivate").get();
+
+        assertThat(
+                sig.types.get("com.example.PackagePrivate").pubApi.methods.keySet(),
+                hasItem("void packagePrivateMethod()"));
+    }
+
+    @Test
+    public void packagePrivateClassSignature() {
+        PubApi sig = test.classSignature("com.example.PackagePrivate").get();
+
+        assertThat(
+                sig.types.get("com.example.PackagePrivate").pubApi.methods.keySet(),
+                hasItem("void packagePrivateMethod()"));
+    }
+
+    @Test
+    public void packagePrivateEquals() {
+        PubApi classSig = test.classSignature("com.example.PackagePrivate").get(),
+                sourceSig = test.sourceSignature("com.example.PackagePrivate").get();
 
         assertThat(classSig, equalTo(sourceSig));
     }

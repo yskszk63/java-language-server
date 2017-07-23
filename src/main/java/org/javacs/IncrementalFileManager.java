@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -9,11 +8,9 @@ import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.util.JavacTask;
 import com.sun.tools.javac.api.JavacTool;
-import com.sun.tools.sjavac.comp.PubapiVisitor;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,6 +22,7 @@ import java.util.logging.Logger;
 import javax.lang.model.element.TypeElement;
 import javax.tools.*;
 import javax.tools.JavaFileObject.Kind;
+import org.javacs.pubapi.*;
 
 /**
  * An implementation of JavaFileManager that removes any .java source files where there is an
@@ -280,7 +278,7 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
     }
 
     /** Signatures of all non-private methods and fields in a .java file */
-    Optional<String> sourceSignature(String qualifiedName) {
+    Optional<PubApi> sourceSignature(String qualifiedName) {
         JavacTask task =
                 javac.getTask(
                         null, fileManager, __ -> {}, ImmutableList.of(), null, ImmutableList.of());
@@ -290,7 +288,7 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
     }
 
     /** Signatures of all non-private methods and fields in a .class file */
-    Optional<String> classSignature(String qualifiedName) {
+    Optional<PubApi> classSignature(String qualifiedName) {
         JavacTask task =
                 javac.getTask(
                         null,
@@ -304,20 +302,16 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
         return signature(element);
     }
 
-    private static Optional<String> signature(TypeElement element) {
+    private static Optional<PubApi> signature(TypeElement element) {
         if (element == null) return Optional.empty();
         else {
-            StringBuffer buffer = new StringBuffer();
+            PubapiVisitor visit = new PubapiVisitor();
 
-            new PubapiVisitor(buffer).scan(element);
+            visit.scan(element);
 
-            // This is super-hacky and can theoretically fail but it's unlikely
-            // Java 9 has a better implementation of PubApi, switch to that on upgrade
-            String[] sorted = buffer.toString().split("\n");
+            PubApi api = visit.getCollectedPubApi();
 
-            Arrays.sort(sorted);
-
-            return Optional.of(Joiner.on("\n").join(sorted));
+            return Optional.of(api);
         }
     }
 
