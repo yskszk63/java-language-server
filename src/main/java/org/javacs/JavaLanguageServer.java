@@ -43,6 +43,7 @@ class JavaLanguageServer implements LanguageServer {
     private JavaSettings cacheSettings;
     private Path cacheWorkspaceRoot;
     private Instant cacheInferConfig = Instant.EPOCH;
+    private Set<Path> cacheSourcePath = Collections.emptySet();
 
     /**
      * Configured java compiler + indices based on workspace settings and inferred source / class
@@ -54,11 +55,13 @@ class JavaLanguageServer implements LanguageServer {
         if (cacheConfigured == null
                 || !Objects.equals(workspace.settings(), cacheSettings)
                 || !Objects.equals(workspaceRoot, cacheWorkspaceRoot)
-                || cacheInferConfig.isBefore(inferConfig)) {
+                || cacheInferConfig.isBefore(inferConfig)
+                || !cacheConfigured.index.sourcePath().equals(cacheSourcePath)) {
             cacheConfigured = createCompiler(workspace.settings(), workspaceRoot);
             cacheSettings = workspace.settings();
             cacheWorkspaceRoot = workspaceRoot;
             cacheInferConfig = inferConfig;
+            cacheSourcePath = cacheConfigured.index.sourcePath();
 
             clearDiagnostics();
         }
