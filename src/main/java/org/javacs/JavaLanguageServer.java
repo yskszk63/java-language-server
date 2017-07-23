@@ -13,6 +13,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -41,18 +42,23 @@ class JavaLanguageServer implements LanguageServer {
     private Configured cacheConfigured;
     private JavaSettings cacheSettings;
     private Path cacheWorkspaceRoot;
+    private Instant cacheInferConfig = Instant.EPOCH;
 
     /**
      * Configured java compiler + indices based on workspace settings and inferred source / class
      * paths
      */
     Configured configured() {
+        Instant inferConfig = InferConfig.buildFilesModified(workspaceRoot);
+
         if (cacheConfigured == null
                 || !Objects.equals(workspace.settings(), cacheSettings)
-                || !Objects.equals(workspaceRoot, cacheWorkspaceRoot)) {
+                || !Objects.equals(workspaceRoot, cacheWorkspaceRoot)
+                || cacheInferConfig.isBefore(inferConfig)) {
             cacheConfigured = createCompiler(workspace.settings(), workspaceRoot);
             cacheSettings = workspace.settings();
             cacheWorkspaceRoot = workspaceRoot;
+            cacheInferConfig = inferConfig;
 
             clearDiagnostics();
         }

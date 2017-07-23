@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.*;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -50,6 +51,33 @@ class InferConfig {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    static Instant buildFilesModified(Path workspaceRoot) {
+        Instant workspaceModified = fileModified(workspaceRoot.resolve("WORKSPACE")),
+                pomModified = fileModified(workspaceRoot.resolve("pom.xml"));
+
+        return maxTime(workspaceModified, pomModified);
+    }
+
+    private static Instant fileModified(Path file) {
+        if (Files.exists(file)) {
+            try {
+                return Files.getLastModifiedTime(file).toInstant();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        } else return Instant.EPOCH;
+    }
+
+    private static Instant maxTime(Instant... of) {
+        Instant result = Instant.EPOCH;
+
+        for (Instant each : of) {
+            if (each.isAfter(result)) result = each;
+        }
+
+        return result;
     }
 
     /**
