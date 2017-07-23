@@ -16,7 +16,6 @@
 
 ## Polish
 * Status bar info during indexing
-* Sort local variables first
 * Convert {@tag ...} to `<tag>...</tag>` (see vscode-java)
 
 ## Autocomplete

@@ -647,7 +647,7 @@ class Completions {
         item.setInsertText(insertText);
         item.setFilterText(className);
         item.setAdditionalTextEdits(addImport(qualifiedName));
-        item.setSortText("2/" + className);
+        item.setSortText("3/" + className);
         item.setData(key);
 
         return item;
@@ -661,7 +661,7 @@ class Completions {
         item.setDetail(packageName);
         item.setInsertText(simpleName);
         item.setAdditionalTextEdits(addImport(qualifiedName));
-        item.setSortText("2/" + simpleName);
+        item.setSortText("3/" + simpleName);
         item.setData(qualifiedName);
 
         // TODO implement vscode resolve-completion-item
@@ -683,7 +683,7 @@ class Completions {
                         item.setKind(CompletionItemKind.Module);
                         item.setLabel(id);
                         item.setInsertText(id);
-                        item.setSortText("0/" + id);
+                        item.setSortText("1/" + id);
 
                         return Stream.of(item);
                     }
@@ -718,7 +718,7 @@ class Completions {
 
                         item.setKind(CompletionItemKind.Reference);
                         item.setLabel(name);
-                        item.setSortText("0/" + name);
+                        item.setSortText("1/" + name);
 
                         return Stream.of(item);
                     }
@@ -729,18 +729,22 @@ class Completions {
                         item.setKind(CompletionItemKind.Enum);
                         item.setLabel(name);
                         item.setDetail(e.getEnclosingElement().getSimpleName().toString());
-                        item.setSortText("0/" + name);
+                        item.setSortText("1/" + name);
 
                         return Stream.of(item);
                     }
                 case FIELD:
                     {
                         CompletionItem item = new CompletionItem();
+                        boolean isField = e.getEnclosingElement().getKind() == ElementKind.CLASS;
 
-                        item.setKind(CompletionItemKind.Property);
+                        item.setKind(
+                                isField
+                                        ? CompletionItemKind.Property
+                                        : CompletionItemKind.Variable);
                         item.setLabel(name);
                         item.setDetail(ShortTypePrinter.print(e.asType()));
-                        item.setSortText("0/" + name);
+                        item.setSortText(String.format("%s/%s", isField ? 1 : 0, name));
 
                         return Stream.of(item);
                     }
@@ -752,7 +756,7 @@ class Completions {
 
                         item.setKind(CompletionItemKind.Variable);
                         item.setLabel(name);
-                        item.setSortText("0/" + name);
+                        item.setSortText("1/" + name);
 
                         return Stream.of(item);
                     }
@@ -766,7 +770,7 @@ class Completions {
                         item.setDetail(Hovers.methodSignature(method, true, false));
                         item.setInsertText(name); // TODO
                         item.setFilterText(name);
-                        item.setSortText("0/" + name);
+                        item.setSortText("1/" + name);
                         item.setData(docs.methodKey(method));
 
                         return Stream.of(item);
@@ -776,8 +780,8 @@ class Completions {
                         TypeElement enclosingClass = (TypeElement) e.getEnclosingElement();
                         int order =
                                 isAlreadyImported(enclosingClass.getQualifiedName().toString())
-                                        ? 1
-                                        : 2;
+                                        ? 2
+                                        : 3;
                         name = enclosingClass.getSimpleName().toString();
 
                         ExecutableElement method = (ExecutableElement) e;
