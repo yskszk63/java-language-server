@@ -9,6 +9,7 @@
 * Autocomplete new MethodScopeClass| adds 'import .MethodScopeClass'
 * implements | doesn't autocomplete
 * super.[protected member] doesn't autocomplete
+* When there is an annotation processor in the *client* dependencies, linting fails
 
 ## Default configuration
 * Alert if we can't find a dependency
