@@ -3,7 +3,9 @@ package org.javacs;
 import com.sun.tools.javac.api.ClientCodeWrapper;
 import com.sun.tools.javac.util.DiagnosticSource;
 import com.sun.tools.javac.util.JCDiagnostic;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.logging.Logger;
 import javax.tools.JavaFileObject;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
@@ -24,7 +26,11 @@ class Lints {
             diagnostic.setMessage(error.getMessage(null));
 
             return Optional.of(diagnostic);
-        } else return Optional.empty();
+        } else {
+            LOG.warning("Skipped " + error.getMessage(Locale.getDefault()));
+
+            return Optional.empty();
+        }
     }
 
     private static DiagnosticSeverity severity(javax.tools.Diagnostic.Kind kind) {
@@ -59,4 +65,6 @@ class Lints {
                         source.getLineNumber((int) end) - 1,
                         source.getColumnNumber((int) end, true) - 1));
     }
+
+    private static final Logger LOG = Logger.getLogger("main");
 }
