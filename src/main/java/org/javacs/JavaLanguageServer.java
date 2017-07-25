@@ -180,40 +180,39 @@ class JavaLanguageServer implements LanguageServer {
     void installClient(LanguageClient client) {
         this.client.complete(client);
 
-        Logger.getLogger("")
-                .addHandler(
-                        new Handler() {
-                            @Override
-                            public void publish(LogRecord record) {
-                                String message = record.getMessage();
+        Handler sendToClient =
+                new Handler() {
+                    @Override
+                    public void publish(LogRecord record) {
+                        String message = record.getMessage();
 
-                                if (record.getThrown() != null) {
-                                    StringWriter trace = new StringWriter();
+                        if (record.getThrown() != null) {
+                            StringWriter trace = new StringWriter();
 
-                                    record.getThrown().printStackTrace(new PrintWriter(trace));
-                                    message += "\n" + trace;
-                                }
+                            record.getThrown().printStackTrace(new PrintWriter(trace));
+                            message += "\n" + trace;
+                        }
 
-                                client.logMessage(
-                                        new MessageParams(
-                                                messageType(record.getLevel().intValue()),
-                                                message));
-                            }
+                        client.logMessage(
+                                new MessageParams(
+                                        messageType(record.getLevel().intValue()), message));
+                    }
 
-                            private MessageType messageType(int level) {
-                                if (level >= Level.SEVERE.intValue()) return MessageType.Error;
-                                else if (level >= Level.WARNING.intValue())
-                                    return MessageType.Warning;
-                                else if (level >= Level.INFO.intValue()) return MessageType.Info;
-                                else return MessageType.Log;
-                            }
+                    private MessageType messageType(int level) {
+                        if (level >= Level.SEVERE.intValue()) return MessageType.Error;
+                        else if (level >= Level.WARNING.intValue()) return MessageType.Warning;
+                        else if (level >= Level.INFO.intValue()) return MessageType.Info;
+                        else return MessageType.Log;
+                    }
 
-                            @Override
-                            public void flush() {}
+                    @Override
+                    public void flush() {}
 
-                            @Override
-                            public void close() throws SecurityException {}
-                        });
+                    @Override
+                    public void close() throws SecurityException {}
+                };
+
+        Logger.getLogger("").addHandler(sendToClient);
     }
 
     static void onDiagnostic(Diagnostic<? extends JavaFileObject> diagnostic) {
