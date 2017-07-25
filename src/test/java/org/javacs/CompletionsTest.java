@@ -486,8 +486,7 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteConstructor.java";
 
         // Static methods
-        List<? extends CompletionItem> items = items(file, 5, 25);
-        List<String> suggestions = Lists.transform(items, i -> i.getInsertText());
+        Set<String> suggestions = insertText(file, 5, 25);
 
         assertThat(suggestions, hasItems("AutocompleteConstructor<>", "AutocompleteMember"));
     }
@@ -500,7 +499,7 @@ public class CompletionsTest extends CompletionsBase {
         List<? extends CompletionItem> items = items(file, 6, 19);
         List<String> suggestions = Lists.transform(items, i -> i.getInsertText());
 
-        assertThat(suggestions, hasItems("ArrayList<>"));
+        assertThat(suggestions, hasItems("ArrayList<>($0)"));
 
         for (CompletionItem each : items) {
             if (each.getInsertText().equals("ArrayList<>"))

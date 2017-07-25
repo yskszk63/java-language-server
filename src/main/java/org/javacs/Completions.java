@@ -16,8 +16,10 @@ import java.util.stream.StreamSupport;
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.util.Elements;
+import org.eclipse.lsp4j.Command;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
+import org.eclipse.lsp4j.InsertTextFormat;
 import org.eclipse.lsp4j.TextEdit;
 
 class Completions {
@@ -625,6 +627,9 @@ class Completions {
         return name.equals(thisName) || name.equals(superName);
     }
 
+    private static final Command TRIGGER_SIGNATURE_HELP =
+            new Command("", "editor.action.triggerParameterHints");
+
     /**
      * Complete constructor with minimal type information.
      *
@@ -642,9 +647,14 @@ class Completions {
 
         if (hasTypeParameters) insertText += "<>";
 
+        insertText += "($0)";
+
         item.setKind(CompletionItemKind.Constructor);
         item.setLabel(className);
+        item.setDetail(packageName);
         item.setInsertText(insertText);
+        item.setInsertTextFormat(InsertTextFormat.Snippet);
+        item.setCommand(TRIGGER_SIGNATURE_HELP);
         item.setFilterText(className);
         item.setAdditionalTextEdits(addImport(qualifiedName));
         item.setSortText("3/" + className);
@@ -768,7 +778,9 @@ class Completions {
                         item.setKind(CompletionItemKind.Method);
                         item.setLabel(name);
                         item.setDetail(Hovers.methodSignature(method, true, false));
-                        item.setInsertText(name); // TODO
+                        item.setInsertText(name + "($0)");
+                        item.setInsertTextFormat(InsertTextFormat.Snippet);
+                        item.setCommand(TRIGGER_SIGNATURE_HELP);
                         item.setFilterText(name);
                         item.setSortText("1/" + name);
                         item.setData(docs.methodKey(method));
@@ -790,10 +802,14 @@ class Completions {
 
                         if (!enclosingClass.getTypeParameters().isEmpty()) insertText += "<>";
 
+                        insertText += "($0)";
+
                         item.setKind(CompletionItemKind.Constructor);
                         item.setLabel(name);
                         item.setDetail(Hovers.methodSignature(method, false, false));
                         item.setInsertText(insertText);
+                        item.setInsertTextFormat(InsertTextFormat.Snippet);
+                        item.setCommand(TRIGGER_SIGNATURE_HELP);
                         item.setFilterText(name);
                         item.setAdditionalTextEdits(
                                 addImport(enclosingClass.getQualifiedName().toString()));

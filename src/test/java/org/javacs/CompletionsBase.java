@@ -23,8 +23,15 @@ public class CompletionsBase {
     }
 
     static String itemInsertText(CompletionItem i) {
-        if (i.getInsertText() != null) return i.getInsertText();
-        else return i.getLabel();
+        String text = i.getInsertText();
+
+        if (text == null) text = i.getLabel();
+
+        assert text != null : "Either insertText or label must be defined";
+
+        if (text.endsWith("($0)")) text = text.substring(0, text.length() - "($0)".length());
+
+        return text;
     }
 
     protected Set<String> documentation(String file, int row, int column) throws IOException {
