@@ -18,7 +18,6 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.util.*;
-import java.util.function.Supplier;
 import javax.tools.JavaFileObject;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
@@ -46,16 +45,16 @@ class RefactorFile {
     }
 
     private TextEdit insertSomehow(String packageName, String className) {
-        Supplier<TextEdit> top = () -> insertAtTop(packageName, className),
-                afterPackage = () -> insertAfterPackage(packageName, className).orElseGet(top),
-                afterImports =
-                        () -> insertAfterImports(packageName, className).orElseGet(afterPackage),
-                alphabetical =
-                        () ->
-                                insertInAlphabeticalOrder(packageName, className)
-                                        .orElseGet(afterImports);
+        Optional<TextEdit> done = insertInAlphabeticalOrder(packageName, className);
+        if (done.isPresent()) return done.get();
 
-        return alphabetical.get();
+        done = insertAfterImports(packageName, className);
+        if (done.isPresent()) return done.get();
+
+        done = insertAfterPackage(packageName, className);
+        if (done.isPresent()) return done.get();
+
+        return insertAtTop(packageName, className);
     }
 
     private Optional<TextEdit> insertInAlphabeticalOrder(String packageName, String className) {
