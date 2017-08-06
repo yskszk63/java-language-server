@@ -3,20 +3,20 @@ package org.javacs;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.*;
 
-public class ShowMessageException extends RuntimeException {
-    public final MessageParams message;
+class ShowMessageException extends RuntimeException {
+    private final MessageParams message;
 
-    public ShowMessageException(MessageParams message, Exception cause) {
+    ShowMessageException(MessageParams message, Exception cause) {
         super(message.getMessage(), cause);
 
         this.message = message;
     }
 
-    public static ShowMessageException error(String message, Exception cause) {
+    static ShowMessageException error(String message, Exception cause) {
         return create(MessageType.Error, message, cause);
     }
 
-    public static ShowMessageException warning(String message, Exception cause) {
+    static ShowMessageException warning(String message, Exception cause) {
         return create(MessageType.Warning, message, cause);
     }
 
