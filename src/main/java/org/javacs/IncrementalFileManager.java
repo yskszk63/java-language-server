@@ -150,57 +150,57 @@ class IncrementalFileManager extends ForwardingJavaFileManager<JavaFileManager> 
                 new CheckedSignature(
                         sourceFile.toUri(), Instant.ofEpochMilli(sourceFile.getLastModified()));
 
-        return upToDate.computeIfAbsent(
-                key,
-                newKey -> {
-                    try {
-                        JavacTask task =
-                                javac.getTask(
-                                        null,
-                                        classOnlyFileManager,
-                                        __ -> {},
-                                        ImmutableList.of(),
-                                        null,
-                                        ImmutableList.of(sourceFile));
-                        CompilationUnitTree tree = task.parse().iterator().next();
+        return upToDate.computeIfAbsent(key, __ -> computeUpToDate(packageName, sourceFile));
+    }
 
-                        for (Tree each : tree.getTypeDecls()) {
-                            if (each instanceof ClassTree) {
-                                ClassTree sourceClass = (ClassTree) each;
-                                String qualifiedName =
-                                        packageName.isEmpty()
-                                                ? sourceClass.getSimpleName().toString()
-                                                : packageName + "." + sourceClass.getSimpleName();
+    private boolean computeUpToDate(String packageName, JavaFileObject sourceFile) {
+        try {
+            JavacTask task =
+                    javac.getTask(
+                            null,
+                            classOnlyFileManager,
+                            __ -> {},
+                            ImmutableList.of(),
+                            null,
+                            ImmutableList.of(sourceFile));
+            CompilationUnitTree tree = task.parse().iterator().next();
 
-                                if (!hasUpToDateSignature(qualifiedName)) {
-                                    JavaFileObject classFile =
-                                            super.getJavaFileForInput(
-                                                    StandardLocation.CLASS_PATH,
-                                                    qualifiedName,
-                                                    JavaFileObject.Kind.CLASS);
+            for (Tree each : tree.getTypeDecls()) {
+                if (each instanceof ClassTree) {
+                    ClassTree sourceClass = (ClassTree) each;
+                    String qualifiedName =
+                            packageName.isEmpty()
+                                    ? sourceClass.getSimpleName().toString()
+                                    : packageName + "." + sourceClass.getSimpleName();
 
-                                    if (classFile != null) {
-                                        LOG.warning(
-                                                String.format(
-                                                        "%s has a different signature than %s",
-                                                        sourceFile.toUri(), classFile));
-                                    }
+                    if (!hasUpToDateSignature(qualifiedName)) {
+                        JavaFileObject classFile =
+                                super.getJavaFileForInput(
+                                        StandardLocation.CLASS_PATH,
+                                        qualifiedName,
+                                        JavaFileObject.Kind.CLASS);
 
-                                    return false;
-                                }
-                            }
+                        if (classFile != null) {
+                            LOG.warning(
+                                    String.format(
+                                            "%s has a different signature than %s",
+                                            sourceFile.toUri(), classFile));
                         }
 
-                        LOG.info(
-                                String.format(
-                                        "%s appears to be out-of-date but its class files have a matching public API",
-                                        sourceFile.toUri()));
-
-                        return true;
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
+                        return false;
                     }
-                });
+                }
+            }
+
+            LOG.info(
+                    String.format(
+                            "%s appears to be out-of-date but its class files have a matching public API",
+                            sourceFile.toUri()));
+
+            return true;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private Optional<JavaFileObject> primaryClassFile(
