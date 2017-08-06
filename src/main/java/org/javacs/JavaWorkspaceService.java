@@ -54,8 +54,7 @@ class JavaWorkspaceService implements WorkspaceService {
                             .applyEdit(
                                     new ApplyWorkspaceEditParams(
                                             new WorkspaceEdit(
-                                                    Collections.singletonMap(fileString, edits),
-                                                    null)));
+                                                    Collections.singletonMap(fileString, edits))));
                 }
 
                 break;
