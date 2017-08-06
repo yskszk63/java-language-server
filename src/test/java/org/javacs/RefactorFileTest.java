@@ -3,14 +3,18 @@ package org.javacs;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertThat;
 
+import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.util.JavacTask;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.net.URI;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.logging.Logger;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextEdit;
@@ -25,7 +29,7 @@ public class RefactorFileTest {
     @Test
     public void addImportToEmpty() {
         String before = "package org.javacs;\n" + "\n" + "public class Example { void main() { } }";
-        List<TextEdit> edits = addImport(file(before), "org.javacs", "Foo");
+        List<TextEdit> edits = addImport(before, "org.javacs", "Foo");
         String after = applyEdits(before, edits);
 
         assertThat(
@@ -46,7 +50,7 @@ public class RefactorFileTest {
                         + "import java.util.List;\n"
                         + "\n"
                         + "public class Example { void main() { } }";
-        List<TextEdit> edits = addImport(file(before), "org.javacs", "Foo");
+        List<TextEdit> edits = addImport(before, "org.javacs", "Foo");
         String after = applyEdits(before, edits);
 
         assertThat(
@@ -68,7 +72,7 @@ public class RefactorFileTest {
                         + "import org.javacs.Foo;\n"
                         + "\n"
                         + "public class Example { void main() { } }";
-        List<TextEdit> edits = addImport(file(before), "java.util", "List");
+        List<TextEdit> edits = addImport(before, "java.util", "List");
         String after = applyEdits(before, edits);
 
         assertThat(
@@ -90,7 +94,7 @@ public class RefactorFileTest {
                         + "import java.util.List;\n"
                         + "\n"
                         + "public class Example { void main() { } }";
-        List<TextEdit> edits = addImport(file(before), "java.util", "List");
+        List<TextEdit> edits = addImport(before, "java.util", "List");
         String after = applyEdits(before, edits);
 
         assertThat(
@@ -107,7 +111,7 @@ public class RefactorFileTest {
     public void noPackage() {
         String before =
                 "import java.util.List;\n" + "\n" + "public class Example { void main() { } }";
-        List<TextEdit> edits = addImport(file(before), "org.javacs", "Foo");
+        List<TextEdit> edits = addImport(before, "org.javacs", "Foo");
         String after = applyEdits(before, edits);
 
         assertThat(
@@ -122,7 +126,7 @@ public class RefactorFileTest {
     @Test
     public void noPackageNoImports() {
         String before = "public class Example { void main() { } }";
-        List<TextEdit> edits = addImport(file(before), "org.javacs", "Foo");
+        List<TextEdit> edits = addImport(before, "org.javacs", "Foo");
         String after = applyEdits(before, edits);
 
         assertThat(
@@ -133,8 +137,24 @@ public class RefactorFileTest {
                                 + "public class Example { void main() { } }"));
     }
 
-    private List<TextEdit> addImport(ParseResult parse, String packageName, String className) {
-        return new RefactorFile(parse.task, parse.tree).addImport(packageName, className);
+    private List<TextEdit> addImport(String content, String packageName, String className) {
+        List<TextEdit> result = new ArrayList<>();
+        JavacHolder compiler =
+                JavacHolder.create(
+                        Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
+                        Collections.emptySet());
+        BiConsumer<JavacTask, CompilationUnitTree> doRefactor =
+                (task, tree) -> {
+                    List<TextEdit> edits =
+                            new RefactorFile(task, tree).addImport(packageName, className);
+
+                    result.addAll(edits);
+                };
+
+        compiler.compileBatch(
+                Collections.singletonMap(FAKE_FILE, Optional.of(content)), doRefactor);
+
+        return result;
     }
 
     private String applyEdits(String before, List<TextEdit> edits) {
@@ -199,15 +219,5 @@ public class RefactorFileTest {
         } catch (IOException e) {
             throw ShowMessageException.error(e.getMessage(), e);
         }
-    }
-
-    private ParseResult file(String content) {
-        JavacHolder compiler =
-                JavacHolder.create(
-                        Collections.singleton(Paths.get("src/test/test-project/workspace/src")),
-                        Collections.emptySet());
-
-        return compiler.parse(
-                FAKE_FILE, Optional.of(content), error -> LOG.warning(error.toString()));
     }
 }

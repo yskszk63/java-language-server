@@ -2,7 +2,6 @@ package org.javacs;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TaskEvent;
@@ -298,28 +297,6 @@ public class JavacHolder {
 
     private void stopCollectingErrors() {
         onErrorDelegate = error -> {};
-    }
-
-    public ParseResult parse(
-            URI file, Optional<String> textContent, DiagnosticListener<JavaFileObject> onError) {
-        JavaFileObject object = findFile(file, textContent);
-        JavacTask task = createTask(Collections.singleton(object), false);
-        onErrorDelegate = onError;
-
-        try {
-            List<CompilationUnitTree> trees = Lists.newArrayList(task.parse());
-
-            if (trees.isEmpty())
-                throw new RuntimeException("Compiling " + file + " produced 0 results");
-            else if (trees.size() == 1) return new ParseResult(task, trees.get(0));
-            else
-                throw new RuntimeException(
-                        "Compiling " + file + " produced " + trees.size() + " results");
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } finally {
-            onErrorDelegate = error -> {};
-        }
     }
 
     private DiagnosticCollector<JavaFileObject> doCompile(
