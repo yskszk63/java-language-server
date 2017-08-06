@@ -6,12 +6,12 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.type.*;
 import javax.lang.model.util.AbstractTypeVisitor8;
 
-public class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
+class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
     private static final Logger LOG = Logger.getLogger("main");
 
     private ShortTypePrinter() {}
 
-    public static String print(TypeMirror type) {
+    static String print(TypeMirror type) {
         return type.accept(new ShortTypePrinter(), null);
     }
 
