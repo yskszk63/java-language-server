@@ -4,11 +4,11 @@ import java.io.IOException;
 import java.net.URI;
 import javax.tools.SimpleJavaFileObject;
 
-public class StringFileObject extends SimpleJavaFileObject {
-    public final String content;
-    public final URI path; // TODO rename
+class StringFileObject extends SimpleJavaFileObject {
+    private final String content;
+    private final URI path; // TODO rename
 
-    public StringFileObject(String content, URI path) {
+    StringFileObject(String content, URI path) {
         super(path, Kind.SOURCE);
 
         this.content = content;
