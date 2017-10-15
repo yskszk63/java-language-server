@@ -294,7 +294,7 @@ class Completions {
 
         if (packageName.equals("java.lang")) return true;
 
-        if (packageName.equals(compilationUnit.getPackageName().toString())) return true;
+        if (packageName.equals(Objects.toString(compilationUnit.getPackageName(), ""))) return true;
 
         for (ImportTree each : compilationUnit.getImports()) {
             if (each.isStatic()) continue;
