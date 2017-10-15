@@ -419,11 +419,9 @@ class Completions {
     /** Suggest all completions that are visible from scope */
     private Stream<? extends Element> alreadyImportedCompletions(
             String partialIdentifier, Scope scope) {
-        return alreadyImportedSymbols(scope)
-                .filter(
-                        e ->
-                                containsCharactersInOrder(
-                                        e.getSimpleName(), partialIdentifier, false));
+        Predicate<Element> matchesName =
+                e -> containsCharactersInOrder(e.getSimpleName(), partialIdentifier, false);
+        return alreadyImportedSymbols(scope).filter(matchesName);
     }
 
     private Stream<TypeElement> tryLoad(ClassPath.ClassInfo c) {
