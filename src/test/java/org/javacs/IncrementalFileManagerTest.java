@@ -20,7 +20,7 @@ public class IncrementalFileManagerTest {
             JavacTool.create().getStandardFileManager(__ -> {}, null, Charset.defaultCharset());
     private IncrementalFileManager test = new IncrementalFileManager(delegate);
     private File sourcePath = Paths.get("./src/test/test-project/workspace/src").toFile();
-    private File classPath = Paths.get("./src/test/test-project/workspace/out").toFile();
+    private File classPath = Paths.get("./src/test/test-project/workspace/target/classes").toFile();
 
     @Before
     public void setPaths() throws IOException {

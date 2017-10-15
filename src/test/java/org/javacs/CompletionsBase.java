@@ -2,7 +2,9 @@ package org.javacs;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
@@ -36,6 +38,21 @@ public class CompletionsBase {
         List<? extends CompletionItem> items = items(file, row, column);
 
         return items.stream().map(CompletionsBase::itemInsertText).collect(Collectors.toSet());
+    }
+
+    protected Map<String, Integer> insertCount(String file, int row, int column)
+            throws IOException {
+        List<? extends CompletionItem> items = items(file, row, column);
+        Map<String, Integer> result = new HashMap<>();
+
+        for (CompletionItem each : items) {
+            String key = itemInsertText(each);
+            int count = result.getOrDefault(key, 0) + 1;
+
+            result.put(key, count);
+        }
+
+        return result;
     }
 
     static String itemInsertText(CompletionItem i) {
