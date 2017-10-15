@@ -8,6 +8,7 @@ import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -25,17 +26,9 @@ import org.eclipse.lsp4j.TextEdit;
 class Completions {
 
     static Stream<CompletionItem> at(FocusedResult compiled, SymbolIndex index, Javadocs docs) {
-        return compiled.cursor
-                .map(
-                        path ->
-                                new Completions(
-                                                compiled.task,
-                                                compiled.classPath,
-                                                index,
-                                                docs,
-                                                path)
-                                        .get())
-                .orElseGet(Stream::empty);
+        Function<TreePath, Completions> newCompletions =
+                path -> new Completions(compiled.task, compiled.classPath, index, docs, path);
+        return compiled.cursor.map(newCompletions).map(Completions::get).orElseGet(Stream::empty);
     }
 
     private final JavacTask task;
@@ -47,6 +40,7 @@ class Completions {
     private final Name thisName, superName;
     private final CompilationUnitTree compilationUnit;
     private final TreePath path;
+    private final CursorContext context;
 
     private Completions(
             JavacTask task,
@@ -64,30 +58,29 @@ class Completions {
         this.docs = docs;
         this.compilationUnit = path.getCompilationUnit();
         this.path = path;
+        this.context = CursorContext.from(path);
     }
 
     private Stream<CompletionItem> get() {
         Tree leaf = path.getLeaf();
         Scope scope = trees.getScope(path);
-        CursorContext context = CursorContext.from(path);
 
         if (leaf instanceof MemberSelectTree) {
             MemberSelectTree select = (MemberSelectTree) leaf;
             TreePath expressionPath = new TreePath(path.getParentPath(), select.getExpression());
 
             return completeMembers(
-                    expressionPath, partialIdentifier(select.getIdentifier()), scope, context);
+                    expressionPath, partialIdentifier(select.getIdentifier()), scope);
         } else if (leaf instanceof MemberReferenceTree) {
             MemberReferenceTree select = (MemberReferenceTree) leaf;
             TreePath expressionPath =
                     new TreePath(path.getParentPath(), select.getQualifierExpression());
 
-            return completeMembers(
-                    expressionPath, partialIdentifier(select.getName()), scope, context);
+            return completeMembers(expressionPath, partialIdentifier(select.getName()), scope);
         } else if (leaf instanceof IdentifierTree) {
             IdentifierTree id = (IdentifierTree) leaf;
 
-            return completeIdentifier(partialIdentifier(id.getName()), scope, context);
+            return completeIdentifier(partialIdentifier(id.getName()), scope);
         } else return Stream.empty();
     }
 
@@ -97,8 +90,7 @@ class Completions {
     }
 
     /** Suggest all available identifiers */
-    private Stream<CompletionItem> completeIdentifier(
-            String partialIdentifier, Scope from, CursorContext context) {
+    private Stream<CompletionItem> completeIdentifier(String partialIdentifier, Scope from) {
         switch (context) {
             case Import:
                 return packageMembers("", partialIdentifier).flatMap(this::completionItem);
@@ -151,7 +143,7 @@ class Completions {
 
     /** Suggest all accessible members of expression */
     private Stream<CompletionItem> completeMembers(
-            TreePath expression, String partialIdentifier, Scope from, CursorContext context) {
+            TreePath expression, String partialIdentifier, Scope from) {
         switch (context) {
             case NewClass:
                 {
