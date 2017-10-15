@@ -96,17 +96,16 @@ class Completions {
                 return packageMembers("", partialIdentifier).flatMap(this::completionItem);
             case NewClass:
                 {
+                    Predicate<ExecutableElement> accessible =
+                            init ->
+                                    trees.isAccessible(
+                                            from,
+                                            init,
+                                            (DeclaredType) init.getEnclosingElement().asType());
                     Stream<CompletionItem> alreadyImported =
                             alreadyImportedCompletions(partialIdentifier, from)
                                     .flatMap(this::explodeConstructors)
-                                    .filter(
-                                            init ->
-                                                    trees.isAccessible(
-                                                            from,
-                                                            init,
-                                                            (DeclaredType)
-                                                                    init.getEnclosingElement()
-                                                                            .asType()))
+                                    .filter(accessible)
                                     .flatMap(this::completionItem);
                     Stream<CompletionItem> notYetImported =
                             notImportedConstructors(partialIdentifier, from);
