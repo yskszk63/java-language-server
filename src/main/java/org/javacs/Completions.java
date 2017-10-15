@@ -384,8 +384,9 @@ class Completions {
         Stream<String> fromSourcePath =
                 accessibleSourcePathClasses(partialIdentifier, scope).map(c -> c.qualifiedName());
         Stream<String> fromClassPath =
-                accessibleClassPathClasses(partialIdentifier, scope).map(c -> c.getName());
-        // TODO remove class path classes that are also available from source path
+                accessibleClassPathClasses(partialIdentifier, scope)
+                        .map(c -> c.getName())
+                        .filter(name -> !sourcePath.isTopLevelClass(name));
 
         return Stream.concat(fromSourcePath, fromClassPath)
                 .map(this::completeClassNameFromClassPath);

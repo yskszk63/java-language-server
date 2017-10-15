@@ -1,6 +1,7 @@
 # Todo
 
 ## Bugs
+* autoc|() should'nt add an extra () before the existing one
 * import static org.| doesn't auto-complete
 * array.length doesn't auto-complete
 * Hover doesn't show 'throws ...'

@@ -247,6 +247,10 @@ class SymbolIndex {
         }
     }
 
+    boolean isTopLevelClass(String qualifiedName) {
+        return doFindDeclaringFile(qualifiedName).isPresent();
+    }
+
     Stream<ReachableClass> accessibleTopLevelClasses(String fromPackage) {
         finishedInitialIndex.join();
 
@@ -270,8 +274,13 @@ class SymbolIndex {
     Optional<URI> findDeclaringFile(TypeElement topLevelClass) {
         updateOpenFiles();
 
-        String qualifiedName = topLevelClass.getQualifiedName().toString(),
-                packageName = Completions.mostIds(qualifiedName),
+        String qualifiedName = topLevelClass.getQualifiedName().toString();
+
+        return doFindDeclaringFile(qualifiedName);
+    }
+
+    private Optional<URI> doFindDeclaringFile(String qualifiedName) {
+        String packageName = Completions.mostIds(qualifiedName),
                 className = Completions.lastId(qualifiedName);
         Predicate<Map.Entry<URI, SourceFileIndex>> containsClass =
                 entry -> {

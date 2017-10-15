@@ -7,6 +7,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.net.URLClassLoader;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.eclipse.lsp4j.CompletionItem;
@@ -745,5 +746,15 @@ public class CompletionsTest extends CompletionsBase {
         Set<String> suggestions = insertText(file, 8, 38);
 
         assertThat("suggests local variable", suggestions, hasItems("length"));
+    }
+
+    @Test
+    public void onlySuggestOnce() throws IOException {
+        String file = "/org/javacs/example/AutocompleteOnce.java";
+
+        Map<String, Integer> suggestions = insertCount(file, 5, 18);
+
+        assertThat("suggests Signatures", suggestions, hasKey("Signatures"));
+        assertThat("suggests Signatures only once", suggestions, hasEntry("Signatures", 1));
     }
 }
