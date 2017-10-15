@@ -770,7 +770,7 @@ class Completions {
                         item.setKind(CompletionItemKind.Method);
                         item.setLabel(name);
                         item.setDetail(Hovers.methodSignature(method, true, false));
-                        item.setInsertText(name + "($0)");
+                        if (context != CursorContext.Reference) item.setInsertText(name + "($0)");
                         item.setInsertTextFormat(InsertTextFormat.Snippet);
                         item.setCommand(TRIGGER_SIGNATURE_HELP);
                         item.setFilterText(name);
