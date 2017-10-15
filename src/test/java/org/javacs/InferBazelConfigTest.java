@@ -20,6 +20,7 @@ public class InferBazelConfigTest {
             new InferConfig(
                     bazelWorkspace,
                     Collections.emptyList(),
+                    Collections.emptyList(),
                     Paths.get("nowhere"),
                     Paths.get("nowhere"));
     private Path bazelBin = bazelWorkspace.resolve("bazel-bin"),

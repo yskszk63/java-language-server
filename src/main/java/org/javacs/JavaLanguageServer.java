@@ -79,9 +79,15 @@ class JavaLanguageServer implements LanguageServer {
                 gradleHome = userHome.resolve(".gradle");
         List<Artifact> externalDependencies =
                 Lists.transform(settings.java.externalDependencies, Artifact::parse);
+        List<Path> settingsClassPath = Lists.transform(settings.java.classPath, Paths::get);
 
         InferConfig infer =
-                new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome);
+                new InferConfig(
+                        workspaceRoot,
+                        externalDependencies,
+                        settingsClassPath,
+                        mavenHome,
+                        gradleHome);
         Set<Path> classPath = infer.buildClassPath(),
                 workspaceClassPath = infer.workspaceClassPath(),
                 docPath = infer.buildDocPath();

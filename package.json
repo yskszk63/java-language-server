@@ -54,6 +54,13 @@
         "configuration": {
             "title": "Java configuration",
             "properties": {
+                "java.classPath": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Relative paths from workspace root to .jar files, .zip files, or folders that should be included in the Java class path"
+                },
                 "java.externalDependencies": {
                     "type": "array",
                     "items": {

@@ -24,6 +24,8 @@ class InferConfig {
     private final Path workspaceRoot;
     /** User-specified external dependencies, configured with java.externalDependencies */
     private final Collection<Artifact> externalDependencies;
+    /** User-specified class path, configured with java.classPath */
+    private final List<Path> classPath;
     /** Location of the maven repository, usually ~/.m2 */
     private final Path mavenHome;
     /** Location of the gradle cache, usually ~/.gradle */
@@ -32,10 +34,12 @@ class InferConfig {
     InferConfig(
             Path workspaceRoot,
             Collection<Artifact> externalDependencies,
+            List<Path> classPath,
             Path mavenHome,
             Path gradleHome) {
         this.workspaceRoot = workspaceRoot;
         this.externalDependencies = externalDependencies;
+        this.classPath = classPath;
         this.mavenHome = mavenHome;
         this.gradleHome = gradleHome;
     }
@@ -91,6 +95,12 @@ class InferConfig {
                         .stream()
                         .flatMap(artifact -> stream(findAnyJar(artifact, false)));
 
+        // Settings `classPath`
+        Stream<Path> classPathJars =
+                classPath.stream().flatMap(jar -> stream(findWorkspaceJar(jar)));
+
+        result = Stream.concat(result, classPathJars);
+
         // Bazel
         if (Files.exists(workspaceRoot.resolve("WORKSPACE"))) {
             Path bazelGenFiles = workspaceRoot.resolve("bazel-genfiles");
@@ -101,6 +111,17 @@ class InferConfig {
         }
 
         return result.collect(Collectors.toSet());
+    }
+
+    private Optional<Path> findWorkspaceJar(Path jar) {
+        jar = workspaceRoot.resolve(jar);
+
+        if (Files.exists(jar)) return Optional.of(jar);
+        else {
+            LOG.warning("No such file " + jar);
+
+            return Optional.empty();
+        }
     }
 
     /**

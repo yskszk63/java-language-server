@@ -6,6 +6,7 @@ import static org.junit.Assert.*;
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import org.junit.Test;
 
@@ -16,15 +17,34 @@ public class InferConfigTest {
     private Artifact externalArtifact = new Artifact("com.external", "external-library", "1.2");
     private List<Artifact> externalDependencies = ImmutableList.of(externalArtifact);
     private InferConfig both =
-            new InferConfig(workspaceRoot, externalDependencies, mavenHome, gradleHome);
+            new InferConfig(
+                    workspaceRoot,
+                    externalDependencies,
+                    Collections.emptyList(),
+                    mavenHome,
+                    gradleHome);
     private InferConfig gradle =
-            new InferConfig(workspaceRoot, externalDependencies, Paths.get("nowhere"), gradleHome);
+            new InferConfig(
+                    workspaceRoot,
+                    externalDependencies,
+                    Collections.emptyList(),
+                    Paths.get("nowhere"),
+                    gradleHome);
     private InferConfig onlyPomXml =
             new InferConfig(
                     Paths.get("src/test/test-project/only-pom-xml"),
-                    ImmutableList.of(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
                     mavenHome,
                     Paths.get("nowhere"));
+    private Path libraryJar = Paths.get("lib/library.jar");
+    private InferConfig settingsClassPath =
+            new InferConfig(
+                    workspaceRoot,
+                    Collections.emptyList(),
+                    ImmutableList.of(libraryJar),
+                    mavenHome,
+                    gradleHome);
 
     @Test
     public void mavenClassPath() {
@@ -89,5 +109,10 @@ public class InferConfigTest {
                 contains(
                         mavenHome.resolve(
                                 "repository/com/external/external-library/1.2/external-library-1.2-sources.jar")));
+    }
+
+    @Test
+    public void settingsClassPath() {
+        assertThat(settingsClassPath.buildClassPath(), contains(workspaceRoot.resolve(libraryJar)));
     }
 }

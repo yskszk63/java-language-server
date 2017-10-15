@@ -72,6 +72,16 @@ you can specify your external dependencies using [.vscode/settings.json](https:/
 }
 ```
 
+If all else fails, you can specify the java class path manually:
+
+```json
+{
+    "java.classPath": [
+        "lib/some-dependency.jar"
+    ]
+}
+```
+
 You can generate a list of external dependencies using your build tool:
 * Maven: `mvn dependency:list` 
 * Gradle: `gradle dependencies`
