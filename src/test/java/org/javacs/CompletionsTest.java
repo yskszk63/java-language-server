@@ -427,7 +427,7 @@ public class CompletionsTest extends CompletionsBase {
         String file = "/org/javacs/example/AutocompleteReference.java";
 
         // Static methods
-        Set<String> suggestions = insertText(file, 7, 21);
+        Set<String> suggestions = insertTemplate(file, 7, 21);
 
         assertThat(suggestions, not(hasItems("methodStatic")));
         assertThat(suggestions, hasItems("methods", "getClass"));

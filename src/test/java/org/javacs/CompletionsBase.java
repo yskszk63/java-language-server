@@ -16,6 +16,22 @@ import org.eclipse.lsp4j.TextDocumentPositionParams;
 public class CompletionsBase {
     protected static final Logger LOG = Logger.getLogger("main");
 
+    protected Set<String> insertTemplate(String file, int row, int column) throws IOException {
+        List<? extends CompletionItem> items = items(file, row, column);
+
+        return items.stream().map(CompletionsBase::itemInsertTemplate).collect(Collectors.toSet());
+    }
+
+    static String itemInsertTemplate(CompletionItem i) {
+        String text = i.getInsertText();
+
+        if (text == null) text = i.getLabel();
+
+        assert text != null : "Either insertText or label must be defined";
+
+        return text;
+    }
+
     protected Set<String> insertText(String file, int row, int column) throws IOException {
         List<? extends CompletionItem> items = items(file, row, column);
 
