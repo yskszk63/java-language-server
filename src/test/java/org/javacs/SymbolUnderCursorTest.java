@@ -84,7 +84,8 @@ public class SymbolUnderCursorTest {
                 "localVariable", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 10, 16));
     }
 
-    private final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
+    // Re-using the language server makes these tests go a lot faster, but it will potentially produce surprising output if things go wrong
+    private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     private String symbolAt(String file, int line, int character) {
         Optional<Element> symbol = server.findSymbol(FindResource.uri(file), line, character);
