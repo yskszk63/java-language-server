@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.net.Socket;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -65,7 +66,18 @@ public class Main {
         return m;
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
+        try {
+            ClassLoader langTools = LangTools.createLangToolsClassLoader();
+            Class<?> main = Class.forName("org.javacs.Main", true, langTools);
+            Method run = main.getMethod("run");
+            run.invoke(null);
+        } catch (Exception e) {
+            LOG.log(Level.SEVERE, "Failed", e);
+        }
+    }
+
+    private static void run() {
         setRootFormat();
 
         try {
