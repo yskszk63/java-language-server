@@ -77,7 +77,7 @@ public class Main {
         }
     }
 
-    private static void run() {
+    public static void run() {
         setRootFormat();
 
         try {
@@ -117,7 +117,6 @@ public class Main {
 
         server.installClient(launcher.getRemoteProxy());
         launcher.startListening();
-
-        LOG.info("Socket closed");
+        LOG.info(String.format("java.version is %s", System.getProperty("java.version")));
     }
 }
