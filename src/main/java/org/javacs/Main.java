@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
+import com.sun.tools.javac.api.JavacTool;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.Socket;
@@ -77,7 +78,12 @@ public class Main {
         }
     }
 
+    public static ClassLoader checkJavacClassLoader() {
+        return JavacTool.create().getClass().getClassLoader();
+    }
+
     public static void run() {
+        assert checkJavacClassLoader() instanceof ChildFirstClassLoader;
         setRootFormat();
 
         try {

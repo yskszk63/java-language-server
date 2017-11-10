@@ -14,7 +14,8 @@ class LangTools {
         "com.sun.tools",
         "javax.annotation.processing",
         "javax.lang.model",
-        "javax.tools"
+        "javax.tools",
+        "org.javacs"
     };
 
     public static ClassLoader createLangToolsClassLoader() {

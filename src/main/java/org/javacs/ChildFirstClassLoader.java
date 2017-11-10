@@ -8,8 +8,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.logging.Logger;
 
-class ChildFirstClassLoader extends ClassLoader {
-    private final ClassLoader child, parent;
+class ChildFirstClassLoader extends URLClassLoader {
     private final String[] packages;
     private static final Logger LOG = Logger.getLogger("main");
 
@@ -38,13 +37,11 @@ class ChildFirstClassLoader extends ClassLoader {
 
     static ChildFirstClassLoader fromClassPath(
             String classPath, String[] packages, ClassLoader parent) {
-        ClassLoader child = new URLClassLoader(parseClassPath(classPath), null);
-        return new ChildFirstClassLoader(child, packages, parent);
+        return new ChildFirstClassLoader(parseClassPath(classPath), packages, parent);
     }
 
-    private ChildFirstClassLoader(ClassLoader child, String[] packages, ClassLoader parent) {
-        this.child = child;
-        this.parent = parent;
+    private ChildFirstClassLoader(URL[] urls, String[] packages, ClassLoader parent) {
+        super(urls, parent);
         this.packages = packages;
     }
 
@@ -53,11 +50,21 @@ class ChildFirstClassLoader extends ClassLoader {
         boolean fromChild = loadFromChild(name);
         Class<?> c = findLoadedClass(name);
 
-        if (c == null && fromChild) c = child.loadClass(name);
+        if (c == null && fromChild) {
+            try {
+                c = findClass(name);
 
-        if (c == null) c = parent.loadClass(name);
+                LOG.info("Loaded " + c + " from child class loader");
 
-        if (resolve) resolveClass(c);
+                return c;
+            } catch (ClassNotFoundException e) {
+                LOG.warning("Couldn't find " + name + " in child class loader");
+            }
+        }
+
+        if (c == null) c = super.loadClass(name, resolve);
+
+        if (c != null && resolve) resolveClass(c);
 
         return c;
     }
