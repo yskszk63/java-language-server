@@ -1,7 +1,5 @@
 package org.javacs;
 
-import com.google.common.base.StandardSystemProperty;
-import com.google.common.reflect.ClassPath;
 import com.sun.javadoc.ClassDoc;
 import com.sun.javadoc.MethodDoc;
 import com.sun.source.tree.*;
@@ -14,10 +12,8 @@ import com.sun.source.util.Trees;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.charset.Charset;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -25,6 +21,7 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -54,10 +51,9 @@ public class JavaCompilerService {
     private static final Logger LOG = Logger.getLogger("main");
     // Not modifiable! If you want to edit these, you need to create a new instance
     private final Set<Path> sourcePath, classPath, docPath;
-    private final ClassPath classPathIndex;
     private final JavaCompiler compiler = ServiceLoader.load(JavaCompiler.class).iterator().next();
     private final Javadocs docs;
-    private final ClassPathIndex classes;
+    private final ClassSource jdkClasses = Classes.jdkTopLevelClasses(), classPathClasses;
     // Diagnostics from the last compilation task
     private final List<Diagnostic<? extends JavaFileObject>> diags = new ArrayList<>();
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files
@@ -88,98 +84,25 @@ public class JavaCompilerService {
         this.sourcePath = Collections.unmodifiableSet(sourcePath);
         this.classPath = Collections.unmodifiableSet(classPath);
         this.docPath = docPath;
-        this.classPathIndex = createClassPath(classPath);
         this.docs = new Javadocs(sourcePath, docPath);
-        this.classes = new ClassPathIndex(classPath);
-    }
-
-    private static URL toUrl(Path path) {
-        try {
-            return path.toUri().toURL();
-        } catch (MalformedURLException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /** Find all the java 8 platform .jar files */
-    private static URL[] java8Platform(String javaHome) {
-        Path rt = Paths.get(javaHome).resolve("lib").resolve("rt.jar");
-
-        if (Files.exists(rt)) {
-            URL[] result = {toUrl(rt)};
-            return result;
-        } else throw new RuntimeException(rt + " does not exist");
-    }
-
-    /** Find all the java 9 platform .jmod files */
-    private static URL[] java9Platform(String javaHome) {
-        Path jmods = Paths.get(javaHome).resolve("jmods");
-
-        try {
-            return Files.list(jmods)
-                    .filter(path -> path.getFileName().toString().endsWith(".jmod"))
-                    .map(path -> toUrl(path))
-                    .toArray(URL[]::new);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static boolean isJava9() {
-        String v = StandardSystemProperty.JAVA_VERSION.value();
-        LOG.info("Loading platform for version " + v);
-        return v.startsWith("9") || v.startsWith("10");
-    }
-
-    private static URL[] platform() {
-        if (isJava9()) return java9Platform(StandardSystemProperty.JAVA_HOME.value());
-        else return java8Platform(StandardSystemProperty.JAVA_HOME.value());
-    }
-
-    static URLClassLoader parentClassLoader() {
-        URL[] bootstrap = platform();
-
-        return new URLClassLoader(bootstrap, null);
-    }
-
-    private static ClassPath createClassPath(Set<Path> classPath) {
-        Function<Path, Stream<URL>> url =
-                p -> {
-                    try {
-                        return Stream.of(p.toUri().toURL());
-                    } catch (MalformedURLException e) {
-                        LOG.warning(e.getMessage());
-
-                        return Stream.empty();
-                    }
-                };
-        URL[] urls = classPath.stream().flatMap(url).toArray(URL[]::new);
-        URLClassLoader cl = new URLClassLoader(urls, parentClassLoader());
-        try {
-            return ClassPath.from(cl);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private String lastName(String p) {
-        int i = p.lastIndexOf('.');
-        if (i == -1) return p;
-        else return p.substring(i + 1);
+        this.classPathClasses = Classes.classPathTopLevelClasses(classPath);
     }
 
     private Set<String> subPackages(String parentPackage) {
-        Set<String> result = new HashSet<>();
-        for (ClassPath.ClassInfo c : classPathIndex.getTopLevelClasses()) {
-            String candidate = c.getPackageName();
-            if (candidate.startsWith(parentPackage) && candidate.length() > parentPackage.length()) {
-                int start = parentPackage.length() + 1;
-                int end = candidate.indexOf('.', start);
-                if (end == -1) end = candidate.length();
-                String prefix = candidate.substring(0, end);
-                result.add(prefix);
-            }
-        }
+        var result = new HashSet<String>();
+        Consumer<String> checkClassName =
+                name -> {
+                    String packageName = Parser.mostName(name);
+                    if (packageName.startsWith(parentPackage) && packageName.length() > parentPackage.length()) {
+                        int start = parentPackage.length() + 1;
+                        int end = packageName.indexOf('.', start);
+                        if (end == -1) end = packageName.length();
+                        String prefix = packageName.substring(0, end);
+                        result.add(prefix);
+                    }
+                };
+        for (var name : jdkClasses.classes()) checkClassName.accept(name);
+        for (var name : classPathClasses.classes()) checkClassName.accept(name);
         return result;
     }
 
@@ -493,7 +416,7 @@ public class JavaCompilerService {
             String parent = p.getQualifiedName().toString();
             Set<String> subs = subPackages(parent);
             for (String sub : subs) {
-                result.add(Completion.ofPackagePart(sub, lastName(sub)));
+                result.add(Completion.ofPackagePart(sub, Parser.lastName(sub)));
             }
 
             return result;
@@ -612,12 +535,11 @@ public class JavaCompilerService {
                     LOG.info("...completing identifiers");
                     result = new ArrayList<>();
                     // Does a candidate completion match the name in `node`?
-                    String id = Objects.toString(node.getName(), "");
-                    Predicate<CharSequence> matches = name -> name.toString().startsWith(id);
+                    String partialName = Objects.toString(node.getName(), "");
                     Set<String> alreadyImported = new HashSet<>();
                     // Add names that have already been imported
                     for (Element m : scopeMembers(file, contents, line, character)) {
-                        if (matches.test(m.getSimpleName())) {
+                        if (m.getSimpleName().toString().startsWith(partialName)) {
                             result.add(Completion.ofElement(m));
 
                             if (m instanceof TypeElement) {
@@ -628,19 +550,30 @@ public class JavaCompilerService {
                     }
                     // Add names of classes that haven't been imported
                     String packageName = Objects.toString(parse.getPackageName(), "");
-                    Iterator<Completion> notImported =
-                            classes.topLevelClasses()
-                                    // This is very cheap, so we do it first
-                                    .filter(c -> matches.test(c.getSimpleName()))
-                                    .filter(c -> !alreadyImported.contains(c.getName()))
-                                    // This is very expensive, so we do it last
-                                    .filter(c -> classes.isAccessibleFromPackage(c, packageName))
-                                    .map(Completion::ofNotImportedClass)
-                                    .iterator();
-                    while (notImported.hasNext() && result.size() < limitHint) {
-                        result.add(notImported.next());
+                    Predicate<String> matchesPartialName =
+                            className -> Parser.lastName(className).startsWith(partialName);
+                    Predicate<String> notAlreadyImported = className -> !alreadyImported.contains(className);
+                    var fromJdk =
+                            jdkClasses
+                                    .classes()
+                                    .stream()
+                                    .filter(matchesPartialName)
+                                    .filter(notAlreadyImported)
+                                    .filter(c -> jdkClasses.isAccessibleFromPackage(c, packageName));
+                    var fromClasspath =
+                            classPathClasses
+                                    .classes()
+                                    .stream()
+                                    .filter(matchesPartialName)
+                                    .filter(notAlreadyImported)
+                                    .filter(c -> classPathClasses.isAccessibleFromPackage(c, packageName));
+                    var fromBoth = Stream.concat(fromJdk, fromClasspath).iterator();
+                    while (fromBoth.hasNext() && result.size() < limitHint) {
+                        var className = fromBoth.next();
+                        var completion = Completion.ofNotImportedClass(className);
+                        result.add(completion);
                     }
-                    isIncomplete = notImported.hasNext();
+                    isIncomplete = fromBoth.hasNext();
                 }
                 return null;
             }
@@ -1016,6 +949,9 @@ public class JavaCompilerService {
         }
         // Look at imports in other classes to help us guess how to fix imports
         ExistingImports sourcePathImports = Parser.existingImports(sourcePath);
+        var classes = new HashSet<String>();
+        classes.addAll(jdkClasses.classes());
+        classes.addAll(classPathClasses.classes());
         Map<String, String> fixes = Parser.resolveSymbols(unresolved, sourcePathImports, classes);
         // Figure out which existing imports are actually used
         Trees trees = Trees.instance(task);

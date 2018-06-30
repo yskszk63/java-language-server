@@ -299,9 +299,19 @@ class Parser {
         return new ExistingImports(classes, packages);
     }
 
+    static String mostName(String name) {
+        var lastDot = name.lastIndexOf('.');
+        return lastDot == -1 ? "" : name.substring(0, lastDot);
+    }
+
+    static String lastName(String name) {
+        int i = name.lastIndexOf('.');
+        if (i == -1) return name;
+        else return name.substring(i + 1);
+    }
+
     // TODO does this really belong in Parser?
-    private static Optional<String> resolveSymbol(
-            String unresolved, ExistingImports imports, ClassPathIndex classPath) {
+    private static Optional<String> resolveSymbol(String unresolved, ExistingImports imports, Set<String> classPath) {
         // Try to disambiguate by looking for exact matches
         // For example, Foo is exactly matched by `import com.bar.Foo`
         // Foo is *not* exactly matched by `import com.bar.*`
@@ -322,10 +332,9 @@ class Parser {
         // are used to generate package names
         candidates =
                 classPath
-                        .topLevelClasses()
-                        .filter(c -> c.getSimpleName().equals(unresolved))
-                        .filter(c -> imports.packages.contains(c.getPackageName()))
-                        .map(c -> c.getName())
+                        .stream()
+                        .filter(c -> lastName(c).equals(unresolved))
+                        .filter(c -> imports.packages.contains(mostName(c)))
                         .collect(Collectors.toSet());
         if (candidates.size() > 1) {
             LOG.warning(
@@ -338,12 +347,7 @@ class Parser {
         }
 
         // If there is only one class on the classpath with this name, use it
-        candidates =
-                classPath
-                        .topLevelClasses()
-                        .filter(c -> c.getSimpleName().equals(unresolved))
-                        .map(c -> c.getName())
-                        .collect(Collectors.toSet());
+        candidates = classPath.stream().filter(c -> lastName(c).equals(unresolved)).collect(Collectors.toSet());
 
         if (candidates.size() > 1) {
             LOG.warning(
@@ -370,7 +374,7 @@ class Parser {
 
     // TODO does this really belong in Parser?
     static Map<String, String> resolveSymbols(
-            Set<String> unresolvedSymbols, ExistingImports imports, ClassPathIndex classPath) {
+            Set<String> unresolvedSymbols, ExistingImports imports, Set<String> classPath) {
         Map<String, String> result = new HashMap<>();
         for (String s : unresolvedSymbols) {
             resolveSymbol(s, imports, classPath).ifPresent(resolved -> result.put(s, resolved));

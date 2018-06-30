@@ -152,9 +152,9 @@ class JavaTextDocumentService implements TextDocumentService {
                 i.setKind(CompletionItemKind.Keyword);
                 i.setDetail(c.classSymbol.toString());
             } else if (c.notImportedClass != null) {
-                i.setLabel(c.notImportedClass.getSimpleName());
+                i.setLabel(Parser.lastName(c.notImportedClass));
                 i.setKind(CompletionItemKind.Class);
-                i.setDetail(c.notImportedClass.getName());
+                i.setDetail(c.notImportedClass);
             } else throw new RuntimeException(c + " is not valid");
 
             result.add(i);

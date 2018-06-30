@@ -8,12 +8,12 @@ import java.util.Map;
 import org.junit.Test;
 
 public class ParserFixImportsTest {
-    ClassPathIndex classPath = new ClassPathIndex(Collections.emptySet());
     ExistingImports emptyImports = new ExistingImports(Collections.emptySet(), Collections.emptySet());
 
     @Test
     public void findJavaUtilList() {
-        Map<String, String> resolved = Parser.resolveSymbols(Collections.singleton("List"), emptyImports, classPath);
+        Map<String, String> resolved =
+                Parser.resolveSymbols(Collections.singleton("List"), emptyImports, Collections.emptySet());
         assertThat(resolved, hasEntry("List", "java.util.List"));
     }
 

@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.google.common.reflect.ClassPath;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import org.javacs.Completion.PackagePart;
@@ -12,10 +11,9 @@ public class Completion {
     public final Element element;
     public final PackagePart packagePart;
     public final TypeElement classSymbol;
-    public final ClassPath.ClassInfo notImportedClass;
+    public final String notImportedClass;
 
-    private Completion(
-            Element element, PackagePart packagePart, TypeElement classSymbol, ClassPath.ClassInfo notImportedClass) {
+    private Completion(Element element, PackagePart packagePart, TypeElement classSymbol, String notImportedClass) {
         this.element = element;
         this.packagePart = packagePart;
         this.classSymbol = classSymbol;
@@ -34,8 +32,8 @@ public class Completion {
         return new Completion(null, null, forClass, null);
     }
 
-    public static Completion ofNotImportedClass(ClassPath.ClassInfo notImportedClass) {
-        return new Completion(null, null, null, notImportedClass);
+    public static Completion ofNotImportedClass(String className) {
+        return new Completion(null, null, null, className);
     }
 
     public static class PackagePart {

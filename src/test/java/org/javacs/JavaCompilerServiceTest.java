@@ -97,7 +97,7 @@ public class JavaCompilerServiceTest {
             if (c.element != null) result.add(c.element.getSimpleName().toString());
             else if (c.packagePart != null) result.add(c.packagePart.name);
             else if (c.classSymbol != null) result.add("class");
-            else if (c.notImportedClass != null) result.add(c.notImportedClass.getSimpleName());
+            else if (c.notImportedClass != null) result.add(Parser.lastName(c.notImportedClass));
         }
         return result;
     }
