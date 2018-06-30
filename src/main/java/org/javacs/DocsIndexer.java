@@ -39,15 +39,23 @@ public class DocsIndexer implements Doclet {
     public boolean run(DocletEnvironment env) {
         Objects.requireNonNull(targetClass, "DocIndexer.targetClass has not been set");
 
+        var els = env.getSpecifiedElements();
+        if (els.isEmpty()) throw new RuntimeException("No specified elements");
         var docs = env.getDocTrees();
         var elements = env.getElementUtils();
-        var target = elements.getTypeElement(targetClass);
-        if (targetMember == null) {
-            result = docs.getDocCommentTree(target);
-        } else {
-            for (var member : elements.getAllMembers(target)) {
-                if (member.getSimpleName().contentEquals(targetMember)) {
-                    result = docs.getDocCommentTree(member);
+        for (var e : els) {
+            if (e instanceof TypeElement) {
+                var t = (TypeElement) e;
+                if (t.getQualifiedName().contentEquals(targetClass)) {
+                    if (targetMember == null) {
+                        result = docs.getDocCommentTree(t);
+                    } else {
+                        for (var member : elements.getAllMembers(t)) {
+                            if (member.getSimpleName().contentEquals(targetMember)) {
+                                result = docs.getDocCommentTree(member);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -58,11 +66,23 @@ public class DocsIndexer implements Doclet {
     private static final StandardJavaFileManager emptyFileManager =
             ServiceLoader.load(JavaCompiler.class).iterator().next().getStandardFileManager(__ -> {}, null, null);
 
+    private static DocumentationTool.DocumentationTask task(JavaFileObject file, String className) {
+        var tool = ToolProvider.getSystemDocumentationTool();
+        return tool.getTask(
+                null,
+                emptyFileManager,
+                err -> LOG.severe(err.getMessage(null)),
+                DocsIndexer.class,
+                List.of("--ignore-source-errors", "-Xclasses", className),
+                List.of(file));
+    }
+
     public static DocCommentTree classDoc(String className, JavaFileObject file) {
+        Objects.requireNonNull(file, "file is null");
+
         try {
             targetClass = className;
-            var tool = ToolProvider.getSystemDocumentationTool();
-            var task = tool.getTask(null, emptyFileManager, __ -> {}, DocsIndexer.class, List.of(), List.of(file));
+            var task = task(file, className);
             if (!task.call()) throw new RuntimeException("Documentation task failed");
             Objects.requireNonNull(result, "Documentation task did not set result");
             return result;
@@ -75,8 +95,7 @@ public class DocsIndexer implements Doclet {
         try {
             targetClass = className;
             targetMember = memberName;
-            var tool = ToolProvider.getSystemDocumentationTool();
-            var task = tool.getTask(null, emptyFileManager, __ -> {}, DocsIndexer.class, List.of(), List.of(file));
+            var task = task(file, className);
             if (!task.call()) throw new RuntimeException("Documentation task failed");
             Objects.requireNonNull(result, "Documentation task did not set result");
             return result;
