@@ -1,8 +1,9 @@
 package org.javacs;
 
-import java.lang.reflect.*;
-import java.util.*;
-import java.util.logging.*;
+import java.lang.reflect.Modifier;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.logging.Logger;
 
 interface ClassSource {
     Set<String> classes();

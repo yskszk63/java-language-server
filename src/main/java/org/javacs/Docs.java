@@ -3,17 +3,29 @@ package org.javacs;
 import com.overzealous.remark.Options;
 import com.overzealous.remark.Remark;
 import com.sun.source.doctree.DocCommentTree;
-import com.sun.source.tree.*;
-import com.sun.source.util.*;
-import java.io.*;
-import java.nio.file.*;
-import java.util.*;
-import java.util.function.*;
+import com.sun.source.tree.ClassTree;
+import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.tree.MethodTree;
+import com.sun.source.tree.Tree;
+import com.sun.source.tree.VariableTree;
+import com.sun.source.util.DocTrees;
+import com.sun.source.util.TreeScanner;
+import com.sun.source.util.Trees;
+import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.*;
-import javax.tools.*;
+import java.util.stream.Collectors;
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardJavaFileManager;
+import javax.tools.StandardLocation;
 
 class Docs {
 
