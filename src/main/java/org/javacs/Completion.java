@@ -1,7 +1,6 @@
 package org.javacs;
 
 import javax.lang.model.element.Element;
-import javax.lang.model.element.TypeElement;
 import org.javacs.Completion.PackagePart;
 
 /**
@@ -10,13 +9,13 @@ import org.javacs.Completion.PackagePart;
 public class Completion {
     public final Element element;
     public final PackagePart packagePart;
-    public final TypeElement classSymbol;
+    public final String keyword;
     public final String notImportedClass;
 
-    private Completion(Element element, PackagePart packagePart, TypeElement classSymbol, String notImportedClass) {
+    private Completion(Element element, PackagePart packagePart, String keyword, String notImportedClass) {
         this.element = element;
         this.packagePart = packagePart;
-        this.classSymbol = classSymbol;
+        this.keyword = keyword;
         this.notImportedClass = notImportedClass;
     }
 
@@ -28,8 +27,8 @@ public class Completion {
         return new Completion(null, new PackagePart(fullName, name), null, null);
     }
 
-    public static Completion ofClassSymbol(TypeElement forClass) {
-        return new Completion(null, null, forClass, null);
+    public static Completion ofKeyword(String keyword) {
+        return new Completion(null, null, keyword, null);
     }
 
     public static Completion ofNotImportedClass(String className) {

@@ -149,10 +149,10 @@ class JavaTextDocumentService implements TextDocumentService {
                 i.setLabel(c.packagePart.name);
                 i.setKind(CompletionItemKind.Module);
                 i.setDetail(c.packagePart.fullName);
-            } else if (c.classSymbol != null) {
-                i.setLabel("class");
+            } else if (c.keyword != null) {
+                i.setLabel(c.keyword);
                 i.setKind(CompletionItemKind.Keyword);
-                i.setDetail(c.classSymbol.toString());
+                i.setDetail("keyword");
             } else if (c.notImportedClass != null) {
                 i.setLabel(Parser.lastName(c.notImportedClass));
                 i.setKind(CompletionItemKind.Class);

@@ -434,7 +434,7 @@ public class JavaCompilerService {
             }
 
             // Add .class
-            result.add(Completion.ofClassSymbol(t));
+            result.add(Completion.ofKeyword("class"));
 
             return result;
         } else {
@@ -474,6 +474,55 @@ public class JavaCompilerService {
         }
     }
 
+    private static String[] TOP_LEVEL_KEYWORDS = {
+        "package",
+        "import",
+        "public",
+        "private",
+        "protected",
+        "abstract",
+        "class",
+        "interface",
+    };
+
+    private static String[] CLASS_BODY_KEYWORDS = {
+        "public",
+        "private",
+        "protected",
+        "static",
+        "final",
+        "native",
+        "synchronized",
+        "abstract",
+        "default",
+        "class",
+        "interface",
+    };
+
+    private static String[] METHOD_BODY_KEYWORDS = {
+        "new",
+        "assert",
+        "try",
+        "catch",
+        "finally",
+        "throw",
+        "return",
+        "break",
+        "case",
+        "continue",
+        "default",
+        "do",
+        "while",
+        "for",
+        "switch",
+        "if",
+        "else",
+        "instanceof",
+        "var",
+        "final",
+        "class",
+    };
+
     /**
      * Complete members or identifiers at the cursor. Delegates to `members` or `scopeMembers`, depending on whether the
      * expression before the cursor looks like `foo.bar` or `foo`
@@ -495,9 +544,26 @@ public class JavaCompilerService {
         class Find extends TreeScanner<Void, Void> {
             List<Completion> result = null;
             boolean isIncomplete = false;
+            int insideClass = 0, insideMethod = 0;
 
             boolean containsCursor(Tree node) {
                 return pos.getStartPosition(parse, node) <= cursor && cursor <= pos.getEndPosition(parse, node);
+            }
+
+            @Override 
+            public Void visitClass​(ClassTree node, Void nothing) {
+                insideClass++;
+                super.visitClass(node, null);
+                insideClass--;
+                return null;
+            }
+
+            @Override 
+            public Void visitMethod​(MethodTree node, Void nothing) {
+                insideMethod++;
+                super.visitMethod(node, null);
+                insideMethod--;
+                return null;
             }
 
             @Override
@@ -535,6 +601,22 @@ public class JavaCompilerService {
                 if (containsCursor(node) && result == null) {
                     LOG.info("...completing identifiers");
                     result = new ArrayList<>();
+                    // Add keywords
+                    if (insideClass == 0) {
+                        for (var k : TOP_LEVEL_KEYWORDS) {
+                            result.add(Completion.ofKeyword(k));
+                        }
+                    }
+                    else if (insideMethod == 0) {
+                        for (var k : CLASS_BODY_KEYWORDS) {
+                            result.add(Completion.ofKeyword(k));
+                        }
+                    }
+                    else {
+                        for (var k : METHOD_BODY_KEYWORDS) {
+                            result.add(Completion.ofKeyword(k));
+                        }
+                    }
                     // Does a candidate completion match the name in `node`?
                     String partialName = Objects.toString(node.getName(), "");
                     Set<String> alreadyImported = new HashSet<>();
@@ -551,6 +633,7 @@ public class JavaCompilerService {
                     }
                     // Add names of classes that haven't been imported
                     String packageName = Objects.toString(parse.getPackageName(), "");
+                    Predicate<String> isUpper = className -> className.length() > 0 && Character.isUpperCase(className.charAt(0));
                     Predicate<String> matchesPartialName =
                             className -> Parser.lastName(className).startsWith(partialName);
                     Predicate<String> notAlreadyImported = className -> !alreadyImported.contains(className);
@@ -558,6 +641,7 @@ public class JavaCompilerService {
                             jdkClasses
                                     .classes()
                                     .stream()
+                                    .filter(isUpper)
                                     .filter(matchesPartialName)
                                     .filter(notAlreadyImported)
                                     .filter(c -> jdkClasses.isAccessibleFromPackage(c, packageName));
@@ -565,6 +649,7 @@ public class JavaCompilerService {
                             classPathClasses
                                     .classes()
                                     .stream()
+                                    .filter(isUpper)
                                     .filter(matchesPartialName)
                                     .filter(notAlreadyImported)
                                     .filter(c -> classPathClasses.isAccessibleFromPackage(c, packageName));
