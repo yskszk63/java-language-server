@@ -946,6 +946,10 @@
 				{
 					"match": "\\b(const|goto)\\b",
 					"name": "keyword.reserved.java"
+                },
+                {
+                    "match": "\\bvar",
+                    "name": "storage.type.java"
                 }
 			]
 		},
