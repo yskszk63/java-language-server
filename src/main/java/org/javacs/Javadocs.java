@@ -11,9 +11,7 @@ import com.sun.javadoc.RootDoc;
 import com.sun.source.util.JavacTask;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 import java.text.BreakIterator;
 import java.time.Instant;
 import java.util.*;
@@ -31,7 +29,7 @@ import javax.tools.*;
 public class Javadocs {
 
     /** Cache for performance reasons */
-    private final StandardJavaFileManager actualFileManager;
+    private final StandardJavaFileManager fileManager;
 
     /** Empty file manager we pass to javadoc to prevent it from roaming all over the place */
     private final StandardJavaFileManager emptyFileManager =
@@ -39,6 +37,8 @@ public class Javadocs {
 
     /** All the classes we have indexed so far */
     private final Map<String, IndexedDoc> topLevelClasses = new ConcurrentHashMap<>();
+
+    private final JavacTask task;
 
     private static class IndexedDoc {
         final RootDoc doc;
@@ -50,44 +50,33 @@ public class Javadocs {
         }
     }
 
-    private final JavacTask task;
+    private static Path srcZip() {
+        try {
+            var fs = FileSystems.newFileSystem(Lib.SRC_ZIP, Docs.class.getClassLoader());
+            return fs.getPath("/");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     Javadocs(Set<Path> sourcePath, Set<Path> docPath) {
-        this.actualFileManager = createFileManager(allSourcePaths(sourcePath, docPath));
+        this.fileManager =
+                ServiceLoader.load(JavaCompiler.class).iterator().next().getStandardFileManager(__ -> {}, null, null);
         this.task =
                 (JavacTask)
                         ServiceLoader.load(JavaCompiler.class)
                                 .iterator()
                                 .next()
                                 .getTask(null, emptyFileManager, __ -> {}, null, null, null);
-    }
-
-    @SafeVarargs
-    private static Set<File> allSourcePaths(Set<Path>... userSourcePath) {
-        Set<File> allSourcePaths = new HashSet<>();
-
-        // Add userSourcePath
-        for (Set<Path> eachPath : userSourcePath) {
-            for (Path each : eachPath) allSourcePaths.add(each.toFile());
-        }
-
-        // Add src.zip from JDK
-        findSrcZip().ifPresent(allSourcePaths::add);
-
-        return allSourcePaths;
-    }
-
-    private static StandardJavaFileManager createFileManager(Set<File> allSourcePaths) {
-        StandardJavaFileManager actualFileManager =
-                ServiceLoader.load(JavaCompiler.class).iterator().next().getStandardFileManager(__ -> {}, null, null);
+        // Compute the full source path, including src.zip for platform classes
+        var sourcePathFiles = sourcePath.stream().map(Path::toFile).collect(Collectors.toSet());
 
         try {
-            actualFileManager.setLocation(StandardLocation.SOURCE_PATH, allSourcePaths);
+            fileManager.setLocation(StandardLocation.SOURCE_PATH, sourcePathFiles);
+            fileManager.setLocationFromPaths(StandardLocation.MODULE_SOURCE_PATH, Set.of(srcZip()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
-        return actualFileManager;
     }
 
     private static final Pattern HTML_TAG = Pattern.compile("<(\\w+)>");
@@ -178,52 +167,55 @@ public class Javadocs {
         return topLevelClasses.get(className).doc;
     }
 
+    private JavaFileObject file(String className) {
+        try {
+            var fromSourcePath =
+                    fileManager.getJavaFileForInput(
+                            StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
+            if (fromSourcePath != null) return fromSourcePath;
+            var moduleLocation = fileManager.getLocationForModule(StandardLocation.MODULE_SOURCE_PATH, "java.base");
+            var fromModuleSourcePath =
+                    fileManager.getJavaFileForInput(moduleLocation, className, JavaFileObject.Kind.SOURCE);
+            if (fromModuleSourcePath != null) return fromModuleSourcePath;
+            throw new RuntimeException("Couldn't find source file for " + className);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private boolean needsUpdate(String className) {
         if (!topLevelClasses.containsKey(className)) return true;
 
         IndexedDoc indexed = topLevelClasses.get(className);
+        JavaFileObject source = file(className);
 
-        try {
-            JavaFileObject source =
-                    actualFileManager.getJavaFileForInput(
-                            StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
+        if (source == null) return true;
 
-            if (source == null) return true;
+        Instant modified = Instant.ofEpochMilli(source.getLastModified());
 
-            Instant modified = Instant.ofEpochMilli(source.getLastModified());
-
-            return indexed.updated.isBefore(modified);
-        } catch (IOException e) {
-            throw new RuntimeException();
-        }
+        return indexed.updated.isBefore(modified);
     }
 
     /** Read all the Javadoc for `className` */
     private IndexedDoc doIndex(String className) {
-        try {
-            JavaFileObject source =
-                    actualFileManager.getJavaFileForInput(
-                            StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
+        JavaFileObject source = file(className);
 
-            if (source == null) {
-                LOG.warning("No source file for " + className);
+        if (source == null) {
+            LOG.warning("No source file for " + className);
 
-                return new IndexedDoc(EmptyRootDoc.INSTANCE, Instant.EPOCH);
-            }
-
-            LOG.info("Found " + source.toUri() + " for " + className);
-
-            DocumentationTool.DocumentationTask task =
-                    ToolProvider.getSystemDocumentationTool()
-                            .getTask(null, emptyFileManager, __ -> {}, Javadocs.class, null, ImmutableList.of(source));
-
-            task.call();
-
-            return new IndexedDoc(
-                    getSneakyReturn().orElse(EmptyRootDoc.INSTANCE), Instant.ofEpochMilli(source.getLastModified()));
-        } catch (IOException e) {
-            throw new RuntimeException();
+            return new IndexedDoc(EmptyRootDoc.INSTANCE, Instant.EPOCH);
         }
+
+        LOG.info("Found " + source.toUri() + " for " + className);
+
+        DocumentationTool.DocumentationTask task =
+                ToolProvider.getSystemDocumentationTool()
+                        .getTask(null, emptyFileManager, __ -> {}, Javadocs.class, null, ImmutableList.of(source));
+
+        task.call();
+
+        return new IndexedDoc(
+                getSneakyReturn().orElse(EmptyRootDoc.INSTANCE), Instant.ofEpochMilli(source.getLastModified()));
     }
 
     private Optional<RootDoc> getSneakyReturn() {
@@ -253,12 +245,17 @@ public class Javadocs {
 
     /** Find the copy of src.zip that comes with the system-installed JDK */
     static Optional<File> findSrcZip() {
-        Path path = Paths.get(System.getProperty("java.home"));
+        Path javaHome = Paths.get(System.getProperty("java.home"));
+        if (javaHome.endsWith("jre")) javaHome = javaHome.getParent();
 
-        if (path.endsWith("jre")) path = path.getParent();
+        var java8 = tryFind(javaHome.resolve("src.zip"));
+        if (java8.isPresent()) return java8;
 
-        path = path.resolve("src.zip");
+        var java9 = tryFind(javaHome.resolve("lib").resolve("src.zip"));
+        return java9;
+    }
 
+    private static Optional<File> tryFind(Path path) {
         while (Files.isSymbolicLink(path)) {
             try {
                 path = path.getParent().resolve(Files.readSymbolicLink(path));
@@ -269,7 +266,7 @@ public class Javadocs {
 
         if (Files.exists(path)) return Optional.of(path.toFile());
         else {
-            LOG.severe(String.format("Could not find %s", path));
+            LOG.warning(String.format("Could not find %s", path));
 
             return Optional.empty();
         }
