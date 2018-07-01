@@ -7,11 +7,11 @@
     "publisher": "georgewfraser",
     "repository": {
         "type": "git",
-        "url": "https://github.com/georgewfraser/vscode-javac.git"
+        "url": "https://github.com/georgewfraser/vscode-javac"
     },
     "license": "MIT",
     "engines": {
-        "vscode": "^1.21.0"
+        "vscode": "^1.24.0"
     },
     "categories": [
         "Programming Languages",
@@ -25,7 +25,7 @@
     ],
     "main": "./out/extension",
     "files": [
-        "target/fat-jar.jar"
+        "./out/fat-jar.jar"
     ],
     "contributes": {
         "languages": [
@@ -76,10 +76,6 @@
                     },
                     "description": "External dependencies of the form groupId:artifactId:version or groupId:artifactId:packaging:version:scope"
                 },
-                "java.home": {
-                    "type": "string",
-                    "description": "Installation directory of Java 8"
-                },
                 "java.trace.server": {
                     "scope": "window",
                     "type": "string",
@@ -107,12 +103,12 @@
         "test": "npm run compile && node ./node_modules/vscode/bin/test"
     },
     "dependencies": {
-        "vscode-languageclient": "^4.0.0"
+        "vscode-languageclient": "^4.2.1"
     },
     "devDependencies": {
-        "typescript": "^2.6.1",
-        "vscode": "^1.1.6",
-        "@types/node": "^7.0.43",
+        "typescript": "^2.9.2",
+        "vscode": "^1.1.18",
+        "@types/node": "^10.3.3",
         "@types/mocha": "^2.2.42"
     }
 }

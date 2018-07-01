@@ -47,6 +47,7 @@ export function activate(context: VSCode.ExtensionContext) {
     ];
     
     console.log(javaExecutablePath + ' ' + args.join(' '));
+    
     // Start the child java process
     let serverOptions: ServerOptions = {
         command: javaExecutablePath,
@@ -159,6 +160,8 @@ function findJavaExecutableInJavaHome(javaHome: string, binname: string) {
         if (FS.existsSync(binpath)) 
             return binpath;
     }
+
+    return null;
 }
 
 // this method is called when your extension is deactivated

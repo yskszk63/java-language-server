@@ -1,11 +1,13 @@
 # IDE configs
 .vscode/**
 .idea/**
+git_hooks/**
 *.iml
 classpath.txt
 tsconfig.json
 tsd.json
 *.xml
+configure
 
 # Logs
 *.log*
@@ -13,14 +15,16 @@ tsd.json
 # Sources
 src/**
 test/**
-lib/**
 repo/**
 scripts/**
+lib/**
+images/**
+!lib/src.zip
+!lib/java.tmLanguage.json
 
 # Compiler output
 out/test/**
 target/**
-!target/fat-jar.jar
 
 # Extensions
 .gitignore

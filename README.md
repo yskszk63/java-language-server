@@ -110,43 +110,7 @@ You should use your build tool to download the library *and* source jars of all 
         testCompile group: 'junit', name: 'junit', version: '4.+', classifier: 'sources'
     }
     ```
-
-### Optional settings
-
-Optional user settings. These should be set in global settings `Preferences -> Settings`, not in your project directory.
-
-* `java.home` Installation directory of Java 8
-
-## javaconfig.json is depecated
-
-Configuration using a `javaconfig.json` file in your workspace is deprecated; 
-please switch to [settings.json](#Settings).
-
-If you have a use case that cannot be supported using `settings.json` please [create an issue](https://github.com/georgewfraser/vscode-javac/issues);
-
-## Directory structure
-
-### Java service process
-
-A java process that does the hard work of parsing and analyzing .java source files.
-
-    pom.xml (maven project file)
-    src/ (java sources)
-    repo/ (tools.jar packaged in a local maven repo)
-    target/ (compiled java .class files, .jar archives)
-    target/fat-jar.jar (single jar that needs to be distributed with extension)
-
-### Typescript Visual Studio Code extension
-
-"Glue code" that launches the external java process
-and connects to it using [vscode-languageclient](https://www.npmjs.com/package/vscode-languageclient).
-
-    package.json (node package file)
-    tsconfig.json (typescript compilation configuration file)
-    tsd.json (project file for tsd, a type definitions manager)
-    lib/ (typescript sources)
-    out/ (compiled javascript)
-
+    
 ## Design
 
 This extension consists of an external java process, 
@@ -154,8 +118,7 @@ which communicates with vscode using the [language server protocol](https://gith
 
 ### Java service process
 
-The java service process uses the implementation of the Java compiler in tools.jar, 
-which is a part of the JDK.
+The java service process uses the standard implementation of the Java compiler.
 When VS Code needs to lint a file, perform autocomplete, 
 or some other task that requires Java code insight,
 the java service process invokes the Java compiler programatically,
@@ -166,8 +129,6 @@ then intercepts the data structures the Java compiler uses to represent source t
 The Java compiler isn't designed for incremental parsing and analysis.
 However, it is *extremely* fast, so recompiling a single file gives good performance,
 as long as we don't also recompile all of its dependencies.
-We cache the .class files that are generated during compilation in a temporary folder,
-and use those .class files instead of .java sources whenever they are up-to-date.
 
 ## Logs
 
