@@ -39,6 +39,13 @@
                 ]
             }
         ],
+        "grammars": [
+            {
+                "language": "java",
+                "scopeName": "source.java",
+                "path": "./lib/java.tmLanguage.json"
+            }
+        ],
         "snippets": [
             {
                 "language": "java",
