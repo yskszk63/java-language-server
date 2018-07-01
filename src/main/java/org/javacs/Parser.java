@@ -318,11 +318,11 @@ class Parser {
         // For example, Foo is exactly matched by `import com.bar.Foo`
         // Foo is *not* exactly matched by `import com.bar.*`
         Set<String> candidates =
-                imports.classes.stream().filter(c -> c.endsWith(unresolved)).collect(Collectors.toSet());
+                imports.classes.stream().filter(c -> c.endsWith("." + unresolved)).collect(Collectors.toSet());
         if (candidates.size() > 1) {
             LOG.warning(
                     String.format(
-                            "%s in ambiguous between previously imported candidates %s",
+                            "%s is ambiguous between previously imported candidates %s",
                             unresolved, Joiner.on(", ").join(candidates)));
             return Optional.empty();
         } else if (candidates.size() == 1) {
@@ -341,7 +341,7 @@ class Parser {
         if (candidates.size() > 1) {
             LOG.warning(
                     String.format(
-                            "%s in ambiguous between package-based candidates %s",
+                            "%s is ambiguous between package-based candidates %s",
                             unresolved, Joiner.on(", ").join(candidates)));
             return Optional.empty();
         } else if (candidates.size() == 1) {
@@ -354,7 +354,7 @@ class Parser {
         if (candidates.size() > 1) {
             LOG.warning(
                     String.format(
-                            "%s in ambiguous between classpath candidates %s",
+                            "%s is ambiguous between classpath candidates %s",
                             unresolved, Joiner.on(", ").join(candidates)));
         } else if (candidates.size() == 1) {
             return Optional.of(candidates.iterator().next());
