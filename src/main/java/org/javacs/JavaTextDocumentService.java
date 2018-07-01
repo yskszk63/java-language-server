@@ -1,12 +1,13 @@
 package org.javacs;
 
 import com.google.gson.JsonPrimitive;
-import com.sun.javadoc.MethodDoc;
-import com.sun.javadoc.ParamTag;
-import com.sun.javadoc.Parameter;
+import com.sun.source.doctree.DocCommentTree;
+import com.sun.source.doctree.DocTree;
+import com.sun.source.doctree.ParamTree;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.ImportTree;
 import com.sun.source.tree.LineMap;
+import com.sun.source.tree.MethodTree;
 import com.sun.source.util.SourcePositions;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
@@ -22,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -162,12 +164,12 @@ class JavaTextDocumentService implements TextDocumentService {
         return CompletableFuture.completedFuture(Either.forRight(new CompletionList(completions.isIncomplete, result)));
     }
 
-    private String resolveDocDetail(MethodDoc doc) {
+    private String resolveDocDetail(MethodTree doc) {
         StringJoiner args = new StringJoiner(", ");
-        for (Parameter p : doc.parameters()) {
-            args.add(p.name());
+        for (var p : doc.getParameters()) {
+            args.add(p.getName());
         }
-        return String.format("%s(%s)", doc.name(), args);
+        return String.format("%s(%s)", doc.getName(), args);
     }
 
     private String resolveDefaultDetail(ExecutableElement method) {
@@ -181,6 +183,26 @@ class JavaTextDocumentService implements TextDocumentService {
         return String.format("%s(%s)", method.getSimpleName(), args);
     }
 
+    private String asMarkdown(List<? extends DocTree> lines) {
+        var join = new StringJoiner("\n");
+        for (var l : lines) join.add(l.toString());
+        var html = join.toString();
+        return Docs.htmlToMarkdown(html);
+    }
+
+    private String asMarkdown(DocCommentTree comment) {
+        var lines = comment.getFirstSentence();
+        return asMarkdown(lines);
+    }
+
+    private MarkupContent asMarkupContent(DocCommentTree comment) {
+        var markdown = asMarkdown(comment);
+        var content = new MarkupContent();
+        content.setKind(MarkupKind.MARKDOWN);
+        content.setValue(markdown);
+        return content;
+    }
+
     @Override
     public CompletableFuture<CompletionItem> resolveCompletionItem(CompletionItem unresolved) {
         JsonPrimitive idJson = (JsonPrimitive) unresolved.getData();
@@ -192,36 +214,27 @@ class JavaTextDocumentService implements TextDocumentService {
         }
         if (cached.element != null) {
             if (cached.element instanceof ExecutableElement) {
-                ExecutableElement method = (ExecutableElement) cached.element;
-                Optional<MethodDoc> doc = server.compiler.methodDoc(method);
-                String detail = doc.map(this::resolveDocDetail).orElse(resolveDefaultDetail(method));
+                var method = (ExecutableElement) cached.element;
+                var tree = server.compiler.methodTree(method);
+                var detail = tree.map(this::resolveDocDetail).orElse(resolveDefaultDetail(method));
                 unresolved.setDetail(detail);
-                doc.flatMap(Javadocs::commentText)
-                        .ifPresent(
-                                html -> {
-                                    String markdown = Javadocs.htmlToMarkdown(html);
-                                    MarkupContent content = new MarkupContent();
-                                    content.setKind(MarkupKind.MARKDOWN);
-                                    content.setValue(markdown);
-                                    unresolved.setDocumentation(content);
-                                });
+
+                var doc = server.compiler.methodDoc(method);
+                var markdown = doc.map(this::asMarkupContent);
+                markdown.ifPresent(unresolved::setDocumentation);
             } else if (cached.element instanceof TypeElement) {
-                TypeElement type = (TypeElement) cached.element;
-                server.compiler
-                        .classDoc(type)
-                        .ifPresent(
-                                doc -> {
-                                    String html = doc.commentText();
-                                    String markdown = Javadocs.htmlToMarkdown(html);
-                                    MarkupContent content = new MarkupContent();
-                                    content.setKind(MarkupKind.MARKDOWN);
-                                    content.setValue(markdown);
-                                    unresolved.setDocumentation(content);
-                                });
+                var type = (TypeElement) cached.element;
+                var doc = server.compiler.classDoc(type);
+                var markdown = doc.map(this::asMarkupContent);
+                markdown.ifPresent(unresolved::setDocumentation);
             } else {
                 LOG.info("Don't know how to look up docs for element " + cached.element);
             }
             // TODO constructors, fields
+        } else if (cached.notImportedClass != null) {
+            var doc = server.compiler.classDoc(cached.notImportedClass);
+            var markdown = doc.map(this::asMarkupContent);
+            markdown.ifPresent(unresolved::setDocumentation);
         }
         return CompletableFuture.completedFuture(unresolved); // TODO
     }
@@ -281,10 +294,10 @@ class JavaTextDocumentService implements TextDocumentService {
     private Optional<String> hoverDocs(Element e) {
         if (e instanceof ExecutableElement) {
             ExecutableElement m = (ExecutableElement) e;
-            return server.compiler.methodDoc(m).flatMap(Javadocs::commentText).map(Javadocs::htmlToMarkdown);
+            return server.compiler.methodDoc(m).map(this::asMarkdown);
         } else if (e instanceof TypeElement) {
             TypeElement t = (TypeElement) e;
-            return server.compiler.classDoc(t).map(doc -> doc.commentText()).map(Javadocs::htmlToMarkdown);
+            return server.compiler.classDoc(t).map(this::asMarkdown);
         } else return Optional.empty();
     }
 
@@ -303,17 +316,22 @@ class JavaTextDocumentService implements TextDocumentService {
         } else return CompletableFuture.completedFuture(new Hover(Collections.emptyList()));
     }
 
-    private List<ParameterInformation> signatureParamsFromDocs(MethodDoc doc) {
+    private List<ParameterInformation> signatureParamsFromDocs(MethodTree method, DocCommentTree doc) {
         List<ParameterInformation> ps = new ArrayList<>();
         Map<String, String> paramComments = new HashMap<>();
-        for (ParamTag t : doc.paramTags()) {
-            paramComments.put(t.parameterName(), t.parameterComment());
+        for (var tag : doc.getBlockTags()) {
+            if (tag.getKind() == DocTree.Kind.PARAM) {
+                var param = (ParamTree) tag;
+                paramComments.put(param.getName().toString(), asMarkdown(param.getDescription()));
+            }
         }
-        for (Parameter d : doc.parameters()) {
-            ParameterInformation p = new ParameterInformation();
-            p.setLabel(d.name());
-            p.setDocumentation(paramComments.get(d.name()));
-            ps.add(p);
+        for (var param : method.getParameters()) {
+            var info = new ParameterInformation();
+            var name = param.getName().toString();
+            info.setLabel(name);
+            if (paramComments.containsKey(name)) info.setDocumentation(paramComments.get(name));
+            else info.setDocumentation(Objects.toString(param.getType(), ""));
+            ps.add(info);
         }
         return ps;
     }
@@ -333,8 +351,10 @@ class JavaTextDocumentService implements TextDocumentService {
 
     private SignatureInformation asSignatureInformation(ExecutableElement e) {
         SignatureInformation i = new SignatureInformation();
-        Optional<MethodDoc> doc = server.compiler.methodDoc(e);
-        List<ParameterInformation> ps = doc.map(this::signatureParamsFromDocs).orElse(signatureParamsFromMethod(e));
+        var ps = signatureParamsFromMethod(e);
+        var doc = server.compiler.methodDoc(e);
+        var tree = server.compiler.methodTree(e);
+        if (doc.isPresent() && tree.isPresent()) ps = signatureParamsFromDocs(tree.get(), doc.get());
         String args = ps.stream().map(p -> p.getLabel()).collect(Collectors.joining(", "));
         String name = e.getSimpleName().toString();
         if (name.equals("<init>")) name = e.getEnclosingElement().getSimpleName().toString();

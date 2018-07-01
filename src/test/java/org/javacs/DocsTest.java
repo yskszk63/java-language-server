@@ -12,7 +12,8 @@ public class DocsTest {
         var sourcePath = Set.of(JavaCompilerServiceTest.resourcesDir());
         var docs = new Docs(sourcePath);
         var tree = docs.classDoc("ClassDoc");
-        assertThat(tree, hasToString("A great class"));
+        assertTrue(tree.isPresent());
+        assertThat(tree.get().getFirstSentence(), hasToString("A great class"));
     }
 
     @Test
@@ -20,6 +21,14 @@ public class DocsTest {
         var sourcePath = Set.of(JavaCompilerServiceTest.resourcesDir());
         var docs = new Docs(sourcePath);
         var tree = docs.memberDoc("LocalMethodDoc", "targetMethod");
-        assertThat(tree, hasToString("A great method"));
+        assertTrue(tree.isPresent());
+        assertThat(tree.get().getFirstSentence(), hasToString("A great method"));
+    }
+
+    @Test
+    public void platformDoc() {
+        var docs = new Docs(Set.of());
+        var tree = docs.classDoc("java.util.List");
+        assertTrue(tree.isPresent());
     }
 }

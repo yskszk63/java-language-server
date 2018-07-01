@@ -42,7 +42,7 @@ class Parser {
     private static final StandardJavaFileManager fileManager =
             compiler.getStandardFileManager(__ -> {}, null, Charset.defaultCharset());
 
-    private static JavacTask parseTask(JavaFileObject file) {
+    static JavacTask parseTask(JavaFileObject file) {
         return (JavacTask)
                 compiler.getTask(
                         null,
@@ -53,7 +53,7 @@ class Parser {
                         Collections.singletonList(file));
     }
 
-    private static JavacTask parseTask(Path source) {
+    static JavacTask parseTask(Path source) {
         JavaFileObject file =
                 fileManager.getJavaFileObjectsFromFiles(Collections.singleton(source.toFile())).iterator().next();
         return parseTask(file);

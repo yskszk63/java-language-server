@@ -1,7 +1,7 @@
 package org.javacs;
 
-import com.sun.javadoc.ClassDoc;
-import com.sun.javadoc.MethodDoc;
+import com.google.common.collect.Sets;
+import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.SourcePositions;
@@ -52,7 +52,7 @@ public class JavaCompilerService {
     // Not modifiable! If you want to edit these, you need to create a new instance
     private final Set<Path> sourcePath, classPath, docPath;
     private final JavaCompiler compiler = ServiceLoader.load(JavaCompiler.class).iterator().next();
-    private final Javadocs docs;
+    private final Docs docs;
     private final ClassSource jdkClasses = Classes.jdkTopLevelClasses(), classPathClasses;
     // Diagnostics from the last compilation task
     private final List<Diagnostic<? extends JavaFileObject>> diags = new ArrayList<>();
@@ -84,7 +84,7 @@ public class JavaCompilerService {
         this.sourcePath = Collections.unmodifiableSet(sourcePath);
         this.classPath = Collections.unmodifiableSet(classPath);
         this.docPath = docPath;
-        this.docs = new Javadocs(sourcePath, docPath);
+        this.docs = new Docs(Sets.union(sourcePath, docPath));
         this.classPathClasses = Classes.classPathTopLevelClasses(classPath);
     }
 
@@ -426,6 +426,7 @@ public class JavaCompilerService {
 
             // Add static members
             for (Element member : t.getEnclosedElements()) {
+                // TODO if this is a member reference :: then include non-statics
                 if (member.getModifiers().contains(Modifier.STATIC)
                         && trees.isAccessible(scope, member, (DeclaredType) t.asType())) {
                     result.add(Completion.ofElement(member));
@@ -777,14 +778,29 @@ public class JavaCompilerService {
         return declaringFile.flatMap(f -> findIn(e, f, contents.apply(f.toUri())));
     }
 
-    /** Look up the javadoc associated with `e` */
-    public Optional<MethodDoc> methodDoc(ExecutableElement e) {
-        return docs.methodDoc(e);
+    /** Look up the javadoc associated with `method` */
+    public Optional<DocCommentTree> methodDoc(ExecutableElement method) {
+        var classElement = (TypeElement) method.getEnclosingElement();
+        var className = classElement.getQualifiedName().toString();
+        var methodName = method.getSimpleName().toString();
+        return docs.memberDoc(className, methodName);
     }
 
-    /** Look up the javadoc associated with `e` */
-    public Optional<ClassDoc> classDoc(TypeElement e) {
-        return docs.classDoc(e);
+    /** Find and parse the source code associated with `method` */
+    public Optional<MethodTree> methodTree(ExecutableElement method) {
+        var classElement = (TypeElement) method.getEnclosingElement();
+        var className = classElement.getQualifiedName().toString();
+        var methodName = method.getSimpleName().toString();
+        return docs.findMethod(className, methodName);
+    }
+
+    /** Look up the javadoc associated with `type` */
+    public Optional<DocCommentTree> classDoc(TypeElement type) {
+        return docs.classDoc(type.getQualifiedName().toString());
+    }
+
+    public Optional<DocCommentTree> classDoc(String qualifiedName) {
+        return docs.classDoc(qualifiedName);
     }
 
     private Stream<Path> javaSourcesInDir(Path dir) {

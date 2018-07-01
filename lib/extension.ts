@@ -51,10 +51,8 @@ export function activate(context: VSCode.ExtensionContext) {
     let serverOptions: ServerOptions = {
         command: javaExecutablePath,
         args: args,
-        options: { cwd: VSCode.workspace.rootPath }
+        options: { cwd: context.extensionPath }
     }
-
-    console.log(javaExecutablePath + ' ' + args.join(' '));
 
     // Copied from typescript
     VSCode.languages.setLanguageConfiguration('java', {

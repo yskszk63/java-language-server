@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 class Classes {
 
     /** All exported modules in the JDK */
-    private static String[] JDK_MODULES = {
+    static String[] JDK_MODULES = {
         "java.activation",
         "java.base",
         "java.compiler",

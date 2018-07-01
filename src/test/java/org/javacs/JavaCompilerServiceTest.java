@@ -3,7 +3,6 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-import com.sun.javadoc.MethodDoc;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.LineMap;
 import com.sun.source.util.SourcePositions;
@@ -20,7 +19,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -297,9 +295,9 @@ public class JavaCompilerServiceTest {
                         .get()
                         .activeMethod
                         .get();
-        Optional<MethodDoc> doc = compiler.methodDoc(method);
+        var doc = compiler.methodDoc(method);
         assertTrue(doc.isPresent());
-        assertThat(Javadocs.commentText(doc.get()).orElse("<empty>"), containsString("A great method"));
+        assertThat(doc.toString(), containsString("A great method"));
     }
 
     @Test

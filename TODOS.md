@@ -75,6 +75,7 @@
 * Cast to type
 * Import missing file
 * Unused return value auto-add
+* Format-on-save should add missing method declarations
 
 ### Code lens
 * "N references" on method, class
