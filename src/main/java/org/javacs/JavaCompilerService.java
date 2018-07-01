@@ -65,25 +65,25 @@ public class JavaCompilerService {
 
     public JavaCompilerService(Set<Path> sourcePath, Set<Path> classPath, Set<Path> docPath) {
         var klass = compiler.getClass();
-        var location = klass.getResource('/' + klass.getName().replace('.', '/') + ".class");
+        var path = klass.getName().replace('.', '/');
+        var location = klass.getResource(String.format("/%s.class", path));
 
-        LOG.info("Creating a new compiler...");
-        LOG.info("Source path:");
+        System.err.println("Source path:");
         for (var p : sourcePath) {
-            LOG.info("  " + p);
+            System.err.println("  " + p);
         }
-        LOG.info("Class path:");
+        System.err.println("Class path:");
         for (var p : classPath) {
-            LOG.info("  " + p);
+            System.err.println("  " + p);
         }
-        LOG.info("Doc path:");
+        System.err.println("Doc path:");
         for (var p : docPath) {
-            LOG.info("  " + p);
+            System.err.println("  " + p);
         }
         // sourcePath and classPath can't actually be modified, because JavaCompiler remembers them from task to task
         this.sourcePath = Collections.unmodifiableSet(sourcePath);
         this.classPath = Collections.unmodifiableSet(classPath);
-        this.docPath = docPath;
+        this.docPath = Collections.unmodifiableSet(docPath);
         this.docs = new Docs(Sets.union(sourcePath, docPath));
         this.classPathClasses = Classes.classPathTopLevelClasses(classPath);
     }
@@ -619,47 +619,50 @@ public class JavaCompilerService {
                     }
                     // Does a candidate completion match the name in `node`?
                     var partialName = Objects.toString(node.getName(), "");
+                    var startsWithUpperCase = partialName.length() > 0 && Character.isUpperCase(partialName.charAt(0));
                     var alreadyImported = new HashSet<String>();
                     // Add names that have already been imported
                     for (var m : scopeMembers(file, contents, line, character)) {
                         if (m.getSimpleName().toString().startsWith(partialName)) {
                             result.add(Completion.ofElement(m));
 
-                            if (m instanceof TypeElement) {
+                            if (m instanceof TypeElement && startsWithUpperCase) {
                                 var t = (TypeElement) m;
                                 alreadyImported.add(t.getQualifiedName().toString());
                             }
                         }
                     }
                     // Add names of classes that haven't been imported
-                    var packageName = Objects.toString(parse.getPackageName(), "");
-                    Predicate<String> isUpper = className -> className.length() > 0 && Character.isUpperCase(className.charAt(0));
-                    Predicate<String> matchesPartialName =
-                            className -> Parser.lastName(className).startsWith(partialName);
-                    Predicate<String> notAlreadyImported = className -> !alreadyImported.contains(className);
-                    var fromJdk =
-                            jdkClasses
-                                    .classes()
-                                    .stream()
-                                    .filter(isUpper)
-                                    .filter(matchesPartialName)
-                                    .filter(notAlreadyImported)
-                                    .filter(c -> jdkClasses.isAccessibleFromPackage(c, packageName));
-                    var fromClasspath =
-                            classPathClasses
-                                    .classes()
-                                    .stream()
-                                    .filter(isUpper)
-                                    .filter(matchesPartialName)
-                                    .filter(notAlreadyImported)
-                                    .filter(c -> classPathClasses.isAccessibleFromPackage(c, packageName));
-                    var fromBoth = Stream.concat(fromJdk, fromClasspath).iterator();
-                    while (fromBoth.hasNext() && result.size() < limitHint) {
-                        var className = fromBoth.next();
-                        var completion = Completion.ofNotImportedClass(className);
-                        result.add(completion);
+                    if (startsWithUpperCase) {
+                        var packageName = Objects.toString(parse.getPackageName(), "");
+                        Predicate<String> matchesPartialName =
+                                qualifiedName -> {
+                                    var className = Parser.lastName(qualifiedName);
+                                    return className.startsWith(partialName);
+                                };
+                        Predicate<String> notAlreadyImported = className -> !alreadyImported.contains(className);
+                        var fromJdk =
+                                jdkClasses
+                                        .classes()
+                                        .stream()
+                                        .filter(matchesPartialName)
+                                        .filter(notAlreadyImported)
+                                        .filter(c -> jdkClasses.isAccessibleFromPackage(c, packageName));
+                        var fromClasspath =
+                                classPathClasses
+                                        .classes()
+                                        .stream()
+                                        .filter(matchesPartialName)
+                                        .filter(notAlreadyImported)
+                                        .filter(c -> classPathClasses.isAccessibleFromPackage(c, packageName));
+                        var fromBoth = Stream.concat(fromJdk, fromClasspath).iterator();
+                        while (fromBoth.hasNext() && result.size() < limitHint) {
+                            var className = fromBoth.next();
+                            var completion = Completion.ofNotImportedClass(className);
+                            result.add(completion);
+                        }
+                        isIncomplete = fromBoth.hasNext();
                     }
-                    isIncomplete = fromBoth.hasNext();
                 }
                 return null;
             }
