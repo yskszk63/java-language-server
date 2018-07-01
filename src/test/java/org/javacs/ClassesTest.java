@@ -3,12 +3,12 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-import com.google.common.collect.*;
-import com.google.common.reflect.*;
-import java.net.*;
-import java.nio.file.*;
-import java.util.*;
-import org.junit.*;
+import com.google.common.reflect.ClassPath;
+import java.net.URI;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.util.Collections;
+import org.junit.Test;
 
 public class ClassesTest {
 

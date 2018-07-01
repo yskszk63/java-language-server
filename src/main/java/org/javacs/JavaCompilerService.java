@@ -1081,9 +1081,17 @@ public class JavaCompilerService {
         // Take the intersection of existing imports ^ existing identifiers
         Set<String> qualifiedNames = new HashSet<>();
         for (ImportTree i : tree.getImports()) {
-            String imported = i.getQualifiedIdentifier().toString();
-            if (references.contains(imported)) qualifiedNames.add(imported);
-            else LOG.warning("There are no references to " + imported);
+            var imported = i.getQualifiedIdentifier().toString();
+            if (imported.endsWith(".*")) {
+                var packageName = Parser.mostName(imported);
+                var isUsed = references.stream().anyMatch(r -> r.startsWith(packageName));
+                if (isUsed) qualifiedNames.add(imported);
+                else LOG.warning("There are no references to package " + imported);
+            }
+            else {
+                if (references.contains(imported)) qualifiedNames.add(imported);
+                else LOG.warning("There are no references to class " + imported);
+            }
         }
         // Add qualified names from fixes
         qualifiedNames.addAll(fixes.values());

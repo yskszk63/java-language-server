@@ -3,8 +3,8 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Set;
 import org.junit.Test;
 
 public class ParserTest {
@@ -20,9 +20,17 @@ public class ParserTest {
 
     @Test
     public void findAutocompleteBetweenLines() {
-        Path file =
-                LanguageServerFixture.DEFAULT_WORKSPACE_ROOT.resolve(
-                        Paths.get("src", "org", "javacs", "example", "AutocompleteBetweenLines.java"));
+        var rel = Paths.get("src", "org", "javacs", "example", "AutocompleteBetweenLines.java");
+        var file = LanguageServerFixture.DEFAULT_WORKSPACE_ROOT.resolve(rel);
         assertTrue(Parser.containsWordMatching(file, "ABetweenLines"));
+    }
+
+    @Test
+    public void findExistingImports() {
+        var rel = Paths.get("src", "org", "javacs", "doimport");
+        var dir = LanguageServerFixture.DEFAULT_WORKSPACE_ROOT.resolve(rel);
+        var existing = Parser.existingImports(Set.of(dir));
+        assertThat(existing.classes, hasItems("java.util.List"));
+        assertThat(existing.packages, hasItems("java.util", "java.io"));
     }
 }

@@ -3,8 +3,8 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-import java.util.*;
-import org.junit.*;
+import java.util.Set;
+import org.junit.Test;
 
 public class DocsTest {
     @Test
