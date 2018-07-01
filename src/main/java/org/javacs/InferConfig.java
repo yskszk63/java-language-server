@@ -118,6 +118,28 @@ class InferConfig {
         return Stream.empty();
     }
 
+    private void findBazelJavac(File bazelRoot, File workspaceRoot, Set<Path> acc) {
+        // If _javac directory exists, search it for dirs with names like lib*_classes
+        var javac = new File(bazelRoot, "_javac");
+        if (javac.exists()) {
+            var match = FileSystems.getDefault().getPathMatcher("glob:**/lib*_classes");
+            try {
+                Files.walk(javac.toPath()).filter(match::matches).filter(Files::isDirectory).forEach(acc::add);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        // Recurse into all directories that mirror the structure of the workspace
+        if (bazelRoot.isDirectory()) {
+            var children = bazelRoot.list((__, name) -> new File(workspaceRoot, name).exists());
+            for (var child : children) {
+                var bazelChild = new File(bazelRoot, child);
+                var workspaceChild = new File(workspaceRoot, child);
+                findBazelJavac(bazelChild, workspaceChild, acc);
+            }
+        }
+    }
+
     /**
      * Search bazel-bin for per-module output directories matching the pattern:
      *
@@ -125,12 +147,11 @@ class InferConfig {
      */
     private Set<Path> bazelOutputDirectories(Path bazelBin) {
         try {
-            LOG.info("Searching for bazel output directories in " + bazelBin);
+            var bazelBinTarget = Files.readSymbolicLink(bazelBin);
+            LOG.info("Searching for bazel output directories in " + bazelBinTarget);
 
-            var target = Files.readSymbolicLink(bazelBin);
-            var match = FileSystems.getDefault().getPathMatcher("glob:**/_javac/*/lib*_classes");
-            var dirs = Files.walk(target).filter(match::matches).filter(Files::isDirectory).collect(Collectors.toSet());
-
+            var dirs = new HashSet<Path>();
+            findBazelJavac(bazelBinTarget.toFile(), workspaceRoot.toFile(), dirs);
             LOG.info(String.format("Found %d bazel output directories", dirs.size()));
 
             return dirs;
