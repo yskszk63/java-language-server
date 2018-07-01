@@ -101,6 +101,8 @@ class Classes {
     };
 
     static ClassSource jdkTopLevelClasses() {
+        LOG.info("Searching for top-level classes in the JDK");
+
         var classes = new HashSet<String>();
         var fs = FileSystems.getFileSystem(URI.create("jrt:/"));
         for (var m : JDK_MODULES) {
@@ -120,7 +122,9 @@ class Classes {
                 throw new RuntimeException(e);
             }
         }
+
         LOG.info(String.format("Found %d classes in the java platform", classes.size()));
+
         class PlatformClassSource implements ClassSource {
             public Set<String> classes() {
                 return Collections.unmodifiableSet(classes);
@@ -138,6 +142,8 @@ class Classes {
     }
 
     static ClassSource classPathTopLevelClasses(Set<Path> classPath) {
+        LOG.info(String.format("Searching for top-level classes in %d classpath locations", classPath.size()));
+
         Function<Path, URL> toUrl =
                 p -> {
                     try {
@@ -155,7 +161,9 @@ class Classes {
             throw new RuntimeException(e);
         }
         var classes = scanner.getTopLevelClasses().stream().map(info -> info.getName()).collect(Collectors.toSet());
-        LOG.info(String.format("Found %d classes in %s", classes.size(), classPath));
+
+        LOG.info(String.format("Found %d classes in classpath", classes.size()));
+
         class ClassPathClassSource implements ClassSource {
             public Set<String> classes() {
                 return Collections.unmodifiableSet(classes);

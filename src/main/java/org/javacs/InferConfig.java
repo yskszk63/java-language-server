@@ -57,7 +57,7 @@ class InferConfig {
         if (!as.isEmpty()) {
             LOG.info("Looking for artifacts:");
             for (var a : as) {
-                LOG.info("  " + a);
+                System.err.println("  " + a);
             }
         }
         for (var a : as) {
@@ -71,11 +71,9 @@ class InferConfig {
             var bazelGenFiles = workspaceRoot.resolve("bazel-genfiles");
 
             if (Files.exists(bazelGenFiles) && Files.isSymbolicLink(bazelGenFiles)) {
+                LOG.info("Looking for bazel generated files in " + bazelGenFiles);
                 var jars = bazelJars(bazelGenFiles);
-                LOG.info(String.format("Adding bazel dependencies in %s:", bazelGenFiles));
-                for (var j : jars) {
-                    LOG.info("  " + bazelGenFiles.toAbsolutePath().relativize(j));
-                }
+                LOG.info(String.format("Found %d generated-files directories", jars.size()));
                 result.addAll(jars);
             }
         }
@@ -127,10 +125,15 @@ class InferConfig {
      */
     private Set<Path> bazelOutputDirectories(Path bazelBin) {
         try {
+            LOG.info("Searching for bazel output directories in " + bazelBin);
+
             var target = Files.readSymbolicLink(bazelBin);
             var match = FileSystems.getDefault().getPathMatcher("glob:**/_javac/*/lib*_classes");
+            var dirs = Files.walk(target).filter(match::matches).filter(Files::isDirectory).collect(Collectors.toSet());
 
-            return Files.walk(target).filter(match::matches).filter(Files::isDirectory).collect(Collectors.toSet());
+            LOG.info(String.format("Found %d bazel output directories", dirs.size()));
+
+            return dirs;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

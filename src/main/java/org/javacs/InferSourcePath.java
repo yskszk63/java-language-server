@@ -28,6 +28,8 @@ class InferSourcePath {
     }
 
     static Set<Path> sourcePath(Path workspaceRoot) {
+        LOG.info("Searching for source roots in " + workspaceRoot);
+
         class SourcePaths implements Consumer<Path> {
             int certaintyThreshold = 10;
             Map<Path, Integer> sourceRoots = new HashMap<>();
