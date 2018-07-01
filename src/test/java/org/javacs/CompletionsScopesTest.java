@@ -5,16 +5,15 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 
 import java.io.IOException;
-import java.util.Set;
 import org.junit.Test;
 
 public class CompletionsScopesTest extends CompletionsBase {
     @Test
     public void staticSub() throws IOException {
-        String file = "/org/javacs/example/AutocompleteScopes.java";
+        var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // Static method
-        Set<String> suggestions = insertText(file, 15, 14);
+        var suggestions = insertText(file, 15, 14);
 
         // Locals
         assertThat(suggestions, hasItems("localVariables", "arguments"));
@@ -35,7 +34,7 @@ public class CompletionsScopesTest extends CompletionsBase {
 
     @Test
     public void staticSubThisSuper() throws IOException {
-        String file = "/org/javacs/example/AutocompleteScopes.java";
+        var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // StaticSub.this, StaticSub.super
         assertThat(insertText(file, 37, 23), hasItems("this", "super"));
@@ -47,10 +46,10 @@ public class CompletionsScopesTest extends CompletionsBase {
 
     @Test
     public void staticSubInner() throws IOException {
-        String file = "/org/javacs/example/AutocompleteScopes.java";
+        var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // Static method
-        Set<String> suggestions = insertText(file, 45, 22);
+        var suggestions = insertText(file, 45, 22);
 
         // Locals
         assertThat(suggestions, hasItems("localVariables", "arguments"));
@@ -71,7 +70,7 @@ public class CompletionsScopesTest extends CompletionsBase {
 
     @Test
     public void staticSubInnerThisSuper() throws IOException {
-        String file = "/org/javacs/example/AutocompleteScopes.java";
+        var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // StaticSub.this, StaticSub.super
         assertThat(insertText(file, 67, 31), hasItems("this", "super"));
@@ -83,10 +82,10 @@ public class CompletionsScopesTest extends CompletionsBase {
 
     @Test
     public void staticSubStaticMethod() throws IOException {
-        String file = "/org/javacs/example/AutocompleteScopes.java";
+        var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // Static method
-        Set<String> suggestions = insertText(file, 78, 14);
+        var suggestions = insertText(file, 78, 14);
 
         // Locals
         assertThat(suggestions, hasItems("localVariables", "arguments"));
@@ -107,7 +106,7 @@ public class CompletionsScopesTest extends CompletionsBase {
 
     @Test
     public void staticSubStaticMethodThisSuper() throws IOException {
-        String file = "/org/javacs/example/AutocompleteScopes.java";
+        var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // StaticSub.this, StaticSub.super
         assertThat(insertText(file, 100, 23), not(hasItems("this", "super")));
@@ -119,10 +118,10 @@ public class CompletionsScopesTest extends CompletionsBase {
 
     @Test
     public void staticSubStaticMethodInner() throws IOException {
-        String file = "/org/javacs/example/AutocompleteScopes.java";
+        var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // Static method
-        Set<String> suggestions = insertText(file, 108, 22);
+        var suggestions = insertText(file, 108, 22);
 
         // Locals
         assertThat(suggestions, hasItems("localVariables", "arguments"));
@@ -143,7 +142,7 @@ public class CompletionsScopesTest extends CompletionsBase {
 
     @Test
     public void staticSubStaticMethodInnerThisSuper() throws IOException {
-        String file = "/org/javacs/example/AutocompleteScopes.java";
+        var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // StaticSub.this, StaticSub.super
         assertThat(insertText(file, 130, 31), not(hasItems("this", "super")));
@@ -155,10 +154,10 @@ public class CompletionsScopesTest extends CompletionsBase {
 
     @Test
     public void sub() throws IOException {
-        String file = "/org/javacs/example/AutocompleteScopes.java";
+        var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // Static method
-        Set<String> suggestions = insertText(file, 143, 14);
+        var suggestions = insertText(file, 143, 14);
 
         // Locals
         assertThat(suggestions, hasItems("localVariables", "arguments"));
@@ -179,7 +178,7 @@ public class CompletionsScopesTest extends CompletionsBase {
 
     @Test
     public void subThisSuper() throws IOException {
-        String file = "/org/javacs/example/AutocompleteScopes.java";
+        var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // sub.this, sub.super
         assertThat(insertText(file, 158, 17), hasItems("this", "super"));
@@ -191,10 +190,10 @@ public class CompletionsScopesTest extends CompletionsBase {
 
     @Test
     public void subInner() throws IOException {
-        String file = "/org/javacs/example/AutocompleteScopes.java";
+        var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // Static method
-        Set<String> suggestions = insertText(file, 166, 22);
+        var suggestions = insertText(file, 166, 22);
 
         // Locals
         assertThat(suggestions, hasItems("localVariables", "arguments"));
@@ -215,7 +214,7 @@ public class CompletionsScopesTest extends CompletionsBase {
 
     @Test
     public void subInnerThisSuper() throws IOException {
-        String file = "/org/javacs/example/AutocompleteScopes.java";
+        var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // sub.this, sub.super
         assertThat(insertText(file, 181, 25), hasItems("this", "super"));

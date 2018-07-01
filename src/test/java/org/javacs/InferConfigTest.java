@@ -5,7 +5,6 @@ import static org.junit.Assert.*;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Optional;
 import org.junit.Test;
 
 public class InferConfigTest {
@@ -16,7 +15,7 @@ public class InferConfigTest {
 
     @Test
     public void mavenClassPath() {
-        Optional<Path> found = infer.findMavenJar(externalArtifact, false);
+        var found = infer.findMavenJar(externalArtifact, false);
         assertTrue(found.isPresent());
         assertThat(
                 found.get(),
@@ -26,7 +25,7 @@ public class InferConfigTest {
 
     @Test
     public void mavenDocPath() {
-        Optional<Path> found = infer.findMavenJar(externalArtifact, true);
+        var found = infer.findMavenJar(externalArtifact, true);
         assertTrue(found.isPresent());
         assertThat(
                 found.get(),

@@ -52,8 +52,8 @@ class LanguageServerFixture {
     }
 
     private static JavaLanguageServer getJavaLanguageServer(Path workspaceRoot, LanguageClient client) {
-        JavaLanguageServer server = new JavaLanguageServer();
-        InitializeParams init = new InitializeParams();
+        var server = new JavaLanguageServer();
+        var init = new InitializeParams();
 
         init.setRootUri(workspaceRoot.toUri().toString());
 

@@ -19,7 +19,6 @@ import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.tools.JavaCompiler;
@@ -180,11 +179,11 @@ class Docs {
     private static final Pattern HTML_TAG = Pattern.compile("<(\\w+)>");
 
     private static boolean isHtml(String text) {
-        Matcher tags = HTML_TAG.matcher(text);
+        var tags = HTML_TAG.matcher(text);
         while (tags.find()) {
-            String tag = tags.group(1);
-            String close = String.format("</%s>", tag);
-            int findClose = text.indexOf(close, tags.end());
+            var tag = tags.group(1);
+            var close = String.format("</%s>", tag);
+            var findClose = text.indexOf(close, tags.end());
             if (findClose != -1) return true;
         }
         return false;
@@ -194,7 +193,7 @@ class Docs {
     /** If `commentText` looks like HTML, convert it to markdown */
     static String htmlToMarkdown(String commentText) {
         if (isHtml(commentText)) {
-            Options options = new Options();
+            var options = new Options();
 
             options.tables = Options.Tables.CONVERT_TO_CODE_BLOCK;
             options.hardwraps = true;

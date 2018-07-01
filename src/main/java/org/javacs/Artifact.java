@@ -23,7 +23,7 @@ class Artifact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Artifact artifact = (Artifact) o;
+        var artifact = (Artifact) o;
         return Objects.equals(groupId, artifact.groupId)
                 && Objects.equals(artifactId, artifact.artifactId)
                 && Objects.equals(version, artifact.version);

@@ -1,7 +1,6 @@
 package org.javacs;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,13 +18,13 @@ public class CompletionsBase {
     protected static final Logger LOG = Logger.getLogger("main");
 
     protected Set<String> insertTemplate(String file, int row, int column) throws IOException {
-        List<? extends CompletionItem> items = items(file, row, column);
+        var items = items(file, row, column);
 
         return items.stream().map(CompletionsBase::itemInsertTemplate).collect(Collectors.toSet());
     }
 
     static String itemInsertTemplate(CompletionItem i) {
-        String text = i.getInsertText();
+        var text = i.getInsertText();
 
         if (text == null) text = i.getLabel();
 
@@ -35,18 +34,18 @@ public class CompletionsBase {
     }
 
     protected Set<String> insertText(String file, int row, int column) throws IOException {
-        List<? extends CompletionItem> items = items(file, row, column);
+        var items = items(file, row, column);
 
         return items.stream().map(CompletionsBase::itemInsertText).collect(Collectors.toSet());
     }
 
     protected Map<String, Integer> insertCount(String file, int row, int column) throws IOException {
-        List<? extends CompletionItem> items = items(file, row, column);
-        Map<String, Integer> result = new HashMap<>();
+        var items = items(file, row, column);
+        var result = new HashMap<String, Integer>();
 
-        for (CompletionItem each : items) {
-            String key = itemInsertText(each);
-            int count = result.getOrDefault(key, 0) + 1;
+        for (var each : items) {
+            var key = itemInsertText(each);
+            var count = result.getOrDefault(key, 0) + 1;
 
             result.put(key, count);
         }
@@ -55,7 +54,7 @@ public class CompletionsBase {
     }
 
     static String itemInsertText(CompletionItem i) {
-        String text = i.getInsertText();
+        var text = i.getInsertText();
 
         if (text == null) text = i.getLabel();
 
@@ -67,7 +66,7 @@ public class CompletionsBase {
     }
 
     protected Set<String> documentation(String file, int row, int column) throws IOException {
-        List<? extends CompletionItem> items = items(file, row, column);
+        var items = items(file, row, column);
 
         return items.stream()
                 .flatMap(
@@ -82,8 +81,8 @@ public class CompletionsBase {
     protected static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     protected List<? extends CompletionItem> items(String file, int row, int column) {
-        URI uri = FindResource.uri(file);
-        CompletionParams position =
+        var uri = FindResource.uri(file);
+        var position =
                 new CompletionParams(new TextDocumentIdentifier(uri.toString()), new Position(row - 1, column - 1));
 
         try {

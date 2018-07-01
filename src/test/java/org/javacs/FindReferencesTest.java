@@ -3,7 +3,6 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-import java.net.URI;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
@@ -19,8 +18,8 @@ public class FindReferencesTest {
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     protected List<? extends Location> items(String file, int row, int column) {
-        URI uri = FindResource.uri(file);
-        ReferenceParams params = new ReferenceParams();
+        var uri = FindResource.uri(file);
+        var params = new ReferenceParams();
 
         params.setTextDocument(new TextDocumentIdentifier(uri.toString()));
         params.setUri(uri.toString());

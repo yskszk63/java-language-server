@@ -4,13 +4,8 @@ import com.google.gson.JsonPrimitive;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.doctree.DocTree;
 import com.sun.source.doctree.ParamTree;
-import com.sun.source.tree.CompilationUnitTree;
-import com.sun.source.tree.ImportTree;
-import com.sun.source.tree.LineMap;
 import com.sun.source.tree.MethodTree;
-import com.sun.source.util.SourcePositions;
 import com.sun.source.util.TreePath;
-import com.sun.source.util.Trees;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
@@ -67,11 +62,8 @@ import org.eclipse.lsp4j.SignatureHelp;
 import org.eclipse.lsp4j.SignatureInformation;
 import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.TextDocumentContentChangeEvent;
-import org.eclipse.lsp4j.TextDocumentIdentifier;
-import org.eclipse.lsp4j.TextDocumentItem;
 import org.eclipse.lsp4j.TextDocumentPositionParams;
 import org.eclipse.lsp4j.TextEdit;
-import org.eclipse.lsp4j.VersionedTextDocumentIdentifier;
 import org.eclipse.lsp4j.WorkspaceEdit;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.TextDocumentService;
@@ -128,16 +120,16 @@ class JavaTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams position) {
-        URI uri = URI.create(position.getTextDocument().getUri());
-        String content = contents(uri).content;
-        int line = position.getPosition().getLine() + 1;
-        int column = position.getPosition().getCharacter() + 1;
-        List<CompletionItem> result = new ArrayList<>();
+        var uri = URI.create(position.getTextDocument().getUri());
+        var content = contents(uri).content;
+        var line = position.getPosition().getLine() + 1;
+        var column = position.getPosition().getCharacter() + 1;
+        var result = new ArrayList<CompletionItem>();
         lastCompletions.clear();
-        CompletionResult completions = server.compiler.completions(uri, content, line, column, 50);
-        for (Completion c : completions.items) {
-            CompletionItem i = new CompletionItem();
-            String id = UUID.randomUUID().toString();
+        var completions = server.compiler.completions(uri, content, line, column, 50);
+        for (var c : completions.items) {
+            var i = new CompletionItem();
+            var id = UUID.randomUUID().toString();
             i.setData(id);
             lastCompletions.put(id, c);
             if (c.element != null) {
@@ -165,7 +157,7 @@ class JavaTextDocumentService implements TextDocumentService {
     }
 
     private String resolveDocDetail(MethodTree doc) {
-        StringJoiner args = new StringJoiner(", ");
+        var args = new StringJoiner(", ");
         for (var p : doc.getParameters()) {
             args.add(p.getName());
         }
@@ -173,10 +165,10 @@ class JavaTextDocumentService implements TextDocumentService {
     }
 
     private String resolveDefaultDetail(ExecutableElement method) {
-        StringJoiner args = new StringJoiner(", ");
-        boolean missingParamNames =
+        var args = new StringJoiner(", ");
+        var missingParamNames =
                 method.getParameters().stream().allMatch(p -> p.getSimpleName().toString().matches("arg\\d+"));
-        for (VariableElement p : method.getParameters()) {
+        for (var p : method.getParameters()) {
             if (missingParamNames) args.add(p.asType().toString());
             else args.add(p.getSimpleName().toString());
         }
@@ -205,9 +197,9 @@ class JavaTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<CompletionItem> resolveCompletionItem(CompletionItem unresolved) {
-        JsonPrimitive idJson = (JsonPrimitive) unresolved.getData();
-        String id = idJson.getAsString();
-        Completion cached = lastCompletions.get(id);
+        var idJson = (JsonPrimitive) unresolved.getData();
+        var id = idJson.getAsString();
+        var cached = lastCompletions.get(id);
         if (cached == null) {
             LOG.warning("CompletionItem " + id + " was not in the cache");
             return CompletableFuture.completedFuture(unresolved);
@@ -240,7 +232,7 @@ class JavaTextDocumentService implements TextDocumentService {
     }
 
     private String hoverTypeDeclaration(TypeElement t) {
-        StringBuilder result = new StringBuilder();
+        var result = new StringBuilder();
         switch (t.getKind()) {
             case INTERFACE:
                 result.append("interface");
@@ -261,24 +253,24 @@ class JavaTextDocumentService implements TextDocumentService {
 
     private String hoverCode(Element e) {
         if (e instanceof ExecutableElement) {
-            ExecutableElement m = (ExecutableElement) e;
+            var m = (ExecutableElement) e;
             if (m.getSimpleName().contentEquals("<init>")) {
                 return m.toString();
             } else {
-                StringJoiner result = new StringJoiner(" ");
+                var result = new StringJoiner(" ");
                 if (m.getModifiers().contains(Modifier.STATIC)) result.add("static");
                 result.add(m.getReturnType().toString());
                 result.add(m.toString());
                 return result.toString();
             }
         } else if (e instanceof VariableElement) {
-            VariableElement v = (VariableElement) e;
+            var v = (VariableElement) e;
             return v.asType() + " " + v;
         } else if (e instanceof TypeElement) {
-            TypeElement t = (TypeElement) e;
-            StringJoiner lines = new StringJoiner("\n");
+            var t = (TypeElement) e;
+            var lines = new StringJoiner("\n");
             lines.add(hoverTypeDeclaration(t) + " {");
-            for (Element member : t.getEnclosedElements()) {
+            for (var member : t.getEnclosedElements()) {
                 // TODO check accessibility
                 if (member instanceof ExecutableElement || member instanceof VariableElement) {
                     lines.add("  " + hoverCode(member) + ";");
@@ -293,21 +285,21 @@ class JavaTextDocumentService implements TextDocumentService {
 
     private Optional<String> hoverDocs(Element e) {
         if (e instanceof ExecutableElement) {
-            ExecutableElement m = (ExecutableElement) e;
+            var m = (ExecutableElement) e;
             return server.compiler.methodDoc(m).map(this::asMarkdown);
         } else if (e instanceof TypeElement) {
-            TypeElement t = (TypeElement) e;
+            var t = (TypeElement) e;
             return server.compiler.classDoc(t).map(this::asMarkdown);
         } else return Optional.empty();
     }
 
     @Override
     public CompletableFuture<Hover> hover(TextDocumentPositionParams position) {
-        URI uri = URI.create(position.getTextDocument().getUri());
-        String content = contents(uri).content;
-        int line = position.getPosition().getLine() + 1;
-        int column = position.getPosition().getCharacter() + 1;
-        Element e = server.compiler.element(uri, content, line, column);
+        var uri = URI.create(position.getTextDocument().getUri());
+        var content = contents(uri).content;
+        var line = position.getPosition().getLine() + 1;
+        var column = position.getPosition().getCharacter() + 1;
+        var e = server.compiler.element(uri, content, line, column);
         if (e != null) {
             List<Either<String, MarkedString>> result = new ArrayList<>();
             result.add(Either.forRight(new MarkedString("java", hoverCode(e))));
@@ -317,8 +309,8 @@ class JavaTextDocumentService implements TextDocumentService {
     }
 
     private List<ParameterInformation> signatureParamsFromDocs(MethodTree method, DocCommentTree doc) {
-        List<ParameterInformation> ps = new ArrayList<>();
-        Map<String, String> paramComments = new HashMap<>();
+        var ps = new ArrayList<ParameterInformation>();
+        var paramComments = new HashMap<String, String>();
         for (var tag : doc.getBlockTags()) {
             if (tag.getKind() == DocTree.Kind.PARAM) {
                 var param = (ParamTree) tag;
@@ -337,11 +329,11 @@ class JavaTextDocumentService implements TextDocumentService {
     }
 
     private List<ParameterInformation> signatureParamsFromMethod(ExecutableElement e) {
-        boolean missingParamNames =
+        var missingParamNames =
                 e.getParameters().stream().allMatch(p -> p.getSimpleName().toString().matches("arg\\d+"));
-        List<ParameterInformation> ps = new ArrayList<>();
-        for (VariableElement v : e.getParameters()) {
-            ParameterInformation p = new ParameterInformation();
+        var ps = new ArrayList<ParameterInformation>();
+        for (var v : e.getParameters()) {
+            var p = new ParameterInformation();
             if (missingParamNames) p.setLabel(v.asType().toString());
             else p.setLabel(v.getSimpleName().toString());
             ps.add(p);
@@ -350,13 +342,13 @@ class JavaTextDocumentService implements TextDocumentService {
     }
 
     private SignatureInformation asSignatureInformation(ExecutableElement e) {
-        SignatureInformation i = new SignatureInformation();
+        var i = new SignatureInformation();
         var ps = signatureParamsFromMethod(e);
         var doc = server.compiler.methodDoc(e);
         var tree = server.compiler.methodTree(e);
         if (doc.isPresent() && tree.isPresent()) ps = signatureParamsFromDocs(tree.get(), doc.get());
-        String args = ps.stream().map(p -> p.getLabel()).collect(Collectors.joining(", "));
-        String name = e.getSimpleName().toString();
+        var args = ps.stream().map(p -> p.getLabel()).collect(Collectors.joining(", "));
+        var name = e.getSimpleName().toString();
         if (name.equals("<init>")) name = e.getEnclosingElement().getSimpleName().toString();
         i.setLabel(name + "(" + args + ")");
         i.setParameters(ps);
@@ -365,21 +357,21 @@ class JavaTextDocumentService implements TextDocumentService {
 
     private SignatureHelp asSignatureHelp(MethodInvocation invoke) {
         // TODO use docs to get parameter names
-        List<SignatureInformation> sigs = new ArrayList<>();
-        for (ExecutableElement e : invoke.overloads) {
+        var sigs = new ArrayList<SignatureInformation>();
+        for (var e : invoke.overloads) {
             sigs.add(asSignatureInformation(e));
         }
-        int activeSig = invoke.activeMethod.map(invoke.overloads::indexOf).orElse(0);
+        var activeSig = invoke.activeMethod.map(invoke.overloads::indexOf).orElse(0);
         return new SignatureHelp(sigs, activeSig, invoke.activeParameter);
     }
 
     @Override
     public CompletableFuture<SignatureHelp> signatureHelp(TextDocumentPositionParams position) {
-        URI uri = URI.create(position.getTextDocument().getUri());
-        String content = contents(uri).content;
-        int line = position.getPosition().getLine() + 1;
-        int column = position.getPosition().getCharacter() + 1;
-        SignatureHelp help =
+        var uri = URI.create(position.getTextDocument().getUri());
+        var content = contents(uri).content;
+        var line = position.getPosition().getLine() + 1;
+        var column = position.getPosition().getCharacter() + 1;
+        var help =
                 server.compiler
                         .methodInvocation(uri, content, line, column)
                         .map(this::asSignatureHelp)
@@ -388,25 +380,25 @@ class JavaTextDocumentService implements TextDocumentService {
     }
 
     private Location location(TreePath p) {
-        Trees trees = server.compiler.trees();
-        SourcePositions pos = trees.getSourcePositions();
-        CompilationUnitTree cu = p.getCompilationUnit();
-        LineMap lines = cu.getLineMap();
+        var trees = server.compiler.trees();
+        var pos = trees.getSourcePositions();
+        var cu = p.getCompilationUnit();
+        var lines = cu.getLineMap();
         long start = pos.getStartPosition(cu, p.getLeaf()), end = pos.getEndPosition(cu, p.getLeaf());
         int startLine = (int) lines.getLineNumber(start) - 1, startCol = (int) lines.getColumnNumber(start) - 1;
         int endLine = (int) lines.getLineNumber(end) - 1, endCol = (int) lines.getColumnNumber(end) - 1;
-        URI dUri = cu.getSourceFile().toUri();
+        var dUri = cu.getSourceFile().toUri();
         return new Location(
                 dUri.toString(), new Range(new Position(startLine, startCol), new Position(endLine, endCol)));
     }
 
     @Override
     public CompletableFuture<List<? extends Location>> definition(TextDocumentPositionParams position) {
-        URI uri = URI.create(position.getTextDocument().getUri());
-        String content = contents(uri).content;
-        int line = position.getPosition().getLine() + 1;
-        int column = position.getPosition().getCharacter() + 1;
-        List<Location> result = new ArrayList<>();
+        var uri = URI.create(position.getTextDocument().getUri());
+        var content = contents(uri).content;
+        var line = position.getPosition().getLine() + 1;
+        var column = position.getPosition().getCharacter() + 1;
+        var result = new ArrayList<Location>();
         server.compiler
                 .definition(uri, line, column, f -> contents(f).content)
                 .ifPresent(
@@ -418,12 +410,12 @@ class JavaTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<List<? extends Location>> references(ReferenceParams position) {
-        URI uri = URI.create(position.getTextDocument().getUri());
-        String content = contents(uri).content;
-        int line = position.getPosition().getLine() + 1;
-        int column = position.getPosition().getCharacter() + 1;
-        List<Location> result = new ArrayList<>();
-        for (TreePath r : server.compiler.references(uri, content, line, column)) {
+        var uri = URI.create(position.getTextDocument().getUri());
+        var content = contents(uri).content;
+        var line = position.getPosition().getLine() + 1;
+        var column = position.getPosition().getCharacter() + 1;
+        var result = new ArrayList<Location>();
+        for (var r : server.compiler.references(uri, content, line, column)) {
             result.add(location(r));
         }
         return CompletableFuture.completedFuture(result);
@@ -436,9 +428,9 @@ class JavaTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<List<? extends SymbolInformation>> documentSymbol(DocumentSymbolParams params) {
-        URI uri = URI.create(params.getTextDocument().getUri());
-        String content = contents(uri).content;
-        List<SymbolInformation> result =
+        var uri = URI.create(params.getTextDocument().getUri());
+        var content = contents(uri).content;
+        var result =
                 Parser.documentSymbols(Paths.get(uri), content)
                         .stream()
                         .map(Parser::asSymbolInformation)
@@ -462,26 +454,26 @@ class JavaTextDocumentService implements TextDocumentService {
     }
 
     private List<TextEdit> fixImports(URI java) {
-        String contents = server.textDocuments.contents(java).content;
-        FixImports fix = server.compiler.fixImports(java, contents);
+        var contents = server.textDocuments.contents(java).content;
+        var fix = server.compiler.fixImports(java, contents);
         // TODO if imports already match fixed-imports, return empty list
         // TODO preserve comments and other details of existing imports
-        List<TextEdit> edits = new ArrayList<>();
+        var edits = new ArrayList<TextEdit>();
         // Delete all existing imports
-        for (ImportTree i : fix.parsed.getImports()) {
+        for (var i : fix.parsed.getImports()) {
             if (!i.isStatic()) {
-                long offset = fix.sourcePositions.getStartPosition(fix.parsed, i);
-                int line = (int) fix.parsed.getLineMap().getLineNumber(offset) - 1;
-                TextEdit delete = new TextEdit(new Range(new Position(line, 0), new Position(line + 1, 0)), "");
+                var offset = fix.sourcePositions.getStartPosition(fix.parsed, i);
+                var line = (int) fix.parsed.getLineMap().getLineNumber(offset) - 1;
+                var delete = new TextEdit(new Range(new Position(line, 0), new Position(line + 1, 0)), "");
                 edits.add(delete);
             }
         }
         if (fix.fixedImports.isEmpty()) return edits;
         // Find a place to insert the new imports
         long insertLine = -1;
-        StringBuilder insertText = new StringBuilder();
+        var insertText = new StringBuilder();
         // If there are imports, use the start of the first import as the insert position
-        for (ImportTree i : fix.parsed.getImports()) {
+        for (var i : fix.parsed.getImports()) {
             if (!i.isStatic() && insertLine == -1) {
                 long offset = fix.sourcePositions.getStartPosition(fix.parsed, i);
                 insertLine = fix.parsed.getLineMap().getLineNumber(offset) - 1;
@@ -505,15 +497,15 @@ class JavaTextDocumentService implements TextDocumentService {
                         i -> {
                             insertText.append("import ").append(i).append(";\n");
                         });
-        Position insertPosition = new Position((int) insertLine, 0);
-        TextEdit insert = new TextEdit(new Range(insertPosition, insertPosition), insertText.toString());
+        var insertPosition = new Position((int) insertLine, 0);
+        var insert = new TextEdit(new Range(insertPosition, insertPosition), insertText.toString());
         edits.add(insert);
         return edits;
     }
 
     @Override
     public CompletableFuture<List<? extends TextEdit>> formatting(DocumentFormattingParams params) {
-        URI uri = URI.create(params.getTextDocument().getUri());
+        var uri = URI.create(params.getTextDocument().getUri());
         return CompletableFuture.completedFuture(fixImports(uri));
     }
 
@@ -538,8 +530,8 @@ class JavaTextDocumentService implements TextDocumentService {
 
     @Override
     public void didOpen(DidOpenTextDocumentParams params) {
-        TextDocumentItem document = params.getTextDocument();
-        URI uri = URI.create(document.getUri());
+        var document = params.getTextDocument();
+        var uri = URI.create(document.getUri());
         if (isJava(uri)) {
             activeDocuments.put(uri, new VersionedContent(document.getText(), document.getVersion()));
             server.lint(Collections.singleton(uri));
@@ -548,14 +540,14 @@ class JavaTextDocumentService implements TextDocumentService {
 
     @Override
     public void didChange(DidChangeTextDocumentParams params) {
-        VersionedTextDocumentIdentifier document = params.getTextDocument();
-        URI uri = URI.create(document.getUri());
+        var document = params.getTextDocument();
+        var uri = URI.create(document.getUri());
         if (isJava(uri)) {
-            VersionedContent existing = activeDocuments.get(uri);
-            String newText = existing.content;
+            var existing = activeDocuments.get(uri);
+            var newText = existing.content;
 
             if (document.getVersion() > existing.version) {
-                for (TextDocumentContentChangeEvent change : params.getContentChanges()) {
+                for (var change : params.getContentChanges()) {
                     if (change.getRange() == null)
                         activeDocuments.put(uri, new VersionedContent(change.getText(), document.getVersion()));
                     else newText = patch(newText, change);
@@ -568,9 +560,9 @@ class JavaTextDocumentService implements TextDocumentService {
 
     private String patch(String sourceText, TextDocumentContentChangeEvent change) {
         try {
-            Range range = change.getRange();
-            BufferedReader reader = new BufferedReader(new StringReader(sourceText));
-            StringWriter writer = new StringWriter();
+            var range = change.getRange();
+            var reader = new BufferedReader(new StringReader(sourceText));
+            var writer = new StringWriter();
 
             // Skip unchanged lines
             int line = 0;
@@ -604,8 +596,8 @@ class JavaTextDocumentService implements TextDocumentService {
 
     @Override
     public void didClose(DidCloseTextDocumentParams params) {
-        TextDocumentIdentifier document = params.getTextDocument();
-        URI uri = URI.create(document.getUri());
+        var document = params.getTextDocument();
+        var uri = URI.create(document.getUri());
         if (isJava(uri)) {
             // Remove from source cache
             activeDocuments.remove(uri);
@@ -617,7 +609,7 @@ class JavaTextDocumentService implements TextDocumentService {
 
     @Override
     public void didSave(DidSaveTextDocumentParams params) {
-        URI uri = URI.create(params.getTextDocument().getUri());
+        var uri = URI.create(params.getTextDocument().getUri());
         if (isJava(uri)) {
             // Re-lint all active documents
             server.lint(activeDocuments.keySet());
@@ -635,7 +627,7 @@ class JavaTextDocumentService implements TextDocumentService {
             return activeDocuments.get(openFile);
         } else {
             try {
-                String content = Files.readAllLines(Paths.get(openFile)).stream().collect(Collectors.joining("\n"));
+                var content = Files.readAllLines(Paths.get(openFile)).stream().collect(Collectors.joining("\n"));
                 return new VersionedContent(content, -1);
             } catch (IOException e) {
                 throw new RuntimeException(e);

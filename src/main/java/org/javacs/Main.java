@@ -15,15 +15,11 @@ import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.FileHandler;
-import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.launch.LSPLauncher;
-import org.eclipse.lsp4j.services.LanguageClient;
 
 public class Main {
     public static final ObjectMapper JSON =
@@ -38,13 +34,13 @@ public class Main {
     private static final Logger LOG = Logger.getLogger("main");
 
     public static void setRootFormat() {
-        Logger root = Logger.getLogger("");
+        var root = Logger.getLogger("");
 
-        for (Handler h : root.getHandlers()) h.setFormatter(new LogFormat());
+        for (var h : root.getHandlers()) h.setFormatter(new LogFormat());
     }
 
     private static SimpleModule pathAsJson() {
-        SimpleModule m = new SimpleModule();
+        var m = new SimpleModule();
 
         m.addSerializer(
                 Path.class,
@@ -75,9 +71,9 @@ public class Main {
             Logger.getLogger("").addHandler(new FileHandler("javacs.%u.log", false));
             setRootFormat();
 
-            JavaLanguageServer server = new JavaLanguageServer();
-            ExecutorService threads = Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "client"));
-            Launcher<LanguageClient> launcher =
+            var server = new JavaLanguageServer();
+            var threads = Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "client"));
+            var launcher =
                     LSPLauncher.createServerLauncher(
                             server, System.in, System.out, threads, messageConsumer -> messageConsumer);
 

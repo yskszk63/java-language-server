@@ -85,11 +85,11 @@ public class SymbolUnderCursorTest {
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     private String symbolAt(String file, int line, int character) {
-        TextDocumentPositionParams pos =
+        var pos =
                 new TextDocumentPositionParams(
                         new TextDocumentIdentifier(FindResource.uri(file).toString()),
                         new Position(line - 1, character - 1));
-        StringJoiner result = new StringJoiner("\n");
+        var result = new StringJoiner("\n");
         try {
             server.getTextDocumentService()
                     .hover(pos)

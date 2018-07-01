@@ -51,16 +51,16 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     void publishDiagnostics(Collection<URI> files, List<Diagnostic<? extends JavaFileObject>> javaDiagnostics) {
-        for (URI f : files) {
+        for (var f : files) {
             List<org.eclipse.lsp4j.Diagnostic> ds = new ArrayList<>();
-            for (Diagnostic<? extends JavaFileObject> j : javaDiagnostics) {
-                URI uri = j.getSource().toUri();
+            for (var j : javaDiagnostics) {
+                var uri = j.getSource().toUri();
                 if (uri.equals(f)) {
-                    String content = textDocuments.contents(uri).content;
-                    Position start = position(content, j.getStartPosition()),
-                            end = position(content, j.getEndPosition());
-                    DiagnosticSeverity sev = severity(j.getKind());
-                    org.eclipse.lsp4j.Diagnostic d = new org.eclipse.lsp4j.Diagnostic();
+                    var content = textDocuments.contents(uri).content;
+                    var start = position(content, j.getStartPosition());
+                    var end = position(content, j.getEndPosition());
+                    var sev = severity(j.getKind());
+                    var d = new org.eclipse.lsp4j.Diagnostic();
                     d.setSeverity(sev);
                     d.setRange(new Range(start, end));
                     d.setCode(j.getCode());
@@ -73,7 +73,7 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     void lint(Collection<URI> uris) {
-        List<Path> paths =
+        var paths =
                 uris.stream()
                         .filter(uri -> uri.getScheme().equals("file"))
                         .map(uri -> Paths.get(uri))
@@ -84,7 +84,7 @@ class JavaLanguageServer implements LanguageServer {
 
     private JavaCompilerService createCompiler() {
         Objects.requireNonNull(workspaceRoot, "Can't create compiler because workspaceRoot has not been initialized");
-        InferConfig infer = new InferConfig(workspaceRoot);
+        var infer = new InferConfig(workspaceRoot);
         return new JavaCompilerService(
                 InferSourcePath.sourcePath(workspaceRoot), infer.classPath(), infer.buildDocPath());
     }
@@ -94,8 +94,8 @@ class JavaLanguageServer implements LanguageServer {
         this.workspaceRoot = Paths.get(URI.create(params.getRootUri()));
         this.compiler = createCompiler();
 
-        InitializeResult result = new InitializeResult();
-        ServerCapabilities c = new ServerCapabilities();
+        var result = new InitializeResult();
+        var c = new ServerCapabilities();
 
         c.setTextDocumentSync(TextDocumentSyncKind.Incremental);
         c.setDefinitionProvider(true);

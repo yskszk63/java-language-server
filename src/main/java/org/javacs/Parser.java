@@ -3,27 +3,21 @@ package org.javacs;
 import com.google.common.base.Joiner;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompilationUnitTree;
-import com.sun.source.tree.LineMap;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.JavacTask;
-import com.sun.source.util.SourcePositions;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.Trees;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.PathMatcher;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -108,10 +102,10 @@ class Parser {
 
     static boolean containsWordMatching(Path java, String query) {
         try {
-            for (String line : Files.readAllLines(java)) {
-                Matcher pattern = WORD.matcher(line);
+            for (var line : Files.readAllLines(java)) {
+                var pattern = WORD.matcher(line);
                 while (pattern.find()) {
-                    String word = pattern.group(0);
+                    var word = pattern.group(0);
                     if (matchesTitleCase(word, query)) return true;
                 }
             }
@@ -126,15 +120,15 @@ class Parser {
             List<TreePath> found = new ArrayList<>();
 
             void accept(TreePath path) {
-                Tree node = path.getLeaf();
+                var node = path.getLeaf();
                 if (node instanceof ClassTree) {
-                    ClassTree c = (ClassTree) node;
+                    var c = (ClassTree) node;
                     if (matchesTitleCase(c.getSimpleName(), query)) found.add(path);
                 } else if (node instanceof MethodTree) {
-                    MethodTree m = (MethodTree) node;
+                    var m = (MethodTree) node;
                     if (matchesTitleCase(m.getName(), query)) found.add(path);
                 } else if (node instanceof VariableTree) {
-                    VariableTree v = (VariableTree) node;
+                    var v = (VariableTree) node;
                     if (matchesTitleCase(v.getName(), query)) found.add(path);
                 }
             }
@@ -143,8 +137,8 @@ class Parser {
             public Void visitClass(ClassTree node, Void nothing) {
                 super.visitClass(node, nothing);
                 accept(getCurrentPath());
-                for (Tree t : node.getMembers()) {
-                    TreePath child = new TreePath(getCurrentPath(), t);
+                for (var t : node.getMembers()) {
+                    var child = new TreePath(getCurrentPath(), t);
                     accept(child);
                 }
                 return null;
@@ -160,7 +154,7 @@ class Parser {
 
     /** Search `dir` for .java files containing important symbols matching `query` */
     static Stream<TreePath> findSymbols(Path dir, String query) {
-        PathMatcher match = FileSystems.getDefault().getPathMatcher("glob:*.java");
+        var match = FileSystems.getDefault().getPathMatcher("glob:*.java");
 
         try {
             return Files.walk(dir)
@@ -173,21 +167,21 @@ class Parser {
     }
 
     static List<TreePath> documentSymbols(Path java, String content) {
-        CompilationUnitTree parse = parse(new StringFileObject(content, java.toUri()));
+        var parse = parse(new StringFileObject(content, java.toUri()));
         return findSymbolsMatching(parse, "").collect(Collectors.toList());
     }
 
     static Location location(TreePath p) {
         // This is very questionable, will this Trees object actually work?
-        JavacTask task = parseTask(p.getCompilationUnit().getSourceFile());
-        Trees trees = Trees.instance(task);
-        SourcePositions pos = trees.getSourcePositions();
-        CompilationUnitTree cu = p.getCompilationUnit();
-        LineMap lines = cu.getLineMap();
+        var task = parseTask(p.getCompilationUnit().getSourceFile());
+        var trees = Trees.instance(task);
+        var pos = trees.getSourcePositions();
+        var cu = p.getCompilationUnit();
+        var lines = cu.getLineMap();
         long start = pos.getStartPosition(cu, p.getLeaf()), end = pos.getEndPosition(cu, p.getLeaf());
         int startLine = (int) lines.getLineNumber(start) - 1, startCol = (int) lines.getColumnNumber(start) - 1;
         int endLine = (int) lines.getLineNumber(end) - 1, endCol = (int) lines.getColumnNumber(end) - 1;
-        URI dUri = cu.getSourceFile().toUri();
+        var dUri = cu.getSourceFile().toUri();
         return new Location(
                 dUri.toString(), new Range(new Position(startLine, startCol), new Position(endLine, endCol)));
     }
@@ -215,14 +209,14 @@ class Parser {
     }
 
     private static String containerName(TreePath path) {
-        TreePath parent = path.getParentPath();
+        var parent = path.getParentPath();
         while (parent != null) {
-            Tree t = parent.getLeaf();
+            var t = parent.getLeaf();
             if (t instanceof ClassTree) {
-                ClassTree c = (ClassTree) t;
+                var c = (ClassTree) t;
                 return c.getSimpleName().toString();
             } else if (t instanceof CompilationUnitTree) {
-                CompilationUnitTree c = (CompilationUnitTree) t;
+                var c = (CompilationUnitTree) t;
                 return Objects.toString(c.getPackageName(), "");
             } else {
                 parent = parent.getParentPath();
@@ -233,13 +227,13 @@ class Parser {
 
     private static String symbolName(Tree t) {
         if (t instanceof ClassTree) {
-            ClassTree c = (ClassTree) t;
+            var c = (ClassTree) t;
             return c.getSimpleName().toString();
         } else if (t instanceof MethodTree) {
-            MethodTree m = (MethodTree) t;
+            var m = (MethodTree) t;
             return m.getName().toString();
         } else if (t instanceof VariableTree) {
-            VariableTree v = (VariableTree) t;
+            var v = (VariableTree) t;
             return v.getName().toString();
         } else {
             LOG.warning("Don't know how to create SymbolInformation from " + t);
@@ -248,8 +242,8 @@ class Parser {
     }
 
     static SymbolInformation asSymbolInformation(TreePath path) {
-        SymbolInformation i = new SymbolInformation();
-        Tree t = path.getLeaf();
+        var i = new SymbolInformation();
+        var t = path.getLeaf();
         i.setKind(asSymbolKind(t.getKind()));
         i.setName(symbolName(t));
         i.setContainerName(containerName(path));
@@ -265,31 +259,31 @@ class Parser {
                 importSimple = Pattern.compile("^import +(\\w+);");
         Consumer<Path> findImports =
                 path -> {
-                    try (BufferedReader lines = Files.newBufferedReader(path)) {
+                    try (var lines = Files.newBufferedReader(path)) {
                         while (true) {
-                            String line = lines.readLine();
+                            var line = lines.readLine();
                             // If we reach the end of the file, stop looking for imports
                             if (line == null) return;
                             // If we reach a class declaration, stop looking for imports
                             // TODO This could be a little more specific
                             if (line.contains("class")) return;
                             // import foo.bar.Doh;
-                            Matcher matchesClass = importClass.matcher(line);
+                            var matchesClass = importClass.matcher(line);
                             if (matchesClass.matches()) {
                                 String className = matchesClass.group(1), packageName = matchesClass.group(2);
                                 packages.add(packageName);
                                 classes.add(className);
                             }
                             // import foo.bar.*
-                            Matcher matchesStar = importStar.matcher(line);
+                            var matchesStar = importStar.matcher(line);
                             if (matchesStar.matches()) {
-                                String packageName = matchesStar.group(1);
+                                var packageName = matchesStar.group(1);
                                 packages.add(packageName);
                             }
                             // import Doh
-                            Matcher matchesSimple = importSimple.matcher(line);
+                            var matchesSimple = importSimple.matcher(line);
                             if (matchesSimple.matches()) {
-                                String className = matchesSimple.group(1);
+                                var className = matchesSimple.group(1);
                                 classes.add(className);
                             }
                         }
@@ -317,8 +311,7 @@ class Parser {
         // Try to disambiguate by looking for exact matches
         // For example, Foo is exactly matched by `import com.bar.Foo`
         // Foo is *not* exactly matched by `import com.bar.*`
-        Set<String> candidates =
-                imports.classes.stream().filter(c -> c.endsWith("." + unresolved)).collect(Collectors.toSet());
+        var candidates = imports.classes.stream().filter(c -> c.endsWith("." + unresolved)).collect(Collectors.toSet());
         if (candidates.size() > 1) {
             LOG.warning(
                     String.format(
@@ -377,8 +370,8 @@ class Parser {
     // TODO does this really belong in Parser?
     static Map<String, String> resolveSymbols(
             Set<String> unresolvedSymbols, ExistingImports imports, Set<String> classPath) {
-        Map<String, String> result = new HashMap<>();
-        for (String s : unresolvedSymbols) {
+        var result = new HashMap<String, String>();
+        for (var s : unresolvedSymbols) {
             resolveSymbol(s, imports, classPath).ifPresent(resolved -> result.put(s, resolved));
         }
         return result;

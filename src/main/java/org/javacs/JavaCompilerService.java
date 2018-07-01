@@ -64,20 +64,20 @@ public class JavaCompilerService {
     private Cache cache;
 
     public JavaCompilerService(Set<Path> sourcePath, Set<Path> classPath, Set<Path> docPath) {
-        Class klass = compiler.getClass();
-        URL location = klass.getResource('/' + klass.getName().replace('.', '/') + ".class");
+        var klass = compiler.getClass();
+        var location = klass.getResource('/' + klass.getName().replace('.', '/') + ".class");
 
         LOG.info("Creating a new compiler...");
         LOG.info("Source path:");
-        for (Path p : sourcePath) {
+        for (var p : sourcePath) {
             LOG.info("  " + p);
         }
         LOG.info("Class path:");
-        for (Path p : classPath) {
+        for (var p : classPath) {
             LOG.info("  " + p);
         }
         LOG.info("Doc path:");
-        for (Path p : docPath) {
+        for (var p : docPath) {
             LOG.info("  " + p);
         }
         // sourcePath and classPath can't actually be modified, because JavaCompiler remembers them from task to task
@@ -92,12 +92,12 @@ public class JavaCompilerService {
         var result = new HashSet<String>();
         Consumer<String> checkClassName =
                 name -> {
-                    String packageName = Parser.mostName(name);
+                    var packageName = Parser.mostName(name);
                     if (packageName.startsWith(parentPackage) && packageName.length() > parentPackage.length()) {
-                        int start = parentPackage.length() + 1;
-                        int end = packageName.indexOf('.', start);
+                        var start = parentPackage.length() + 1;
+                        var end = packageName.indexOf('.', start);
                         if (end == -1) end = packageName.length();
-                        String prefix = packageName.substring(0, end);
+                        var prefix = packageName.substring(0, end);
                         result.add(prefix);
                     }
                 };
@@ -148,7 +148,7 @@ public class JavaCompilerService {
 
     private JavacTask batchTask(Collection<Path> paths) {
         diags.clear();
-        List<File> files = paths.stream().map(Path::toFile).collect(Collectors.toList());
+        var files = paths.stream().map(Path::toFile).collect(Collectors.toList());
         return (JavacTask)
                 compiler.getTask(
                         null,
@@ -160,7 +160,7 @@ public class JavaCompilerService {
     }
 
     List<Diagnostic<? extends JavaFileObject>> lint(Collection<Path> files) {
-        JavacTask task = batchTask(files);
+        var task = batchTask(files);
         try {
             task.parse();
             task.analyze();
@@ -186,7 +186,7 @@ public class JavaCompilerService {
             // Otherwise, focus on the block surrounding line:character,
             // erasing all other block bodies and everything after the cursor in its own block
             else {
-                Pruner p = new Pruner(file, contents);
+                var p = new Pruner(file, contents);
                 p.prune(line, character);
                 this.contents = p.contents();
             }
@@ -218,9 +218,9 @@ public class JavaCompilerService {
 
     /** Find the smallest tree that includes the cursor */
     private TreePath path(URI file, int line, int character) {
-        Trees trees = Trees.instance(cache.task);
-        SourcePositions pos = trees.getSourcePositions();
-        long cursor = cache.root.getLineMap().getPosition(line, character);
+        var trees = Trees.instance(cache.task);
+        var pos = trees.getSourcePositions();
+        var cursor = cache.root.getLineMap().getPosition(line, character);
 
         // Search for the smallest element that encompasses line:column
         class FindSmallest extends TreePathScanner<Void, Void> {
@@ -244,7 +244,7 @@ public class JavaCompilerService {
 
             @Override
             public Void visitErroneous(ErroneousTree node, Void nothing) {
-                for (Tree t : node.getErrorTrees()) {
+                for (var t : node.getErrorTrees()) {
                     t.accept(this, nothing);
                 }
                 return null;
@@ -257,8 +257,8 @@ public class JavaCompilerService {
         }
         Supplier<RuntimeException> notFound =
                 () -> {
-                    String m = String.format("No TreePath to %s %d:%d", file, line, character);
-                    return new RuntimeException(m);
+                    var message = String.format("No TreePath to %s %d:%d", file, line, character);
+                    return new RuntimeException(message);
                 };
         return new FindSmallest().find(cache.root).orElseThrow(notFound);
     }
@@ -267,16 +267,16 @@ public class JavaCompilerService {
     public List<Element> scopeMembers(URI file, String contents, int line, int character) {
         recompile(file, contents, line, character);
 
-        Trees trees = Trees.instance(cache.task);
-        Types types = cache.task.getTypes();
-        TreePath path = path(file, line, character);
-        Scope start = trees.getScope(path);
+        var trees = Trees.instance(cache.task);
+        var types = cache.task.getTypes();
+        var path = path(file, line, character);
+        var start = trees.getScope(path);
 
         class Walk {
             List<Element> result = new ArrayList<>();
 
             boolean isStatic(Scope s) {
-                ExecutableElement method = s.getEnclosingMethod();
+                var method = s.getEnclosingMethod();
                 if (method != null) {
                     return method.getModifiers().contains(Modifier.STATIC);
                 } else return false;
@@ -287,21 +287,21 @@ public class JavaCompilerService {
             }
 
             boolean isThisOrSuper(VariableElement ve) {
-                String name = ve.getSimpleName().toString();
+                var name = ve.getSimpleName().toString();
                 return name.equals("this") || name.equals("super");
             }
 
             // Place each member of `this` or `super` directly into `results`
             void unwrapThisSuper(VariableElement ve) {
-                TypeMirror thisType = ve.asType();
+                var thisType = ve.asType();
                 // `this` and `super` should always be instances of DeclaredType, which we'll use to check accessibility
                 if (!(thisType instanceof DeclaredType)) {
                     LOG.warning(String.format("%s is not a DeclaredType", thisType));
                     return;
                 }
-                DeclaredType thisDeclaredType = (DeclaredType) thisType;
-                Element thisElement = types.asElement(thisDeclaredType);
-                for (Element thisMember : thisElement.getEnclosedElements()) {
+                var thisDeclaredType = (DeclaredType) thisType;
+                var thisElement = types.asElement(thisDeclaredType);
+                for (var thisMember : thisElement.getEnclosedElements()) {
                     if (isStatic(start) && !isStatic(thisMember)) continue;
                     if (thisMember.getSimpleName().contentEquals("<init>")) continue;
 
@@ -314,12 +314,12 @@ public class JavaCompilerService {
 
             // Place each member of `s` into results, and unwrap `this` and `super`
             void walkLocals(Scope s) {
-                for (Element e : s.getLocalElements()) {
+                for (var e : s.getLocalElements()) {
                     if (e instanceof TypeElement) {
-                        TypeElement te = (TypeElement) e;
+                        var te = (TypeElement) e;
                         if (trees.isAccessible(start, te)) result.add(te);
                     } else if (e instanceof VariableElement) {
-                        VariableElement ve = (VariableElement) e;
+                        var ve = (VariableElement) e;
                         if (isThisOrSuper(ve)) {
                             unwrapThisSuper(ve);
                             if (!isStatic(s)) result.add(ve);
@@ -334,7 +334,7 @@ public class JavaCompilerService {
 
             // Walk each enclosing scope, placing its members into `results`
             List<Element> walkScopes() {
-                for (Scope s = start; s != null; s = s.getEnclosingScope()) {
+                for (var s = start; s != null; s = s.getEnclosingScope()) {
                     walkLocals(s);
                 }
 
@@ -345,9 +345,9 @@ public class JavaCompilerService {
     }
 
     private List<TypeMirror> supersWithSelf(TypeMirror t) {
-        Elements elements = cache.task.getElements();
-        Types types = cache.task.getTypes();
-        List<TypeMirror> result = new ArrayList<>();
+        var elements = cache.task.getElements();
+        var types = cache.task.getTypes();
+        var result = new ArrayList<TypeMirror>();
         result.add(t);
         // Add members of superclasses and interfaces
         result.addAll(types.directSupertypes(t));
@@ -391,18 +391,18 @@ public class JavaCompilerService {
     public List<Completion> members(URI file, String contents, int line, int character) {
         recompile(file, contents, line, character);
 
-        Trees trees = Trees.instance(cache.task);
-        Types types = cache.task.getTypes();
-        TreePath path = path(file, line, character);
-        Scope scope = trees.getScope(path);
-        Element element = trees.getElement(path);
+        var trees = Trees.instance(cache.task);
+        var types = cache.task.getTypes();
+        var path = path(file, line, character);
+        var scope = trees.getScope(path);
+        var element = trees.getElement(path);
 
         if (element instanceof PackageElement) {
-            List<Completion> result = new ArrayList<>();
-            PackageElement p = (PackageElement) element;
+            var result = new ArrayList<Completion>();
+            var p = (PackageElement) element;
 
             // Add class-names resolved as Element by javac
-            for (Element member : p.getEnclosedElements()) {
+            for (var member : p.getEnclosedElements()) {
                 // If the package member is a TypeElement, like a class or interface, check if it's accessible
                 if (member instanceof TypeElement) {
                     if (trees.isAccessible(scope, (TypeElement) member)) {
@@ -413,19 +413,19 @@ public class JavaCompilerService {
                 else result.add(Completion.ofElement(member));
             }
             // Add sub-package names resolved as String by guava ClassPath
-            String parent = p.getQualifiedName().toString();
-            Set<String> subs = subPackages(parent);
-            for (String sub : subs) {
+            var parent = p.getQualifiedName().toString();
+            var subs = subPackages(parent);
+            for (var sub : subs) {
                 result.add(Completion.ofPackagePart(sub, Parser.lastName(sub)));
             }
 
             return result;
         } else if (element instanceof TypeElement) {
-            List<Completion> result = new ArrayList<>();
-            TypeElement t = (TypeElement) element;
+            var result = new ArrayList<Completion>();
+            var t = (TypeElement) element;
 
             // Add static members
-            for (Element member : t.getEnclosedElements()) {
+            for (var member : t.getEnclosedElements()) {
                 // TODO if this is a member reference :: then include non-statics
                 if (member.getModifiers().contains(Modifier.STATIC)
                         && trees.isAccessible(scope, member, (DeclaredType) t.asType())) {
@@ -438,14 +438,14 @@ public class JavaCompilerService {
 
             return result;
         } else {
-            TypeMirror type = trees.getTypeMirror(path);
+            var type = trees.getTypeMirror(path);
             if (hasMembers(type)) {
-                List<Completion> result = new ArrayList<>();
-                List<TypeMirror> ts = supersWithSelf(type);
-                Set<String> alreadyAdded = new HashSet<>();
-                for (TypeMirror t : ts) {
-                    Element e = types.asElement(t);
-                    for (Element member : e.getEnclosedElements()) {
+                var result = new ArrayList<Completion>();
+                var ts = supersWithSelf(type);
+                var alreadyAdded = new HashSet<String>();
+                for (var t : ts) {
+                    var e = types.asElement(t);
+                    for (var member : e.getEnclosedElements()) {
                         // Don't add statics
                         if (member.getModifiers().contains(Modifier.STATIC)) continue;
                         // Don't add constructors
@@ -530,16 +530,16 @@ public class JavaCompilerService {
     public CompletionResult completions(URI file, String contents, int line, int character, int limitHint) {
         LOG.info(String.format("Completing at %s[%d,%d]...", file.getPath(), line, character));
         // TODO why not just recompile? It's going to get triggered shortly anyway
-        JavacTask task = singleFileTask(file, contents);
+        var task = singleFileTask(file, contents);
         CompilationUnitTree parse;
         try {
             parse = task.parse().iterator().next();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        SourcePositions pos = Trees.instance(task).getSourcePositions();
-        LineMap lines = parse.getLineMap();
-        long cursor = lines.getPosition(line, character);
+        var pos = Trees.instance(task).getSourcePositions();
+        var lines = parse.getLineMap();
+        var cursor = lines.getPosition(line, character);
 
         class Find extends TreeScanner<Void, Void> {
             List<Completion> result = null;
@@ -618,21 +618,21 @@ public class JavaCompilerService {
                         }
                     }
                     // Does a candidate completion match the name in `node`?
-                    String partialName = Objects.toString(node.getName(), "");
-                    Set<String> alreadyImported = new HashSet<>();
+                    var partialName = Objects.toString(node.getName(), "");
+                    var alreadyImported = new HashSet<String>();
                     // Add names that have already been imported
-                    for (Element m : scopeMembers(file, contents, line, character)) {
+                    for (var m : scopeMembers(file, contents, line, character)) {
                         if (m.getSimpleName().toString().startsWith(partialName)) {
                             result.add(Completion.ofElement(m));
 
                             if (m instanceof TypeElement) {
-                                TypeElement t = (TypeElement) m;
+                                var t = (TypeElement) m;
                                 alreadyImported.add(t.getQualifiedName().toString());
                             }
                         }
                     }
                     // Add names of classes that haven't been imported
-                    String packageName = Objects.toString(parse.getPackageName(), "");
+                    var packageName = Objects.toString(parse.getPackageName(), "");
                     Predicate<String> isUpper = className -> className.length() > 0 && Character.isUpperCase(className.charAt(0));
                     Predicate<String> matchesPartialName =
                             className -> Parser.lastName(className).startsWith(partialName);
@@ -666,7 +666,7 @@ public class JavaCompilerService {
 
             @Override
             public Void visitErroneous(ErroneousTree node, Void nothing) {
-                for (Tree t : node.getErrorTrees()) {
+                for (var t : node.getErrorTrees()) {
                     t.accept(this, null);
                 }
                 return null;
@@ -686,35 +686,35 @@ public class JavaCompilerService {
     public Optional<MethodInvocation> methodInvocation(URI file, String contents, int line, int character) {
         recompile(file, contents, line, character);
 
-        Trees trees = Trees.instance(cache.task);
-        TreePath start = path(file, line, character);
+        var trees = Trees.instance(cache.task);
+        var start = path(file, line, character);
 
-        for (TreePath path = start; path != null; path = path.getParentPath()) {
+        for (var path = start; path != null; path = path.getParentPath()) {
             if (path.getLeaf() instanceof MethodInvocationTree) {
-                MethodInvocationTree invoke = (MethodInvocationTree) path.getLeaf();
-                Element method = trees.getElement(trees.getPath(path.getCompilationUnit(), invoke.getMethodSelect()));
-                List<ExecutableElement> results = new ArrayList<>();
-                for (Element m : method.getEnclosingElement().getEnclosedElements()) {
+                var invoke = (MethodInvocationTree) path.getLeaf();
+                var method = trees.getElement(trees.getPath(path.getCompilationUnit(), invoke.getMethodSelect()));
+                var results = new ArrayList<ExecutableElement>();
+                for (var m : method.getEnclosingElement().getEnclosedElements()) {
                     if (m.getKind() == ElementKind.METHOD && m.getSimpleName().equals(method.getSimpleName())) {
                         results.add((ExecutableElement) m);
                     }
                 }
-                int activeParameter = invoke.getArguments().indexOf(start.getLeaf());
+                var activeParameter = invoke.getArguments().indexOf(start.getLeaf());
                 Optional<ExecutableElement> activeMethod =
                         method instanceof ExecutableElement
                                 ? Optional.of((ExecutableElement) method)
                                 : Optional.empty();
                 return Optional.of(new MethodInvocation(invoke, activeMethod, activeParameter, results));
             } else if (path.getLeaf() instanceof NewClassTree) {
-                NewClassTree invoke = (NewClassTree) path.getLeaf();
-                Element method = trees.getElement(path);
-                List<ExecutableElement> results = new ArrayList<>();
-                for (Element m : method.getEnclosingElement().getEnclosedElements()) {
+                var invoke = (NewClassTree) path.getLeaf();
+                var method = trees.getElement(path);
+                var results = new ArrayList<ExecutableElement>();
+                for (var m : method.getEnclosingElement().getEnclosedElements()) {
                     if (m.getKind() == ElementKind.CONSTRUCTOR) {
                         results.add((ExecutableElement) m);
                     }
                 }
-                int activeParameter = invoke.getArguments().indexOf(start.getLeaf());
+                var activeParameter = invoke.getArguments().indexOf(start.getLeaf());
                 Optional<ExecutableElement> activeMethod =
                         method instanceof ExecutableElement
                                 ? Optional.of((ExecutableElement) method)
@@ -729,13 +729,13 @@ public class JavaCompilerService {
     public Element element(URI file, String contents, int line, int character) {
         recompile(file, contents, line, character);
 
-        Trees trees = Trees.instance(cache.task);
-        TreePath path = path(file, line, character);
+        var trees = Trees.instance(cache.task);
+        var path = path(file, line, character);
         return trees.getElement(path);
     }
 
     private Optional<TypeElement> topLevelDeclaration(Element e) {
-        Element parent = e;
+        var parent = e;
         TypeElement result = null;
         while (parent.getEnclosingElement() != null) {
             if (parent instanceof TypeElement) result = (TypeElement) parent;
@@ -746,9 +746,9 @@ public class JavaCompilerService {
 
     /** */
     private boolean containsTopLevelDeclaration(Path file, String simpleClassName) {
-        Pattern find = Pattern.compile("\\b(class|interface|enum) +" + simpleClassName + "\\b");
-        try (BufferedReader lines = Files.newBufferedReader(file)) {
-            String line = lines.readLine();
+        var find = Pattern.compile("\\b(class|interface|enum) +" + simpleClassName + "\\b");
+        try (var lines = Files.newBufferedReader(file)) {
+            var line = lines.readLine();
             while (line != null) {
                 if (find.matcher(line).find()) return true;
                 line = lines.readLine();
@@ -761,26 +761,26 @@ public class JavaCompilerService {
 
     /** Find the file `e` was declared in */
     private Optional<Path> findDeclaringFile(TypeElement e) {
-        String name = e.getQualifiedName().toString();
-        int lastDot = name.lastIndexOf('.');
-        String packageName = lastDot == -1 ? "" : name.substring(0, lastDot);
-        String className = name.substring(lastDot + 1);
+        var name = e.getQualifiedName().toString();
+        var lastDot = name.lastIndexOf('.');
+        var packageName = lastDot == -1 ? "" : name.substring(0, lastDot);
+        var className = name.substring(lastDot + 1);
         // First, look for a file named [ClassName].java
-        Path packagePath = Paths.get(packageName.replace('.', File.separatorChar));
-        Path publicClassPath = packagePath.resolve(className + ".java");
-        for (Path root : sourcePath) {
-            Path absPath = root.resolve(publicClassPath);
+        var packagePath = Paths.get(packageName.replace('.', File.separatorChar));
+        var publicClassPath = packagePath.resolve(className + ".java");
+        for (var root : sourcePath) {
+            var absPath = root.resolve(publicClassPath);
             if (Files.exists(absPath) && containsTopLevelDeclaration(absPath, className)) {
                 return Optional.of(absPath);
             }
         }
         // Then, look for a secondary declaration in all java files in the package
-        boolean isPublic = e.getModifiers().contains(Modifier.PUBLIC);
+        var isPublic = e.getModifiers().contains(Modifier.PUBLIC);
         if (!isPublic) {
-            for (Path root : sourcePath) {
-                Path absDir = root.resolve(packagePath);
+            for (var root : sourcePath) {
+                var absDir = root.resolve(packagePath);
                 try {
-                    Optional<Path> foundFile =
+                    var foundFile =
                             Files.list(absDir).filter(f -> containsTopLevelDeclaration(f, className)).findFirst();
                     if (foundFile.isPresent()) return foundFile;
                 } catch (IOException err) {
@@ -793,7 +793,7 @@ public class JavaCompilerService {
 
     /** Compile `file` and locate `e` in it */
     private Optional<TreePath> findIn(Element e, Path file, String contents) {
-        JavacTask task = singleFileTask(file.toUri(), contents);
+        var task = singleFileTask(file.toUri(), contents);
         CompilationUnitTree tree;
         try {
             tree = task.parse().iterator().next();
@@ -801,7 +801,7 @@ public class JavaCompilerService {
         } catch (IOException err) {
             throw new RuntimeException(err);
         }
-        Trees trees = Trees.instance(task);
+        var trees = Trees.instance(task);
         class Find extends TreePathScanner<Void, Void> {
             Optional<TreePath> found = Optional.empty();
 
@@ -811,7 +811,7 @@ public class JavaCompilerService {
 
             /** Check if the declaration at the current path is the same symbol as `e` */
             boolean sameSymbol() {
-                Element candidate = trees.getElement(getCurrentPath());
+                var candidate = trees.getElement(getCurrentPath());
                 // `e` is from a different compilation, so we have to compare qualified names
                 return toStringEquals(candidate.getEnclosingElement(), e.getEnclosingElement())
                         && toStringEquals(candidate, e);
@@ -852,13 +852,13 @@ public class JavaCompilerService {
     public Optional<TreePath> definition(URI file, int line, int character, Function<URI, String> contents) {
         recompile(file, contents.apply(file), line, character);
 
-        Trees trees = Trees.instance(cache.task);
-        TreePath path = path(file, line, character);
+        var trees = Trees.instance(cache.task);
+        var path = path(file, line, character);
         LOG.info("Looking for definition for " + path.getLeaf() + "...");
-        Element e = trees.getElement(path);
-        Optional<TypeElement> declaration = topLevelDeclaration(e);
+        var e = trees.getElement(path);
+        var declaration = topLevelDeclaration(e);
         LOG.info("...looking for top-level declaration " + declaration);
-        Optional<Path> declaringFile = declaration.flatMap(this::findDeclaringFile);
+        var declaringFile = declaration.flatMap(this::findDeclaringFile);
         LOG.info("...declaration is in " + declaringFile);
         return declaringFile.flatMap(f -> findIn(e, f, contents.apply(f.toUri())));
     }
@@ -889,7 +889,7 @@ public class JavaCompilerService {
     }
 
     private Stream<Path> javaSourcesInDir(Path dir) {
-        PathMatcher match = FileSystems.getDefault().getPathMatcher("glob:*.java");
+        var match = FileSystems.getDefault().getPathMatcher("glob:*.java");
 
         try {
             // TODO instead of looking at EVERY file, once you see a few files with the same source directory,
@@ -905,8 +905,8 @@ public class JavaCompilerService {
     }
 
     private List<Path> potentialReferences(Element to) {
-        String name = to.getSimpleName().toString();
-        Pattern word = Pattern.compile("\\b\\w+\\b");
+        var name = to.getSimpleName().toString();
+        var word = Pattern.compile("\\b\\w+\\b");
         Predicate<String> containsWord =
                 line -> {
                     Matcher m = word.matcher(line);
@@ -951,7 +951,7 @@ public class JavaCompilerService {
         }
 
         private List<TreePath> actualReferences(CompilationUnitTree from, Element to) {
-            Trees trees = Trees.instance(task);
+            var trees = Trees.instance(task);
 
             class Finder extends TreeScanner<Void, Void> {
                 List<TreePath> results = new ArrayList<>();
@@ -959,8 +959,8 @@ public class JavaCompilerService {
                 @Override
                 public Void scan(Tree leaf, Void nothing) {
                     if (leaf != null) {
-                        TreePath path = trees.getPath(from, leaf);
-                        Element found = trees.getElement(path);
+                        var path = trees.getPath(from, leaf);
+                        var found = trees.getElement(path);
 
                         if (sameSymbol(found, to)) results.add(path);
                         else super.scan(leaf, nothing);
@@ -978,11 +978,10 @@ public class JavaCompilerService {
     }
 
     private Batch compileBatch(List<Path> files) {
-        JavacTask task = batchTask(files);
-
-        List<CompilationUnitTree> result = new ArrayList<>();
+        var task = batchTask(files);
+        var result = new ArrayList<CompilationUnitTree>();
         try {
-            for (CompilationUnitTree t : task.parse()) result.add(t);
+            for (var t : task.parse()) result.add(t);
             task.analyze();
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -994,16 +993,16 @@ public class JavaCompilerService {
     public List<TreePath> references(URI file, String contents, int line, int character) {
         recompile(file, contents, -1, -1);
 
-        Trees trees = Trees.instance(cache.task);
-        TreePath path = path(file, line, character);
+        var trees = Trees.instance(cache.task);
+        var path = path(file, line, character);
         // It's sort of odd that this works
         // `to` is part of a different batch than `batch = compileBatch(possible)`,
         // so `to.equals(...thing from batch...)` shouldn't work
-        Element to = trees.getElement(path);
-        List<Path> possible = potentialReferences(to);
-        Batch batch = compileBatch(possible);
-        List<TreePath> result = new ArrayList<>();
-        for (CompilationUnitTree f : batch.roots) {
+        var to = trees.getElement(path);
+        var possible = potentialReferences(to);
+        var batch = compileBatch(possible);
+        var result = new ArrayList<TreePath>();
+        for (var f : batch.roots) {
             result.addAll(batch.actualReferences(f, to));
         }
         return result;
@@ -1025,7 +1024,7 @@ public class JavaCompilerService {
     public FixImports fixImports(URI file, String contents) {
         LOG.info("Fix imports in " + file);
         // Compile a single file
-        JavacTask task = singleFileTask(file, contents);
+        var task = singleFileTask(file, contents);
         CompilationUnitTree tree;
         try {
             tree = task.parse().iterator().next();
@@ -1034,39 +1033,39 @@ public class JavaCompilerService {
             throw new RuntimeException(e);
         }
         // Check diagnostics for missing imports
-        Set<String> unresolved = new HashSet<>();
-        for (Diagnostic<? extends JavaFileObject> d : diags) {
+        var unresolved = new HashSet<String>();
+        for (var d : diags) {
             if (d.getCode().equals("compiler.err.cant.resolve.location") && d.getSource().toUri().equals(file)) {
                 long start = d.getStartPosition(), end = d.getEndPosition();
-                String id = contents.substring((int) start, (int) end);
+                var id = contents.substring((int) start, (int) end);
                 if (id.matches("[A-Z]\\w+")) {
                     unresolved.add(id);
                 } else LOG.warning(id + " doesn't look like a class");
             } else if (d.getMessage(null).contains("cannot find symbol")) {
-                String[] lines = d.getMessage(null).split("\n");
-                String firstLine = lines.length > 0 ? lines[0] : "";
+                var lines = d.getMessage(null).split("\n");
+                var firstLine = lines.length > 0 ? lines[0] : "";
                 LOG.warning(String.format("%s %s doesn't look like symbol-not-found", d.getCode(), firstLine));
             }
         }
         // Look at imports in other classes to help us guess how to fix imports
-        ExistingImports sourcePathImports = Parser.existingImports(sourcePath);
+        var sourcePathImports = Parser.existingImports(sourcePath);
         var classes = new HashSet<String>();
         classes.addAll(jdkClasses.classes());
         classes.addAll(classPathClasses.classes());
-        Map<String, String> fixes = Parser.resolveSymbols(unresolved, sourcePathImports, classes);
+        var fixes = Parser.resolveSymbols(unresolved, sourcePathImports, classes);
         // Figure out which existing imports are actually used
-        Trees trees = Trees.instance(task);
-        Set<String> references = new HashSet<>();
+        var trees = Trees.instance(task);
+        var references = new HashSet<String>();
         class FindUsedImports extends TreePathScanner<Void, Void> {
             @Override
             public Void visitIdentifier(IdentifierTree node, Void nothing) {
-                Element e = trees.getElement(getCurrentPath());
+                var e = trees.getElement(getCurrentPath());
                 if (e instanceof TypeElement) {
-                    TypeElement t = (TypeElement) e;
-                    String qualifiedName = t.getQualifiedName().toString();
-                    int lastDot = qualifiedName.lastIndexOf('.');
-                    String packageName = lastDot == -1 ? "" : qualifiedName.substring(0, lastDot);
-                    String thisPackage = Objects.toString(tree.getPackageName(), "");
+                    var t = (TypeElement) e;
+                    var qualifiedName = t.getQualifiedName().toString();
+                    var lastDot = qualifiedName.lastIndexOf('.');
+                    var packageName = lastDot == -1 ? "" : qualifiedName.substring(0, lastDot);
+                    var thisPackage = Objects.toString(tree.getPackageName(), "");
                     // java.lang.* and current package are imported by default
                     if (!packageName.equals("java.lang")
                             && !packageName.equals(thisPackage)
@@ -1079,8 +1078,8 @@ public class JavaCompilerService {
         }
         new FindUsedImports().scan(tree, null);
         // Take the intersection of existing imports ^ existing identifiers
-        Set<String> qualifiedNames = new HashSet<>();
-        for (ImportTree i : tree.getImports()) {
+        var qualifiedNames = new HashSet<String>();
+        for (var i : tree.getImports()) {
             var imported = i.getQualifiedIdentifier().toString();
             if (imported.endsWith(".*")) {
                 var packageName = Parser.mostName(imported);

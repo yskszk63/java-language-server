@@ -23,9 +23,9 @@ public class SearchTest {
 
     @BeforeClass
     public static void openSource() throws IOException {
-        URI uri = FindResource.uri("/org/javacs/example/AutocompleteBetweenLines.java");
-        String textContent = Joiner.on("\n").join(Files.readAllLines(Paths.get(uri)));
-        TextDocumentItem document = new TextDocumentItem();
+        var uri = FindResource.uri("/org/javacs/example/AutocompleteBetweenLines.java");
+        var textContent = Joiner.on("\n").join(Files.readAllLines(Paths.get(uri)));
+        var document = new TextDocumentItem();
 
         document.setUri(uri.toString());
         document.setText(textContent);
@@ -62,29 +62,29 @@ public class SearchTest {
 
     @Test
     public void all() {
-        Set<String> all = searchWorkspace("", 100);
+        var all = searchWorkspace("", 100);
 
         assertThat(all, not(empty()));
     }
 
     @Test
     public void searchClasses() {
-        Set<String> all = searchWorkspace("ABetweenLines", Integer.MAX_VALUE);
+        var all = searchWorkspace("ABetweenLines", Integer.MAX_VALUE);
 
         assertThat(all, hasItem("AutocompleteBetweenLines"));
     }
 
     @Test
     public void searchMethods() {
-        Set<String> all = searchWorkspace("mStatic", Integer.MAX_VALUE);
+        var all = searchWorkspace("mStatic", Integer.MAX_VALUE);
 
         assertThat(all, hasItem("methodStatic"));
     }
 
     @Test
     public void symbolsInFile() {
-        String path = "/org/javacs/example/AutocompleteMemberFixed.java";
-        Set<String> all = searchFile(FindResource.uri(path));
+        var path = "/org/javacs/example/AutocompleteMemberFixed.java";
+        var all = searchFile(FindResource.uri(path));
 
         assertThat(
                 all,
@@ -101,8 +101,8 @@ public class SearchTest {
 
     @Test
     public void explicitConstructor() {
-        String path = "/org/javacs/example/ReferenceConstructor.java";
-        Set<String> all = searchFile(FindResource.uri(path));
+        var path = "/org/javacs/example/ReferenceConstructor.java";
+        var all = searchFile(FindResource.uri(path));
 
         assertThat("includes explicit constructor", all, hasItem("ReferenceConstructor"));
     }

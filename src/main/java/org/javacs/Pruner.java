@@ -3,10 +3,8 @@ package org.javacs;
 import com.sun.source.tree.BlockTree;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.ErroneousTree;
-import com.sun.source.tree.LineMap;
 import com.sun.source.tree.Tree;
 import com.sun.source.util.JavacTask;
-import com.sun.source.util.SourcePositions;
 import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
 import java.io.IOException;
@@ -59,9 +57,9 @@ class Pruner {
     }
 
     void prune(int line, int character) {
-        SourcePositions sourcePositions = Trees.instance(task).getSourcePositions();
-        LineMap lines = root.getLineMap();
-        long cursor = lines.getPosition(line, character);
+        var sourcePositions = Trees.instance(task).getSourcePositions();
+        var lines = root.getLineMap();
+        var cursor = lines.getPosition(line, character);
 
         class Scan extends TreeScanner<Void, Void> {
             boolean erasedAfterCursor = false;

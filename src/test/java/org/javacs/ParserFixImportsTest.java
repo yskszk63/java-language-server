@@ -4,7 +4,6 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
 import java.util.Collections;
-import java.util.Map;
 import org.junit.Test;
 
 public class ParserFixImportsTest {
@@ -12,14 +11,13 @@ public class ParserFixImportsTest {
 
     @Test
     public void findJavaUtilList() {
-        Map<String, String> resolved =
-                Parser.resolveSymbols(Collections.singleton("List"), emptyImports, Collections.emptySet());
+        var resolved = Parser.resolveSymbols(Collections.singleton("List"), emptyImports, Collections.emptySet());
         assertThat(resolved, hasEntry("List", "java.util.List"));
     }
 
     @Test
     public void findExistingImports() {
-        ExistingImports find = Parser.existingImports(Collections.singleton(JavaCompilerServiceTest.resourcesDir()));
+        var find = Parser.existingImports(Collections.singleton(JavaCompilerServiceTest.resourcesDir()));
         assertThat(find.classes, hasItem("java.util.List"));
         assertThat(find.packages, hasItem("java.util"));
     }

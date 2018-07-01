@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,7 +18,7 @@ import java.util.stream.Stream;
 class InferSourcePath {
 
     static Stream<Path> allJavaFiles(Path dir) {
-        PathMatcher match = FileSystems.getDefault().getPathMatcher("glob:*.java");
+        var match = FileSystems.getDefault().getPathMatcher("glob:*.java");
 
         try {
             return Files.walk(dir).filter(java -> match.matches(java.getFileName()));
@@ -34,22 +33,22 @@ class InferSourcePath {
             Map<Path, Integer> sourceRoots = new HashMap<>();
 
             boolean alreadyKnown(Path java) {
-                for (Path root : sourceRoots.keySet()) {
+                for (var root : sourceRoots.keySet()) {
                     if (java.startsWith(root) && sourceRoots.get(root) > certaintyThreshold) return true;
                 }
                 return false;
             }
 
             Optional<Path> infer(Path java) {
-                String packageName = Objects.toString(Parser.parse(java).getPackageName(), "");
-                String packagePath = packageName.replace('.', File.separatorChar);
-                Path dir = java.getParent();
+                var packageName = Objects.toString(Parser.parse(java).getPackageName(), "");
+                var packagePath = packageName.replace('.', File.separatorChar);
+                var dir = java.getParent();
                 if (!dir.endsWith(packagePath)) {
                     LOG.warning("Java source file " + java + " is not in " + packagePath);
                     return Optional.empty();
                 } else {
-                    int up = Paths.get(packagePath).getNameCount();
-                    Path truncate = dir;
+                    var up = Paths.get(packagePath).getNameCount();
+                    var truncate = dir;
                     for (int i = 0; i < up; i++) truncate = truncate.getParent();
                     return Optional.of(truncate);
                 }
@@ -61,13 +60,13 @@ class InferSourcePath {
                     infer(java)
                             .ifPresent(
                                     root -> {
-                                        int count = sourceRoots.getOrDefault(root, 0);
+                                        var count = sourceRoots.getOrDefault(root, 0);
                                         sourceRoots.put(root, count + 1);
                                     });
                 }
             }
         }
-        SourcePaths checker = new SourcePaths();
+        var checker = new SourcePaths();
         allJavaFiles(workspaceRoot).forEach(checker);
         return checker.sourceRoots.keySet();
     }
