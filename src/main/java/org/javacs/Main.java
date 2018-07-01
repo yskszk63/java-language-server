@@ -13,17 +13,14 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ServiceLoader;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.FileHandler;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.tools.JavaCompiler;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -76,24 +73,8 @@ public class Main {
         try {
             // TODO remove when it is stable again
             Logger.getLogger("").addHandler(new FileHandler("javacs.%u.log", false));
-            ClassLoader langTools = LangTools.createLangToolsClassLoader();
-            Class<?> main = Class.forName("org.javacs.Main", true, langTools);
-            Method run = main.getMethod("run");
-            run.invoke(null);
-        } catch (Exception e) {
-            LOG.log(Level.SEVERE, "Failed", e);
-        }
-    }
+            setRootFormat();
 
-    public static ClassLoader checkJavacClassLoader() {
-        return ServiceLoader.load(JavaCompiler.class).iterator().next().getClass().getClassLoader();
-    }
-
-    public static void run() {
-        assert checkJavacClassLoader() instanceof ChildFirstClassLoader;
-        setRootFormat();
-
-        try {
             JavaLanguageServer server = new JavaLanguageServer();
             ExecutorService threads = Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "client"));
             Launcher<LanguageClient> launcher =
