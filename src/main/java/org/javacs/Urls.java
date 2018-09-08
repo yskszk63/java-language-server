@@ -6,7 +6,13 @@ import java.nio.file.Paths;
 
 public final class Urls {
 
-    public static URL of(String path) {
+    /**
+     * Convert a class path element into an equivalent URL.
+     *
+     * @param path: The class path element
+     * @return An equivalent URL
+     */
+    public static URL pathToUrl(String path) {
         try {
             if (isSystemPath(path))
                 return Paths.get(path).toUri().toURL();

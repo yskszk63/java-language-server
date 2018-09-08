@@ -24,7 +24,7 @@ class ChildFirstClassLoader extends URLClassLoader {
 
     static URL[] parseClassPath(String classPath) {
         return Arrays.stream(classPath.split(File.pathSeparator))
-                .map(Urls::of)
+                .map(Urls::pathToUrl)
                 .toArray(URL[]::new);
     }
 
