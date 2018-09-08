@@ -13,31 +13,31 @@ import org.junit.Test;
 public class UrlsTest {
 
   @Test
-  public void of_whenPathStartsWithForwardSlash() throws Exception {
-    URL actual = Urls.of("/a/b/c");
+  public void pathToUrl_whenPathStartsWithForwardSlash() throws Exception {
+    URL actual = Urls.pathToUrl("/a/b/c");
     assertThat(actual.getProtocol(), equalTo("file"));
     assertThat(actual.getPath(), containsString("/a/b/c"));
   }
 
   @Test
-  public void of_whenPathStartsWithProtocol() throws Exception {
-    URL actual = Urls.of("file:///a/b/c");
+  public void pathToUrl_whenPathStartsWithProtocol() throws Exception {
+    URL actual = Urls.pathToUrl("file:///a/b/c");
     assertThat("file", equalTo(actual.getProtocol()));
     assertThat(actual.getPath(), containsString("/a/b/c"));
   }
 
   @Test
-  public void of_whenPathStartsWithDriveLetter_usingForwardSlashes()
+  public void pathToUrl_whenPathStartsWithDriveLetter_usingForwardSlashes()
       throws Exception {
-    URL actual = Urls.of("c:/a/b/c");
+    URL actual = Urls.pathToUrl("c:/a/b/c");
     assertThat(actual.getProtocol(), equalTo("file"));
     assertThat(actual.getPath(), containsString("/a/b/c"));
   }
 
   @Test
-  public void of_whenPathStartsWithDriveLetter_usingBackslashes()
+  public void pathToUrl_whenPathStartsWithDriveLetter_usingBackslashes()
       throws Exception {
-    URL actual = Urls.of("c:\\a\\b\\c");
+    URL actual = Urls.pathToUrl("c:\\a\\b\\c");
     assertThat(actual.getProtocol(), equalTo("file"));
     assertThat(actual.getPath(), containsString("/a/b/c"));
   }
