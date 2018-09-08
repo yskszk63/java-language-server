@@ -6,6 +6,8 @@ import java.nio.file.Paths;
 
 public final class Urls {
 
+    private Urls() {}
+
     /**
      * Convert a class path element into an equivalent URL.
      *
