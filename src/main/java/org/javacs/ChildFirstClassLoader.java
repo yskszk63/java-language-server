@@ -8,6 +8,8 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.logging.Logger;
 
+import org.javacs.Urls;
+
 class ChildFirstClassLoader extends URLClassLoader {
     private final String[] packages;
     private static final Logger LOG = Logger.getLogger("main");
@@ -22,17 +24,8 @@ class ChildFirstClassLoader extends URLClassLoader {
 
     static URL[] parseClassPath(String classPath) {
         return Arrays.stream(classPath.split(File.pathSeparator))
-                .map(ChildFirstClassLoader::parse)
+                .map(Urls::of)
                 .toArray(URL[]::new);
-    }
-
-    private static URL parse(String urlString) {
-        try {
-            if (urlString.startsWith("/")) return Paths.get(urlString).toUri().toURL();
-            else return new URL(urlString);
-        } catch (MalformedURLException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     static ChildFirstClassLoader fromClassPath(
