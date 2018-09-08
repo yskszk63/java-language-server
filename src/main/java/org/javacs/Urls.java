@@ -25,7 +25,7 @@ public final class Urls {
         }
     }
 
-    static boolean isSystemPath(String path) {
+    private static boolean isSystemPath(String path) {
         return path.startsWith("/") ||
             path.matches("^[a-zA-Z]:[/\\\\].*");
     }
