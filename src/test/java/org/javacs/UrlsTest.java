@@ -11,7 +11,7 @@ public class UrlsTest {
 
   @Test
   public void of_whenPathStartsWithSlash() throws Exception {
-    URL actual = Urls.of("/a/b/c");
+    URL actual = Urls.of("file:///a/b/c");
     assertEquals("file", actual.getProtocol());
     assertEquals("/a/b/c", actual.getPath());
   }
@@ -37,6 +37,7 @@ public class UrlsTest {
   @Test
   public void isSystemPath_whenPathStartsWithDriveLetter() {
     assertTrue(Urls.isSystemPath("c:/a/b/c"));
+    assertTrue(Urls.isSystemPath("c:\\a\\b\\c"));
   }
 
   @Test

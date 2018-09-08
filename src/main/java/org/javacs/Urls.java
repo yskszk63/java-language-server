@@ -13,11 +13,12 @@ public final class Urls {
             else
                 return new URL(path);
         } catch (MalformedURLException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to parse path " + path, e);
         }
     }
 
     static boolean isSystemPath(String path) {
-        return path.startsWith("/") || path.matches("^[a-zA-Z]:/.*");
+        return path.startsWith("/") ||
+            path.matches("^[/\\\\]?[a-zA-Z]:[/\\\\].*");
     }
 }
