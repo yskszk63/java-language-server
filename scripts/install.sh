@@ -4,6 +4,8 @@
 # You will need java, maven, vsce, and visual studio code to run this script
 set -e
 
+export JAVA_HOME=`/usr/libexec/java_home -v 1.8`
+
 # Needed once
 npm install
 
