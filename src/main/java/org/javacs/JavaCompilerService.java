@@ -435,6 +435,8 @@ public class JavaCompilerService {
 
             // Add .class
             result.add(Completion.ofKeyword("class"));
+            result.add(Completion.ofKeyword("this"));
+            result.add(Completion.ofKeyword("super"));
 
             return result;
         } else {

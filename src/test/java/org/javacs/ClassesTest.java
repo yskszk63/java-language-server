@@ -49,20 +49,6 @@ public class ClassesTest {
         assertNotNull(load);
     }
 
-    @Test
-    public void loadList() throws Exception {
-        var classes = ClassPath.from(ClassLoader.getPlatformClassLoader());
-        var found = classes.getTopLevelClasses("java.util");
-        assertThat(found, not(empty()));
-        assertThat(found, hasItem(hasToString("java.util.List")));
-
-        var list = found.stream().filter(c -> c.getName().equals("java.util.List")).findFirst();
-        assertTrue(list.isPresent());
-
-        var load = list.get().load();
-        assertNotNull(load);
-    }
-
     void ancestors(ClassLoader classLoader) {
         while (classLoader != null) {
             System.out.println(classLoader.toString());
