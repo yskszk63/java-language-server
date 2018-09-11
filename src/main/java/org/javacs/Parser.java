@@ -253,10 +253,11 @@ class Parser {
 
     /** Find all already-imported symbols in all .java files in sourcePath */
     static ExistingImports existingImports(Collection<Path> sourcePath) {
-        Set<String> classes = new HashSet<>(), packages = new HashSet<>();
-        Pattern importClass = Pattern.compile("^import +(([\\w\\.]+)\\.\\w+);"),
-                importStar = Pattern.compile("^import +([\\w\\.]+)\\.\\*;"),
-                importSimple = Pattern.compile("^import +(\\w+);");
+        var classes = new HashSet<String>();
+        var packages = new HashSet<String>();
+        var importClass = Pattern.compile("^import +(([\\w\\.]+)\\.\\w+);");
+        var importStar = Pattern.compile("^import +([\\w\\.]+)\\.\\*;");
+        var importSimple = Pattern.compile("^import +(\\w+);");
         Consumer<Path> findImports =
                 path -> {
                     try (var lines = Files.newBufferedReader(path)) {
