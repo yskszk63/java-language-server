@@ -13,58 +13,12 @@ import java.io.StringWriter;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.StringJoiner;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
-import org.eclipse.lsp4j.CodeActionParams;
-import org.eclipse.lsp4j.CodeLens;
-import org.eclipse.lsp4j.CodeLensParams;
-import org.eclipse.lsp4j.Command;
-import org.eclipse.lsp4j.CompletionItem;
-import org.eclipse.lsp4j.CompletionItemKind;
-import org.eclipse.lsp4j.CompletionList;
-import org.eclipse.lsp4j.CompletionParams;
-import org.eclipse.lsp4j.DidChangeTextDocumentParams;
-import org.eclipse.lsp4j.DidCloseTextDocumentParams;
-import org.eclipse.lsp4j.DidOpenTextDocumentParams;
-import org.eclipse.lsp4j.DidSaveTextDocumentParams;
-import org.eclipse.lsp4j.DocumentFormattingParams;
-import org.eclipse.lsp4j.DocumentHighlight;
-import org.eclipse.lsp4j.DocumentOnTypeFormattingParams;
-import org.eclipse.lsp4j.DocumentRangeFormattingParams;
-import org.eclipse.lsp4j.DocumentSymbolParams;
-import org.eclipse.lsp4j.Hover;
-import org.eclipse.lsp4j.Location;
-import org.eclipse.lsp4j.MarkedString;
-import org.eclipse.lsp4j.MarkupContent;
-import org.eclipse.lsp4j.MarkupKind;
-import org.eclipse.lsp4j.ParameterInformation;
-import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.Range;
-import org.eclipse.lsp4j.ReferenceParams;
-import org.eclipse.lsp4j.RenameParams;
-import org.eclipse.lsp4j.SignatureHelp;
-import org.eclipse.lsp4j.SignatureInformation;
-import org.eclipse.lsp4j.SymbolInformation;
-import org.eclipse.lsp4j.TextDocumentContentChangeEvent;
-import org.eclipse.lsp4j.TextDocumentPositionParams;
-import org.eclipse.lsp4j.TextEdit;
-import org.eclipse.lsp4j.WorkspaceEdit;
+import javax.lang.model.element.*;
+import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.TextDocumentService;
 
@@ -169,7 +123,7 @@ class JavaTextDocumentService implements TextDocumentService {
         var missingParamNames =
                 method.getParameters().stream().allMatch(p -> p.getSimpleName().toString().matches("arg\\d+"));
         for (var p : method.getParameters()) {
-            if (missingParamNames) args.add(p.asType().toString());
+            if (missingParamNames) args.add(ShortTypePrinter.print(p.asType()));
             else args.add(p.getSimpleName().toString());
         }
         return String.format("%s(%s)", method.getSimpleName(), args);
@@ -244,9 +198,9 @@ class JavaTextDocumentService implements TextDocumentService {
                 LOG.warning("Don't know what to call type element " + t);
                 result.append("???");
         }
-        result.append(" ").append(t.asType());
+        result.append(" ").append(ShortTypePrinter.print(t.asType()));
         if (!t.getSuperclass().toString().equals("java.lang.Object")) {
-            result.append(" extends ").append(t.getSuperclass());
+            result.append(" extends ").append(ShortTypePrinter.print(t.getSuperclass()));
         }
         return result.toString();
     }
@@ -254,18 +208,10 @@ class JavaTextDocumentService implements TextDocumentService {
     private String hoverCode(Element e) {
         if (e instanceof ExecutableElement) {
             var m = (ExecutableElement) e;
-            if (m.getSimpleName().contentEquals("<init>")) {
-                return m.toString();
-            } else {
-                var result = new StringJoiner(" ");
-                if (m.getModifiers().contains(Modifier.STATIC)) result.add("static");
-                result.add(m.getReturnType().toString());
-                result.add(m.toString());
-                return result.toString();
-            }
+            return ShortTypePrinter.printMethod(m);
         } else if (e instanceof VariableElement) {
             var v = (VariableElement) e;
-            return v.asType() + " " + v;
+            return ShortTypePrinter.print(v.asType()) + " " + v;
         } else if (e instanceof TypeElement) {
             var t = (TypeElement) e;
             var lines = new StringJoiner("\n");
@@ -329,12 +275,11 @@ class JavaTextDocumentService implements TextDocumentService {
     }
 
     private List<ParameterInformation> signatureParamsFromMethod(ExecutableElement e) {
-        var missingParamNames =
-                e.getParameters().stream().allMatch(p -> p.getSimpleName().toString().matches("arg\\d+"));
+        var missingParamNames = ShortTypePrinter.missingParamNames(e);
         var ps = new ArrayList<ParameterInformation>();
         for (var v : e.getParameters()) {
             var p = new ParameterInformation();
-            if (missingParamNames) p.setLabel(v.asType().toString());
+            if (missingParamNames) p.setLabel(ShortTypePrinter.print(v.asType()));
             else p.setLabel(v.getSimpleName().toString());
             ps.add(p);
         }
