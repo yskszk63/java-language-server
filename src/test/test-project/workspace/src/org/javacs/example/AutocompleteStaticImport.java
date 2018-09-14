@@ -8,6 +8,6 @@ class AutocompleteStaticImport {
     void test() {
         emptyL;
         B;
-        staticFinal;
+        p;
     }
 }

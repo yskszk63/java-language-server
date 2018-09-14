@@ -92,10 +92,12 @@ class Pruner {
                         erase(cursor, sourcePositions.getEndPosition(root, node) - 1);
                         erasedAfterCursor = true;
                     }
-                } else {
-                    long start = sourcePositions.getStartPosition(root, node),
-                            end = sourcePositions.getEndPosition(root, node);
-                    erase(start + 1, end - 1);
+                } else if (!node.getStatements().isEmpty()) {
+                    var first = node.getStatements().get(0);
+                    var last = node.getStatements().get(node.getStatements().size() - 1);
+                    var start = sourcePositions.getStartPosition(root, first);
+                    var end = sourcePositions.getEndPosition(root, last);
+                    erase(start, end);
                 }
                 return null;
             }

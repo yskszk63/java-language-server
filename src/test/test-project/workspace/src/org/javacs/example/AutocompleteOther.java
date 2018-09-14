@@ -3,7 +3,7 @@ package org.javacs.example; import java.util.Arrays; import java.util.concurrent
 public class AutocompleteOther {
     public void test() {
         new AutocompleteMember().;
-        A;
+        Auto;
         AutocompleteMember.;
         AutocompleteOther.class.;
         ArrayLis;

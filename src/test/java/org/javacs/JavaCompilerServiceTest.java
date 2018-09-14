@@ -153,7 +153,8 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void members() {
-        var found = compiler.members(URI.create("/CompleteMembers.java"), contents("/CompleteMembers.java"), 3, 14);
+        var found =
+                compiler.members(URI.create("/CompleteMembers.java"), contents("/CompleteMembers.java"), 3, 14, false);
         var names = completionNames(found);
         assertThat(names, hasItem("subMethod"));
         assertThat(names, hasItem("superMethod"));

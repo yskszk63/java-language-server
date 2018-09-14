@@ -191,7 +191,7 @@ public class JavaCompilerService {
                 this.contents = p.contents();
             }
             this.file = file;
-            this.task = singleFileTask(file, contents);
+            this.task = singleFileTask(file, this.contents);
             try {
                 this.root = task.parse().iterator().next();
                 // The results of task.analyze() are unreliable when errors are present
@@ -245,22 +245,21 @@ public class JavaCompilerService {
             @Override
             public Void visitErroneous(ErroneousTree node, Void nothing) {
                 for (var t : node.getErrorTrees()) {
-                    t.accept(this, nothing);
+                    scan(t, nothing);
                 }
                 return null;
             }
 
-            Optional<TreePath> find(Tree root) {
+            TreePath find(Tree root) {
                 scan(root, null);
-                return Optional.ofNullable(found);
+                if (found == null) {
+                    var message = String.format("No TreePath to %s %d:%d", file, line, character);
+                    throw new RuntimeException(message);
+                }
+                return found;
             }
         }
-        Supplier<RuntimeException> notFound =
-                () -> {
-                    var message = String.format("No TreePath to %s %d:%d", file, line, character);
-                    return new RuntimeException(message);
-                };
-        return new FindSmallest().find(cache.root).orElseThrow(notFound);
+        return new FindSmallest().find(cache.root);
     }
 
     /** Find all identifiers in scope at line:character */
@@ -388,7 +387,7 @@ public class JavaCompilerService {
     }
 
     /** Find all members of expression ending at line:character */
-    public List<Completion> members(URI file, String contents, int line, int character) {
+    public List<Completion> members(URI file, String contents, int line, int character, boolean isReference) {
         recompile(file, contents, line, character);
 
         var trees = Trees.instance(cache.task);
@@ -420,7 +419,22 @@ public class JavaCompilerService {
             }
 
             return result;
-        } else if (element instanceof TypeElement) {
+        } else if (element instanceof TypeElement && isReference) {
+            var result = new ArrayList<Completion>();
+            var t = (TypeElement) element;
+
+            // Add members
+            for (var member : t.getEnclosedElements()) {
+                if (member.getKind() == ElementKind.METHOD && trees.isAccessible(scope, member, (DeclaredType) t.asType())) {
+                    result.add(Completion.ofElement(member));
+                }
+            }
+
+            // Add ::new
+            result.add(Completion.ofKeyword("new"));
+
+            return result;
+        } else if (element instanceof TypeElement && !isReference) {
             var result = new ArrayList<Completion>();
             var t = (TypeElement) element;
 
@@ -577,7 +591,7 @@ public class JavaCompilerService {
                     long offset = pos.getEndPosition(parse, node.getExpression()),
                             line = lines.getLineNumber(offset),
                             column = lines.getColumnNumber(offset);
-                    result = members(file, contents, (int) line, (int) column);
+                    result = members(file, contents, (int) line, (int) column, false);
                 }
                 return null;
             }
@@ -591,7 +605,7 @@ public class JavaCompilerService {
                     long offset = pos.getEndPosition(parse, node.getQualifierExpression()),
                             line = lines.getLineNumber(offset),
                             column = lines.getColumnNumber(offset);
-                    result = members(file, contents, (int) line, (int) column);
+                    result = members(file, contents, (int) line, (int) column, true);
                 }
                 return null;
             }
@@ -657,13 +671,49 @@ public class JavaCompilerService {
                                         .filter(matchesPartialName)
                                         .filter(notAlreadyImported)
                                         .filter(c -> classPathClasses.isAccessibleFromPackage(c, packageName));
-                        var fromBoth = Stream.concat(fromJdk, fromClasspath).iterator();
-                        while (fromBoth.hasNext() && result.size() < limitHint) {
-                            var className = fromBoth.next();
-                            var completion = Completion.ofNotImportedClass(className);
-                            result.add(completion);
-                        }
-                        isIncomplete = fromBoth.hasNext();
+                        Function<Path, Stream<String>> classesInDir = dir -> {
+                            Predicate<Path> matchesFileName = 
+                                    file -> file.getFileName().toString().startsWith(partialName);
+                            Predicate<Path> isPublic = 
+                                file -> {
+                                    var fileName = file.getFileName().toString();
+                                    if (!fileName.endsWith(".java")) return false;
+                                    var simpleName = fileName.substring(0, fileName.length() - ".java".length());
+                                    Stream<String> lines;
+                                    try {
+                                        lines = Files.lines(file);
+                                    } catch (IOException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                    return lines.anyMatch(line -> line.matches(".*public\\s+class\\s+" + simpleName + ".*"));
+                                };
+                            Function<Path, String> qualifiedName = 
+                                    file -> {
+                                        var relative = dir.relativize(file).toString().replace('/', '.');
+                                        if (!relative.endsWith(".java")) return "??? " + relative + " does not end in .java";
+                                        return relative.substring(0, relative.length() - ".java".length());
+                                    };
+                            return javaSourcesInDir(dir).filter(matchesFileName).filter(isPublic).map(qualifiedName);
+                        };
+                        var fromSourcePath = 
+                                sourcePath.stream()
+                                .flatMap(classesInDir)
+                                .filter(notAlreadyImported);
+                        Consumer<Stream<String>> addCompletions = qualifiedNames -> {
+                            Iterable<String> it = qualifiedNames::iterator;
+                            for (var name : it) {
+                                if (result.size() >= limitHint) {
+                                    isIncomplete = true;
+                                    return;
+                                } else {
+                                    var completion = Completion.ofNotImportedClass(name);
+                                    result.add(completion);
+                                }
+                            }
+                        };
+                        addCompletions.accept(fromJdk);
+                        addCompletions.accept(fromClasspath);
+                        addCompletions.accept(fromSourcePath);
                     }
                 }
                 return null;
