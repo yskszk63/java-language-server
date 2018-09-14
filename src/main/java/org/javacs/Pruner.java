@@ -1,9 +1,6 @@
 package org.javacs;
 
-import com.sun.source.tree.BlockTree;
-import com.sun.source.tree.CompilationUnitTree;
-import com.sun.source.tree.ErroneousTree;
-import com.sun.source.tree.Tree;
+import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
@@ -88,8 +85,11 @@ class Pruner {
                     super.visitBlock(node, aVoid);
                     // When we find the deepest block that includes the cursor
                     if (!erasedAfterCursor) {
-                        // Erase the contents of the block after the cursor
-                        erase(cursor, sourcePositions.getEndPosition(root, node) - 1);
+                        for (StatementTree line : node.getStatements()) {
+                            var start = sourcePositions.getStartPosition(root, line);
+                            var end = sourcePositions.getEndPosition(root, line);
+                            if (cursor < start) erase(start, end);
+                        }
                         erasedAfterCursor = true;
                     }
                 } else if (!node.getStatements().isEmpty()) {

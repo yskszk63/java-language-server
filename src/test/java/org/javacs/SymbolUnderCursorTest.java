@@ -1,6 +1,7 @@
 package org.javacs;
 
-import static org.junit.Assert.assertEquals;
+import static org.hamcrest.Matchers.containsString;
+import static org.junit.Assert.assertThat;
 
 import java.util.StringJoiner;
 import java.util.concurrent.ExecutionException;
@@ -14,70 +15,79 @@ public class SymbolUnderCursorTest {
 
     @Test
     public void classDeclaration() {
-        assertEquals(
-                "org.javacs.example.SymbolUnderCursor", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 3, 22));
+        assertThat(
+                symbolAt("/org/javacs/example/SymbolUnderCursor.java", 3, 22),
+                containsString("org.javacs.example.SymbolUnderCursor"));
     }
 
     @Test
     public void fieldDeclaration() {
-        assertEquals("field", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 4, 22));
+        assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 4, 22), containsString("field"));
     }
 
     @Test
     public void methodDeclaration() {
-        assertEquals("method(java.lang.String)", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 6, 22));
+        assertThat(
+                symbolAt("/org/javacs/example/SymbolUnderCursor.java", 6, 22),
+                containsString("method(java.lang.String)"));
     }
 
     @Test
     public void methodParameterDeclaration() {
-        assertEquals("methodParameter", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 6, 36));
+        assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 6, 36), containsString("methodParameter"));
     }
 
     @Test
     public void localVariableDeclaration() {
-        assertEquals("localVariable", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 7, 22));
+        assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 7, 22), containsString("localVariable"));
     }
 
     @Test
     public void constructorParameterDeclaration() {
-        assertEquals("constructorParameter", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 17, 46));
+        assertThat(
+                symbolAt("/org/javacs/example/SymbolUnderCursor.java", 17, 46), containsString("constructorParameter"));
     }
 
     @Test
     public void classIdentifier() {
-        assertEquals(
-                "org.javacs.example.SymbolUnderCursor", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 12, 23));
+        assertThat(
+                symbolAt("/org/javacs/example/SymbolUnderCursor.java", 12, 23),
+                containsString("org.javacs.example.SymbolUnderCursor"));
     }
 
     @Test
     public void fieldIdentifier() {
-        assertEquals("field", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 9, 27));
+        assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 9, 27), containsString("field"));
     }
 
     @Test
     public void methodIdentifier() {
-        assertEquals("method(java.lang.String)", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 12, 12));
+        assertThat(
+                symbolAt("/org/javacs/example/SymbolUnderCursor.java", 12, 12),
+                containsString("method(java.lang.String)"));
     }
 
     @Test
     public void methodSelect() {
-        assertEquals("method(java.lang.String)", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 13, 17));
+        assertThat(
+                symbolAt("/org/javacs/example/SymbolUnderCursor.java", 13, 17),
+                containsString("method(java.lang.String)"));
     }
 
     @Ignore // tree.sym is null
     @Test
     public void methodReference() {
-        assertEquals("method", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 14, 46));
+        assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 14, 46), containsString("method"));
     }
 
     @Test
     public void methodParameterReference() {
-        assertEquals("methodParameter", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 10, 32));
+        assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 10, 32), containsString("methodParameter"));
     }
 
     @Test
     public void localVariableReference() {
-        assertEquals("localVariable", symbolAt("/org/javacs/example/SymbolUnderCursor.java", 10, 16));
+        assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 10, 16), containsString("localVariable"));
     }
 
     // Re-using the language server makes these tests go a lot faster, but it will potentially produce surprising output

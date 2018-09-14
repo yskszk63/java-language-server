@@ -395,16 +395,10 @@ class JavaTextDocumentService implements TextDocumentService {
     @Override
     public CompletableFuture<List<? extends Location>> definition(TextDocumentPositionParams position) {
         var uri = URI.create(position.getTextDocument().getUri());
-        var content = contents(uri).content;
         var line = position.getPosition().getLine() + 1;
         var column = position.getPosition().getCharacter() + 1;
         var result = new ArrayList<Location>();
-        server.compiler
-                .definition(uri, line, column, f -> contents(f).content)
-                .ifPresent(
-                        d -> {
-                            result.add(location(d));
-                        });
+        server.compiler.definition(uri, line, column, f -> contents(f).content).ifPresent(d -> result.add(location(d)));
         return CompletableFuture.completedFuture(result);
     }
 

@@ -9,10 +9,10 @@ public class FindResource {
         if (resourcePath.startsWith("/")) resourcePath = resourcePath.substring(1);
 
         var path = Paths.get("./src/test/test-project/workspace/src").resolve(resourcePath).normalize();
-        var file = path.toFile();
+        var file = path.toAbsolutePath().toFile();
 
         if (!file.exists()) throw new RuntimeException(file + " does not exist");
 
-        return file.toURI();
+        return URI.create("file://" + file);
     }
 }
