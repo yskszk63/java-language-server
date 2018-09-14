@@ -85,11 +85,14 @@ class Pruner {
                     super.visitBlock(node, aVoid);
                     // When we find the deepest block that includes the cursor
                     if (!erasedAfterCursor) {
-                        for (StatementTree line : node.getStatements()) {
-                            var start = sourcePositions.getStartPosition(root, line);
-                            var end = sourcePositions.getEndPosition(root, line);
-                            if (cursor < start) erase(start, end);
-                        }
+                        var start = cursor;
+                        var end = sourcePositions.getEndPosition(root, node);
+                        // Find the next line
+                        while (start < end && contents.charAt((int) start) != '\n') start++;
+                        // Find the end of the block
+                        while (end > start && contents.charAt((int) end) != '}') end--;
+                        // Erase from next line to end of block
+                        erase(start, end - 1);
                         erasedAfterCursor = true;
                     }
                 } else if (!node.getStatements().isEmpty()) {

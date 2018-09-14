@@ -65,22 +65,6 @@ public class JavaCompilerServiceTest {
         assertThat(found, notNullValue());
     }
 
-    @Test
-    public void pruneMethods() {
-        var pruner = new Pruner(URI.create("/PruneMethods.java"), contents("/PruneMethods.java"));
-        pruner.prune(6, 19);
-        var expected = contents("/PruneMethods_erased.java");
-        assertThat(pruner.contents(), equalToIgnoringWhiteSpace(expected));
-    }
-
-    @Test
-    public void pruneToEndOfBlock() {
-        var pruner = new Pruner(URI.create("/PruneToEndOfBlock.java"), contents("/PruneToEndOfBlock.java"));
-        pruner.prune(4, 18);
-        var expected = contents("/PruneToEndOfBlock_erased.java");
-        assertThat(pruner.contents(), equalToIgnoringWhiteSpace(expected));
-    }
-
     private List<String> completionNames(List<Completion> found) {
         var result = new ArrayList<String>();
         for (var c : found) {

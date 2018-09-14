@@ -29,7 +29,7 @@ public class SymbolUnderCursorTest {
     public void methodDeclaration() {
         assertThat(
                 symbolAt("/org/javacs/example/SymbolUnderCursor.java", 6, 22),
-                containsString("method(java.lang.String)"));
+                containsString("method(String methodParameter)"));
     }
 
     @Test
@@ -64,14 +64,14 @@ public class SymbolUnderCursorTest {
     public void methodIdentifier() {
         assertThat(
                 symbolAt("/org/javacs/example/SymbolUnderCursor.java", 12, 12),
-                containsString("method(java.lang.String)"));
+                containsString("method(String methodParameter)"));
     }
 
     @Test
     public void methodSelect() {
         assertThat(
                 symbolAt("/org/javacs/example/SymbolUnderCursor.java", 13, 17),
-                containsString("method(java.lang.String)"));
+                containsString("method(String methodParameter)"));
     }
 
     @Ignore // tree.sym is null
