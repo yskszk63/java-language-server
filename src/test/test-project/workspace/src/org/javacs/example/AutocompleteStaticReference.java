@@ -16,7 +16,7 @@ public class AutocompleteStaticReference {
     private static String testMethodStatic() {
         return "foo";
     }
-    private String methods() {
+    private String testMethod() {
         return "foo";
     }
 }
