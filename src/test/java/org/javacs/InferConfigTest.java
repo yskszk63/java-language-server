@@ -37,6 +37,8 @@ public class InferConfigTest {
 
     @Test
     public void dependencyList() {
-        assertThat(InferConfig.dependencyList(Paths.get("pom.xml")), hasItem(new Artifact("com.sun", "tools", "1.8")));
+        assertThat(
+                InferConfig.dependencyList(Paths.get("pom.xml")),
+                hasItem(new Artifact("org.hamcrest", "hamcrest-all", "1.3")));
     }
 }

@@ -1,6 +1,6 @@
 class LocalMethodDoc {
     void testMethod() {
-        targetMethod();
+        targetMethod(1);
     }
 
     /**
