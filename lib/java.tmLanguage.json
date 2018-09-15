@@ -124,22 +124,31 @@
 		"annotations": {
 			"patterns": [
 				{
-					"begin": "((@)[^\\s(]+)(\\()",
-					"beginCaptures": {
+					"match": "(@interface)\\s+(\\w+)",
+					"name": "meta.declaration.annotation.java",
+					"captures": {
 						"1": {
-							"name": "entity.name.type.annotation.java"
+							"name": "storage.modifier.java"
 						},
 						"2": {
-							"name": "punctuation.definition.annotation.java"
+							"name": "entity.name.type.annotation.java"
+						}
+					}
+				},
+				{
+					"begin": "(@[^\\s(]+)(\\()",
+					"beginCaptures": {
+						"1": {
+							"name": "punctuation.definition.tag"
 						},
-						"3": {
-							"name": "punctuation.definition.annotation-arguments.begin.bracket.round.java"
+						"2": {
+							"name": "punctuation.definition.tag.left"
 						}
 					},
 					"end": "\\)",
 					"endCaptures": {
 						"0": {
-							"name": "punctuation.definition.annotation-arguments.end.bracket.round.java"
+							"name": "punctuation.definition.tag.right"
 						}
 					},
 					"name": "meta.declaration.annotation.java",
@@ -147,10 +156,10 @@
 						{
 							"captures": {
 								"1": {
-									"name": "constant.other.key.java"
+									"name": "punctuation.definition.tag.key"
 								},
 								"2": {
-									"name": "keyword.operator.assignment.java"
+									"name": "punctuation.definition.tag.assign"
 								}
 							},
 							"match": "(\\w*)\\s*(=)"
@@ -161,23 +170,11 @@
 					]
 				},
 				{
-					"match": "(@)(interface)\\s+(\\w*)|((@)\\w*)",
+					"match": "(@\\w+)",
 					"name": "meta.declaration.annotation.java",
 					"captures": {
 						"1": {
-							"name": "punctuation.definition.annotation.java"
-						},
-						"2": {
-							"name": "storage.modifier.java"
-						},
-						"3": {
-							"name": "entity.name.type.annotation.java"
-						},
-						"4": {
-							"name": "entity.name.type.annotation.java"
-						},
-						"5": {
-							"name": "punctuation.definition.annotation.java"
+							"name": "punctuation.definition.tag"
 						}
 					}
 				}
