@@ -410,9 +410,10 @@ class JavaTextDocumentService implements TextDocumentService {
             var endLine = (int) lines.getLineNumber(end) - 1;
             var endCol = (int) lines.getColumnNumber(end) - 1;
             var range = new Range(new Position(startLine, startCol), new Position(endLine, endCol));
+            var sourceUri = test.compilationUnit.getSourceFile().toUri();
             var className = test.enclosingClass.getSimpleName().toString();
             var methodName = test.method.getName().toString();
-            var command = new Command("Run Test", "java.command.test.run", List.of(className, methodName));
+            var command = new Command("Run Test", "java.command.test.run", List.of(sourceUri, className, methodName));
             result.add(new CodeLens(range, command, null));
         }
         // TODO run all tests in file

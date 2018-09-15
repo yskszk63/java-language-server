@@ -1,19 +1,20 @@
 'use strict';
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
-import * as VSCode from "vscode";
 import * as Path from "path";
 import * as FS from "fs";
+import { window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction } from 'vscode';
+
 import {LanguageClient, LanguageClientOptions, ServerOptions} from "vscode-languageclient";
 
 /** Called when extension is activated */
-export function activate(context: VSCode.ExtensionContext) {
+export function activate(context: ExtensionContext) {
     console.log('Activating Java');
 
     let javaExecutablePath = findJavaExecutable('java');
     
     if (javaExecutablePath == null) {
-        VSCode.window.showErrorMessage("Couldn't locate java in $JAVA_HOME or $PATH");
+        window.showErrorMessage("Couldn't locate java in $JAVA_HOME or $PATH");
         
         return;
     }
@@ -27,11 +28,11 @@ export function activate(context: VSCode.ExtensionContext) {
             configurationSection: 'java',
             // Notify the server about file changes to 'javaconfig.json' files contain in the workspace
             fileEvents: [
-                VSCode.workspace.createFileSystemWatcher('**/javaconfig.json'),
-                VSCode.workspace.createFileSystemWatcher('**/pom.xml'),
-                VSCode.workspace.createFileSystemWatcher('**/WORKSPACE'),
-                VSCode.workspace.createFileSystemWatcher('**/BUILD'),
-                VSCode.workspace.createFileSystemWatcher('**/*.java')
+                workspace.createFileSystemWatcher('**/javaconfig.json'),
+                workspace.createFileSystemWatcher('**/pom.xml'),
+                workspace.createFileSystemWatcher('**/WORKSPACE'),
+                workspace.createFileSystemWatcher('**/BUILD'),
+                workspace.createFileSystemWatcher('**/*.java')
             ]
         },
         outputChannelName: 'Java',
@@ -56,7 +57,7 @@ export function activate(context: VSCode.ExtensionContext) {
     }
 
     // Copied from typescript
-    VSCode.languages.setLanguageConfiguration('java', {
+    languages.setLanguageConfiguration('java', {
         indentationRules: {
             // ^(.*\*/)?\s*\}.*$
             decreaseIndentPattern: /^((?!.*?\/\*).*\*\/)?\s*[\}\]\)].*$/,
@@ -69,24 +70,24 @@ export function activate(context: VSCode.ExtensionContext) {
                 // e.g. /** | */
                 beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
                 afterText: /^\s*\*\/$/,
-                action: { indentAction: VSCode.IndentAction.IndentOutdent, appendText: ' * ' }
+                action: { indentAction: IndentAction.IndentOutdent, appendText: ' * ' }
             }, {
                 // e.g. /** ...|
                 beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
-                action: { indentAction: VSCode.IndentAction.None, appendText: ' * ' }
+                action: { indentAction: IndentAction.None, appendText: ' * ' }
             }, {
                 // e.g.  * ...|
                 beforeText: /^(\t|(\ \ ))*\ \*(\ ([^\*]|\*(?!\/))*)?$/,
-                action: { indentAction: VSCode.IndentAction.None, appendText: '* ' }
+                action: { indentAction: IndentAction.None, appendText: '* ' }
             }, {
                 // e.g.  */|
                 beforeText: /^(\t|(\ \ ))*\ \*\/\s*$/,
-                action: { indentAction: VSCode.IndentAction.None, removeText: 1 }
+                action: { indentAction: IndentAction.None, removeText: 1 }
             },
             {
                 // e.g.  *-----*/|
                 beforeText: /^(\t|(\ \ ))*\ \*[^/]*\*\/\s*$/,
-                action: { indentAction: VSCode.IndentAction.None, removeText: 1 }
+                action: { indentAction: IndentAction.None, removeText: 1 }
             }
         ]
     })
@@ -98,13 +99,16 @@ export function activate(context: VSCode.ExtensionContext) {
     // Push the disposable to the context's subscriptions so that the 
     // client can be deactivated on extension deactivation
     context.subscriptions.push(disposable);
+
+    // Register test commands
+	commands.registerCommand('java.command.test.run', runTest);
 }
 
 function findJavaExecutable(binname: string) {
 	binname = correctBinname(binname);
 
 	// First search java.home setting
-    let userJavaHome = VSCode.workspace.getConfiguration('java').get('home') as string;
+    let userJavaHome = workspace.getConfiguration('java').get('home') as string;
 
 	if (userJavaHome != null) {
         console.log('Looking for java in settings java.home ' + userJavaHome + '...');
@@ -166,4 +170,22 @@ function findJavaExecutableInJavaHome(javaHome: string, binname: string) {
 
 // this method is called when your extension is deactivated
 export function deactivate() {
+}
+
+interface JavaTestTask extends TaskDefinition {
+    enclosingClass: string
+    method: string
+}
+
+function runTest(sourceUri: string, enclosingClass: string, method: string): Thenable<TaskExecution> {
+	let kind: JavaTestTask = {
+		type: 'java.task.test',
+        enclosingClass: enclosingClass,
+        method: method,
+    }
+    // TODO make this configurable
+	let shell = new ShellExecution('mvn', ['test', `-Dtest=${enclosingClass}#${method}`])
+	let workspaceFolder = workspace.getWorkspaceFolder(Uri.parse(sourceUri))
+	let task = new Task(kind, workspaceFolder, 'Java Test', 'Java Language Server', shell)
+	return tasks.executeTask(task)
 }
