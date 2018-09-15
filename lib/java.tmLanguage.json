@@ -127,7 +127,7 @@
 					"begin": "((@)[^\\s(]+)(\\()",
 					"beginCaptures": {
 						"1": {
-							"name": "storage.type.annotation.java"
+							"name": "entity.name.type.annotation.java"
 						},
 						"2": {
 							"name": "punctuation.definition.annotation.java"
@@ -171,10 +171,10 @@
 							"name": "storage.modifier.java"
 						},
 						"3": {
-							"name": "storage.type.annotation.java"
+							"name": "entity.name.type.annotation.java"
 						},
 						"4": {
-							"name": "storage.type.annotation.java"
+							"name": "entity.name.type.annotation.java"
 						},
 						"5": {
 							"name": "punctuation.definition.annotation.java"
