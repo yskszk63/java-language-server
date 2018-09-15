@@ -53,8 +53,8 @@ class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
             result += "<" + params + ">";
         }
 
-        if (result.startsWith("java.lang.")) return result.substring("java.lang.".length());
-        else if (result.startsWith("java.util.")) return result.substring("java.util.".length());
+        if (result.matches("java\\.lang\\.\\w+")) return result.substring("java.lang.".length());
+        else if (result.startsWith("java\\.util\\.\\w+")) return result.substring("java.util.".length());
         else return result;
     }
 

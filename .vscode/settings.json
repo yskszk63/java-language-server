@@ -15,7 +15,7 @@
         "out": true // set this to false to include "out" folder in search results
     },
     "[java]": {
-        "editor.formatOnSave": false
+        "editor.formatOnSave": true
     },
     "java.trace.server": "messages"
 }
