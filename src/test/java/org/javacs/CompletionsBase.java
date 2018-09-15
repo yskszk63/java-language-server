@@ -1,10 +1,8 @@
 package org.javacs;
 
+import com.google.gson.Gson;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -37,6 +35,17 @@ public class CompletionsBase {
         var items = items(file, row, column);
 
         return items.stream().map(CompletionsBase::itemInsertText).collect(Collectors.toSet());
+    }
+
+    protected Set<String> detail(String file, int row, int column) throws IOException {
+        var items = items(file, row, column);
+        var result = new HashSet<String>();
+        for (var i : items) {
+            i.setData(new Gson().toJsonTree(i.getData()));
+            var resolved = resolve(i);
+            result.add(resolved.getDetail());
+        }
+        return result;
     }
 
     protected Map<String, Integer> insertCount(String file, int row, int column) throws IOException {
@@ -87,6 +96,14 @@ public class CompletionsBase {
 
         try {
             return server.getTextDocumentService().completion(position).get().getRight().getItems();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    protected CompletionItem resolve(CompletionItem item) {
+        try {
+            return server.getTextDocumentService().resolveCompletionItem(item).get();
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }

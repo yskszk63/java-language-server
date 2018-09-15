@@ -707,11 +707,32 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
+    @Ignore
     public void onlySuggestOnce() throws IOException {
         var file = "/org/javacs/example/AutocompleteOnce.java";
         var suggestions = insertCount(file, 5, 18);
 
         assertThat("suggests Signatures", suggestions, hasKey("Signatures"));
         assertThat("suggests Signatures only once", suggestions, hasEntry("Signatures", 1));
+    }
+
+    @Test
+    public void overloadedOnSourcePath() throws IOException {
+        var file = "/org/javacs/example/OverloadedMethod.java";
+        var detail = detail(file, 9, 13);
+
+        assertThat("suggests empty method", detail, hasItem("overloaded()"));
+        assertThat("suggests int method", detail, hasItem("overloaded(i)"));
+        assertThat("suggests string method", detail, hasItem("overloaded(s)"));
+    }
+
+    @Test
+    public void overloadedOnClassPath() throws IOException {
+        var file = "/org/javacs/example/OverloadedMethod.java";
+        var detail = detail(file, 10, 26);
+
+        assertThat("suggests empty method", detail, hasItem("of()"));
+        assertThat("suggests one-arg method", detail, hasItem("of(e1)"));
+        // assertThat("suggests vararg method", detail, hasItem("of(elements)"));
     }
 }

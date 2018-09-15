@@ -610,24 +610,30 @@ public class JavaCompilerService {
                 if (containsCursor(node) && result == null) {
                     LOG.info("...completing identifiers");
                     result = new ArrayList<>();
+                    // Does a candidate completion match the name in `node`?
+                    var partialName = Objects.toString(node.getName(), "");
                     // Add keywords
                     if (insideClass == 0) {
                         for (var k : TOP_LEVEL_KEYWORDS) {
-                            result.add(Completion.ofKeyword(k));
+                            if (k.startsWith(partialName)) {
+                                result.add(Completion.ofKeyword(k));
+                            }
                         }
                     }
                     else if (insideMethod == 0) {
                         for (var k : CLASS_BODY_KEYWORDS) {
-                            result.add(Completion.ofKeyword(k));
+                            if (k.startsWith(partialName)) {
+                                result.add(Completion.ofKeyword(k));
+                            }
                         }
                     }
                     else {
                         for (var k : METHOD_BODY_KEYWORDS) {
-                            result.add(Completion.ofKeyword(k));
+                            if (k.startsWith(partialName)) {
+                                result.add(Completion.ofKeyword(k));
+                            }
                         }
                     }
-                    // Does a candidate completion match the name in `node`?
-                    var partialName = Objects.toString(node.getName(), "");
                     var startsWithUpperCase = partialName.length() > 0 && Character.isUpperCase(partialName.charAt(0));
                     var alreadyImported = new HashSet<String>();
                     // Add names that have already been imported
@@ -924,7 +930,8 @@ public class JavaCompilerService {
         var classElement = (TypeElement) method.getEnclosingElement();
         var className = classElement.getQualifiedName().toString();
         var methodName = method.getSimpleName().toString();
-        return docs.findMethod(className, methodName);
+        var parameterTypes = method.getParameters().stream().map(p -> p.asType().toString()).collect(Collectors.toList());
+        return docs.findMethod(className, methodName, parameterTypes);
     }
 
     /** Look up the javadoc associated with `type` */

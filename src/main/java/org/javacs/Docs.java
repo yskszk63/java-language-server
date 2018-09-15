@@ -3,28 +3,18 @@ package org.javacs;
 import com.overzealous.remark.Options;
 import com.overzealous.remark.Remark;
 import com.sun.source.doctree.DocCommentTree;
-import com.sun.source.tree.ClassTree;
-import com.sun.source.tree.CompilationUnitTree;
-import com.sun.source.tree.MethodTree;
-import com.sun.source.tree.Tree;
-import com.sun.source.tree.VariableTree;
+import com.sun.source.tree.*;
 import com.sun.source.util.DocTrees;
 import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.ServiceLoader;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import javax.tools.JavaCompiler;
-import javax.tools.JavaFileObject;
-import javax.tools.StandardJavaFileManager;
-import javax.tools.StandardLocation;
+import javax.tools.*;
 
 class Docs {
 
@@ -141,7 +131,29 @@ class Docs {
         return findDoc(className, null);
     }
 
-    Optional<MethodTree> findMethod(String className, String methodName) {
+    private boolean sameMethod(MethodTree candidate, String methodName, List<String> parameterTypes) {
+        if (!candidate.getName().contentEquals(methodName)) return false;
+        var params = candidate.getParameters();
+        if (params.size() != parameterTypes.size()) return false;
+        for (int i = 0; i < params.size(); i++) {
+            var expect = parameterTypes.get(i);
+            var expectSimple = Parser.lastName(expect);
+            var p = params.get(i);
+            var t = p.getType();
+            if (!(t instanceof IdentifierTree)) {
+                LOG.warning(
+                        "Parameter " + p.getName() + " of method " + candidate.getName() + " is not an IdentifierTree");
+                return false;
+            }
+            var id = (IdentifierTree) t;
+            var simple = Parser.lastName(id.getName().toString());
+
+            if (!simple.equals(expectSimple)) return false;
+        }
+        return true;
+    }
+
+    Optional<MethodTree> findMethod(String className, String methodName, List<String> parameterTypes) {
         Objects.requireNonNull(className);
         Objects.requireNonNull(methodName);
 
@@ -164,7 +176,7 @@ class Docs {
                     for (var member : node.getMembers()) {
                         if (member instanceof MethodTree) {
                             var method = (MethodTree) member;
-                            if (method.getName().contentEquals(methodName)) result = Optional.of(method);
+                            if (sameMethod(method, methodName, parameterTypes)) result = Optional.of(method);
                         }
                     }
                 }
