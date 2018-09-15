@@ -1,7 +1,7 @@
 package org.javacs;
 
-import static org.hamcrest.Matchers.containsString;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.junit.Assert.*;
 
 import java.util.StringJoiner;
 import java.util.concurrent.ExecutionException;
@@ -77,7 +77,14 @@ public class SymbolUnderCursorTest {
     @Ignore // tree.sym is null
     @Test
     public void methodReference() {
-        assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 14, 46), containsString("method"));
+        assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 14, 65), containsString("method"));
+    }
+
+    @Test
+    public void annotationUse() {
+        var found = symbolAt("/org/javacs/example/SymbolUnderCursor.java", 21, 8);
+        assertThat(found, containsString("@interface Override"));
+        assertThat(found, not(containsString("extends none")));
     }
 
     @Test
@@ -106,7 +113,7 @@ public class SymbolUnderCursorTest {
                     .get()
                     .getContents()
                     .getLeft()
-                    .forEach(hover -> result.add(hover.getRight().getValue()));
+                    .forEach(hover -> result.add(hover.isLeft() ? hover.getLeft() : hover.getRight().getValue()));
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }

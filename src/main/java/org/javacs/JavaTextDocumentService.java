@@ -188,6 +188,9 @@ class JavaTextDocumentService implements TextDocumentService {
     private String hoverTypeDeclaration(TypeElement t) {
         var result = new StringBuilder();
         switch (t.getKind()) {
+            case ANNOTATION_TYPE:
+                result.append("@interface");
+                break;
             case INTERFACE:
                 result.append("interface");
                 break;
@@ -199,8 +202,13 @@ class JavaTextDocumentService implements TextDocumentService {
                 result.append("???");
         }
         result.append(" ").append(ShortTypePrinter.print(t.asType()));
-        if (!t.getSuperclass().toString().equals("java.lang.Object")) {
-            result.append(" extends ").append(ShortTypePrinter.print(t.getSuperclass()));
+        var superType = ShortTypePrinter.print(t.getSuperclass());
+        switch (superType) {
+            case "Object":
+            case "none":
+                break;
+            default:
+                result.append(" extends ").append(superType);
         }
         return result.toString();
     }
