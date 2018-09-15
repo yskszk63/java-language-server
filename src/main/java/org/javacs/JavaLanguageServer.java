@@ -106,6 +106,7 @@ class JavaLanguageServer implements LanguageServer {
         c.setDocumentSymbolProvider(true);
         c.setSignatureHelpProvider(new SignatureHelpOptions(ImmutableList.of("(", ",")));
         c.setDocumentFormattingProvider(true);
+        c.setCodeLensProvider(new CodeLensOptions(false));
 
         result.setCapabilities(c);
 

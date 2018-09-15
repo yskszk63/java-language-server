@@ -4,27 +4,22 @@ import com.google.common.collect.Sets;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.JavacTask;
-import com.sun.source.util.SourcePositions;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -39,8 +34,6 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
-import javax.lang.model.util.Elements;
-import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
@@ -1150,5 +1143,53 @@ public class JavaCompilerService {
         // Add qualified names from fixes
         qualifiedNames.addAll(fixes.values());
         return new FixImports(tree, trees.getSourcePositions(), qualifiedNames);
+    }
+
+    public List<TestMethod> testMethods(URI file, String contents) {
+        LOG.info(String.format("Finding test methods in %s", file.getPath()));
+
+        var task = singleFileTask(file, contents);
+        CompilationUnitTree parse;
+        try {
+            parse = task.parse().iterator().next();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        class Find extends TreeScanner<Void, Void> {
+            ClassTree enclosingClass = null;
+            List<TestMethod> found = new ArrayList<>();
+
+            @Override 
+            public Void visitClass​(ClassTree node, Void nothing) {
+                var shadowed = enclosingClass;
+                enclosingClass = node;
+                super.visitClass(node, null);
+                enclosingClass = shadowed;
+                return null;
+            }
+
+            @Override
+            public Void visitMethod(MethodTree node, Void aVoid) {
+                for (var ann : node.getModifiers().getAnnotations()) {
+                    var type = ann.getAnnotationType();
+                    if (type instanceof IdentifierTree) {
+                        var id = (IdentifierTree) type;
+                        var name = id.getName();
+                        if (name.contentEquals("Test") || name.contentEquals("org.junit.Test")) {
+                            found.add(new TestMethod(task, parse, enclosingClass, node));
+                        }
+                    }
+                }
+                return super.visitMethod(node, aVoid);
+            }
+
+            List<TestMethod> run() {
+                scan(parse, null);
+                return found;
+            }
+        }
+
+        return new Find().run();
     }
 }

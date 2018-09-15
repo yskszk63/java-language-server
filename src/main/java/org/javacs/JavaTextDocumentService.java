@@ -6,6 +6,7 @@ import com.sun.source.doctree.DocTree;
 import com.sun.source.doctree.ParamTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.util.TreePath;
+import com.sun.source.util.Trees;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
@@ -19,6 +20,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.element.*;
 import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.TextDocumentService;
 
@@ -392,7 +394,30 @@ class JavaTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<List<? extends CodeLens>> codeLens(CodeLensParams params) {
-        return null;
+        var uri = URI.create(params.getTextDocument().getUri());
+        var content = contents(uri).content;
+        var tests = server.compiler.testMethods(uri, content);
+
+        var result = new ArrayList<CodeLens>();
+        for (var test : tests) {
+            var trees = Trees.instance(test.parseTask);
+            var pos = trees.getSourcePositions();
+            var start = pos.getStartPosition(test.compilationUnit, test.method);
+            var end = pos.getEndPosition(test.compilationUnit, test.method);
+            var lines = test.compilationUnit.getLineMap();
+            var startLine = (int) lines.getLineNumber(start) - 1;
+            var startCol = (int) lines.getColumnNumber(start) - 1;
+            var endLine = (int) lines.getLineNumber(end) - 1;
+            var endCol = (int) lines.getColumnNumber(end) - 1;
+            var range = new Range(new Position(startLine, startCol), new Position(endLine, endCol));
+            var className = test.enclosingClass.getSimpleName().toString();
+            var methodName = test.method.getName().toString();
+            var command = new Command("Run Test", "java.command.test.run", List.of(className, methodName));
+            result.add(new CodeLens(range, command, null));
+        }
+        // TODO run all tests in file
+        // TODO run all tests in package
+        return CompletableFuture.completedFuture(result);
     }
 
     @Override
