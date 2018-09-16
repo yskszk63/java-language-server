@@ -5,21 +5,21 @@ public class AutocompleteMember {
         this.;
     }
 
-    public static String fieldStatic;
-    public String fields;
-    public static String methodStatic() {
+    public static String testFieldStatic;
+    public String testFields;
+    public static String testMethodStatic() {
         return "foo";
     }
-    public String methods() throws Exception {
+    public String testMethods() throws Exception {
         return "foo";
     }
 
-    private static String fieldStaticPrivate;
-    private String fieldsPrivate;
-    private static String methodStaticPrivate() {
+    private static String testFieldStaticPrivate;
+    private String testFieldsPrivate;
+    private static String testMethodStaticPrivate() {
         return "foo";
     }
-    private String methodsPrivate() {
+    private String testMethodsPrivate() {
         return "foo";
     }
 }

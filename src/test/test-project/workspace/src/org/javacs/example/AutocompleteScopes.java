@@ -1,188 +1,188 @@
 package org.javacs.example;
 
 public class AutocompleteScopes {
-    static void outerStaticMethod() { }
-    void outerMethods() { }
+    static void testOuterStaticMethod() { }
+    void testOuterMethods() { }
 
     static class Super {
-        static void inheritedStaticMethod() { }
-        void inheritedMethods() { }
+        static void testInheritedStaticMethod() { }
+        void testInheritedMethods() { }
     }
 
     static class StaticSub extends Super {
-        void test(String arguments) {
-            int localVariables;
-            s;
+        void test(String testArguments) {
+            int testLocalVariables;
+            t;
             // Locals
-            // YES: localVariables, arguments
+            // YES: testLocalVariables, testArguments
             //
             // Static methods in enclosing scopes
             // YES: testStatic
-            // YES: outerStaticMethod
+            // YES: testOuterStaticMethod
             //
             // Virtual methods in enclosing scopes
             // NO: testInner
             // YES: test
-            // NO: outerMethods
+            // NO: testOuterMethods
             //
             // Inherited static methods
-            // YES: inheritedStaticMethod
+            // YES: testInheritedStaticMethod
             //
             // Inherited virtual methods
-            // YES: inheritedMethods
+            // YES: testInheritedMethods
             //
             // this/super in enclosing scopes
             // YES: this, super
             // YES: StaticSub.this, StaticSub.super
-            StaticSub.s;
+            StaticSub.;
             // NO: AutocompleteScopes.this, AutocompleteScopes.super
-            AutocompleteScopes.s;
+            AutocompleteScopes.;
             // NO: Super.this, Super.super
-            Super.s;
+            Super.;
 
             new Object() {
                 void testInner() {
-                    s;
+                    t;
                     // Locals
-                    // YES: localVariables, arguments
+                    // YES: testLocalVariables, testArguments
                     //
                     // Static methods in enclosing scopes
                     // YES: testStatic
-                    // YES: outerStaticMethod
+                    // YES: testOuterStaticMethod
                     //
                     // Virtual methods in enclosing scopes
                     // YES: testInner
                     // YES: test
-                    // NO: outerMethods
+                    // NO: testOuterMethods
                     //
                     // Inherited static methods
-                    // YES: inheritedStaticMethod
+                    // YES: testInheritedStaticMethod
                     //
                     // Inherited virtual methods
-                    // YES: inheritedMethods
+                    // YES: testInheritedMethods
                     //
                     // this/super in enclosing scopes
                     // YES: this, super
                     // YES: StaticSub.this, StaticSub.super
-                    StaticSub.s;
+                    StaticSub.;
                     // NO: AutocompleteScopes.this, AutocompleteScopes.super
-                    AutocompleteScopes.s;
+                    AutocompleteScopes.;
                     // NO: Super.this, Super.super
-                    Super.s;
+                    Super.;
                 }
             };
         }
 
-        static void testStatic(String arguments) {
-            int localVariables;
-            s;
+        static void testStatic(String testArguments) {
+            int testLocalVariables;
+            t;
             // Locals
-            // YES: localVariables, arguments
+            // YES: testLocalVariables, testArguments
             //
             // Static methods in enclosing scopes
             // YES: testStatic
-            // YES: outerStaticMethod
+            // YES: testOuterStaticMethod
             //
             // Virtual methods in enclosing scopes
             // NO: testInner
             // NO: test
-            // NO: outerMethods
+            // NO: testOuterMethods
             //
             // Inherited static methods
-            // YES: inheritedStaticMethod
+            // YES: testInheritedStaticMethod
             //
             // Inherited virtual methods
-            // NO: inheritedMethods
+            // NO: testInheritedMethods
             //
             // this/super in enclosing scopes
             // NO: this, super
             // NO: StaticSub.this, StaticSub.super
-            StaticSub.s;
+            StaticSub.;
             // NO: AutocompleteScopes.this, AutocompleteScopes.super
-            AutocompleteScopes.s;
+            AutocompleteScopes.;
             // NO: Super.this, Super.super
-            Super.s;
+            Super.;
 
             new Object() {
                 void testInner() {
-                    s;
+                    t;
                     // Locals
-                    // YES: localVariables, arguments
+                    // YES: testLocalVariables, testArguments
                     //
                     // Static methods in enclosing scopes
                     // YES: testStatic
-                    // YES: outerStaticMethod
+                    // YES: testOuterStaticMethod
                     //
                     // Virtual methods in enclosing scopes
                     // YES: testInner
                     // NO: test
-                    // NO: outerMethods
+                    // NO: testOuterMethods
                     //
                     // Inherited static methods
-                    // YES: inheritedStaticMethod
+                    // YES: testInheritedStaticMethod
                     //
                     // Inherited virtual methods
-                    // NO: inheritedMethods
+                    // NO: testInheritedMethods
                     //
                     // this/super in enclosing scopes
                     // YES: this, super
                     // NO: StaticSub.this, StaticSub.super
-                    StaticSub.s;
+                    StaticSub.;
                     // NO: AutocompleteScopes.this, AutocompleteScopes.super
-                    AutocompleteScopes.s;
+                    AutocompleteScopes.;
                     // NO: Super.this, Super.super
-                    Super.s;
+                    Super.;
                 }
             };
         }
     }
 
     class Sub extends Super {
-        void test(String arguments) {
-            int localVariables;
-            s;
+        void test(String testArguments) {
+            int testLocalVariables;
+            t;
             // Locals
-            // YES: localVariables, arguments
+            // YES: testLocalVariables, testArguments
             //
             // Methods in enclosing scopes
             // NO: testInner
             // YES: test
-            // YES: outerMethods, outerStaticMethod
+            // YES: testOuterMethods, testOuterStaticMethod
             //
             // Inherited methods
-            // YES: inheritedMethods, inheritedStaticMethod
+            // YES: testInheritedMethods, testInheritedStaticMethod
             //
             // this/super in enclosing scopes
             // YES: this, super
             // YES: Sub.this, Sub.super
-            Sub.s;
+            Sub.;
             // YES: AutocompleteScopes.this, AutocompleteScopes.super
-            AutocompleteScopes.s;
+            AutocompleteScopes.;
             // NO: Super.this, Super.super
-            Super.s;
+            Super.;
 
             new Object() {
                 void testInner() {
-                    s;
+                    t;
                     // Locals
-                    // YES: localVariables, arguments
+                    // YES: testLocalVariables, testArguments
                     //
                     // Methods in enclosing scopes
                     // YES: testInner
                     // YES: test
-                    // YES: outerMethods, outerStaticMethod
+                    // YES: testOuterMethods, testOuterStaticMethod
                     //
                     // Inherited methods
-                    // YES: inheritedMethods, inheritedStaticMethod
+                    // YES: testInheritedMethods, testInheritedStaticMethod
                     //
                     // this/super in enclosing scopes
                     // YES: this, super
                     // YES: Sub.this, Sub.super
-                    Sub.s;
+                    Sub.;
                     // YES: AutocompleteScopes.this, AutocompleteScopes.super
-                    AutocompleteScopes.s;
+                    AutocompleteScopes.;
                     // NO: Super.this, Super.super
-                    Super.s;
+                    Super.;
                 }
             };
         }

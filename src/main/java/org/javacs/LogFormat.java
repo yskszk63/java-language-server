@@ -22,23 +22,17 @@ class LogFormat extends Formatter {
         } else {
             source = record.getLoggerName();
         }
-        String message = formatMessage(record);
-        String throwable = "";
+        var message = formatMessage(record);
+        var throwable = "";
         if (record.getThrown() != null) {
-            StringWriter sw = new StringWriter();
-            PrintWriter pw = new PrintWriter(sw);
+            var sw = new StringWriter();
+            var pw = new PrintWriter(sw);
             pw.println();
             record.getThrown().printStackTrace(pw);
             pw.close();
             throwable = sw.toString();
         }
         return String.format(
-                format,
-                dat,
-                source,
-                record.getLoggerName(),
-                record.getLevel().getLocalizedName(),
-                message,
-                throwable);
+                format, dat, source, record.getLoggerName(), record.getLevel().getLocalizedName(), message, throwable);
     }
 }

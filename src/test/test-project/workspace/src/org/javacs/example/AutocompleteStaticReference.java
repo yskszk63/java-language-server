@@ -4,19 +4,19 @@ import java.util.function.Supplier;
 
 public class AutocompleteStaticReference {
     public static void test() {
-        print(AutocompleteStaticReference::)
+        print(AutocompleteStaticReference::test)
     }
 
     private void print(Supplier<String> message) {
         System.out.println(message.get());
     }
 
-    private static String fieldStatic;
-    private String field;
-    private static String methodStatic() {
+    private static String testFieldStatic;
+    private String testField;
+    private static String testMethodStatic() {
         return "foo";
     }
-    private String methods() {
+    private String testMethod() {
         return "foo";
     }
 }

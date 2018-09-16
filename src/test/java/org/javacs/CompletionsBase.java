@@ -1,31 +1,28 @@
 package org.javacs;
 
+import com.google.gson.Gson;
 import java.io.IOException;
-import java.net.URI;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.eclipse.lsp4j.CompletionItem;
+import org.eclipse.lsp4j.CompletionParams;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
-import org.eclipse.lsp4j.TextDocumentPositionParams;
 
 public class CompletionsBase {
     protected static final Logger LOG = Logger.getLogger("main");
 
     protected Set<String> insertTemplate(String file, int row, int column) throws IOException {
-        List<? extends CompletionItem> items = items(file, row, column);
+        var items = items(file, row, column);
 
         return items.stream().map(CompletionsBase::itemInsertTemplate).collect(Collectors.toSet());
     }
 
     static String itemInsertTemplate(CompletionItem i) {
-        String text = i.getInsertText();
+        var text = i.getInsertText();
 
         if (text == null) text = i.getLabel();
 
@@ -35,19 +32,29 @@ public class CompletionsBase {
     }
 
     protected Set<String> insertText(String file, int row, int column) throws IOException {
-        List<? extends CompletionItem> items = items(file, row, column);
+        var items = items(file, row, column);
 
         return items.stream().map(CompletionsBase::itemInsertText).collect(Collectors.toSet());
     }
 
-    protected Map<String, Integer> insertCount(String file, int row, int column)
-            throws IOException {
-        List<? extends CompletionItem> items = items(file, row, column);
-        Map<String, Integer> result = new HashMap<>();
+    protected Set<String> detail(String file, int row, int column) throws IOException {
+        var items = items(file, row, column);
+        var result = new HashSet<String>();
+        for (var i : items) {
+            i.setData(new Gson().toJsonTree(i.getData()));
+            var resolved = resolve(i);
+            result.add(resolved.getDetail());
+        }
+        return result;
+    }
 
-        for (CompletionItem each : items) {
-            String key = itemInsertText(each);
-            int count = result.getOrDefault(key, 0) + 1;
+    protected Map<String, Integer> insertCount(String file, int row, int column) throws IOException {
+        var items = items(file, row, column);
+        var result = new HashMap<String, Integer>();
+
+        for (var each : items) {
+            var key = itemInsertText(each);
+            var count = result.getOrDefault(key, 0) + 1;
 
             result.put(key, count);
         }
@@ -56,7 +63,7 @@ public class CompletionsBase {
     }
 
     static String itemInsertText(CompletionItem i) {
-        String text = i.getInsertText();
+        var text = i.getInsertText();
 
         if (text == null) text = i.getLabel();
 
@@ -68,31 +75,35 @@ public class CompletionsBase {
     }
 
     protected Set<String> documentation(String file, int row, int column) throws IOException {
-        List<? extends CompletionItem> items = items(file, row, column);
+        var items = items(file, row, column);
 
         return items.stream()
                 .flatMap(
                         i -> {
                             if (i.getDocumentation() != null)
-                                return Stream.of(i.getDocumentation().trim());
+                                return Stream.of(i.getDocumentation().getRight().getValue().trim());
                             else return Stream.empty();
                         })
                 .collect(Collectors.toSet());
     }
 
-    protected static final JavaLanguageServer server =
-            LanguageServerFixture.getJavaLanguageServer();
+    protected static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     protected List<? extends CompletionItem> items(String file, int row, int column) {
-        URI uri = FindResource.uri(file);
-        TextDocumentPositionParams position =
-                new TextDocumentPositionParams(
-                        new TextDocumentIdentifier(uri.toString()),
-                        uri.toString(),
-                        new Position(row - 1, column - 1));
+        var uri = FindResource.uri(file);
+        var position =
+                new CompletionParams(new TextDocumentIdentifier(uri.toString()), new Position(row - 1, column - 1));
 
         try {
             return server.getTextDocumentService().completion(position).get().getRight().getItems();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    protected CompletionItem resolve(CompletionItem item) {
+        try {
+            return server.getTextDocumentService().resolveCompletionItem(item).get();
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }

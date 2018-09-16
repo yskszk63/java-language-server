@@ -11,12 +11,12 @@ public class AutocompleteReference {
         System.out.println(message.get());
     }
 
-    private static String fieldStatic;
-    private String fields;
-    private static String methodStatic() {
+    private static String testFieldStatic;
+    private String testFields;
+    private static String testMethodStatic() {
         return "foo";
     }
-    private String methods() {
+    private String testMethods() {
         return "foo";
     }
 }

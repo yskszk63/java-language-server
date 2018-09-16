@@ -6,7 +6,6 @@ import static org.junit.Assert.assertThat;
 import com.google.common.base.Joiner;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Set;
@@ -23,10 +22,10 @@ public class SearchTest {
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     @BeforeClass
-    public static void openSource() throws URISyntaxException, IOException {
-        URI uri = FindResource.uri("/org/javacs/example/AutocompleteBetweenLines.java");
-        String textContent = Joiner.on("\n").join(Files.readAllLines(Paths.get(uri)));
-        TextDocumentItem document = new TextDocumentItem();
+    public static void openSource() throws IOException {
+        var uri = FindResource.uri("/org/javacs/example/AutocompleteBetweenLines.java");
+        var textContent = Joiner.on("\n").join(Files.readAllLines(Paths.get(uri)));
+        var document = new TextDocumentItem();
 
         document.setUri(uri.toString());
         document.setText(textContent);
@@ -34,13 +33,14 @@ public class SearchTest {
         server.getTextDocumentService().didOpen(new DidOpenTextDocumentParams(document, null));
     }
 
-    private static Set<String> searchWorkspace(String query) {
+    private static Set<String> searchWorkspace(String query, int limit) {
         try {
             return server.getWorkspaceService()
                     .symbol(new WorkspaceSymbolParams(query))
                     .get()
                     .stream()
                     .map(result -> result.getName())
+                    .limit(limit)
                     .collect(Collectors.toSet());
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
@@ -50,8 +50,7 @@ public class SearchTest {
     private static Set<String> searchFile(URI uri) {
         try {
             return server.getTextDocumentService()
-                    .documentSymbol(
-                            new DocumentSymbolParams(new TextDocumentIdentifier(uri.toString())))
+                    .documentSymbol(new DocumentSymbolParams(new TextDocumentIdentifier(uri.toString())))
                     .get()
                     .stream()
                     .map(result -> result.getName())
@@ -63,29 +62,29 @@ public class SearchTest {
 
     @Test
     public void all() {
-        Set<String> all = searchWorkspace("");
+        var all = searchWorkspace("", 100);
 
         assertThat(all, not(empty()));
     }
 
     @Test
     public void searchClasses() {
-        Set<String> all = searchWorkspace("ABetweenLines");
+        var all = searchWorkspace("ABetweenLines", Integer.MAX_VALUE);
 
         assertThat(all, hasItem("AutocompleteBetweenLines"));
     }
 
     @Test
     public void searchMethods() {
-        Set<String> all = searchWorkspace("mStatic");
+        var all = searchWorkspace("mStatic", Integer.MAX_VALUE);
 
         assertThat(all, hasItem("methodStatic"));
     }
 
     @Test
     public void symbolsInFile() {
-        String path = "/org/javacs/example/AutocompleteMemberFixed.java";
-        Set<String> all = searchFile(FindResource.uri(path));
+        var path = "/org/javacs/example/AutocompleteMemberFixed.java";
+        var all = searchFile(FindResource.uri(path));
 
         assertThat(
                 all,
@@ -102,8 +101,8 @@ public class SearchTest {
 
     @Test
     public void explicitConstructor() {
-        String path = "/org/javacs/example/ReferenceConstructor.java";
-        Set<String> all = searchFile(FindResource.uri(path));
+        var path = "/org/javacs/example/ReferenceConstructor.java";
+        var all = searchFile(FindResource.uri(path));
 
         assertThat("includes explicit constructor", all, hasItem("ReferenceConstructor"));
     }

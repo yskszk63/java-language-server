@@ -1,34 +1,34 @@
 package org.javacs.example;
 
 public class AutocompleteMembers {
-    private String fields;
-    private static String fieldStatic;
+    private String testFields;
+    private static String testFieldStatic;
 
     {
-        s; // fields, fieldStatic, methods, methodStatic
-        this.s; // fields, methods
-        AutocompleteMembers.s; // fieldStatic, methodStatic
-        this::s; // methods
-        AutocompleteMembers::s; // methods, methodStatic
+        t; // testFields, testFieldStatic, testMethods, testMethodStatic
+        this.t; // testFields, testMethods
+        AutocompleteMembers.t; // testFieldStatic, testMethodStatic
+        this::t; // testMethods
+        AutocompleteMembers::t; // testMethods, testMethodStatic
     }
 
     static {
-        s; // fieldStatic
-        AutocompleteMembers.s; // fieldStatic
-        AutocompleteMembers::s; // methods, methodStatic
+        t; // testFieldStatic
+        AutocompleteMembers.t; // testFieldStatic
+        AutocompleteMembers::t; // testMethods, testMethodStatic
     }
 
-    private void methods(String arguments) {
-        s; // fields, fieldStatic, methods, methodStatic, arguments
-        this.s; // fields, methods
-        AutocompleteMembers.s; // fieldStatic, methodStatic
-        java.util.function.Supplier<String> test = this::s; // methods
-        java.util.function.Supplier<String> test = AutocompleteMembers::s; // methods, methodStatic
+    private void testMethods(String testArguments) {
+        t; // testFields, testFieldStatic, testMethods, testMethodStatic, testArguments
+        this.t; // testFields, testMethods
+        AutocompleteMembers.t; // testFieldStatic, testMethodStatic
+        java.util.function.Supplier<String> test = this::t; // testMethods
+        java.util.function.Supplier<String> test = AutocompleteMembers::t; // testMethods, testMethodStatic
     }
 
-    private static void methodStatic(String arguments) {
-        s; // fieldStatic, arguments
-        AutocompleteMembers.s; // fieldStatic
-        AutocompleteMembers::s; // methods, methodStatic
+    private static void testMethodStatic(String testArguments) {
+        t; // testFieldStatic, testArguments
+        AutocompleteMembers.t; // testFieldStatic
+        AutocompleteMembers::t; // testMethods, testMethodStatic
     }
 }

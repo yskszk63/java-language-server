@@ -1,15 +1,16 @@
 package org.javacs;
 
-import com.google.common.base.Joiner;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.file.*;
-import java.time.Instant;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -20,129 +21,83 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 class InferConfig {
+    private static final Logger LOG = Logger.getLogger("main");
+
     /** Root of the workspace that is currently open in VSCode */
     private final Path workspaceRoot;
-    /** User-specified external dependencies, configured with java.externalDependencies */
-    private final Collection<Artifact> externalDependencies;
-    /** User-specified class path, configured with java.classPath */
-    private final List<Path> classPath;
     /** Location of the maven repository, usually ~/.m2 */
     private final Path mavenHome;
-    /** Location of the gradle cache, usually ~/.gradle */
-    private final Path gradleHome;
 
-    InferConfig(
-            Path workspaceRoot,
-            Collection<Artifact> externalDependencies,
-            List<Path> classPath,
-            Path mavenHome,
-            Path gradleHome) {
+    InferConfig(Path workspaceRoot, Path mavenHome) {
         this.workspaceRoot = workspaceRoot;
-        this.externalDependencies = externalDependencies;
-        this.classPath = classPath;
         this.mavenHome = mavenHome;
-        this.gradleHome = gradleHome;
     }
 
-    // TODO move to JavaLanguageServer
-    static Stream<Path> allJavaFiles(Path dir) {
-        PathMatcher match = FileSystems.getDefault().getPathMatcher("glob:*.java");
-
-        try {
-            // TODO instead of looking at EVERY file, once you see a few files with the same source directory,
-            // ignore all subsequent files in the directory
-            return Files.walk(dir).filter(java -> match.matches(java.getFileName()));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    InferConfig(Path workspaceRoot) {
+        this(workspaceRoot, defaultMavenHome());
     }
 
-    static Instant buildFilesModified(Path workspaceRoot) {
-        Instant workspaceModified = fileModified(workspaceRoot.resolve("WORKSPACE")),
-                pomModified = fileModified(workspaceRoot.resolve("pom.xml"));
-
-        return maxTime(workspaceModified, pomModified);
+    private static Path defaultMavenHome() {
+        return Paths.get(System.getProperty("user.home")).resolve(".m2");
     }
 
-    private static Instant fileModified(Path file) {
-        if (Files.exists(file)) {
-            try {
-                return Files.getLastModifiedTime(file).toInstant();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+    Set<Path> classPath() {
+        var result = new HashSet<Path>();
+        result.addAll(buildClassPath());
+        result.addAll(workspaceClassPath());
+        return result;
+    }
+
+    /** Find .jar files for external dependencies, for examples maven dependencies in ~/.m2 or jars in bazel-genfiles */
+    Set<Path> buildClassPath() {
+        var result = new HashSet<Path>();
+
+        // Maven
+        var as = mvnDependencies();
+        if (!as.isEmpty()) {
+            LOG.info("Looking for artifacts:");
+            for (var a : as) {
+                System.err.println("  " + a);
             }
-        } else return Instant.EPOCH;
-    }
+        }
+        for (var a : as) {
+            var found = findMavenJar(a, false);
+            if (found.isPresent()) result.add(found.get());
+            else LOG.warning(String.format("Couldn't find jar for %s in %s", a, mavenHome));
+        }
 
-    private static Instant maxTime(Instant... of) {
-        Instant result = Instant.EPOCH;
+        // Bazel
+        if (Files.exists(workspaceRoot.resolve("WORKSPACE"))) {
+            var bazelGenFiles = workspaceRoot.resolve("bazel-genfiles");
 
-        for (Instant each : of) {
-            if (each.isAfter(result)) result = each;
+            if (Files.exists(bazelGenFiles) && Files.isSymbolicLink(bazelGenFiles)) {
+                LOG.info("Looking for bazel generated files in " + bazelGenFiles);
+                var jars = bazelJars(bazelGenFiles);
+                LOG.info(String.format("Found %d generated-files directories", jars.size()));
+                result.addAll(jars);
+            }
         }
 
         return result;
     }
 
     /**
-     * Find .jar files for external dependencies, for examples settings `externalDependencies` in
-     * local maven / gradle repository.
-     */
-    Set<Path> buildClassPath() {
-        // Settings `externalDependencies`
-        Stream<Path> result =
-                allExternalDependencies()
-                        .stream()
-                        .flatMap(artifact -> stream(findAnyJar(artifact, false)));
-
-        // Settings `classPath`
-        Stream<Path> classPathJars =
-                classPath.stream().flatMap(jar -> stream(findWorkspaceJar(jar)));
-
-        result = Stream.concat(result, classPathJars);
-
-        // Bazel
-        if (Files.exists(workspaceRoot.resolve("WORKSPACE"))) {
-            Path bazelGenFiles = workspaceRoot.resolve("bazel-genfiles");
-
-            if (Files.exists(bazelGenFiles) && Files.isSymbolicLink(bazelGenFiles)) {
-                result = Stream.concat(result, bazelJars(bazelGenFiles));
-            }
-        }
-
-        return result.collect(Collectors.toSet());
-    }
-
-    private Optional<Path> findWorkspaceJar(Path jar) {
-        jar = workspaceRoot.resolve(jar);
-
-        if (Files.exists(jar)) return Optional.of(jar);
-        else {
-            LOG.warning("No such file " + jar);
-
-            return Optional.empty();
-        }
-    }
-
-    /**
-     * Find directories that contain java .class files in the workspace, for example files generated
-     * by maven in target/classes
+     * Find directories that contain java .class files in the workspace, for example files generated by maven in
+     * target/classes
      */
     Set<Path> workspaceClassPath() {
         // Bazel
         if (Files.exists(workspaceRoot.resolve("WORKSPACE"))) {
-            Path bazelBin = workspaceRoot.resolve("bazel-bin");
+            var bazelBin = workspaceRoot.resolve("bazel-bin");
 
             if (Files.exists(bazelBin) && Files.isSymbolicLink(bazelBin)) {
-                return bazelOutputDirectories(bazelBin).collect(Collectors.toSet());
+                return bazelOutputDirectories(bazelBin);
             }
         }
 
         // Maven
         try {
-            return Files.walk(workspaceRoot)
-                    .flatMap(this::outputDirectory)
-                    .collect(Collectors.toSet());
+            return Files.walk(workspaceRoot).flatMap(this::outputDirectory).collect(Collectors.toSet());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -151,7 +106,7 @@ class InferConfig {
     /** Recognize build root files like pom.xml and return compiler output directories */
     private Stream<Path> outputDirectory(Path file) {
         if (file.getFileName().toString().equals("pom.xml")) {
-            Path target = file.resolveSibling("target");
+            var target = file.resolveSibling("target");
 
             if (Files.exists(target) && Files.isDirectory(target)) {
                 return Stream.of(target.resolve("classes"), target.resolve("test-classes"));
@@ -163,30 +118,56 @@ class InferConfig {
         return Stream.empty();
     }
 
+    private void findBazelJavac(File bazelRoot, File workspaceRoot, Set<Path> acc) {
+        // If _javac directory exists, search it for dirs with names like lib*_classes
+        var javac = new File(bazelRoot, "_javac");
+        if (javac.exists()) {
+            var match = FileSystems.getDefault().getPathMatcher("glob:**/lib*_classes");
+            try {
+                Files.walk(javac.toPath()).filter(match::matches).filter(Files::isDirectory).forEach(acc::add);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        // Recurse into all directories that mirror the structure of the workspace
+        if (bazelRoot.isDirectory()) {
+            var children = bazelRoot.list((__, name) -> new File(workspaceRoot, name).exists());
+            for (var child : children) {
+                var bazelChild = new File(bazelRoot, child);
+                var workspaceChild = new File(workspaceRoot, child);
+                findBazelJavac(bazelChild, workspaceChild, acc);
+            }
+        }
+    }
+
     /**
      * Search bazel-bin for per-module output directories matching the pattern:
      *
      * <p>bazel-bin/path/to/module/_javac/rule/lib*_classes
      */
-    private Stream<Path> bazelOutputDirectories(Path bazelBin) {
+    private Set<Path> bazelOutputDirectories(Path bazelBin) {
         try {
-            Path target = Files.readSymbolicLink(bazelBin);
-            PathMatcher match =
-                    FileSystems.getDefault().getPathMatcher("glob:**/_javac/*/lib*_classes");
+            var bazelBinTarget = Files.readSymbolicLink(bazelBin);
+            LOG.info("Searching for bazel output directories in " + bazelBinTarget);
 
-            return Files.walk(target).filter(match::matches).filter(Files::isDirectory);
+            var dirs = new HashSet<Path>();
+            findBazelJavac(bazelBinTarget.toFile(), workspaceRoot.toFile(), dirs);
+            LOG.info(String.format("Found %d bazel output directories", dirs.size()));
+
+            return dirs;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
     /** Search bazel-genfiles for jars */
-    private Stream<Path> bazelJars(Path bazelGenFiles) {
+    private Set<Path> bazelJars(Path bazelGenFiles) {
         try {
-            Path target = Files.readSymbolicLink(bazelGenFiles);
+            var target = Files.readSymbolicLink(bazelGenFiles);
 
             return Files.walk(target)
-                    .filter(file -> file.getFileName().toString().endsWith(".jar"));
+                    .filter(file -> file.getFileName().toString().endsWith(".jar"))
+                    .collect(Collectors.toSet());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -194,21 +175,17 @@ class InferConfig {
 
     /** Find source .jar files for `externalDependencies` in local maven / gradle repository. */
     Set<Path> buildDocPath() {
-        return allExternalDependencies()
-                .stream()
-                .flatMap(artifact -> stream(findAnyJar(artifact, true)))
-                .collect(Collectors.toSet());
+        var result = new HashSet<Path>();
+        // Maven
+        for (var a : mvnDependencies()) {
+            findMavenJar(a, true).ifPresent(result::add);
+        }
+        // TODO Bazel
+        return result;
     }
 
-    private Optional<Path> findAnyJar(Artifact artifact, boolean source) {
-        Optional<Path> maven = findMavenJar(artifact, source);
-
-        if (maven.isPresent()) return maven;
-        else return findGradleJar(artifact, source);
-    }
-
-    private Optional<Path> findMavenJar(Artifact artifact, boolean source) {
-        Path jar =
+    Optional<Path> findMavenJar(Artifact artifact, boolean source) {
+        var jar =
                 mavenHome
                         .resolve("repository")
                         .resolve(artifact.groupId.replace('.', File.separatorChar))
@@ -220,60 +197,8 @@ class InferConfig {
         else return Optional.empty();
     }
 
-    private Optional<Path> findGradleJar(Artifact artifact, boolean source) {
-        // Search for caches/modules-*/files-*/groupId/artifactId/version/*/artifactId-version[-sources].jar
-        Path base = gradleHome.resolve("caches");
-        String pattern =
-                "glob:"
-                        + Joiner.on(File.separatorChar)
-                                .join(
-                                        base.toString(),
-                                        "modules-*",
-                                        "files-*",
-                                        artifact.groupId,
-                                        artifact.artifactId,
-                                        artifact.version,
-                                        "*",
-                                        fileName(artifact, source));
-        PathMatcher match = FileSystems.getDefault().getPathMatcher(pattern);
-
-        try {
-            return Files.walk(base, 7).filter(match::matches).findFirst();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     private String fileName(Artifact artifact, boolean source) {
         return artifact.artifactId + '-' + artifact.version + (source ? "-sources" : "") + ".jar";
-    }
-
-    private boolean isSourceJar(Path jar) {
-        return jar.getFileName().toString().endsWith("-sources.jar");
-    }
-
-    private int compareMavenVersions(Path leftJar, Path rightJar) {
-        return compareVersions(mavenVersion(leftJar), mavenVersion(rightJar));
-    }
-
-    private String[] mavenVersion(Path jar) {
-        return jar.getParent().getFileName().toString().split("\\.");
-    }
-
-    private int compareVersions(String[] left, String[] right) {
-        int n = Math.min(left.length, right.length);
-
-        for (int i = 0; i < n; i++) {
-            int each = left[i].compareTo(right[i]);
-
-            if (each != 0) return each;
-        }
-
-        return 0;
-    }
-
-    private static <T> Stream<T> stream(Optional<T> option) {
-        return option.map(Stream::of).orElseGet(Stream::empty);
     }
 
     static List<Artifact> dependencyList(Path pomXml) {
@@ -281,14 +206,13 @@ class InferConfig {
 
         try {
             // Tell maven to output deps to a temporary file
-            Path outputFile = Files.createTempFile("deps", ".txt");
+            var outputFile = Files.createTempFile("deps", ".txt");
 
-            String cmd =
+            var cmd =
                     String.format(
-                            "%s dependency:list -DincludeScope=test -DoutputFile=%s",
-                            getMvnCommand(), outputFile);
-            File workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
-            int result = Runtime.getRuntime().exec(cmd, null, workingDirectory).waitFor();
+                            "%s dependency:list -DincludeScope=test -DoutputFile=%s", getMvnCommand(), outputFile);
+            var workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
+            var result = Runtime.getRuntime().exec(cmd, null, workingDirectory).waitFor();
 
             if (result != 0) throw new RuntimeException("`" + cmd + "` returned " + result);
 
@@ -299,9 +223,9 @@ class InferConfig {
     }
 
     private static List<Artifact> readDependencyList(Path outputFile) {
-        Pattern artifact = Pattern.compile(".*:.*:.*:.*:.*");
+        var artifact = Pattern.compile(".*:.*:.*:.*:.*");
 
-        try (InputStream in = Files.newInputStream(outputFile)) {
+        try (var in = Files.newInputStream(outputFile)) {
             return new BufferedReader(new InputStreamReader(in))
                     .lines()
                     .map(String::trim)
@@ -313,14 +237,9 @@ class InferConfig {
         }
     }
 
-    /**
-     * Get external dependencies from this.externalDependencies if available, or try to infer them.
-     */
-    private Collection<Artifact> allExternalDependencies() {
-        if (!externalDependencies.isEmpty()) return externalDependencies;
-
-        // If user does not specify java.externalDependencies, look for pom.xml
-        Path pomXml = workspaceRoot.resolve("pom.xml");
+    /** Get external dependencies from this.externalDependencies if available, or try to infer them. */
+    private Collection<Artifact> mvnDependencies() {
+        var pomXml = workspaceRoot.resolve("pom.xml");
 
         if (Files.exists(pomXml)) return dependencyList(pomXml);
 
@@ -328,7 +247,7 @@ class InferConfig {
     }
 
     static String getMvnCommand() {
-        String mvnCommand = "mvn";
+        var mvnCommand = "mvn";
         if (File.separatorChar == '\\') {
             mvnCommand = findExecutableOnPath("mvn.cmd");
             if (mvnCommand == null) {
@@ -339,14 +258,12 @@ class InferConfig {
     }
 
     private static String findExecutableOnPath(String name) {
-        for (String dirname : System.getenv("PATH").split(File.pathSeparator)) {
-            File file = new File(dirname, name);
+        for (var dirname : System.getenv("PATH").split(File.pathSeparator)) {
+            var file = new File(dirname, name);
             if (file.isFile() && file.canExecute()) {
                 return file.getAbsolutePath();
             }
         }
         return null;
     }
-
-    private static final Logger LOG = Logger.getLogger("main");
 }

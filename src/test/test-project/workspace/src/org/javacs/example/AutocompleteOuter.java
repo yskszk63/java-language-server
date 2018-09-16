@@ -1,21 +1,21 @@
 package org.javacs.example;
 
 public class AutocompleteOuter {
-    public String fields;
-    public static String fieldStatic;
+    public String testFields;
+    public static String testFieldStatic;
 
-    public String methods() { }
-    public static String methodStatic() { }
+    public String testMethods() { }
+    public static String testMethodStatic() { }
 
     static class StaticInner {
         {
-            s
+            t
         }
     }
 
     class Inner {
         {
-            s
+            t
         }
     }
 }

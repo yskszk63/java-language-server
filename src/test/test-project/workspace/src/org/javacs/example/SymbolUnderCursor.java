@@ -11,10 +11,15 @@ public class SymbolUnderCursor {
 
         method(SymbolUnderCursor.class.getName());
         this.method("foo");
-        Function<String, String> m = this::method;
+        java.util.function.Function<String, String> m = this::method;
     }
 
     public SymbolUnderCursor(String constructorParameter) {
         
+    }
+
+    @Override
+    public void overrideMethod() {
+
     }
 }

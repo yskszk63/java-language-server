@@ -13,5 +13,9 @@
         "node_modules": true,
         "target": true,
         "out": true // set this to false to include "out" folder in search results
-    }
+    },
+    "[java]": {
+        "editor.formatOnSave": true
+    },
+    "java.trace.server": "messages"
 }

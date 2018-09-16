@@ -2,15 +2,15 @@ package org.javacs.example;
 
 public class AutocompleteStaticMember {
     public static void test() {
-        AutocompleteStaticMember.
+        AutocompleteStaticMember.test
     }
 
-    private static String fieldStatic;
-    private String field;
-    private static String methodStatic() {
+    private static String testFieldStatic;
+    private String testField;
+    private static String testMethodStatic() {
         return "foo";
     }
-    private String method() {
+    private String testMethod() {
         return "foo";
     }
 }

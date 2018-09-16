@@ -3,18 +3,18 @@
     "displayName": "Java Language Support",
     "description": "Java support using the Java Compiler API",
     "icon": "icon.png",
-    "version": "0.1.2",
+    "version": "0.2.0",
     "publisher": "georgewfraser",
     "repository": {
         "type": "git",
-        "url": "https://github.com/georgewfraser/vscode-javac.git"
+        "url": "https://github.com/georgewfraser/vscode-javac"
     },
     "license": "MIT",
     "engines": {
-        "vscode": "^1.21.0"
+        "vscode": "^1.24.0"
     },
     "categories": [
-        "Languages",
+        "Programming Languages",
         "Linters"
     ],
     "keywords": [
@@ -23,9 +23,9 @@
     "activationEvents": [
         "onLanguage:java"
     ],
-    "main": "./out/extension",
+    "main": "./out/lib/extension",
     "files": [
-        "target/fat-jar.jar"
+        "./out/fat-jar.jar"
     ],
     "contributes": {
         "languages": [
@@ -37,6 +37,13 @@
                 "aliases": [
                     "Java"
                 ]
+            }
+        ],
+        "grammars": [
+            {
+                "language": "java",
+                "scopeName": "source.java",
+                "path": "./lib/java.tmLanguage.json"
             }
         ],
         "snippets": [
@@ -69,10 +76,22 @@
                     },
                     "description": "External dependencies of the form groupId:artifactId:version or groupId:artifactId:packaging:version:scope"
                 },
-                "java.home": {
+                "java.trace.server": {
+                    "scope": "window",
                     "type": "string",
-                    "description": "Installation directory of Java 8"
+                    "enum": [
+                        "off",
+                        "messages",
+                        "verbose"
+                    ],
+                    "default": "off",
+                    "description": "Traces the communication between VSCode and the language server."
                 }
+            }
+        },
+        "configurationDefaults": {
+            "[java]": {
+                "editor.formatOnSave": true
             }
         }
     },
@@ -84,12 +103,12 @@
         "test": "npm run compile && node ./node_modules/vscode/bin/test"
     },
     "dependencies": {
-        "vscode-languageclient": "^4.0.0"
+        "vscode-languageclient": "^4.2.1"
     },
     "devDependencies": {
-        "typescript": "^2.6.1",
-        "vscode": "^1.1.6",
-        "@types/node": "^7.0.43",
+        "typescript": "^2.9.2",
+        "vscode": "^1.1.18",
+        "@types/node": "^10.3.3",
         "@types/mocha": "^2.2.42"
     }
 }

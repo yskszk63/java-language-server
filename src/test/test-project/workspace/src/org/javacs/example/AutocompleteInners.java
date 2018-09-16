@@ -8,7 +8,7 @@ public class AutocompleteInners {
 
     public void testReference() {
         new AutocompleteInners.I;
-        new I;
+        new Inner;
     }
 
     public void testEnum() {
