@@ -1,5 +1,9 @@
 package org.javacs;
 
+import com.google.gson.JsonObject;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
@@ -37,7 +41,20 @@ class JavaWorkspaceService implements WorkspaceService {
     }
 
     @Override
-    public void didChangeConfiguration(DidChangeConfigurationParams change) {}
+    public void didChangeConfiguration(DidChangeConfigurationParams change) {
+        var settings = (JsonObject) change.getSettings();
+        var java = settings.getAsJsonObject("java");
+
+        var externalDependencies = java.getAsJsonArray("externalDependencies");
+        var strings = new HashSet<String>();
+        for (var each : externalDependencies) strings.add(each.getAsString());
+        server.setExternalDependencies(strings);
+
+        var classPath = java.getAsJsonArray("classPath");
+        var paths = new HashSet<Path>();
+        for (var each : classPath) paths.add(Paths.get(each.getAsString()).toAbsolutePath());
+        server.setClassPath(paths);
+    }
 
     @Override
     public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {}

@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -15,7 +16,8 @@ public class InferBazelConfigTest {
 
     private Path bazelWorkspace = Paths.get("src/test/test-project/bazel-workspace"),
             bazelTemp = Paths.get("src/test/test-project/bazel-temp");
-    private InferConfig bazel = new InferConfig(bazelWorkspace, Paths.get("nowhere"));
+    private InferConfig bazel =
+            new InferConfig(bazelWorkspace, Collections.emptySet(), Paths.get("nowhere"), Paths.get("nowhere"));
     private Path bazelBin = bazelWorkspace.resolve("bazel-bin"),
             bazelBinTarget = bazelTemp.resolve("xyz/execroot/test/bazel-out/local-fastbuild/bin").toAbsolutePath(),
             bazelGenfiles = bazelWorkspace.resolve("bazel-genfiles"),

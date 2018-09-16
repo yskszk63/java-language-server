@@ -25,20 +25,34 @@ class InferConfig {
 
     /** Root of the workspace that is currently open in VSCode */
     private final Path workspaceRoot;
+    /** External dependencies specified manually by the user */
+    private final Collection<String> externalDependencies;
     /** Location of the maven repository, usually ~/.m2 */
     private final Path mavenHome;
+    /** Location of the gradle cache, usually ~/.gradle */
+    private final Path gradleHome;
 
-    InferConfig(Path workspaceRoot, Path mavenHome) {
+    InferConfig(Path workspaceRoot, Collection<String> externalDependencies, Path mavenHome, Path gradleHome) {
         this.workspaceRoot = workspaceRoot;
+        this.externalDependencies = externalDependencies;
         this.mavenHome = mavenHome;
+        this.gradleHome = gradleHome;
+    }
+
+    InferConfig(Path workspaceRoot, Collection<String> externalDependencies) {
+        this(workspaceRoot, externalDependencies, defaultMavenHome(), defaultGradleHome());
     }
 
     InferConfig(Path workspaceRoot) {
-        this(workspaceRoot, defaultMavenHome());
+        this(workspaceRoot, Collections.emptySet(), defaultMavenHome(), defaultGradleHome());
     }
 
     private static Path defaultMavenHome() {
         return Paths.get(System.getProperty("user.home")).resolve(".m2");
+    }
+
+    private static Path defaultGradleHome() {
+        return Paths.get(System.getProperty("user.home")).resolve(".gradle");
     }
 
     Set<Path> classPath() {
@@ -50,24 +64,32 @@ class InferConfig {
 
     /** Find .jar files for external dependencies, for examples maven dependencies in ~/.m2 or jars in bazel-genfiles */
     Set<Path> buildClassPath() {
-        var result = new HashSet<Path>();
+        // externalDependencies
+        if (!externalDependencies.isEmpty()) {
+            var result = new HashSet<Path>();
+            for (var id : externalDependencies) {
+                var a = Artifact.parse(id);
+                var found = findAnyJar(a, false);
+                if (found.isPresent()) result.add(found.get());
+                else LOG.warning(String.format("Couldn't find jar for %s in %s or %s", a, mavenHome, gradleHome));
+            }
+            return result;
+        }
 
         // Maven
-        var as = mvnDependencies();
-        if (!as.isEmpty()) {
-            LOG.info("Looking for artifacts:");
-            for (var a : as) {
-                System.err.println("  " + a);
+        if (Files.exists(workspaceRoot.resolve("pom.xml"))) {
+            var result = new HashSet<Path>();
+            for (var a : mvnDependencies()) {
+                var found = findMavenJar(a, false);
+                if (found.isPresent()) result.add(found.get());
+                else LOG.warning(String.format("Couldn't find jar for %s in %s", a, mavenHome));
             }
-        }
-        for (var a : as) {
-            var found = findMavenJar(a, false);
-            if (found.isPresent()) result.add(found.get());
-            else LOG.warning(String.format("Couldn't find jar for %s in %s", a, mavenHome));
+            return result;
         }
 
         // Bazel
         if (Files.exists(workspaceRoot.resolve("WORKSPACE"))) {
+            var result = new HashSet<Path>();
             var bazelGenFiles = workspaceRoot.resolve("bazel-genfiles");
 
             if (Files.exists(bazelGenFiles) && Files.isSymbolicLink(bazelGenFiles)) {
@@ -76,9 +98,10 @@ class InferConfig {
                 LOG.info(String.format("Found %d generated-files directories", jars.size()));
                 result.addAll(jars);
             }
+            return result;
         }
 
-        return result;
+        return Collections.emptySet();
     }
 
     /**
@@ -86,6 +109,20 @@ class InferConfig {
      * target/classes
      */
     Set<Path> workspaceClassPath() {
+        // externalDependencies
+        if (!externalDependencies.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        // Maven
+        if (Files.exists(workspaceRoot.resolve("pom.xml"))) {
+            try {
+                return Files.walk(workspaceRoot).flatMap(this::outputDirectory).collect(Collectors.toSet());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         // Bazel
         if (Files.exists(workspaceRoot.resolve("WORKSPACE"))) {
             var bazelBin = workspaceRoot.resolve("bazel-bin");
@@ -95,12 +132,7 @@ class InferConfig {
             }
         }
 
-        // Maven
-        try {
-            return Files.walk(workspaceRoot).flatMap(this::outputDirectory).collect(Collectors.toSet());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        return Collections.emptySet();
     }
 
     /** Recognize build root files like pom.xml and return compiler output directories */
@@ -173,15 +205,39 @@ class InferConfig {
         }
     }
 
-    /** Find source .jar files for `externalDependencies` in local maven / gradle repository. */
+    /** Find source .jar files in local maven repository. */
     Set<Path> buildDocPath() {
-        var result = new HashSet<Path>();
-        // Maven
-        for (var a : mvnDependencies()) {
-            findMavenJar(a, true).ifPresent(result::add);
+        // externalDependencies
+        if (!externalDependencies.isEmpty()) {
+            var result = new HashSet<Path>();
+            for (var id : externalDependencies) {
+                var a = Artifact.parse(id);
+                var found = findAnyJar(a, true);
+                if (found.isPresent()) result.add(found.get());
+                else LOG.warning(String.format("Couldn't find doc jar for %s in %s or %s", a, mavenHome, gradleHome));
+            }
+            return result;
         }
+
+        // Maven
+        if (Files.exists(workspaceRoot.resolve("pom.xml"))) {
+            var result = new HashSet<Path>();
+            for (var a : mvnDependencies()) {
+                findMavenJar(a, true).ifPresent(result::add);
+            }
+            return result;
+        }
+
         // TODO Bazel
-        return result;
+
+        return Collections.emptySet();
+    }
+
+    private Optional<Path> findAnyJar(Artifact artifact, boolean source) {
+        Optional<Path> maven = findMavenJar(artifact, source);
+
+        if (maven.isPresent()) return maven;
+        else return findGradleJar(artifact, source);
     }
 
     Optional<Path> findMavenJar(Artifact artifact, boolean source) {
@@ -195,6 +251,30 @@ class InferConfig {
 
         if (Files.exists(jar)) return Optional.of(jar);
         else return Optional.empty();
+    }
+
+    private Optional<Path> findGradleJar(Artifact artifact, boolean source) {
+        // Search for caches/modules-*/files-*/groupId/artifactId/version/*/artifactId-version[-sources].jar
+        var base = gradleHome.resolve("caches");
+        var pattern =
+                "glob:"
+                        + String.join(
+                                File.separator,
+                                base.toString(),
+                                "modules-*",
+                                "files-*",
+                                artifact.groupId,
+                                artifact.artifactId,
+                                artifact.version,
+                                "*",
+                                fileName(artifact, source));
+        var match = FileSystems.getDefault().getPathMatcher(pattern);
+
+        try {
+            return Files.walk(base, 7).filter(match::matches).findFirst();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private String fileName(Artifact artifact, boolean source) {
@@ -237,7 +317,6 @@ class InferConfig {
         }
     }
 
-    /** Get external dependencies from this.externalDependencies if available, or try to infer them. */
     private Collection<Artifact> mvnDependencies() {
         var pomXml = workspaceRoot.resolve("pom.xml");
 

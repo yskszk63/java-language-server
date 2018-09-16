@@ -6,8 +6,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -19,8 +21,11 @@ import org.eclipse.lsp4j.services.*;
 class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
 
-    Path workspaceRoot;
-    LanguageClient client;
+    private Path workspaceRoot;
+    private LanguageClient client;
+    private Set<String> externalDependencies = Set.of();
+    private Set<Path> classPath = Set.of();
+
     JavaCompilerService compiler;
     final JavaTextDocumentService textDocuments = new JavaTextDocumentService(this);
     final JavaWorkspaceService workspace = new JavaWorkspaceService(this);
@@ -84,9 +89,30 @@ class JavaLanguageServer implements LanguageServer {
 
     private JavaCompilerService createCompiler() {
         Objects.requireNonNull(workspaceRoot, "Can't create compiler because workspaceRoot has not been initialized");
-        var infer = new InferConfig(workspaceRoot);
-        return new JavaCompilerService(
-                InferSourcePath.sourcePath(workspaceRoot), infer.classPath(), infer.buildDocPath());
+
+        // If classpath is specified by the user, don't infer anything
+        if (!classPath.isEmpty()) {
+            return new JavaCompilerService(
+                    InferSourcePath.sourcePath(workspaceRoot), classPath, Collections.emptySet());
+        }
+        // Otherwise, combine inference with user-specified external dependencies
+        else {
+            var infer = new InferConfig(workspaceRoot, externalDependencies);
+            return new JavaCompilerService(
+                    InferSourcePath.sourcePath(workspaceRoot), infer.classPath(), infer.buildDocPath());
+        }
+    }
+
+    void setExternalDependencies(Set<String> externalDependencies) {
+        var changed = this.externalDependencies.isEmpty() != externalDependencies.isEmpty();
+        this.externalDependencies = externalDependencies;
+        if (changed) this.compiler = createCompiler();
+    }
+
+    void setClassPath(Set<Path> classPath) {
+        var changed = this.classPath.isEmpty() != classPath.isEmpty();
+        this.classPath = classPath;
+        if (changed) this.compiler = createCompiler();
     }
 
     @Override
