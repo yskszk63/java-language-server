@@ -208,9 +208,9 @@ function runTest(sourceUri: string, enclosingClass: string, method: string): The
 }
 
 function templateCommand(command: string[], enclosingClass: string, method: string) {
+    var replaced = []
     for (var i = 0; i < command.length; i++) {
-        command[i] = command[i].replace('${class}', enclosingClass)
-        command[i] = command[i].replace('${method}', method)
+        replaced[i] = command[i].replace('${class}', enclosingClass).replace('${method}', method)
     }
-    return new ShellExecution(command[0], command.slice(1))
+    return new ShellExecution(replaced[0], replaced.slice(1))
 }

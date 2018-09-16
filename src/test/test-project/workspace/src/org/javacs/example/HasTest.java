@@ -7,4 +7,9 @@ public class HasTest {
     public void testMethod() {
         
     }
+    
+    @Test 
+    public void otherTestMethod() {
+        
+    }
 }
