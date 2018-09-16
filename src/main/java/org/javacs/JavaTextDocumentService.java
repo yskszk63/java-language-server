@@ -402,8 +402,14 @@ class JavaTextDocumentService implements TextDocumentService {
         for (var test : tests) {
             var trees = Trees.instance(test.parseTask);
             var pos = trees.getSourcePositions();
-            var start = pos.getStartPosition(test.compilationUnit, test.method);
-            var end = pos.getEndPosition(test.compilationUnit, test.method);
+            long start, end;
+            if (test.method.isPresent()) {
+                start = pos.getStartPosition(test.compilationUnit, test.method.get());
+                end = pos.getEndPosition(test.compilationUnit, test.method.get());
+            } else {
+                start = pos.getStartPosition(test.compilationUnit, test.enclosingClass);
+                end = pos.getEndPosition(test.compilationUnit, test.enclosingClass);
+            }
             var lines = test.compilationUnit.getLineMap();
             var startLine = (int) lines.getLineNumber(start) - 1;
             var startCol = (int) lines.getColumnNumber(start) - 1;
@@ -412,8 +418,10 @@ class JavaTextDocumentService implements TextDocumentService {
             var range = new Range(new Position(startLine, startCol), new Position(endLine, endCol));
             var sourceUri = test.compilationUnit.getSourceFile().toUri();
             var className = test.enclosingClass.getSimpleName().toString();
-            var methodName = test.method.getName().toString();
-            var command = new Command("Run Test", "java.command.test.run", List.of(sourceUri, className, methodName));
+            var methodName = test.method.map(m -> m.getName().toString()).orElse(null);
+            var message = test.method.isPresent() ? "Run Test" : "Run All Tests";
+            var command =
+                    new Command(message, "java.command.test.run", Arrays.asList(sourceUri, className, methodName));
             result.add(new CodeLens(range, command, null));
         }
         // TODO run all tests in file

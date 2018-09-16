@@ -184,7 +184,11 @@ function runTest(sourceUri: string, enclosingClass: string, method: string): The
         method: method,
     }
     // TODO make this configurable
-	let shell = new ShellExecution('mvn', ['test', `-Dtest=${enclosingClass}#${method}`])
+    var shell;
+    if (method != null)
+        shell = new ShellExecution('mvn', ['test', `-Dtest=${enclosingClass}#${method}`])
+    else 
+        shell = new ShellExecution('mvn', ['test', `-Dtest=${enclosingClass}`])
 	let workspaceFolder = workspace.getWorkspaceFolder(Uri.parse(sourceUri))
 	let task = new Task(kind, workspaceFolder, 'Java Test', 'Java Language Server', shell)
 	return tasks.executeTask(task)

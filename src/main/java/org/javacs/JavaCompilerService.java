@@ -1165,6 +1165,7 @@ public class JavaCompilerService {
 
         class Find extends TreeScanner<Void, Void> {
             ClassTree enclosingClass = null;
+            Set<ClassTree> testClasses = new HashSet<>();
             List<TestMethod> found = new ArrayList<>();
 
             @Override 
@@ -1184,7 +1185,10 @@ public class JavaCompilerService {
                         var id = (IdentifierTree) type;
                         var name = id.getName();
                         if (name.contentEquals("Test") || name.contentEquals("org.junit.Test")) {
-                            found.add(new TestMethod(task, parse, enclosingClass, node));
+                            found.add(new TestMethod(task, parse, enclosingClass, Optional.of(node)));
+                            if (!testClasses.contains(enclosingClass)) {
+                                found.add(new TestMethod(task, parse, enclosingClass, Optional.empty()));
+                            }
                         }
                     }
                 }
