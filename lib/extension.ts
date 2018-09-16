@@ -183,13 +183,34 @@ function runTest(sourceUri: string, enclosingClass: string, method: string): The
         enclosingClass: enclosingClass,
         method: method,
     }
-    // TODO make this configurable
     var shell;
-    if (method != null)
-        shell = new ShellExecution('mvn', ['test', `-Dtest=${enclosingClass}#${method}`])
-    else 
-        shell = new ShellExecution('mvn', ['test', `-Dtest=${enclosingClass}`])
+    let config = workspace.getConfiguration('java')
+    if (method != null) {
+        let command = config.get('testMethod') as string[]
+        if (command.length == 0) {
+            window.showErrorMessage('Set "java.testMethod" in .vscode/settings.json')
+            shell = new ShellExecution('echo', ['Set "java.testMethod" in .vscode/settings.json, for example ["mvn", "test", "-Dtest=${class}#${method}"]'])
+        } else {
+            shell = templateCommand(command, enclosingClass, method)
+        }
+    } else {
+        let command = config.get('testClass') as string[]
+        if (command.length == 0) {
+            window.showErrorMessage('Set "java.testClass" in .vscode/settings.json')
+            shell = new ShellExecution('echo', ['Set "java.testClass" in .vscode/settings.json, for example ["mvn", "test", "-Dtest=${class}"]'])
+        } else {
+            shell = templateCommand(command, enclosingClass, method)
+        }
+    }
 	let workspaceFolder = workspace.getWorkspaceFolder(Uri.parse(sourceUri))
 	let task = new Task(kind, workspaceFolder, 'Java Test', 'Java Language Server', shell)
 	return tasks.executeTask(task)
+}
+
+function templateCommand(command: string[], enclosingClass: string, method: string) {
+    for (var i = 0; i < command.length; i++) {
+        command[i] = command[i].replace('${class}', enclosingClass)
+        command[i] = command[i].replace('${method}', method)
+    }
+    return new ShellExecution(command[0], command.slice(1))
 }

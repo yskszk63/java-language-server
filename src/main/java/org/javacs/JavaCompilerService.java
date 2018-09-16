@@ -1188,6 +1188,7 @@ public class JavaCompilerService {
                             found.add(new TestMethod(task, parse, enclosingClass, Optional.of(node)));
                             if (!testClasses.contains(enclosingClass)) {
                                 found.add(new TestMethod(task, parse, enclosingClass, Optional.empty()));
+                                testClasses.add(enclosingClass);
                             }
                         }
                     }

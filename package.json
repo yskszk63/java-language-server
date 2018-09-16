@@ -52,12 +52,6 @@
                 "path": "./snippets/java.json"
             }
         ],
-        "jsonValidation": [
-            {
-                "fileMatch": "javaconfig.json",
-                "url": "./lib/javaconfig.schema.json"
-            }
-        ],
         "configuration": {
             "title": "Java configuration",
             "properties": {
@@ -75,6 +69,20 @@
                         "pattern": "^[^:]+:[^:]+:[^:]+(:[^:]+:[^:]+)?$"
                     },
                     "description": "External dependencies of the form groupId:artifactId:version or groupId:artifactId:packaging:version:scope"
+                },
+                "java.testMethod": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Command to run one test method, for example [\"mvn\", \"test\", \"-Dtest=${class}#${method}\""
+                },
+                "java.testClass": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Command to run all tests in a class, for example [\"mvn\", \"test\", \"-Dtest=${class}\""
                 },
                 "java.trace.server": {
                     "scope": "window",
