@@ -1,7 +1,7 @@
 # Language Server for Java using the [Java Compiler API](https://docs.oracle.com/javase/7/docs/api/javax/tools/JavaCompiler.html)
 
 Provides Java support using the Java Compiler API.
-Requires that you have Java 8 installed on your system.
+Requires that you have Java 10 installed on your system.
 
 ## Installation
 
@@ -48,12 +48,6 @@ Requires that you have Java 8 installed on your system.
 ### Type information on hover
 
 ![Type hover](images/TypeHover.png)
-
-### Code actions
-
-![Suggest import 1](images/SuggestImport1.png)
-
-![Suggest import 2](images/SuggestImport2.png)
 
 ### Find references
 
