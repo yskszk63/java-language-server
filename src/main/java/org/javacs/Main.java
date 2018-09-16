@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.Executors;
-import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.eclipse.lsp4j.launch.LSPLauncher;
@@ -67,8 +66,7 @@ public class Main {
 
     public static void main(String[] args) {
         try {
-            // TODO remove when it is stable again
-            Logger.getLogger("").addHandler(new FileHandler("javacs.%u.log", false));
+            // Logger.getLogger("").addHandler(new FileHandler("javacs.%u.log", false));
             setRootFormat();
 
             var server = new JavaLanguageServer();
