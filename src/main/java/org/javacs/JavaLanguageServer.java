@@ -59,6 +59,11 @@ class JavaLanguageServer implements LanguageServer {
         for (var f : files) {
             List<org.eclipse.lsp4j.Diagnostic> ds = new ArrayList<>();
             for (var j : javaDiagnostics) {
+                if (j.getSource() == null) {
+                    LOG.warning("No source in warning " + j.getMessage(null));
+                    continue;
+                }
+
                 var uri = j.getSource().toUri();
                 if (uri.equals(f)) {
                     var content = textDocuments.contents(uri).content;

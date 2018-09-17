@@ -58,6 +58,8 @@ class InferSourcePath {
 
             @Override
             public void accept(Path java) {
+                if (java.getFileName().toString().equals("module-info.java")) return;
+
                 if (!alreadyKnown(java)) {
                     infer(java)
                             .ifPresent(

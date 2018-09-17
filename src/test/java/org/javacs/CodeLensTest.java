@@ -5,6 +5,7 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.concurrent.ExecutionException;
 import org.eclipse.lsp4j.CodeLens;
@@ -31,7 +32,7 @@ public class CodeLensTest {
         for (var lens : lenses) {
             var command = new StringJoiner(", ");
             for (var arg : lens.getCommand().getArguments()) {
-                command.add(arg.toString());
+                command.add(Objects.toString(arg));
             }
             commands.add(command.toString());
         }
@@ -45,7 +46,8 @@ public class CodeLensTest {
         assertThat(lenses, not(empty()));
 
         var commands = commands(lenses);
-        assertThat(commands, hasItem("HasTest, testMethod"));
-        assertThat(commands, hasItem("HasTest, otherTestMethod"));
+        assertThat(commands, hasItem(containsString("HasTest, null")));
+        assertThat(commands, hasItem(containsString("HasTest, testMethod")));
+        assertThat(commands, hasItem(containsString("HasTest, otherTestMethod")));
     }
 }

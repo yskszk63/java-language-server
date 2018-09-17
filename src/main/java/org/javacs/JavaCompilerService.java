@@ -51,16 +51,12 @@ public class JavaCompilerService {
     private final List<Diagnostic<? extends JavaFileObject>> diags = new ArrayList<>();
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files
     private final StandardJavaFileManager fileManager =
-            compiler.getStandardFileManager(diags::add, null, Charset.defaultCharset());
+            new HideModuleInfo(compiler.getStandardFileManager(diags::add, null, Charset.defaultCharset()));
     // Cache a single compiled file
     // Since the user can only edit one file at a time, this should be sufficient
     private Cache cache;
 
     public JavaCompilerService(Set<Path> sourcePath, Set<Path> classPath, Set<Path> docPath) {
-        var klass = compiler.getClass();
-        var path = klass.getName().replace('.', '/');
-        var location = klass.getResource(String.format("/%s.class", path));
-
         System.err.println("Source path:");
         for (var p : sourcePath) {
             System.err.println("  " + p);
@@ -152,7 +148,21 @@ public class JavaCompilerService {
                         fileManager.getJavaFileObjectsFromFiles(files));
     }
 
+    private Collection<Path> removeModuleInfo(Collection<Path> files) {
+        var result = new ArrayList<Path>();
+        for (var f : files) {
+            if (f.getFileName().endsWith("module-info.java"))
+                LOG.info("Skip " + f);
+            else 
+                result.add(f);
+        }
+        return result;
+    }
+
     List<Diagnostic<? extends JavaFileObject>> lint(Collection<Path> files) {
+        files = removeModuleInfo(files);
+        if (files.isEmpty()) return Collections.emptyList();
+        
         var task = batchTask(files);
         try {
             task.parse();
