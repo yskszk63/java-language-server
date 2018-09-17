@@ -25,6 +25,8 @@
 - Auto-add 'throws ?'
 - New .java file class boilerplate
 - Missing method definition
+- Use var types to disambiguate imports
+- Generate catch clauses somehow
 
 ## Lint
 - Add 3rd-party linter (findbugs?)

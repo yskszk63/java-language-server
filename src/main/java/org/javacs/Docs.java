@@ -1,7 +1,5 @@
 package org.javacs;
 
-import com.overzealous.remark.Options;
-import com.overzealous.remark.Remark;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.DocTrees;
@@ -201,19 +199,10 @@ class Docs {
         return false;
     }
 
-    // TODO is this still necessary?
     /** If `commentText` looks like HTML, convert it to markdown */
     static String htmlToMarkdown(String commentText) {
         if (isHtml(commentText)) {
-            var options = new Options();
-
-            options.tables = Options.Tables.CONVERT_TO_CODE_BLOCK;
-            options.hardwraps = true;
-            options.inlineLinks = true;
-            options.autoLinks = true;
-            options.reverseHtmlSmartPunctuation = true;
-
-            return new Remark(options).convertFragment(commentText);
+            return TipFormatter.asMarkdown(commentText);
         } else return commentText;
     }
 

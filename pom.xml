@@ -62,12 +62,6 @@
             <artifactId>guava</artifactId>
             <version>25.1-jre</version>
         </dependency>
-        <!-- HTML-to-markdown -->
-        <dependency>
-            <groupId>com.kotcrab.remark</groupId>
-            <artifactId>remark</artifactId>
-            <version>1.0.0</version>
-        </dependency>
         <!-- Testing framework -->
         <dependency>
             <groupId>junit</groupId>

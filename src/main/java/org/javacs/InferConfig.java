@@ -288,6 +288,7 @@ class InferConfig {
             // Tell maven to output deps to a temporary file
             var outputFile = Files.createTempFile("deps", ".txt");
 
+            // TODO consider using mvn dependency:copy-dependencies instead
             var cmd =
                     String.format(
                             "%s dependency:list -DincludeScope=test -DoutputFile=%s", getMvnCommand(), outputFile);
