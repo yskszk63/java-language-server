@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.google.common.collect.ImmutableList;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -130,12 +129,12 @@ class JavaLanguageServer implements LanguageServer {
 
         c.setTextDocumentSync(TextDocumentSyncKind.Incremental);
         c.setDefinitionProvider(true);
-        c.setCompletionProvider(new CompletionOptions(true, ImmutableList.of(".")));
+        c.setCompletionProvider(new CompletionOptions(true, List.of(".")));
         c.setHoverProvider(true);
         c.setWorkspaceSymbolProvider(true);
         c.setReferencesProvider(true);
         c.setDocumentSymbolProvider(true);
-        c.setSignatureHelpProvider(new SignatureHelpOptions(ImmutableList.of("(", ",")));
+        c.setSignatureHelpProvider(new SignatureHelpOptions(List.of("(", ",")));
         c.setDocumentFormattingProvider(true);
         c.setCodeLensProvider(new CodeLensOptions(false));
 
