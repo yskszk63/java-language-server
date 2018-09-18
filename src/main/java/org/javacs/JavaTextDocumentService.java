@@ -20,7 +20,6 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.element.*;
 import org.eclipse.lsp4j.*;
-import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.TextDocumentService;
 
@@ -376,19 +375,21 @@ class JavaTextDocumentService implements TextDocumentService {
     }
 
     @Override
-    public CompletableFuture<List<? extends SymbolInformation>> documentSymbol(DocumentSymbolParams params) {
+    public CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> documentSymbol(
+            DocumentSymbolParams params) {
         var uri = URI.create(params.getTextDocument().getUri());
         var content = contents(uri).content;
         var result =
                 Parser.documentSymbols(Paths.get(uri), content)
                         .stream()
                         .map(Parser::asSymbolInformation)
+                        .map(Either::<SymbolInformation, DocumentSymbol>forLeft)
                         .collect(Collectors.toList());
         return CompletableFuture.completedFuture(result);
     }
 
     @Override
-    public CompletableFuture<List<? extends Command>> codeAction(CodeActionParams params) {
+    public CompletableFuture<List<Either<Command, CodeAction>>> codeAction(CodeActionParams params) {
         return null;
     }
 
