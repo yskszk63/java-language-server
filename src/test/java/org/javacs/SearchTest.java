@@ -53,7 +53,7 @@ public class SearchTest {
                     .documentSymbol(new DocumentSymbolParams(new TextDocumentIdentifier(uri.toString())))
                     .get()
                     .stream()
-                    .map(result -> result.getName())
+                    .map(result -> result.getLeft().getName())
                     .collect(Collectors.toSet());
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);

@@ -12,8 +12,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -100,6 +102,8 @@ class Classes {
         "jdk.zipfs",
     };
 
+    private static Set<String> loadError = new HashSet<String>();
+
     static ClassSource jdkTopLevelClasses() {
         LOG.info("Searching for top-level classes in the JDK");
 
@@ -130,11 +134,15 @@ class Classes {
                 return Collections.unmodifiableSet(classes);
             }
 
-            public Class<?> load(String className) {
+            public Optional<Class<?>> load(String className) {
+                if (loadError.contains(className)) return Optional.empty();
+
                 try {
-                    return ClassLoader.getPlatformClassLoader().loadClass(className);
-                } catch (ClassNotFoundException e) {
-                    throw new RuntimeException(e);
+                    return Optional.of(ClassLoader.getPlatformClassLoader().loadClass(className));
+                } catch (ClassNotFoundException | NoClassDefFoundError e) {
+                    LOG.log(Level.WARNING, "Could not load " + className, e);
+                    loadError.add(className);
+                    return Optional.empty();
                 }
             }
         }
@@ -169,11 +177,15 @@ class Classes {
                 return Collections.unmodifiableSet(classes);
             }
 
-            public Class<?> load(String className) {
+            public Optional<Class<?>> load(String className) {
+                if (loadError.contains(className)) return Optional.empty();
+
                 try {
-                    return classLoader.loadClass(className);
-                } catch (ClassNotFoundException e) {
-                    throw new RuntimeException(e);
+                    return Optional.of(classLoader.loadClass(className));
+                } catch (ClassNotFoundException | NoClassDefFoundError e) {
+                    LOG.log(Level.WARNING, "Could not load " + className, e);
+                    loadError.add(className);
+                    return Optional.empty();
                 }
             }
         }

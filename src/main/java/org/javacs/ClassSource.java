@@ -2,13 +2,14 @@ package org.javacs;
 
 import java.lang.reflect.Modifier;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Logger;
 
 interface ClassSource {
     Set<String> classes();
 
-    Class<?> load(String className);
+    Optional<Class<?>> load(String className);
 
     static final Logger LOG = Logger.getLogger("main");
     static final Set<String> failedToLoad = new HashSet<>();
@@ -16,8 +17,7 @@ interface ClassSource {
     default boolean isPublic(String className) {
         if (failedToLoad.contains(className)) return false;
         try {
-            var c = load(className);
-            return Modifier.isPublic(c.getModifiers());
+            return load(className).map(c -> Modifier.isPublic(c.getModifiers())).orElse(false);
         } catch (Exception e) {
             LOG.warning(String.format("Failed to load %s: %s", className, e.getMessage()));
             failedToLoad.add(className);
