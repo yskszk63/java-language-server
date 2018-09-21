@@ -119,10 +119,21 @@ class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
             return m.getEnclosingElement().getSimpleName() + "(" + printArguments(m) + ")";
         } else {
             var result = new StringBuilder();
+            // static void foo
             if (m.getModifiers().contains(Modifier.STATIC)) result.append("static ");
             result.append(ShortTypePrinter.print(m.getReturnType())).append(" ");
             result.append(m.getSimpleName());
+            // (int arg, String other)
             result.append("(").append(printArguments(m)).append(")");
+            // throws Foo, Bar
+            if (!m.getThrownTypes().isEmpty()) {
+                result.append(" throws ");
+                var types = new StringJoiner(", ");
+                for (var t : m.getThrownTypes()) {
+                    types.add(ShortTypePrinter.print(t));
+                }
+                result.append(types);
+            }
             return result.toString();
         }
     }

@@ -97,6 +97,12 @@ public class SymbolUnderCursorTest {
         assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 10, 16), containsString("localVariable"));
     }
 
+    @Test
+    public void throwsList() {
+        assertThat(
+                symbolAt("/org/javacs/example/HoverThrows.java", 11, 11), containsString("throws java.io.IOException"));
+    }
+
     // Re-using the language server makes these tests go a lot faster, but it will potentially produce surprising output
     // if things go wrong
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();

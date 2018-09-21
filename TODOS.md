@@ -2,7 +2,6 @@
 
 ## Bugs
 - import static foo.? doesn't auto-complete
-- Hover doesn't show 'throws ...'
 - Workspace root as source path crashes compiler
 
 ## Autocomplete
