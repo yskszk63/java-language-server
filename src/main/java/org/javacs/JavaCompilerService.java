@@ -32,6 +32,7 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
@@ -490,25 +491,31 @@ public class JavaCompilerService {
                 var alreadyAdded = new HashSet<String>();
                 for (var t : ts) {
                     var e = types.asElement(t);
-                    for (var member : e.getEnclosedElements()) {
-                        // Don't add statics
-                        if (member.getModifiers().contains(Modifier.STATIC)) continue;
-                        // Don't add constructors
-                        if (member.getSimpleName().contentEquals("<init>")) continue;
-                        // Skip overridden members from superclass
-                        if (alreadyAdded.contains(member.toString())) continue;
+                    if (e != null) {
+                        for (var member : e.getEnclosedElements()) {
+                            // Don't add statics
+                            if (member.getModifiers().contains(Modifier.STATIC)) continue;
+                            // Don't add constructors
+                            if (member.getSimpleName().contentEquals("<init>")) continue;
+                            // Skip overridden members from superclass
+                            if (alreadyAdded.contains(member.toString())) continue;
 
-                        // If type is a DeclaredType, check accessibility of member
-                        if (t instanceof DeclaredType) {
-                            if (trees.isAccessible(scope, member, (DeclaredType) t)) {
-                                result.add(Completion.ofElement(member));
+                            // If type is a DeclaredType, check accessibility of member
+                            if (t instanceof DeclaredType) {
+                                if (trees.isAccessible(scope, member, (DeclaredType) t)) {
+                                    result.add(Completion.ofElement(member));
+                                }
                             }
+                            // Otherwise, accessibility rules are very complicated
+                            // Give up and just declare that everything is accessible
+                            else result.add(Completion.ofElement(member));
+                            // Remember the signature of the added method, so we don't re-add it later
+                            alreadyAdded.add(member.toString());
                         }
-                        // Otherwise, accessibility rules are very complicated
-                        // Give up and just declare that everything is accessible
-                        else result.add(Completion.ofElement(member));
-                        // Remember the signature of the added method, so we don't re-add it later
-                        alreadyAdded.add(member.toString());
+                    }
+                    
+                    if (t instanceof ArrayType) {
+                        result.add(Completion.ofKeyword("length"));
                     }
                 }
                 return result;

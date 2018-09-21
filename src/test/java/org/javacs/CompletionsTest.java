@@ -284,6 +284,16 @@ public class CompletionsTest extends CompletionsBase {
         assertThat(suggestions, hasItems("AutocompleteOther", "AutocompleteMember"));
     }
 
+    @Test
+    public void arrayLength() throws IOException {
+        var file = "/org/javacs/example/AutocompleteArray.java";
+
+        // a.?
+        var suggestions = insertText(file, 7, 11);
+
+        assertThat(suggestions, hasItems("length"));
+    }
+
     @Ignore // We are now managing imports with FixImports
     @Test
     public void addImport() {
