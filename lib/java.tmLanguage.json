@@ -945,7 +945,7 @@
 					"name": "keyword.reserved.java"
                 },
                 {
-                    "match": "\\bvar",
+                    "match": "\\bvar\\b",
                     "name": "storage.type.java"
                 }
 			]

@@ -11,9 +11,7 @@
 - public [class NameOfFile]
 - NameOfClass... default constructor initializing final fields
 - im[plements]
-- v[oid]
 - Annotation fields
-- Enum options in switch statement
 - @Override [method body from super]
 
 ## Navigation

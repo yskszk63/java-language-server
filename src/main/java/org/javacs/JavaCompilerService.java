@@ -542,6 +542,12 @@ public class JavaCompilerService {
         "default",
         "class",
         "interface",
+        "void",
+        "boolean",
+        "int",
+        "long",
+        "float",
+        "double",
     };
 
     private static String[] METHOD_BODY_KEYWORDS = {
@@ -566,6 +572,12 @@ public class JavaCompilerService {
         "var",
         "final",
         "class",
+        "void",
+        "boolean",
+        "int",
+        "long",
+        "float",
+        "double",
     };
 
     /**
