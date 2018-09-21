@@ -389,6 +389,32 @@ public class JavaCompilerService {
         }
     }
 
+    /** Find all case options in the switch expression surrounding line:character */
+    private List<Completion> cases(URI file, String contents, int line, int character) {
+        recompile(file, contents, line, character);
+
+        // Find path to case
+        var trees = Trees.instance(cache.task);
+        var types = cache.task.getTypes();
+        var path = path(file, line, character);
+        // Find surrounding switch
+        while (!(path.getLeaf() instanceof SwitchTree))
+            path = path.getParentPath();
+        var leaf = (SwitchTree) path.getLeaf();
+        path = new TreePath(path, leaf.getExpression());
+        // Get members of switched type
+        var element = trees.getElement(path);
+        var type = element.asType();
+        var definition = types.asElement(type);
+        var result = new ArrayList<Completion>();
+        for (var member : definition.getEnclosedElements()) {
+            if (member.getKind() == ElementKind.ENUM_CONSTANT)
+                result.add(Completion.ofElement(member));
+        }
+
+        return result;
+    }
+
     /** Find all members of expression ending at line:character */
     public List<Completion> members(URI file, String contents, int line, int character, boolean isReference) {
         recompile(file, contents, line, character);
@@ -609,6 +635,25 @@ public class JavaCompilerService {
                             line = lines.getLineNumber(offset),
                             column = lines.getColumnNumber(offset);
                     result = members(file, contents, (int) line, (int) column, true);
+                }
+                return null;
+            }
+
+            @Override
+            public Void visitCase(CaseTree node, Void nothing) {
+                var containsCursor = containsCursor(node);
+                for (var s : node.getStatements()) {
+                    if (containsCursor(s))
+                        containsCursor = false;
+                }
+
+                if (containsCursor) {
+                    long offset = pos.getEndPosition(parse, node.getExpression()),
+                            line = lines.getLineNumber(offset),
+                            column = lines.getColumnNumber(offset);
+                    result = cases(file, contents, (int) line, (int) column);
+                } else {
+                    super.visitCase(node, nothing);
                 }
                 return null;
             }

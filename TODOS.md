@@ -1,11 +1,9 @@
 # Todo
 
 ## Bugs
-- Overload help shows same method signature multiple times
 - import static foo.? doesn't auto-complete
 - array.length doesn't auto-complete
 - Hover doesn't show 'throws ...'
-- Enum const javadocs are not showing
 - Workspace root as source path crashes compiler
 
 ## Autocomplete

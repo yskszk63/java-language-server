@@ -668,6 +668,14 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
+    public void switchCase() throws IOException {
+        var file = "/org/javacs/example/AutocompleteCase.java";
+        var suggestions = insertText(file, 8, 18);
+
+        assertThat("suggests enum options", suggestions, containsInAnyOrder("Foo", "Bar"));
+    }
+
+    @Test
     public void staticStarImport() throws IOException {
         var file = "/org/javacs/example/AutocompleteStaticImport.java";
         var suggestions = insertText(file, 9, 15);
