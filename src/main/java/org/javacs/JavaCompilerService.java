@@ -768,8 +768,6 @@ public class JavaCompilerService {
                     result = new ArrayList<>();
                     var id = (IdentifierTree) node.getAnnotationType();
                     var partialName = Objects.toString(id.getName(), "");
-                    // Add @Override, @Test, other simple class names
-                    completeScopeIdentifiers(partialName);
                     // Add @Override ... snippet
                     if ("Override".startsWith(partialName)) {
                         // TODO filter out already-implemented methods using thisMethods
@@ -777,12 +775,14 @@ public class JavaCompilerService {
                             var mods = method.getModifiers();
                             if (mods.contains(Modifier.STATIC) || mods.contains(Modifier.PRIVATE)) continue;
                             
-                            var label = "Override " + ShortTypePrinter.printMethod(method);
+                            var label = "@Override " + ShortTypePrinter.printMethod(method);
                             var snippet = "Override\n" + new TemplatePrinter().printMethod(method) + " {\n    $0\n}";
                             var override = Completion.ofSnippet(label, snippet);
                             result.add(override);
                         }
                     }
+                    // Add @Override, @Test, other simple class names
+                    completeScopeIdentifiers(partialName);
                 } else {
                     super.visitAnnotation(node, nothing);
                 }
@@ -796,9 +796,8 @@ public class JavaCompilerService {
                 if (containsCursor(node) && result == null) {
                     LOG.info("...completing identifiers");
                     result = new ArrayList<>();
-                    // Does a candidate completion match the name in `node`?
-                    var partialName = Objects.toString(node.getName(), "");
-                    // Add keywords
+
+                    // Add snippets
                     if (insideClass == 0) {
                         // If no package declaration is present, suggest package [inferred name];
                         if (parse.getPackage() == null) {
@@ -819,7 +818,12 @@ public class JavaCompilerService {
                             name = name.substring(0, name.length() - ".java".length());
                             result.add(Completion.ofSnippet("class " + name, "class " + name + " {\n    $0\n}"));
                         }
-                        // Add keywords
+                    }
+                    // Add identifiers
+                    var partialName = Objects.toString(node.getName(), "");
+                    completeScopeIdentifiers(partialName);
+                    // Add keywords
+                    if (insideClass == 0) {
                         for (var k : TOP_LEVEL_KEYWORDS) {
                             if (k.startsWith(partialName)) {
                                 result.add(Completion.ofKeyword(k));
@@ -840,7 +844,6 @@ public class JavaCompilerService {
                             }
                         }
                     }
-                    completeScopeIdentifiers(partialName);
                 }
                 return null;
             }
