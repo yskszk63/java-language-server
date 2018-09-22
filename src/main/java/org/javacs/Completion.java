@@ -11,28 +11,35 @@ public class Completion {
     public final PackagePart packagePart;
     public final String keyword;
     public final String notImportedClass;
+    public final String snippet;
 
-    private Completion(Element element, PackagePart packagePart, String keyword, String notImportedClass) {
+    private Completion(
+            Element element, PackagePart packagePart, String keyword, String notImportedClass, String snippet) {
         this.element = element;
         this.packagePart = packagePart;
         this.keyword = keyword;
         this.notImportedClass = notImportedClass;
+        this.snippet = snippet;
     }
 
     public static Completion ofElement(Element element) {
-        return new Completion(element, null, null, null);
+        return new Completion(element, null, null, null, null);
     }
 
     public static Completion ofPackagePart(String fullName, String name) {
-        return new Completion(null, new PackagePart(fullName, name), null, null);
+        return new Completion(null, new PackagePart(fullName, name), null, null, null);
     }
 
     public static Completion ofKeyword(String keyword) {
-        return new Completion(null, null, keyword, null);
+        return new Completion(null, null, keyword, null, null);
     }
 
     public static Completion ofNotImportedClass(String className) {
-        return new Completion(null, null, null, className);
+        return new Completion(null, null, null, className, null);
+    }
+
+    public static Completion ofSnippet(String snippet) {
+        return new Completion(null, null, null, null, snippet);
     }
 
     public static class PackagePart {

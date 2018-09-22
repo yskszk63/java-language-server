@@ -104,6 +104,10 @@ class JavaTextDocumentService implements TextDocumentService {
                 i.setLabel(Parser.lastName(c.notImportedClass));
                 i.setKind(CompletionItemKind.Class);
                 i.setDetail(c.notImportedClass);
+            } else if (c.snippet != null) {
+                i.setLabel(c.snippet);
+                i.setKind(CompletionItemKind.Snippet);
+                i.setInsertTextFormat(InsertTextFormat.Snippet);
             } else throw new RuntimeException(c + " is not valid");
 
             result.add(i);
@@ -183,7 +187,7 @@ class JavaTextDocumentService implements TextDocumentService {
             var markdown = doc.map(this::asMarkupContent);
             markdown.ifPresent(unresolved::setDocumentation);
         }
-        return CompletableFuture.completedFuture(unresolved); // TODO
+        return CompletableFuture.completedFuture(unresolved);
     }
 
     private String hoverTypeDeclaration(TypeElement t) {

@@ -707,7 +707,7 @@ public class JavaCompilerService {
                         if (parse.getPackage() == null) {
                             relativeToSourcePath(file).ifPresent(relative -> {
                                 var name = relative.toString().replace(File.separatorChar, '.');
-                                result.add(Completion.ofKeyword("package " + name + ";\n\n"));
+                                result.add(Completion.ofSnippet("package " + name + ";\n\n"));
                             });
                         }
                     }
