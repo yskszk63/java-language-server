@@ -768,4 +768,12 @@ public class CompletionsTest extends CompletionsBase {
 
         assertThat(suggestions, hasItem(startsWith("class AutocompleteClassName")));
     }
+
+    @Test
+    public void annotationInInnerClass() {
+        var file = "/org/javacs/example/AnnotationInInnerClass.java";
+        var suggestions = insertText(file, 6, 17);
+
+        assertThat(suggestions, hasItem(startsWith("Override")));
+    }
 }

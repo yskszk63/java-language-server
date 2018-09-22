@@ -20,6 +20,7 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -338,21 +339,25 @@ public class JavaCompilerService {
 
             // Place each member of `s` into results, and unwrap `this` and `super`
             void walkLocals(Scope s) {
-                for (var e : s.getLocalElements()) {
-                    if (e instanceof TypeElement) {
-                        var te = (TypeElement) e;
-                        if (trees.isAccessible(start, te)) result.add(te);
-                    } else if (e instanceof VariableElement) {
-                        var ve = (VariableElement) e;
-                        if (isThisOrSuper(ve)) {
-                            unwrapThisSuper(ve);
-                            if (!isStatic(s)) result.add(ve);
+                try {
+                    for (var e : s.getLocalElements()) {
+                        if (e instanceof TypeElement) {
+                            var te = (TypeElement) e;
+                            if (trees.isAccessible(start, te)) result.add(te);
+                        } else if (e instanceof VariableElement) {
+                            var ve = (VariableElement) e;
+                            if (isThisOrSuper(ve)) {
+                                unwrapThisSuper(ve);
+                                if (!isStatic(s)) result.add(ve);
+                            } else {
+                                result.add(ve);
+                            }
                         } else {
-                            result.add(ve);
+                            result.add(e);
                         }
-                    } else {
-                        result.add(e);
                     }
+                } catch (Exception e) {
+                    LOG.log(Level.WARNING, "error walking locals in scope", e);
                 }
             }
 
