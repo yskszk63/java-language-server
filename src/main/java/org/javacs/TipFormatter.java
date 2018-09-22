@@ -60,6 +60,7 @@ class TipFormatter {
         replaceNodes(doc, "i", contents -> String.format("*%s*", contents));
         replaceNodes(doc, "b", contents -> String.format("**%s**", contents));
         replaceNodes(doc, "pre", contents -> String.format("`%s`", contents));
+        replaceNodes(doc, "code", contents -> String.format("`%s`", contents));
 
         return print(doc);
     }
