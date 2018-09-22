@@ -11,10 +11,10 @@ public class Completion {
     public final PackagePart packagePart;
     public final String keyword;
     public final String notImportedClass;
-    public final String snippet; // TODO separate label and insertText
+    public final Snippet snippet; // TODO separate label and insertText
 
     private Completion(
-            Element element, PackagePart packagePart, String keyword, String notImportedClass, String snippet) {
+            Element element, PackagePart packagePart, String keyword, String notImportedClass, Snippet snippet) {
         this.element = element;
         this.packagePart = packagePart;
         this.keyword = keyword;
@@ -38,8 +38,8 @@ public class Completion {
         return new Completion(null, null, null, className, null);
     }
 
-    public static Completion ofSnippet(String snippet) {
-        return new Completion(null, null, null, null, snippet);
+    public static Completion ofSnippet(String label, String snippet) {
+        return new Completion(null, null, null, null, new Snippet(label, snippet));
     }
 
     public static class PackagePart {
@@ -48,6 +48,15 @@ public class Completion {
         public PackagePart(String fullName, String name) {
             this.fullName = fullName;
             this.name = name;
+        }
+    }
+
+    public static class Snippet {
+        public final String label, snippet;
+
+        public Snippet(String label, String snippet) {
+            this.label = label;
+            this.snippet = snippet;
         }
     }
 }

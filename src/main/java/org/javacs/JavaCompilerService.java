@@ -703,7 +703,7 @@ public class JavaCompilerService {
                         if (parse.getPackage() == null) {
                             relativeToSourcePath(file).ifPresent(relative -> {
                                 var name = relative.toString().replace(File.separatorChar, '.');
-                                result.add(Completion.ofSnippet("package " + name + ";\n\n"));
+                                result.add(Completion.ofSnippet("package " + name, "package " + name + ";\n\n"));
                             });
                         }
                         // If no class declaration is present, suggest class [file name]
@@ -716,7 +716,7 @@ public class JavaCompilerService {
                         if (!hasClassDeclaration) {
                             var name = Paths.get(file).getFileName().toString();
                             name = name.substring(0, name.length() - ".java".length());
-                            result.add(Completion.ofSnippet("class " + name + " {\n    $0\n}"));
+                            result.add(Completion.ofSnippet("class " + name, "class " + name + " {\n    $0\n}"));
                         }
                         // Add keywords
                         for (var k : TOP_LEVEL_KEYWORDS) {

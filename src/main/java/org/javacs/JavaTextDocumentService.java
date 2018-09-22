@@ -109,9 +109,9 @@ class JavaTextDocumentService implements TextDocumentService {
                 i.setDetail(c.notImportedClass);
                 i.setSortText(1 + i.getLabel());
             } else if (c.snippet != null) {
-                i.setLabel(c.snippet);
+                i.setLabel(c.snippet.label);
                 i.setKind(CompletionItemKind.Snippet);
-                i.setInsertText(c.snippet);
+                i.setInsertText(c.snippet.snippet);
                 i.setInsertTextFormat(InsertTextFormat.Snippet);
                 i.setSortText(0 + i.getLabel());
             } else throw new RuntimeException(c + " is not valid");
