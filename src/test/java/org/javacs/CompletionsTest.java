@@ -776,4 +776,12 @@ public class CompletionsTest extends CompletionsBase {
 
         assertThat(suggestions, hasItem(startsWith("Override")));
     }
+
+    @Test
+    public void overrideMethod() {
+        var file = "/org/javacs/example/AutocompleteOverride.java";
+        var suggestions = insertText(file, 8, 15);
+
+        assertThat(suggestions, hasItem(containsString("void superMethod() {")));
+    }
 }

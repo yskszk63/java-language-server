@@ -8,7 +8,7 @@
 - NameOfClass... default constructor initializing final fields
 - im[plements]
 - Annotation fields
-- @Override [method body from super]
+- cc should match CamelCase
 
 ## Navigation
 - Go-to-subclasses

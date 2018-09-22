@@ -288,6 +288,64 @@ public class JavaCompilerService {
         return new FindSmallest().find(cache.root);
     }
 
+    private List<ExecutableElement> virtualMethods(DeclaredType type) {
+        var result = new ArrayList<ExecutableElement>();
+        for (var member : type.asElement().getEnclosedElements()) {
+            if (member instanceof ExecutableElement) {
+                var method = (ExecutableElement) member;
+                if (!method.getSimpleName().contentEquals("<init>") && !method.getModifiers().contains(Modifier.STATIC)) {
+                    result.add(method);
+                }
+            }
+        }
+        return result;
+    }
+
+    private TypeMirror enclosingClass(URI file, String contents, int line, int character) {
+        recompile(file, contents, line, character);
+
+        var trees = Trees.instance(cache.task);
+        var path = path(file, line, character);
+        while (!(path.getLeaf() instanceof ClassTree)) path = path.getParentPath();
+        var enclosingClass = trees.getElement(path);
+
+        return enclosingClass.asType();
+    }
+
+    private List<ExecutableElement> thisMethods(URI file, String contents, int line, int character) {
+        var thisType = enclosingClass(file, contents, line, character);
+        var types = cache.task.getTypes();
+        var result = new ArrayList<ExecutableElement>();
+
+        if (thisType instanceof DeclaredType) {
+            var type = (DeclaredType) thisType;
+            result.addAll(virtualMethods(type));
+        }
+        
+        return result;
+    }
+
+    private void collectSuperMethods(TypeMirror thisType, List<ExecutableElement> result) {
+        var types = cache.task.getTypes();
+
+        for (var superType : types.directSupertypes(thisType)) {
+            if (superType instanceof DeclaredType) {
+                var type = (DeclaredType) superType;
+                result.addAll(virtualMethods(type));
+                collectSuperMethods(type, result);
+            }
+        }
+    }
+
+    private List<ExecutableElement> superMethods(URI file, String contents, int line, int character) {
+        var thisType = enclosingClass(file, contents, line, character);
+        var result = new ArrayList<ExecutableElement>();
+
+        collectSuperMethods(thisType, result);
+
+        return result;
+    }
+
     /** Find all identifiers in scope at line:character */
     public List<Element> scopeMembers(URI file, String contents, int line, int character) {
         recompile(file, contents, line, character);
@@ -312,8 +370,8 @@ public class JavaCompilerService {
             }
 
             boolean isThisOrSuper(VariableElement ve) {
-                var name = ve.getSimpleName().toString();
-                return name.equals("this") || name.equals("super");
+                var name = ve.getSimpleName();
+                return name.contentEquals("this") || name.contentEquals("super");
             }
 
             // Place each member of `this` or `super` directly into `results`
@@ -704,6 +762,34 @@ public class JavaCompilerService {
             }
 
             @Override
+            public Void visitAnnotation(AnnotationTree node, Void nothing) {
+                if (containsCursor(node.getAnnotationType())) {
+                    LOG.info("...completing annotation");
+                    result = new ArrayList<>();
+                    var id = (IdentifierTree) node.getAnnotationType();
+                    var partialName = Objects.toString(id.getName(), "");
+                    // Add @Override, @Test, other simple class names
+                    completeScopeIdentifiers(partialName);
+                    // Add @Override ... snippet
+                    if ("Override".startsWith(partialName)) {
+                        // TODO filter out already-implemented methods using thisMethods
+                        for (var method : superMethods(file, contents, line, character)) {
+                            var mods = method.getModifiers();
+                            if (mods.contains(Modifier.STATIC) || mods.contains(Modifier.PRIVATE)) continue;
+                            
+                            var label = "Override " + ShortTypePrinter.printMethod(method);
+                            var snippet = "Override\n" + new TemplatePrinter().printMethod(method) + " {\n    $0\n}";
+                            var override = Completion.ofSnippet(label, snippet);
+                            result.add(override);
+                        }
+                    }
+                } else {
+                    super.visitAnnotation(node, nothing);
+                }
+                return null;
+            }
+
+            @Override
             public Void visitIdentifier(IdentifierTree node, Void nothing) {
                 super.visitIdentifier(node, nothing);
 
@@ -754,88 +840,92 @@ public class JavaCompilerService {
                             }
                         }
                     }
-                    var startsWithUpperCase = partialName.length() > 0 && Character.isUpperCase(partialName.charAt(0));
-                    var alreadyImported = new HashSet<String>();
-                    // Add names that have already been imported
-                    for (var m : scopeMembers(file, contents, line, character)) {
-                        if (m.getSimpleName().toString().startsWith(partialName)) {
-                            result.add(Completion.ofElement(m));
-
-                            if (m instanceof TypeElement && startsWithUpperCase) {
-                                var t = (TypeElement) m;
-                                alreadyImported.add(t.getQualifiedName().toString());
-                            }
-                        }
-                    }
-                    // Add names of classes that haven't been imported
-                    if (startsWithUpperCase) {
-                        var packageName = Objects.toString(parse.getPackageName(), "");
-                        Predicate<String> matchesPartialName =
-                                qualifiedName -> {
-                                    var className = Parser.lastName(qualifiedName);
-                                    return className.startsWith(partialName);
-                                };
-                        Predicate<String> notAlreadyImported = className -> !alreadyImported.contains(className);
-                        var fromJdk =
-                                jdkClasses
-                                        .classes()
-                                        .stream()
-                                        .filter(matchesPartialName)
-                                        .filter(notAlreadyImported)
-                                        .filter(c -> jdkClasses.isAccessibleFromPackage(c, packageName));
-                        var fromClasspath =
-                                classPathClasses
-                                        .classes()
-                                        .stream()
-                                        .filter(matchesPartialName)
-                                        .filter(notAlreadyImported)
-                                        .filter(c -> classPathClasses.isAccessibleFromPackage(c, packageName));
-                        Function<Path, Stream<String>> classesInDir = dir -> {
-                            Predicate<Path> matchesFileName = 
-                                    file -> file.getFileName().toString().startsWith(partialName);
-                            Predicate<Path> isPublic = 
-                                file -> {
-                                    var fileName = file.getFileName().toString();
-                                    if (!fileName.endsWith(".java")) return false;
-                                    var simpleName = fileName.substring(0, fileName.length() - ".java".length());
-                                    Stream<String> lines;
-                                    try {
-                                        lines = Files.lines(file);
-                                    } catch (IOException e) {
-                                        throw new RuntimeException(e);
-                                    }
-                                    return lines.anyMatch(line -> line.matches(".*public\\s+class\\s+" + simpleName + ".*"));
-                                };
-                            Function<Path, String> qualifiedName = 
-                                    file -> {
-                                        var relative = dir.relativize(file).toString().replace('/', '.');
-                                        if (!relative.endsWith(".java")) return "??? " + relative + " does not end in .java";
-                                        return relative.substring(0, relative.length() - ".java".length());
-                                    };
-                            return javaSourcesInDir(dir).filter(matchesFileName).filter(isPublic).map(qualifiedName);
-                        };
-                        var fromSourcePath = 
-                                sourcePath.stream()
-                                .flatMap(classesInDir)
-                                .filter(notAlreadyImported);
-                        Consumer<Stream<String>> addCompletions = qualifiedNames -> {
-                            Iterable<String> it = qualifiedNames::iterator;
-                            for (var name : it) {
-                                if (result.size() >= limitHint) {
-                                    isIncomplete = true;
-                                    return;
-                                } else {
-                                    var completion = Completion.ofNotImportedClass(name);
-                                    result.add(completion);
-                                }
-                            }
-                        };
-                        addCompletions.accept(fromJdk);
-                        addCompletions.accept(fromClasspath);
-                        addCompletions.accept(fromSourcePath);
-                    }
+                    completeScopeIdentifiers(partialName);
                 }
                 return null;
+            }
+
+            private void completeScopeIdentifiers(String partialName) {
+                var startsWithUpperCase = partialName.length() > 0 && Character.isUpperCase(partialName.charAt(0));
+                var alreadyImported = new HashSet<String>();
+                // Add names that have already been imported
+                for (var m : scopeMembers(file, contents, line, character)) {
+                    if (m.getSimpleName().toString().startsWith(partialName)) {
+                        result.add(Completion.ofElement(m));
+
+                        if (m instanceof TypeElement && startsWithUpperCase) {
+                            var t = (TypeElement) m;
+                            alreadyImported.add(t.getQualifiedName().toString());
+                        }
+                    }
+                }
+                // Add names of classes that haven't been imported
+                if (startsWithUpperCase) {
+                    var packageName = Objects.toString(parse.getPackageName(), "");
+                    Predicate<String> matchesPartialName =
+                            qualifiedName -> {
+                                var className = Parser.lastName(qualifiedName);
+                                return className.startsWith(partialName);
+                            };
+                    Predicate<String> notAlreadyImported = className -> !alreadyImported.contains(className);
+                    var fromJdk =
+                            jdkClasses
+                                    .classes()
+                                    .stream()
+                                    .filter(matchesPartialName)
+                                    .filter(notAlreadyImported)
+                                    .filter(c -> jdkClasses.isAccessibleFromPackage(c, packageName));
+                    var fromClasspath =
+                            classPathClasses
+                                    .classes()
+                                    .stream()
+                                    .filter(matchesPartialName)
+                                    .filter(notAlreadyImported)
+                                    .filter(c -> classPathClasses.isAccessibleFromPackage(c, packageName));
+                    Function<Path, Stream<String>> classesInDir = dir -> {
+                        Predicate<Path> matchesFileName = 
+                                file -> file.getFileName().toString().startsWith(partialName);
+                        Predicate<Path> isPublic = 
+                            file -> {
+                                var fileName = file.getFileName().toString();
+                                if (!fileName.endsWith(".java")) return false;
+                                var simpleName = fileName.substring(0, fileName.length() - ".java".length());
+                                Stream<String> lines;
+                                try {
+                                    lines = Files.lines(file);
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                }
+                                return lines.anyMatch(line -> line.matches(".*public\\s+class\\s+" + simpleName + ".*"));
+                            };
+                        Function<Path, String> qualifiedName = 
+                                file -> {
+                                    var relative = dir.relativize(file).toString().replace('/', '.');
+                                    if (!relative.endsWith(".java")) return "??? " + relative + " does not end in .java";
+                                    return relative.substring(0, relative.length() - ".java".length());
+                                };
+                        return javaSourcesInDir(dir).filter(matchesFileName).filter(isPublic).map(qualifiedName);
+                    };
+                    var fromSourcePath = 
+                            sourcePath.stream()
+                            .flatMap(classesInDir)
+                            .filter(notAlreadyImported);
+                    Consumer<Stream<String>> addCompletions = qualifiedNames -> {
+                        Iterable<String> it = qualifiedNames::iterator;
+                        for (var name : it) {
+                            if (result.size() >= limitHint) {
+                                isIncomplete = true;
+                                return;
+                            } else {
+                                var completion = Completion.ofNotImportedClass(name);
+                                result.add(completion);
+                            }
+                        }
+                    };
+                    addCompletions.accept(fromJdk);
+                    addCompletions.accept(fromClasspath);
+                    addCompletions.accept(fromSourcePath);
+                }
             }
 
             @Override
