@@ -13,15 +13,14 @@
 ## Navigation
 - Go-to-subclasses
 
-### Code generation
+## Code generation
 - Auto-add 'throws ?'
 - New .java file class boilerplate
 - Missing method definition
 - Use var types to disambiguate imports
 - Generate catch clauses somehow
-
-## Lint
-- Add 3rd-party linter (findbugs?)
+- Implement error-prone [patch](https://errorprone.info/docs/patching)
+- Custom refaster rules
 
 ## Polish
 - Status bar during startup

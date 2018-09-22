@@ -112,26 +112,35 @@ public class JavaCompilerService {
         return classOrSourcePath.stream().map(p -> p.toString()).collect(Collectors.joining(File.pathSeparator));
     }
 
-    private static List<String> options(Set<Path> sourcePath, Set<Path> classPath) {
-        return Arrays.asList(
-                "-classpath",
-                joinPath(classPath),
-                "-sourcepath",
-                joinPath(sourcePath),
-                // "-verbose",
-                "-proc:none",
-                "-g",
-                // You would think we could do -Xlint:all,
-                // but some lints trigger fatal errors in the presence of parse errors
-                "-Xlint:cast",
-                "-Xlint:deprecation",
-                "-Xlint:empty",
-                "-Xlint:fallthrough",
-                "-Xlint:finally",
-                "-Xlint:path",
-                "-Xlint:unchecked",
-                "-Xlint:varargs",
-                "-Xlint:static");
+    private static List<String> options(Set<Path> sourcePath, Set<Path> classPath, boolean lint) {
+        var list = new ArrayList<String>();
+
+        Collections.addAll(list, "-classpath", joinPath(classPath));
+        Collections.addAll(list, "-sourcepath", joinPath(sourcePath));
+        // Collections.addAll(list, "-verbose");
+        Collections.addAll(list, "-proc:none");
+        Collections.addAll(list, "-g");
+        // You would think we could do -Xlint:all,
+        // but some lints trigger fatal errors in the presence of parse errors
+        Collections.addAll(list, 
+            "-Xlint:cast", 
+            "-Xlint:deprecation", 
+            "-Xlint:empty", 
+            "-Xlint:fallthrough", 
+            "-Xlint:finally", 
+            "-Xlint:path", 
+            "-Xlint:unchecked", 
+            "-Xlint:varargs", 
+            "-Xlint:static");
+        if (lint) {
+            // Add error-prone
+            // TODO re-enable when error-prone is stable for Java 10 https://github.com/google/error-prone/issues/1124
+            // Collections.addAll(list, "-XDcompilePolicy=byfile");
+            // Collections.addAll(list, "-processorpath", Lib.ERROR_PRONE.toString());
+            // Collections.addAll(list, "-Xplugin:ErrorProne -XepAllErrorsAsWarnings --illegal-access=warn");
+        }
+
+        return list;
     }
 
     /** Create a task that compiles a single file */
@@ -142,12 +151,12 @@ public class JavaCompilerService {
                         null,
                         fileManager,
                         diags::add,
-                        options(sourcePath, classPath),
+                        options(sourcePath, classPath, false),
                         Collections.emptyList(),
                         Collections.singletonList(new StringFileObject(contents, file)));
     }
 
-    private JavacTask batchTask(Collection<Path> paths) {
+    private JavacTask batchTask(Collection<Path> paths, boolean lint) {
         diags.clear();
         var files = paths.stream().map(Path::toFile).collect(Collectors.toList());
         return (JavacTask)
@@ -155,7 +164,7 @@ public class JavaCompilerService {
                         null,
                         fileManager,
                         diags::add,
-                        options(sourcePath, classPath),
+                        options(sourcePath, classPath, lint),
                         Collections.emptyList(),
                         fileManager.getJavaFileObjectsFromFiles(files));
     }
@@ -175,7 +184,7 @@ public class JavaCompilerService {
         files = removeModuleInfo(files);
         if (files.isEmpty()) return Collections.emptyList();
         
-        var task = batchTask(files);
+        var task = batchTask(files, true);
         try {
             task.parse();
             task.analyze();
@@ -208,7 +217,8 @@ public class JavaCompilerService {
             this.file = file;
             this.task = singleFileTask(file, this.contents);
             try {
-                this.root = task.parse().iterator().next();
+                var it = task.parse().iterator();
+                this.root = it.hasNext() ? it.next() : null;
                 // The results of task.analyze() are unreliable when errors are present
                 // You can get at `Element` values using `Trees`
                 task.analyze();
@@ -1138,7 +1148,7 @@ public class JavaCompilerService {
     }
 
     private Batch compileBatch(List<Path> files) {
-        var task = batchTask(files);
+        var task = batchTask(files, false);
         var result = new ArrayList<CompilationUnitTree>();
         try {
             for (var t : task.parse()) result.add(t);

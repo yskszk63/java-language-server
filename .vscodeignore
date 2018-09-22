@@ -20,6 +20,7 @@ scripts/**
 lib/**
 images/**
 !lib/src.zip
+!lib/error_prone.jar
 !lib/java.tmLanguage.json
 
 # Compiler output

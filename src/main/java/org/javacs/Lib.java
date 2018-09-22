@@ -12,4 +12,6 @@ class Lib {
     }
 
     static final Path SRC_ZIP = installRoot().resolve("lib/src.zip");
+
+    static final Path ERROR_PRONE = installRoot().resolve("lib/error_prone.jar");
 }
