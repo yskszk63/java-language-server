@@ -750,7 +750,15 @@ public class CompletionsTest extends CompletionsBase {
         var detail = detail(file, 10, 26);
 
         assertThat("suggests empty method", detail, hasItem("of()"));
-        assertThat("suggests one-arg method", detail, hasItem("of(e1)"));
+        assertThat("ksuggests one-arg method", detail, hasItem("of(e1)"));
         // assertThat("suggests vararg method", detail, hasItem("of(elements)"));
+    }
+
+    @Test
+    public void packageName() throws IOException {
+        var file = "/org/javacs/example/AutocompletePackageName.java";
+        var suggestions = insertText(file, 1, 5);
+
+        assertThat(suggestions, contains("package org.javacs.example;\n\n"));
     }
 }

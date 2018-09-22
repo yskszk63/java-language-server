@@ -78,6 +78,17 @@ public class JavaCompilerService {
         this.classPathClasses = Classes.classPathTopLevelClasses(classPath);
     }
 
+    private Optional<Path> relativeToSourcePath(URI source) {
+        var p = Paths.get(source);
+        for (var root : sourcePath) {
+            if (p.startsWith(root)) {
+                var rel = root.relativize(p.getParent());
+                return Optional.of(rel);
+            }
+        }
+        return Optional.empty();
+    }
+
     private Set<String> subPackages(String parentPackage) {
         var result = new HashSet<String>();
         Consumer<String> checkClassName =
@@ -527,7 +538,6 @@ public class JavaCompilerService {
     }
 
     private static String[] TOP_LEVEL_KEYWORDS = {
-        "package",
         "import",
         "public",
         "private",
@@ -692,6 +702,13 @@ public class JavaCompilerService {
                             if (k.startsWith(partialName)) {
                                 result.add(Completion.ofKeyword(k));
                             }
+                        }
+                        // If no package declaration is present, suggest package [inferred name];
+                        if (parse.getPackage() == null) {
+                            relativeToSourcePath(file).ifPresent(relative -> {
+                                var name = relative.toString().replace(File.separatorChar, '.');
+                                result.add(Completion.ofKeyword("package " + name + ";\n\n"));
+                            });
                         }
                     }
                     else if (insideMethod == 0) {
