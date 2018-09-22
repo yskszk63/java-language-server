@@ -1,7 +1,6 @@
 package org.javacs;
 
 import com.google.gson.Gson;
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
@@ -15,7 +14,7 @@ import org.eclipse.lsp4j.TextDocumentIdentifier;
 public class CompletionsBase {
     protected static final Logger LOG = Logger.getLogger("main");
 
-    protected Set<String> insertTemplate(String file, int row, int column) throws IOException {
+    protected Set<String> insertTemplate(String file, int row, int column) {
         var items = items(file, row, column);
 
         return items.stream().map(CompletionsBase::itemInsertTemplate).collect(Collectors.toSet());
@@ -31,13 +30,13 @@ public class CompletionsBase {
         return text;
     }
 
-    protected Set<String> insertText(String file, int row, int column) throws IOException {
+    protected Set<String> insertText(String file, int row, int column) {
         var items = items(file, row, column);
 
         return items.stream().map(CompletionsBase::itemInsertText).collect(Collectors.toSet());
     }
 
-    protected Set<String> detail(String file, int row, int column) throws IOException {
+    protected Set<String> detail(String file, int row, int column) {
         var items = items(file, row, column);
         var result = new HashSet<String>();
         for (var i : items) {
@@ -48,7 +47,7 @@ public class CompletionsBase {
         return result;
     }
 
-    protected Map<String, Integer> insertCount(String file, int row, int column) throws IOException {
+    protected Map<String, Integer> insertCount(String file, int row, int column) {
         var items = items(file, row, column);
         var result = new HashMap<String, Integer>();
 
@@ -74,7 +73,7 @@ public class CompletionsBase {
         return text;
     }
 
-    protected Set<String> documentation(String file, int row, int column) throws IOException {
+    protected Set<String> documentation(String file, int row, int column) {
         var items = items(file, row, column);
 
         return items.stream()

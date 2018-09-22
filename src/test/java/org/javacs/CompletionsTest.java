@@ -4,7 +4,6 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
 import com.google.common.collect.Lists;
-import java.io.IOException;
 import java.util.stream.Collectors;
 import org.eclipse.lsp4j.CompletionItem;
 import org.junit.Ignore;
@@ -13,7 +12,7 @@ import org.junit.Test;
 public class CompletionsTest extends CompletionsBase {
 
     @Test
-    public void staticMember() throws IOException {
+    public void staticMember() {
         var file = "/org/javacs/example/AutocompleteStaticMember.java";
 
         // Static methods
@@ -24,7 +23,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void staticReference() throws IOException {
+    public void staticReference() {
         var file = "/org/javacs/example/AutocompleteStaticReference.java";
 
         // Static methods
@@ -35,7 +34,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void member() throws IOException {
+    public void member() {
         var file = "/org/javacs/example/AutocompleteMember.java";
 
         // Virtual testMethods
@@ -61,7 +60,7 @@ public class CompletionsTest extends CompletionsBase {
 
     @Test
     @Ignore // This has been subsumed by Javadocs
-    public void throwsSignature() throws IOException {
+    public void throwsSignature() {
         var file = "/org/javacs/example/AutocompleteMember.java";
 
         // Static methods
@@ -74,7 +73,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void fieldFromInitBlock() throws IOException {
+    public void fieldFromInitBlock() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // f
@@ -84,7 +83,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void thisDotFieldFromInitBlock() throws IOException {
+    public void thisDotFieldFromInitBlock() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // this.f
@@ -95,7 +94,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void classDotFieldFromInitBlock() throws IOException {
+    public void classDotFieldFromInitBlock() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // AutocompleteMembers.f
@@ -106,7 +105,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void fieldFromMethod() throws IOException {
+    public void fieldFromMethod() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // f
@@ -118,7 +117,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void thisDotFieldFromMethod() throws IOException {
+    public void thisDotFieldFromMethod() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // this.f
@@ -129,7 +128,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void classDotFieldFromMethod() throws IOException {
+    public void classDotFieldFromMethod() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // AutocompleteMembers.f
@@ -140,7 +139,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void thisRefMethodFromMethod() throws IOException {
+    public void thisRefMethodFromMethod() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // this::m
@@ -151,7 +150,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void classRefMethodFromMethod() throws IOException {
+    public void classRefMethodFromMethod() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // AutocompleteMembers::m
@@ -163,7 +162,7 @@ public class CompletionsTest extends CompletionsBase {
 
     @Test
     @Ignore // javac doesn't give us helpful info about the fact that static initializers are static
-    public void fieldFromStaticInitBlock() throws IOException {
+    public void fieldFromStaticInitBlock() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // f
@@ -174,7 +173,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void classDotFieldFromStaticInitBlock() throws IOException {
+    public void classDotFieldFromStaticInitBlock() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // AutocompleteMembers.f
@@ -185,7 +184,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void classRefFieldFromStaticInitBlock() throws IOException {
+    public void classRefFieldFromStaticInitBlock() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // AutocompleteMembers::m
@@ -196,7 +195,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void fieldFromStaticMethod() throws IOException {
+    public void fieldFromStaticMethod() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // f
@@ -207,7 +206,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void classDotFieldFromStaticMethod() throws IOException {
+    public void classDotFieldFromStaticMethod() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // AutocompleteMembers.f
@@ -218,7 +217,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void classRefFieldFromStaticMethod() throws IOException {
+    public void classRefFieldFromStaticMethod() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
         // TODO
@@ -235,7 +234,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void otherMethod() throws IOException {
+    public void otherMethod() {
         var file = "/org/javacs/example/AutocompleteOther.java";
 
         // new AutocompleteMember().
@@ -248,7 +247,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void otherStatic() throws IOException {
+    public void otherStatic() {
         var file = "/org/javacs/example/AutocompleteOther.java";
 
         // AutocompleteMember.
@@ -261,7 +260,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void otherDotClassDot() throws IOException {
+    public void otherDotClassDot() {
         var file = "/org/javacs/example/AutocompleteOther.java";
 
         // AutocompleteMember.class.
@@ -275,7 +274,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void otherClass() throws IOException {
+    public void otherClass() {
         var file = "/org/javacs/example/AutocompleteOther.java";
 
         // Auto?
@@ -285,7 +284,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void arrayLength() throws IOException {
+    public void arrayLength() {
         var file = "/org/javacs/example/AutocompleteArray.java";
 
         // a.?
@@ -410,7 +409,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void fromClasspath() throws IOException {
+    public void fromClasspath() {
         var file = "/org/javacs/example/AutocompleteFromClasspath.java";
 
         // Static methods
@@ -422,7 +421,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void betweenLines() throws IOException {
+    public void betweenLines() {
         var file = "/org/javacs/example/AutocompleteBetweenLines.java";
 
         // Static methods
@@ -432,7 +431,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void reference() throws IOException {
+    public void reference() {
         var file = "/org/javacs/example/AutocompleteReference.java";
 
         // Static methods
@@ -444,7 +443,7 @@ public class CompletionsTest extends CompletionsBase {
 
     @Test
     @Ignore // This has been subsumed by Javadocs
-    public void docstring() throws IOException {
+    public void docstring() {
         var file = "/org/javacs/example/AutocompleteDocstring.java";
         var docstrings = documentation(file, 8, 14);
 
@@ -456,7 +455,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void classes() throws IOException {
+    public void classes() {
         var file = "/org/javacs/example/AutocompleteClasses.java";
 
         // Fix?
@@ -471,7 +470,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void editMethodName() throws IOException {
+    public void editMethodName() {
         var file = "/org/javacs/example/AutocompleteEditMethodName.java";
 
         // Static methods
@@ -482,7 +481,7 @@ public class CompletionsTest extends CompletionsBase {
 
     @Test
     @Ignore // This has been subsumed by Javadocs
-    public void restParams() throws IOException {
+    public void restParams() {
         var file = "/org/javacs/example/AutocompleteRest.java";
 
         // Static methods
@@ -495,7 +494,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void constructor() throws IOException {
+    public void constructor() {
         var file = "/org/javacs/example/AutocompleteConstructor.java";
 
         // Static methods
@@ -507,7 +506,7 @@ public class CompletionsTest extends CompletionsBase {
 
     @Ignore // We are now managing imports with FixImports
     @Test
-    public void autoImportConstructor() throws IOException {
+    public void autoImportConstructor() {
         var file = "/org/javacs/example/AutocompleteConstructor.java";
 
         // Static methods
@@ -525,7 +524,7 @@ public class CompletionsTest extends CompletionsBase {
 
     @Ignore
     @Test
-    public void importFromSource() throws IOException {
+    public void importFromSource() {
         var file = "/org/javacs/example/AutocompletePackage.java";
         var suggestions = insertText(file, 3, 12);
 
@@ -533,7 +532,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void importFromClasspath() throws IOException {
+    public void importFromClasspath() {
         var file = "/org/javacs/example/AutocompletePackage.java";
         var suggestions = insertText(file, 5, 13);
 
@@ -543,7 +542,7 @@ public class CompletionsTest extends CompletionsBase {
     // TODO top level of import
     @Ignore
     @Test
-    public void importFirstId() throws IOException {
+    public void importFirstId() {
         var file = "/org/javacs/example/AutocompletePackage.java";
 
         // import ?
@@ -553,7 +552,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void emptyClasspath() throws IOException {
+    public void emptyClasspath() {
         var file = "/org/javacs/example/AutocompletePackage.java";
 
         // Static methods
@@ -563,7 +562,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void importClass() throws IOException {
+    public void importClass() {
         var file = "/org/javacs/example/AutocompletePackage.java";
 
         // Static methods
@@ -584,7 +583,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void otherPackageId() throws IOException {
+    public void otherPackageId() {
         var file = "/org/javacs/example/AutocompleteOtherPackage.java";
 
         // Static methods
@@ -601,7 +600,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void fieldFromStaticInner() throws IOException {
+    public void fieldFromStaticInner() {
         var file = "/org/javacs/example/AutocompleteOuter.java";
 
         // Initializer of static inner class
@@ -613,7 +612,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void fieldFromInner() throws IOException {
+    public void fieldFromInner() {
         var file = "/org/javacs/example/AutocompleteOuter.java";
 
         // Initializer of inner class
@@ -624,7 +623,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void classDotClassFromMethod() throws IOException {
+    public void classDotClassFromMethod() {
         var file = "/org/javacs/example/AutocompleteInners.java";
 
         // AutocompleteInners.I
@@ -635,7 +634,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void innerClassFromMethod() throws IOException {
+    public void innerClassFromMethod() {
         var file = "/org/javacs/example/AutocompleteInners.java";
 
         // I
@@ -646,7 +645,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void newClassDotInnerClassFromMethod() throws IOException {
+    public void newClassDotInnerClassFromMethod() {
         var file = "/org/javacs/example/AutocompleteInners.java";
 
         // new AutocompleteInners.I
@@ -658,7 +657,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void newInnerClassFromMethod() throws IOException {
+    public void newInnerClassFromMethod() {
         var file = "/org/javacs/example/AutocompleteInners.java";
 
         // new Inner?
@@ -670,7 +669,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void innerEnum() throws IOException {
+    public void innerEnum() {
         var file = "/org/javacs/example/AutocompleteInners.java";
         var suggestions = insertText(file, 15, 40);
 
@@ -678,7 +677,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void switchCase() throws IOException {
+    public void switchCase() {
         var file = "/org/javacs/example/AutocompleteCase.java";
         var suggestions = insertText(file, 8, 18);
 
@@ -686,7 +685,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void staticStarImport() throws IOException {
+    public void staticStarImport() {
         var file = "/org/javacs/example/AutocompleteStaticImport.java";
         var suggestions = insertText(file, 9, 15);
 
@@ -694,7 +693,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void staticImport() throws IOException {
+    public void staticImport() {
         var file = "/org/javacs/example/AutocompleteStaticImport.java";
         var suggestions = insertText(file, 10, 10);
 
@@ -702,7 +701,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void staticImportSourcePath() throws IOException {
+    public void staticImportSourcePath() {
         var file = "/org/javacs/example/AutocompleteStaticImport.java";
         var suggestions = insertText(file, 11, 10);
 
@@ -717,7 +716,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void withinConstructor() throws IOException {
+    public void withinConstructor() {
         var file = "/org/javacs/example/AutocompleteContext.java";
         var suggestions = insertText(file, 8, 38);
 
@@ -726,7 +725,7 @@ public class CompletionsTest extends CompletionsBase {
 
     @Test
     @Ignore
-    public void onlySuggestOnce() throws IOException {
+    public void onlySuggestOnce() {
         var file = "/org/javacs/example/AutocompleteOnce.java";
         var suggestions = insertCount(file, 5, 18);
 
@@ -735,7 +734,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void overloadedOnSourcePath() throws IOException {
+    public void overloadedOnSourcePath() {
         var file = "/org/javacs/example/OverloadedMethod.java";
         var detail = detail(file, 9, 13);
 
@@ -745,7 +744,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void overloadedOnClassPath() throws IOException {
+    public void overloadedOnClassPath() {
         var file = "/org/javacs/example/OverloadedMethod.java";
         var detail = detail(file, 10, 26);
 
@@ -755,7 +754,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void packageName() throws IOException {
+    public void packageName() {
         var file = "/org/javacs/example/AutocompletePackageName.java";
         var suggestions = insertText(file, 1, 5);
 
@@ -763,7 +762,7 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void className() throws IOException {
+    public void className() {
         var file = "/org/javacs/example/AutocompleteClassName.java";
         var suggestions = insertText(file, 1, 2);
 
