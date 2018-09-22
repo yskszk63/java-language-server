@@ -538,6 +538,7 @@ public class JavaCompilerService {
     }
 
     private static String[] TOP_LEVEL_KEYWORDS = {
+        "package",
         "import",
         "public",
         "private",
@@ -698,17 +699,30 @@ public class JavaCompilerService {
                     var partialName = Objects.toString(node.getName(), "");
                     // Add keywords
                     if (insideClass == 0) {
-                        for (var k : TOP_LEVEL_KEYWORDS) {
-                            if (k.startsWith(partialName)) {
-                                result.add(Completion.ofKeyword(k));
-                            }
-                        }
                         // If no package declaration is present, suggest package [inferred name];
                         if (parse.getPackage() == null) {
                             relativeToSourcePath(file).ifPresent(relative -> {
                                 var name = relative.toString().replace(File.separatorChar, '.');
                                 result.add(Completion.ofSnippet("package " + name + ";\n\n"));
                             });
+                        }
+                        // If no class declaration is present, suggest class [file name]
+                        var hasClassDeclaration = false;
+                        for (var t : parse.getTypeDecls()) {
+                            if (!(t instanceof ErroneousTree)) {
+                                hasClassDeclaration = true;
+                            }
+                        }
+                        if (!hasClassDeclaration) {
+                            var name = Paths.get(file).getFileName().toString();
+                            name = name.substring(0, name.length() - ".java".length());
+                            result.add(Completion.ofSnippet("class " + name + " {\n    $0\n}"));
+                        }
+                        // Add keywords
+                        for (var k : TOP_LEVEL_KEYWORDS) {
+                            if (k.startsWith(partialName)) {
+                                result.add(Completion.ofKeyword(k));
+                            }
                         }
                     }
                     else if (insideMethod == 0) {

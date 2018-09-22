@@ -5,7 +5,6 @@
 - Workspace root as source path crashes compiler
 
 ## Autocomplete
-- public [class NameOfFile]
 - NameOfClass... default constructor initializing final fields
 - im[plements]
 - Annotation fields

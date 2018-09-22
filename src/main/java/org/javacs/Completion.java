@@ -11,7 +11,7 @@ public class Completion {
     public final PackagePart packagePart;
     public final String keyword;
     public final String notImportedClass;
-    public final String snippet;
+    public final String snippet; // TODO separate label and insertText
 
     private Completion(
             Element element, PackagePart packagePart, String keyword, String notImportedClass, String snippet) {

@@ -92,22 +92,28 @@ class JavaTextDocumentService implements TextDocumentService {
                 i.setKind(completionItemKind(c.element));
                 // Detailed name will be resolved later, using docs to fill in method names
                 if (!(c.element instanceof ExecutableElement)) i.setDetail(c.element.toString());
+                i.setSortText(1 + i.getLabel());
             } else if (c.packagePart != null) {
                 i.setLabel(c.packagePart.name);
                 i.setKind(CompletionItemKind.Module);
                 i.setDetail(c.packagePart.fullName);
+                i.setSortText(1 + i.getLabel());
             } else if (c.keyword != null) {
                 i.setLabel(c.keyword);
                 i.setKind(CompletionItemKind.Keyword);
                 i.setDetail("keyword");
+                i.setSortText(1 + i.getLabel());
             } else if (c.notImportedClass != null) {
                 i.setLabel(Parser.lastName(c.notImportedClass));
                 i.setKind(CompletionItemKind.Class);
                 i.setDetail(c.notImportedClass);
+                i.setSortText(1 + i.getLabel());
             } else if (c.snippet != null) {
                 i.setLabel(c.snippet);
                 i.setKind(CompletionItemKind.Snippet);
+                i.setInsertText(c.snippet);
                 i.setInsertTextFormat(InsertTextFormat.Snippet);
+                i.setSortText(0 + i.getLabel());
             } else throw new RuntimeException(c + " is not valid");
 
             result.add(i);

@@ -759,6 +759,14 @@ public class CompletionsTest extends CompletionsBase {
         var file = "/org/javacs/example/AutocompletePackageName.java";
         var suggestions = insertText(file, 1, 5);
 
-        assertThat(suggestions, contains("package org.javacs.example;\n\n"));
+        assertThat(suggestions, hasItem(startsWith("package org.javacs.example;")));
+    }
+
+    @Test
+    public void className() throws IOException {
+        var file = "/org/javacs/example/AutocompleteClassName.java";
+        var suggestions = insertText(file, 1, 2);
+
+        assertThat(suggestions, hasItem(startsWith("class AutocompleteClassName")));
     }
 }
