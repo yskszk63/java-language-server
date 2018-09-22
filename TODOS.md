@@ -6,7 +6,6 @@
 
 ## Autocomplete
 - NameOfClass... default constructor initializing final fields
-- im[plements]
 - Annotation fields
 - cc should match CamelCase
 

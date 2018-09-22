@@ -619,6 +619,7 @@ public class JavaCompilerService {
         "abstract",
         "class",
         "interface",
+        "implements",
     };
 
     private static String[] CLASS_BODY_KEYWORDS = {
@@ -824,28 +825,24 @@ public class JavaCompilerService {
                     completeScopeIdentifiers(partialName);
                     // Add keywords
                     if (insideClass == 0) {
-                        for (var k : TOP_LEVEL_KEYWORDS) {
-                            if (k.startsWith(partialName)) {
-                                result.add(Completion.ofKeyword(k));
-                            }
-                        }
+                        addKeywords(TOP_LEVEL_KEYWORDS, partialName);
                     }
                     else if (insideMethod == 0) {
-                        for (var k : CLASS_BODY_KEYWORDS) {
-                            if (k.startsWith(partialName)) {
-                                result.add(Completion.ofKeyword(k));
-                            }
-                        }
+                        addKeywords(CLASS_BODY_KEYWORDS, partialName);
                     }
                     else {
-                        for (var k : METHOD_BODY_KEYWORDS) {
-                            if (k.startsWith(partialName)) {
-                                result.add(Completion.ofKeyword(k));
-                            }
-                        }
+                        addKeywords(METHOD_BODY_KEYWORDS, partialName);
                     }
                 }
                 return null;
+            }
+
+            private void addKeywords(String[] keywords, String partialName) {
+                for (var k : keywords) {
+                    if (k.startsWith(partialName)) {
+                        result.add(Completion.ofKeyword(k));
+                    }
+                }
             }
 
             private void completeScopeIdentifiers(String partialName) {
@@ -941,7 +938,10 @@ public class JavaCompilerService {
 
             CompletionResult run() {
                 scan(parse, null);
-                if (result == null) result = Collections.emptyList();
+                if (result == null) {
+                    result = new ArrayList<>();
+                    addKeywords(TOP_LEVEL_KEYWORDS, "");
+                }
                 if (isIncomplete) LOG.info(String.format("Found %d items (incomplete)", result.size()));
                 return new CompletionResult(result, isIncomplete);
             }

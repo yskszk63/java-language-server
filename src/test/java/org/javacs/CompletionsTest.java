@@ -784,4 +784,12 @@ public class CompletionsTest extends CompletionsBase {
 
         assertThat(suggestions, hasItem(containsString("void superMethod() {")));
     }
+
+    @Test
+    public void implementsKeyword() {
+        var file = "/org/javacs/example/AutocompleteImplements.java";
+        var suggestions = insertText(file, 3, 34);
+
+        assertThat(suggestions, hasItem(containsString("implements")));
+    }
 }
