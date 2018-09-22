@@ -16,17 +16,14 @@ public final class Urls {
      */
     public static URL pathToUrl(String path) {
         try {
-            if (isSystemPath(path))
-                return Paths.get(path).toUri().toURL();
-            else
-                return new URL(path);
+            if (isSystemPath(path)) return Paths.get(path).toUri().toURL();
+            else return new URL(path);
         } catch (MalformedURLException e) {
             throw new RuntimeException("Failed to parse path " + path, e);
         }
     }
 
     private static boolean isSystemPath(String path) {
-        return path.startsWith("/") ||
-            path.matches("^[a-zA-Z]:[/\\\\].*");
+        return path.startsWith("/") || path.matches("^[a-zA-Z]:[/\\\\].*");
     }
 }
