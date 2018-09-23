@@ -21,7 +21,7 @@ class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
 
     private Path workspaceRoot;
-    private LanguageClient client;
+    private CustomLanguageClient client;
     private Set<String> externalDependencies = Set.of();
     private Set<Path> classPath = Set.of();
 
@@ -94,27 +94,41 @@ class JavaLanguageServer implements LanguageServer {
     private JavaCompilerService createCompiler() {
         Objects.requireNonNull(workspaceRoot, "Can't create compiler because workspaceRoot has not been initialized");
 
+        client.javaStartProgress(new JavaStartProgressParams("Configure javac"));
+        client.javaReportProgress(new JavaReportProgressParams("Finding source roots"));
+
+        var sourcePath = InferSourcePath.sourcePath(workspaceRoot); // TODO show each folder as we find it
+
         // If classpath is specified by the user, don't infer anything
         if (!classPath.isEmpty()) {
-            return new JavaCompilerService(
-                    InferSourcePath.sourcePath(workspaceRoot), classPath, Collections.emptySet());
+            client.javaEndProgress();
+            return new JavaCompilerService(sourcePath, classPath, Collections.emptySet());
         }
         // Otherwise, combine inference with user-specified external dependencies
         else {
             var infer = new InferConfig(workspaceRoot, externalDependencies);
-            return new JavaCompilerService(
-                    InferSourcePath.sourcePath(workspaceRoot), infer.classPath(), infer.buildDocPath());
+
+            client.javaReportProgress(new JavaReportProgressParams("Inferring class path"));
+            var classPath = infer.classPath();
+
+            client.javaReportProgress(new JavaReportProgressParams("Inferring doc path"));
+            var docPath = infer.buildDocPath();
+
+            client.javaEndProgress();
+            return new JavaCompilerService(sourcePath, classPath, docPath);
         }
     }
 
     void setExternalDependencies(Set<String> externalDependencies) {
-        var changed = this.externalDependencies.isEmpty() != externalDependencies.isEmpty();
+        var changed =
+                this.externalDependencies.isEmpty()
+                        != externalDependencies.isEmpty(); // TODO shouldn't this be any change?
         this.externalDependencies = externalDependencies;
         if (changed) this.compiler = createCompiler();
     }
 
     void setClassPath(Set<Path> classPath) {
-        var changed = this.classPath.isEmpty() != classPath.isEmpty();
+        var changed = this.classPath.isEmpty() != classPath.isEmpty(); // TODO shouldn't this be any change?
         this.classPath = classPath;
         if (changed) this.compiler = createCompiler();
     }
@@ -122,7 +136,6 @@ class JavaLanguageServer implements LanguageServer {
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
         this.workspaceRoot = Paths.get(URI.create(params.getRootUri()));
-        this.compiler = createCompiler();
 
         var result = new InitializeResult();
         var c = new ServerCapabilities();
@@ -144,6 +157,11 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     @Override
+    public void initialized(InitializedParams params) {
+        this.compiler = createCompiler();
+    }
+
+    @Override
     public CompletableFuture<Object> shutdown() {
         return CompletableFuture.completedFuture(null);
     }
@@ -161,7 +179,7 @@ class JavaLanguageServer implements LanguageServer {
         return workspace;
     }
 
-    void installClient(LanguageClient client) {
+    void installClient(CustomLanguageClient client) {
         this.client = client;
     }
 }

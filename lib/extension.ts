@@ -3,9 +3,9 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as Path from "path";
 import * as FS from "fs";
-import { window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction } from 'vscode';
+import { window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation } from 'vscode';
 
-import {LanguageClient, LanguageClientOptions, ServerOptions} from "vscode-languageclient";
+import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType} from "vscode-languageclient";
 
 /** Called when extension is activated */
 export function activate(context: ExtensionContext) {
@@ -44,6 +44,8 @@ export function activate(context: ExtensionContext) {
     let args = [
         '-cp', fatJar, 
         '-Xverify:none', // helps VisualVM avoid 'error 62'
+        '-Xdebug',
+        // '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005',
         'org.javacs.Main'
     ];
     
@@ -93,8 +95,8 @@ export function activate(context: ExtensionContext) {
     })
 
     // Create the language client and start the client.
-    let languageClient = new LanguageClient('java', 'Java Language Server', serverOptions, clientOptions);
-    let disposable = languageClient.start();
+    let client = new LanguageClient('java', 'Java Language Server', serverOptions, clientOptions);
+    let disposable = client.start();
 
     // Push the disposable to the context's subscriptions so that the 
     // client can be deactivated on extension deactivation
@@ -102,6 +104,9 @@ export function activate(context: ExtensionContext) {
 
     // Register test commands
 	commands.registerCommand('java.command.test.run', runTest);
+
+	// When the language client activates, register a progress-listener
+	client.onReady().then(() => createProgressListeners(client));
 }
 
 function findJavaExecutable(binname: string) {
@@ -213,4 +218,48 @@ function templateCommand(command: string[], enclosingClass: string, method: stri
         replaced[i] = command[i].replace('${class}', enclosingClass).replace('${method}', method)
     }
     return new ShellExecution(replaced[0], replaced.slice(1))
+}
+
+interface ProgressMessage {
+	message: string 
+}
+
+function createProgressListeners(client: LanguageClient) {
+	// Create a "checking files" progress indicator
+	let progressListener = new class {
+		progress: Progress<{message?: string}>
+		resolve: (nothing: {}) => void
+		
+		startProgress(message: string) {
+            if (this.progress != null)
+                this.endProgress();
+
+            window.withProgress({title: message, location: ProgressLocation.Notification}, progress => new Promise((resolve, _reject) => {
+                this.progress = progress;
+                this.resolve = resolve;
+            }));
+		}
+		
+		reportProgress(message: string) {
+            this.progress.report({message});
+		}
+
+		endProgress() {
+            if (this.progress != null) {
+                this.resolve({});
+                this.progress = null;
+                this.resolve = null;
+            }
+		}
+	}
+	// Use custom notifications to drive progressListener
+	client.onNotification(new NotificationType('java/startProgress'), (event: ProgressMessage) => {
+		progressListener.startProgress(event.message);
+	});
+	client.onNotification(new NotificationType('java/reportProgress'), (event: ProgressMessage) => {
+		progressListener.reportProgress(event.message);
+	});
+	client.onNotification(new NotificationType('java/endProgress'), () => {
+		progressListener.endProgress();
+	});
 }

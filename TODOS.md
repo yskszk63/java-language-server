@@ -24,6 +24,10 @@
 ## Polish
 - Status bar during startup
 - Convert {@tag ...} to `<tag>...</tag>` (see vscode-java)
+- Semantic coloring beta feature
+
+## Simplicity
+Use module-info.java instead of build files to figure out classpath
 
 ## JShell
 - Support .jshell extension as "scratch pad"

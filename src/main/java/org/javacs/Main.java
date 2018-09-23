@@ -3,7 +3,7 @@ package org.javacs;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.eclipse.lsp4j.launch.LSPLauncher;
+import org.eclipse.lsp4j.jsonrpc.*;
 
 public class Main {
     private static final Logger LOG = Logger.getLogger("main");
@@ -22,8 +22,13 @@ public class Main {
             var server = new JavaLanguageServer();
             var threads = Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "client"));
             var launcher =
-                    LSPLauncher.createServerLauncher(
-                            server, System.in, System.out, threads, messageConsumer -> messageConsumer);
+                    new Launcher.Builder<CustomLanguageClient>()
+                            .setLocalService(server)
+                            .setRemoteInterface(CustomLanguageClient.class)
+                            .setInput(System.in)
+                            .setOutput(System.out)
+                            .setExecutorService(threads)
+                            .create();
 
             server.installClient(launcher.getRemoteProxy());
             launcher.startListening();
