@@ -11,7 +11,6 @@ import org.eclipse.lsp4j.MessageActionItem;
 import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
 import org.eclipse.lsp4j.ShowMessageRequestParams;
-import org.eclipse.lsp4j.services.LanguageClient;
 
 class LanguageServerFixture {
 
@@ -28,7 +27,7 @@ class LanguageServerFixture {
     static JavaLanguageServer getJavaLanguageServer(Path workspaceRoot, Consumer<Diagnostic> onError) {
         return getJavaLanguageServer(
                 workspaceRoot,
-                new LanguageClient() {
+                new CustomLanguageClient() {
                     @Override
                     public void telemetryEvent(Object o) {}
 
@@ -48,17 +47,27 @@ class LanguageServerFixture {
 
                     @Override
                     public void logMessage(MessageParams messageParams) {}
+
+                    @Override
+                    public void javaStartProgress(JavaStartProgressParams params) {}
+
+                    @Override
+                    public void javaReportProgress(JavaReportProgressParams params) {}
+
+                    @Override
+                    public void javaEndProgress() {}
                 });
     }
 
-    private static JavaLanguageServer getJavaLanguageServer(Path workspaceRoot, LanguageClient client) {
+    private static JavaLanguageServer getJavaLanguageServer(Path workspaceRoot, CustomLanguageClient client) {
         var server = new JavaLanguageServer();
         var init = new InitializeParams();
 
         init.setRootUri(workspaceRoot.toUri().toString());
 
-        server.initialize(init);
         server.installClient(client);
+        server.initialize(init);
+        server.initialized(null);
 
         return server;
     }
