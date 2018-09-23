@@ -1,3 +1,3 @@
-FROM circleci/openjdk:8-jdk
+FROM circleci/openjdk:10-jdk
 
-RUN sudo apt-get install openjdk-8-source
+RUN sudo apt-get install openjdk-10-source
