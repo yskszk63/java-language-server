@@ -27,7 +27,8 @@
 - Semantic coloring beta feature
 
 ## Simplicity
-Use module-info.java instead of build files to figure out classpath
+- Use module-info.java instead of build files to figure out classpath
+- Link a standalone executable with jlink (scripts/link.sh)
 
 ## JShell
 - Support .jshell extension as "scratch pad"
