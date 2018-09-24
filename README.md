@@ -3,13 +3,13 @@
 Provides Java support using the Java Compiler API.
 Requires that you have Java 10 installed on your system.
 
-[![CircleCI](https://circleci.com/gh/georgewfraser/vscode-javac.png)](https://circleci.com/gh/georgewfraser/vscode-javac)
+[![CircleCI](https://circleci.com/gh/georgewfraser/java-language-server.png)](https://circleci.com/gh/georgewfraser/java-language-server)
 
 ## Installation
 
 [Install from the VS Code marketplace](https://marketplace.visualstudio.com/items?itemName=georgewfraser.vscode-javac)
 
-## [Issues](https://github.com/georgewfraser/vscode-javac/issues)
+## [Issues](https://github.com/georgewfraser/java-language-server/issues)
 
 ## Features
 

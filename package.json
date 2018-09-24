@@ -7,7 +7,7 @@
     "publisher": "georgewfraser",
     "repository": {
         "type": "git",
-        "url": "https://github.com/georgewfraser/vscode-javac"
+        "url": "https://github.com/georgewfraser/java-language-server"
     },
     "license": "MIT",
     "engines": {
