@@ -1,7 +1,6 @@
-# Language Server for Java using the [Java Compiler API](https://docs.oracle.com/javase/7/docs/api/javax/tools/JavaCompiler.html)
+# Language Server for Java using the [Java compiler API](https://docs.oracle.com/javase/10/docs/api/jdk.compiler-summary.html) 
 
-Provides Java support using the Java Compiler API.
-Requires that you have Java 10 installed on your system.
+A Java [language server](https://github.com/Microsoft/vscode-languageserver-protocol) implemented using the Java compiler API. Requires that you have Java 10 installed on your system.
 
 [![CircleCI](https://circleci.com/gh/georgewfraser/java-language-server.png)](https://circleci.com/gh/georgewfraser/java-language-server)
 
@@ -59,15 +58,14 @@ Requires that you have Java 10 installed on your system.
 
 ## Usage
 
-VSCode will provide autocomplete and help text using:
+The language server will provide autocomplete and other features using:
 * .java files anywhere in your workspace
 * Java platform classes
 * External dependencies specified using `pom.xml`, Bazel, or [settings](#Settings)
 
 ## Settings
 
-If VSCode doesn't detect your external dependencies automatically, 
-you can specify your external dependencies using [.vscode/settings.json](https://code.visualstudio.com/docs/getstarted/settings)
+If the language server doesn't detect your external dependencies automatically, you can specify them using [.vscode/settings.json](https://code.visualstudio.com/docs/getstarted/settings)
 
 ```json
 {
@@ -92,8 +90,7 @@ You can generate a list of external dependencies using your build tool:
 * Maven: `mvn dependency:list` 
 * Gradle: `gradle dependencies`
 
-The Java language server will look for the dependencies you specify in `java.externalDependencies` in your Maven and Gradle caches `~/.m2` and `~/.gradle`.
-You should use your build tool to download the library *and* source jars of all your dependencies so that the Java language server can find them:
+The Java language server will look for the dependencies you specify in `java.externalDependencies` in your Maven and Gradle caches `~/.m2` and `~/.gradle`. You should use your build tool to download the library *and* source jars of all your dependencies so that the Java language server can find them:
 * Maven
   * `mvn dependency:resolve` for compilation and autocomplete
   * `mvn dependency:resolve -Dclassifier=sources` for inline Javadoc help
@@ -109,31 +106,51 @@ You should use your build tool to download the library *and* source jars of all 
     
 ## Design
 
-This extension consists of an external java process, 
-which communicates with vscode using the [language server protocol](https://github.com/Microsoft/vscode-languageserver-protocol). 
-
-### Java service process
-
-The java service process uses the standard implementation of the Java compiler.
-When VS Code needs to lint a file, perform autocomplete, 
-or some other task that requires Java code insight,
-the java service process invokes the Java compiler programatically,
-then intercepts the data structures the Java compiler uses to represent source trees and types.
+The Java language server uses the [Java compiler API](https://docs.oracle.com/javase/10/docs/api/jdk.compiler-summary.html) to implement language features like linting, autocomplete, and smart navigation, and the [language server protocol](https://github.com/Microsoft/vscode-languageserver-protocol) to communicate with text editors like VSCode.
 
 ### Incremental updates
 
-The Java compiler isn't designed for incremental parsing and analysis.
-However, it is *extremely* fast, so recompiling a single file gives good performance,
-as long as we don't also recompile all of its dependencies.
+The Java compiler API provides incremental compilation at the level of files: you can create a long-lived instance of the Java compiler, and as the user edits, you only need to recompile files that have changed. The Java language server optimizes this further by *focusing* compilation on the region of interest by erasing irrelevant code. For example, suppose we want to provide autocomplete after `print` in the below code:
+
+```java
+class Printer {
+    void printFoo() {
+        System.out.println("foo");
+    }
+    void printBar() {
+        System.out.println("bar");
+    }
+    void main() {
+        print // Autocomplete here
+    }
+}
+```
+
+None of the code inside `printFoo()` and `printBar()` is relevant to autocompleting `print`. Before servicing the autocomplete request, the Java language server erases the contents of these methods:
+
+```java
+class Printer {
+    void printFoo() {
+        
+    }
+    void printBar() {
+        
+    }
+    void main() {
+        print // Autocomplete here
+    }
+}
+```
+
+For most requests, the vast majority of code can be erased, dramatically speeding up compilation.
 
 ## Logs
 
-The java service process will output a log file to stdout, which is visible using View / Output.
+The java service process will output a log file to stderr, which is visible in VSCode using View / Output, under "Java".
 
 ## Contributing
 
-If you have npm and maven installed,
-you should be able to install locally using 
+If you have npm and maven installed, you should be able to install locally using 
 
     npm install -g vsce
     npm install
