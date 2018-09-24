@@ -123,7 +123,7 @@ class Classes {
                                     }
                                 });
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                LOG.log(Level.WARNING, "Failed indexing module " + m, e);
             }
         }
 
