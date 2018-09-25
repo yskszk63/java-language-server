@@ -686,7 +686,7 @@
 									"match": "([a-zA-Z$_][\\.a-zA-Z0-9$_]*)\\s*(\\w+)?",
 									"captures": {
 										"1": {
-											"name": "storage.type.java"
+											"name": "entity.name.type.java"
 										},
 										"2": {
 											"name": "variable.parameter.java"
@@ -784,7 +784,7 @@
 					"match": "(?<!\\.)([a-zA-Z$_][a-zA-Z0-9$_]*)(?=\\s*<)",
 					"captures": {
 						"1": {
-							"name": "storage.type.java"
+							"name": "entity.name.type.java"
 						}
 					}
 				},
@@ -793,7 +793,7 @@
 				},
 				{
 					"match": "[a-zA-Z$_][a-zA-Z0-9$_]*",
-					"name": "storage.type.generic.java"
+					"name": "entity.name.type.generic.java"
 				},
 				{
 					"match": "\\?",
@@ -1136,7 +1136,7 @@
 							"name": "punctuation.separator.period.java"
 						},
 						"2": {
-							"name": "storage.type.object.array.java"
+							"name": "entity.name.type.object.array.java"
 						}
 					},
 					"end": "(?!\\s*\\[)",
@@ -1153,7 +1153,7 @@
 					"begin": "\\b((?:[A-Z]\\w*\\s*(\\.)\\s*)*[A-Z]\\w*)\\s*(?=<)",
 					"beginCaptures": {
 						"1": {
-							"name": "storage.type.java"
+							"name": "entity.name.type.java"
 						},
 						"2": {
 							"name": "punctuation.separator.period.java"
@@ -1168,7 +1168,7 @@
 				},
 				{
 					"match": "\\b(?:[A-Z]\\w*\\s*(\\.)\\s*)*[A-Z]\\w*\\b((?=\\s*[A-Za-z$_\\n])|(?=\\s*\\.\\.\\.))",
-					"name": "storage.type.java",
+					"name": "entity.name.type.java",
 					"captures": {
 						"1": {
 							"name": "punctuation.separator.period.java"
@@ -1419,7 +1419,7 @@
 				},
 				{
 					"match": "[a-zA-Z$_][\\.a-zA-Z0-9$_]*",
-					"name": "storage.type.java"
+					"name": "entity.name.type.java"
 				}
 			]
 		},
