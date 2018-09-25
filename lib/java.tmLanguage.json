@@ -66,7 +66,7 @@
 				}
 			},
 			"name": "meta.import.java",
-			"contentName": "storage.modifier.import.java",
+			"contentName": "entity.name.type.import.java",
 			"patterns": [
 				{
 					"include": "#comments"
@@ -446,9 +446,6 @@
 				},
 				{
 					"include": "#function-call"
-				},
-				{
-					"include": "#objects"
 				},
 				{
 					"include": "#properties"
@@ -1197,10 +1194,7 @@
 				}
 			]
 		},
-		"objects": {
-			"match": "(?<![\\w$])[a-zA-Z_$][\\w$]*(?=\\s*\\.\\s*[\\w$]+)",
-			"name": "variable.other.object.java"
-		},
+		
 		"parameters": {
 			"patterns": [
 				{
@@ -1429,12 +1423,7 @@
 			"name": "meta.definition.variable.java",
 			"patterns": [
 				{
-					"match": "([A-Za-z$_][\\w$]*)(?=\\s*(\\[\\])*\\s*(;|=|,))",
-					"captures": {
-						"1": {
-							"name": "variable.other.definition.java"
-						}
-					}
+					"match": "([A-Za-z$_][\\w$]*)(?=\\s*(\\[\\])*\\s*(;|=|,))"
 				},
 				{
 					"include": "#all-types"
