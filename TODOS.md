@@ -4,28 +4,17 @@
 - import static foo.? doesn't auto-complete
 - Workspace root as source path crashes compiler
 - Nested source roots don't make sense
+- @Override snippets include duplicates
 
 ## Autocomplete
-- NameOfClass... default constructor initializing final fields
 - Annotation fields
 - cc should match CamelCase
 
 ## Navigation
 - Go-to-subclasses
 
-## Code generation
-- Auto-add 'throws ?'
-- New .java file class boilerplate
-- Missing method definition
-- Use var types to disambiguate imports
-- Generate catch clauses somehow
-- Implement error-prone [patch](https://errorprone.info/docs/patching)
-- Custom refaster rules
-
 ## Polish
-- Status bar during startup
 - Convert {@tag ...} to `<tag>...</tag>` (see vscode-java)
-- Semantic coloring beta feature
 - Auto-collapse imports
 
 ## Simplicity
