@@ -22,6 +22,7 @@ import javax.lang.model.element.*;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.TextDocumentService;
+import org.eclipse.lsp4j.util.SemanticHighlightingTokens;
 
 class JavaTextDocumentService implements TextDocumentService {
     private final JavaLanguageServer server;
@@ -520,12 +521,20 @@ class JavaTextDocumentService implements TextDocumentService {
         return uri.getPath().endsWith(".java");
     }
 
+    private void updateSemanticColoring(URI file) {
+        var lines = new ArrayList<SemanticHighlightingInformation>();
+        SemanticHighlightingTokens.Token x;
+        server.client.semanticHighlighting(
+                new SemanticHighlightingParams(new TextDocumentIdentifier(file.toString()), lines));
+    }
+
     @Override
     public void didOpen(DidOpenTextDocumentParams params) {
         var document = params.getTextDocument();
         var uri = URI.create(document.getUri());
         if (isJava(uri)) {
             activeDocuments.put(uri, new VersionedContent(document.getText(), document.getVersion()));
+            updateSemanticColoring(uri);
             server.lint(Collections.singleton(uri));
         }
     }

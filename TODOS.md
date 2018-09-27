@@ -26,6 +26,8 @@
 - Status bar during startup
 - Convert {@tag ...} to `<tag>...</tag>` (see vscode-java)
 - Semantic coloring beta feature
+  - Statics *italic*
+  - Outer scope _underline_
 - Auto-collapse imports
 
 ## Simplicity

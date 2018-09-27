@@ -21,10 +21,10 @@ class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
 
     private Path workspaceRoot;
-    private CustomLanguageClient client;
     private Set<String> externalDependencies = Set.of();
     private Set<Path> classPath = Set.of();
 
+    CustomLanguageClient client;
     JavaCompilerService compiler;
     final JavaTextDocumentService textDocuments = new JavaTextDocumentService(this);
     final JavaWorkspaceService workspace = new JavaWorkspaceService(this);
