@@ -154,4 +154,4 @@ If you have npm and maven installed, you should be able to install locally using
 
     npm install -g vsce
     npm install
-    ./scripts/install.sh
+    ./scripts/build.sh
