@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.*;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.function.*;
 import java.util.logging.Level;
@@ -657,7 +659,9 @@ public class JavaCompilerService {
      * expression before the cursor looks like `foo.bar` or `foo`
      */
     public CompletionResult completions(URI file, String contents, int line, int character, int limitHint) {
+        var started = Instant.now();
         LOG.info(String.format("Completing at %s[%d,%d]...", file.getPath(), line, character));
+        
         // TODO why not just recompile? It's going to get triggered shortly anyway
         var task = singleFileTask(file, contents);
         CompilationUnitTree parse;
@@ -926,7 +930,10 @@ public class JavaCompilerService {
                 return new CompletionResult(result, isIncomplete);
             }
         }
-        return new Find().run();
+        var result = new Find().run();
+        
+        LOG.info(String.format("...completed in %d ms", Duration.between(started, Instant.now()).toMillis()));
+        return result;
     }
 
     /** Find all overloads for the smallest method call that includes the cursor */
