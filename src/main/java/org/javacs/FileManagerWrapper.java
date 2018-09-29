@@ -4,18 +4,25 @@ import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.Set;
 import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
+import javax.tools.StandardLocation;
 
-class HideModuleInfo implements StandardJavaFileManager {
+class FileManagerWrapper implements StandardJavaFileManager {
     private final StandardJavaFileManager delegate;
 
-    HideModuleInfo(StandardJavaFileManager delegate) {
+    FileManagerWrapper(StandardJavaFileManager delegate) {
         this.delegate = delegate;
     }
 
@@ -135,10 +142,70 @@ class HideModuleInfo implements StandardJavaFileManager {
         return delegate.getClassLoader(location);
     }
 
+    // Cache calls to list(...)
+    static class Key {
+        final Location location;
+        final String packageName;
+        final JavaFileObject.Kind kind;
+        final boolean recurse;
+
+        Key(Location location, String packageName, JavaFileObject.Kind kind, boolean recurse) {
+            this.location = location;
+            this.packageName = packageName;
+            this.kind = kind;
+            this.recurse = recurse;
+        }
+
+        @Override
+        public boolean equals(Object candidate) {
+            if (!(candidate instanceof Key)) return false;
+            var that = (Key) candidate;
+
+            return Objects.equals(this.location, that.location)
+                    && Objects.equals(this.packageName, that.packageName)
+                    && Objects.equals(this.kind, that.kind)
+                    && Objects.equals(this.recurse, that.recurse);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(location, packageName, kind, recurse);
+        }
+    }
+
+    // Store previous calls to list, because listing directories and .jar files is expensive
+    private Map<Key, List<JavaFileObject>> cache = new HashMap<>();
+
+    private List<JavaFileObject> loadCache(Key key) {
+        try {
+            var list = new ArrayList<JavaFileObject>();
+            var it =
+                    removeModuleInfoInvariant(
+                            delegate.list(key.location, key.packageName, Collections.singleton(key.kind), key.recurse));
+            for (var file : it) list.add(file);
+            return list;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @Override
     public Iterable<JavaFileObject> list(
             Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
-        return removeModuleInfoInvariant(delegate.list(location, packageName, kinds, recurse));
+        // If search source path, skip cache
+        // TODO does this actually do anything?
+        if (location == StandardLocation.SOURCE_PATH
+                || location == StandardLocation.MODULE_SOURCE_PATH
+                || location == StandardLocation.SOURCE_OUTPUT)
+            return removeModuleInfoInvariant(delegate.list(location, packageName, kinds, recurse));
+
+        // Search for each kind separately to improve cacheability
+        var result = new ArrayList<JavaFileObject>();
+        for (var kind : kinds) {
+            var list = cache.computeIfAbsent(new Key(location, packageName, kind, recurse), this::loadCache);
+            result.addAll(list);
+        }
+        return result;
     }
 
     @Override

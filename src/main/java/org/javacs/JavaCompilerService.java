@@ -35,7 +35,7 @@ public class JavaCompilerService {
     private final List<Diagnostic<? extends JavaFileObject>> diags = new ArrayList<>();
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files
     private final StandardJavaFileManager fileManager =
-            new HideModuleInfo(compiler.getStandardFileManager(diags::add, null, Charset.defaultCharset()));
+            new FileManagerWrapper(compiler.getStandardFileManager(diags::add, null, Charset.defaultCharset()));
     // Cache a single compiled file
     // Since the user can only edit one file at a time, this should be sufficient
     private Cache cache;
