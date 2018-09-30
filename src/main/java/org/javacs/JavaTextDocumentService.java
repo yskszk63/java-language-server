@@ -541,7 +541,7 @@ class JavaTextDocumentService implements TextDocumentService {
             if (document.getVersion() > existing.version) {
                 for (var change : params.getContentChanges()) {
                     if (change.getRange() == null)
-                        activeDocuments.put(uri, new VersionedContent(change.getText(), document.getVersion()));
+                        newText = change.getText();
                     else newText = patch(newText, change);
                 }
 
