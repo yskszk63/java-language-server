@@ -12,11 +12,7 @@ formatter_cmd="java -jar ${formatter_jar}"
 # Format file in-place and use 4-space style (AOSP).
 formatter_args="--replace --aosp"
 
-changed_java_files=($(git diff --name-only --diff-filter=ACMR src/main/java src/test/java \
-    | grep ".*java$" \
-    | sed "s:^:${root_dir}/:"))
+changed_java_files=($(find src/main/java src/test/java -name '*.java'))
 
 # If we have changed java files, format them!
-if [ ${#changed_java_files[@]} -gt 0 ]; then
-    eval ${formatter_cmd} ${formatter_args} "${changed_java_files[@]}"
-fi
+eval ${formatter_cmd} ${formatter_args} "${changed_java_files[@]}"

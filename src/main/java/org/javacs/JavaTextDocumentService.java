@@ -540,8 +540,7 @@ class JavaTextDocumentService implements TextDocumentService {
 
             if (document.getVersion() > existing.version) {
                 for (var change : params.getContentChanges()) {
-                    if (change.getRange() == null)
-                        newText = change.getText();
+                    if (change.getRange() == null) newText = change.getText();
                     else newText = patch(newText, change);
                 }
 
