@@ -126,7 +126,7 @@ class JavaTextDocumentService implements TextDocumentService {
         for (var p : doc.getParameters()) {
             args.add(p.getName());
         }
-        return String.format("%s(%s)", doc.getName(), args);
+        return String.format("%s %s(%s)", doc.getReturnType(), doc.getName(), args);
     }
 
     private String resolveDefaultDetail(ExecutableElement method) {
@@ -137,7 +137,7 @@ class JavaTextDocumentService implements TextDocumentService {
             if (missingParamNames) args.add(ShortTypePrinter.print(p.asType()));
             else args.add(p.getSimpleName().toString());
         }
-        return String.format("%s(%s)", method.getSimpleName(), args);
+        return String.format("%s %s(%s)", ShortTypePrinter.print(method.getReturnType()), method.getSimpleName(), args);
     }
 
     private String asMarkdown(List<? extends DocTree> lines) {
