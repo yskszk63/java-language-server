@@ -80,6 +80,19 @@ class Pruner {
             }
 
             @Override
+            public Void visitImport(ImportTree node, Void aVoid) {
+                // Erase 'static' keyword so autocomplete works better
+                if (containsCursor(node) && node.isStatic()) {
+                    var start = (int) sourcePositions.getStartPosition(root, node);
+                    start = contents.indexOf("static", start);
+                    var end = start + "static".length();
+                    erase(start, end);
+                }
+
+                return super.visitImport(node, aVoid);
+            }
+
+            @Override
             public Void visitBlock(BlockTree node, Void aVoid) {
                 if (containsCursor(node)) {
                     super.visitBlock(node, aVoid);

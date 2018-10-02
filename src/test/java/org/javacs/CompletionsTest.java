@@ -792,4 +792,12 @@ public class CompletionsTest extends CompletionsBase {
 
         assertThat(suggestions, hasItem(containsString("implements")));
     }
+
+    @Test
+    public void importStaticPackage() {
+        var file = "/org/javacs/example/AutocompleteImportStatic.java";
+        var suggestions = insertText(file, 3, 20);
+
+        assertThat(suggestions, hasItem(containsString("util")));
+    }
 }

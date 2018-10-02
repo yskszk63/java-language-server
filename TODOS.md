@@ -1,7 +1,6 @@
 # Todo
 
 ## Bugs
-- import static foo.? doesn't auto-complete
 - Workspace root as source path crashes compiler
 - Nested source roots don't make sense
 - @Override snippets include duplicates
