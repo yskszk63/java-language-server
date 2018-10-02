@@ -683,16 +683,16 @@ public class JavaCompilerService {
                 return pos.getStartPosition(parse, node) <= cursor && cursor <= pos.getEndPosition(parse, node);
             }
 
-            @Override 
-            public Void visitClass​(ClassTree node, Void nothing) {
+            @Override
+            public Void visitClass(ClassTree node, Void nothing) {
                 insideClass++;
                 super.visitClass(node, null);
                 insideClass--;
                 return null;
             }
 
-            @Override 
-            public Void visitMethod​(MethodTree node, Void nothing) {
+            @Override
+            public Void visitMethod(MethodTree node, Void nothing) {
                 insideMethod++;
                 super.visitMethod(node, null);
                 insideMethod--;
