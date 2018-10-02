@@ -190,6 +190,7 @@ function runTest(sourceUri: string, enclosingClass: string, method: string): The
     }
     var shell;
     let config = workspace.getConfiguration('java')
+    // Run method or class
     if (method != null) {
         let command = config.get('testMethod') as string[]
         if (command.length == 0) {
@@ -213,11 +214,17 @@ function runTest(sourceUri: string, enclosingClass: string, method: string): The
 }
 
 function templateCommand(command: string[], enclosingClass: string, method: string) {
+    // Replace template parameters
     var replaced = []
     for (var i = 0; i < command.length; i++) {
         replaced[i] = command[i].replace('${class}', enclosingClass).replace('${method}', method)
     }
-    return new ShellExecution(replaced[0], replaced.slice(1))
+    // Populate env
+    let env = {} as {[key: string]: string};
+    let config = workspace.getConfiguration('java')
+    if (config.has('home')) 
+        env['JAVA_HOME'] = config.get('home')
+    return new ShellExecution(replaced[0], replaced.slice(1), {env})
 }
 
 interface ProgressMessage {
