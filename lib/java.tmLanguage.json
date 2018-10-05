@@ -460,6 +460,10 @@
 					"include": "#all-types"
 				},
 				{
+					"match": "[\\w$]+",
+					"name": "variable.other.reference.java"
+				},
+				{
 					"match": ",",
 					"name": "punctuation.separator.delimiter.java"
 				},
@@ -1423,10 +1427,11 @@
 			"name": "meta.definition.variable.java",
 			"patterns": [
 				{
-					"match": "([A-Za-z$_][\\w$]*)(?=\\s*(\\[\\])*\\s*(;|=|,))"
+					"include": "#all-types"
 				},
 				{
-					"include": "#all-types"
+					"match": "[\\w$]+",
+					"name": "variable.other.declaration.java"
 				},
 				{
 					"begin": "=",
@@ -1441,9 +1446,6 @@
 							"include": "#code"
 						}
 					]
-				},
-				{
-					"include": "#code"
 				}
 			]
 		},
