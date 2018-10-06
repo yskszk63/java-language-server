@@ -366,17 +366,8 @@
 		},
 		"anonymous-block-and-instance-initializer": {
 			"begin": "{",
-			"beginCaptures": {
-				"0": {
-					"name": "punctuation.section.block.begin.bracket.curly.java"
-				}
-			},
 			"end": "}",
-			"endCaptures": {
-				"0": {
-					"name": "punctuation.section.block.end.bracket.curly.java"
-				}
-			},
+			"name": "meta.block.java",
 			"patterns": [
 				{
 					"include": "#code"
@@ -412,7 +403,13 @@
 					"include": "#anonymous-block-and-instance-initializer"
 				},
 				{
-					"include": "#try-catch-finally"
+					"include": "#try"
+				},
+				{
+					"include": "#try-with-resources"
+				},
+				{
+					"include": "#catch"
 				},
 				{
 					"include": "#assertions"
@@ -579,158 +576,61 @@
 				}
 			]
 		},
-		"try-catch-finally": {
+		"try": {
+			"match": "\\b(try)\\b\\s*(?={)",
+			"captures": {
+				"1": "keyword.control.try.java"
+			}
+		},
+		"try-with-resources": {
+			"begin": "\\b(try)\\b\\s*\\(",
+			"end": "(?={)",
+			"name": "meta.try-with-resources.java",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.try.java"
+				}
+			},
 			"patterns": [
 				{
-					"begin": "\\btry\\b",
-					"beginCaptures": {
-						"0": {
-							"name": "keyword.control.try.java"
-						}
-					},
-					"end": "}",
-					"endCaptures": {
-						"0": {
-							"name": "punctuation.section.try.end.bracket.curly.java"
-						}
-					},
-					"name": "meta.try.java",
-					"patterns": [
-						{
-							"begin": "\\(",
-							"beginCaptures": {
-								"0": {
-									"name": "punctuation.section.try.resources.begin.bracket.round.java"
-								}
-							},
-							"end": "\\)",
-							"endCaptures": {
-								"0": {
-									"name": "punctuation.section.try.resources.end.bracket.round.java"
-								}
-							},
-							"name": "meta.try.resources.java",
-							"patterns": [
-								{
-									"include": "#code"
-								}
-							]
-						},
-						{
-							"begin": "{",
-							"beginCaptures": {
-								"0": {
-									"name": "punctuation.section.try.begin.bracket.curly.java"
-								}
-							},
-							"end": "(?=})",
-							"contentName": "meta.try.body.java",
-							"patterns": [
-								{
-									"include": "#code"
-								}
-							]
-						}
-					]
+					"include": "#comments"
 				},
 				{
-					"begin": "\\b(catch)\\b\\s*(?=\\(\\s*[^\\s]+\\s*[^)]+\\))",
-					"beginCaptures": {
+					"match": "([a-zA-Z$_][\\.a-zA-Z0-9$_]*)\\s*(\\w+)?",
+					"captures": {
 						"1": {
-							"name": "keyword.control.catch.java"
-						}
-					},
-					"end": "}",
-					"endCaptures": {
-						"0": {
-							"name": "punctuation.section.catch.end.bracket.curly.java"
-						}
-					},
-					"name": "meta.catch.java",
-					"patterns": [
-						{
-							"begin": "\\(",
-							"beginCaptures": {
-								"0": {
-									"name": "punctuation.definition.parameters.begin.bracket.round.java"
-								}
-							},
-							"end": "\\)",
-							"endCaptures": {
-								"0": {
-									"name": "punctuation.definition.parameters.end.bracket.round.java"
-								}
-							},
-							"contentName": "meta.catch.parameters.java",
-							"patterns": [
-								{
-									"include": "#comments"
-								},
-								{
-									"match": "\\|",
-									"name": "punctuation.catch.separator.java"
-								},
-								{
-									"match": "([a-zA-Z$_][\\.a-zA-Z0-9$_]*)\\s*(\\w+)?",
-									"captures": {
-										"1": {
-											"name": "entity.name.type.java"
-										},
-										"2": {
-											"name": "variable.parameter.java"
-										}
-									}
-								}
-							]
+							"name": "entity.name.type.java"
 						},
-						{
-							"begin": "{",
-							"beginCaptures": {
-								"0": {
-									"name": "punctuation.section.catch.begin.bracket.curly.java"
-								}
-							},
-							"end": "(?=})",
-							"contentName": "meta.catch.body.java",
-							"patterns": [
-								{
-									"include": "#code"
-								}
-							]
+						"2": {
+							"name": "variable.parameter.java"
 						}
-					]
+					}
+				}
+			]
+		},
+		"catch": {
+			"begin": "\\b(catch)\\b",
+			"end": "(?={)",
+			"name": "meta.catch.java",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.catch.java"
+				}
+			},
+			"patterns": [
+				{
+					"include": "#comments"
 				},
 				{
-					"begin": "\\bfinally\\b",
-					"beginCaptures": {
-						"0": {
-							"name": "keyword.control.finally.java"
+					"match": "([a-zA-Z$_][\\.a-zA-Z0-9$_]*)\\s*(\\w+)?",
+					"captures": {
+						"1": {
+							"name": "entity.name.type.java"
+						},
+						"2": {
+							"name": "variable.parameter.java"
 						}
-					},
-					"end": "}",
-					"endCaptures": {
-						"0": {
-							"name": "punctuation.section.finally.end.bracket.curly.java"
-						}
-					},
-					"name": "meta.finally.java",
-					"patterns": [
-						{
-							"begin": "{",
-							"beginCaptures": {
-								"0": {
-									"name": "punctuation.section.finally.begin.bracket.curly.java"
-								}
-							},
-							"end": "(?=})",
-							"contentName": "meta.finally.body.java",
-							"patterns": [
-								{
-									"include": "#code"
-								}
-							]
-						}
-					]
+					}
 				}
 			]
 		},
@@ -862,7 +762,7 @@
 					"name": "keyword.control.ternary.java"
 				},
 				{
-					"match": "\\b(return|break|case|continue|default|do|while|for|switch|if|else)\\b",
+					"match": "\\b(return|break|case|continue|default|do|while|for|switch|if|else|finally)\\b",
 					"name": "keyword.control.java"
 				},
 				{
