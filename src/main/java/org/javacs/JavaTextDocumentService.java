@@ -373,9 +373,37 @@ class JavaTextDocumentService implements TextDocumentService {
         var line = position.getPosition().getLine() + 1;
         var column = position.getPosition().getCharacter() + 1;
         var result = new ArrayList<Location>();
-        for (var r : server.compiler.references(uri, content, line, column)) {
+        server.client().javaStartProgress(new JavaStartProgressParams("Find references"));
+        var progress =
+                new ReportReferencesProgress() {
+                    private int percent(int n, int d) {
+                        double nD = n, dD = d;
+                        double ratio = nD / dD;
+                        return (int) (ratio * 100);
+                    }
+
+                    public void scanForPotentialReferences(int nScanned, int nFiles) {
+                        if (nScanned == 0) {
+                            var message = String.format("Scan %,d files for potential references", nScanned, nFiles);
+                            server.client().javaReportProgress(new JavaReportProgressParams(message));
+                        }
+                    }
+
+                    public void checkPotentialReferences(int nCompiled, int nPotential) {
+                        if (nCompiled == 0) {
+                            var message = String.format("Compile %,d files", nPotential);
+                            server.client().javaReportProgress(new JavaReportProgressParams(message));
+                        } else {
+                            var increment = percent(nCompiled, nPotential) > percent(nCompiled - 1, nPotential) ? 1 : 0;
+                            var message = String.format("Check %,d files", nPotential);
+                            server.client().javaReportProgress(new JavaReportProgressParams(message, increment));
+                        }
+                    }
+                };
+        for (var r : server.compiler.references(uri, content, line, column, progress)) {
             result.add(location(r));
         }
+        server.client().javaEndProgress();
         return CompletableFuture.completedFuture(result);
     }
 

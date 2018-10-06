@@ -1163,7 +1163,8 @@ public class JavaCompilerService {
         return sourcePath.stream().flatMap(dir -> javaSourcesInDir(dir));
     }
 
-    private List<Path> potentialReferences(Element to) {
+    private List<Path> potentialReferences(Element to, ReportReferencesProgress progress) {
+        var allFiles = javaSources().collect(Collectors.toList());
         var name = to.getSimpleName().toString();
         var word = Pattern.compile("\\b\\w+\\b");
         Predicate<String> containsWord =
@@ -1174,15 +1175,20 @@ public class JavaCompilerService {
                     }
                     return false;
                 };
-        Predicate<Path> test =
-                file -> {
-                    try {
-                        return Files.readAllLines(file).stream().anyMatch(containsWord);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                };
-        return javaSources().filter(test).collect(Collectors.toList());
+        var result = new ArrayList<Path>();
+        int nScanned = 0;
+        progress.scanForPotentialReferences(0, allFiles.size());
+        for (var file : allFiles) {
+            try {
+                if (Files.lines(file).anyMatch(containsWord)) 
+                    result.add(file);
+                nScanned++;
+                progress.scanForPotentialReferences(nScanned, allFiles.size());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return result;
     }
 
     /**
@@ -1249,7 +1255,7 @@ public class JavaCompilerService {
         return new Batch(task, result);
     }
 
-    public List<TreePath> references(URI file, String contents, int line, int character) {
+    public List<TreePath> references(URI file, String contents, int line, int character, ReportReferencesProgress progress) {
         recompile(file, contents, -1, -1);
 
         var trees = Trees.instance(cache.task);
@@ -1258,11 +1264,16 @@ public class JavaCompilerService {
         // `to` is part of a different batch than `batch = compileBatch(possible)`,
         // so `to.equals(...thing from batch...)` shouldn't work
         var to = trees.getElement(path);
-        var possible = potentialReferences(to);
+        var possible = potentialReferences(to, progress);
+        progress.checkPotentialReferences(0, possible.size());
+        // TODO optimize by pruning method bodies that don't contain potential references
         var batch = compileBatch(possible);
         var result = new ArrayList<TreePath>();
+        int nChecked = 0;
         for (var f : batch.roots) {
             result.addAll(batch.actualReferences(f, to));
+            nChecked++;
+            progress.checkPotentialReferences(nChecked, possible.size());
         }
         return result;
     }

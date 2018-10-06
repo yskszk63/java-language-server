@@ -228,13 +228,14 @@ function templateCommand(command: string[], enclosingClass: string, method: stri
 }
 
 interface ProgressMessage {
-	message: string 
+    message: string 
+    increment: number
 }
 
 function createProgressListeners(client: LanguageClient) {
 	// Create a "checking files" progress indicator
 	let progressListener = new class {
-		progress: Progress<{message?: string}>
+		progress: Progress<{message: string, increment?: number}>
 		resolve: (nothing: {}) => void
 		
 		startProgress(message: string) {
@@ -247,8 +248,11 @@ function createProgressListeners(client: LanguageClient) {
             }));
 		}
 		
-		reportProgress(message: string) {
-            this.progress.report({message});
+		reportProgress(message: string, increment: number) {
+            if (increment == -1)
+                this.progress.report({message});
+            else 
+                this.progress.report({message, increment})
 		}
 
 		endProgress() {
@@ -264,7 +268,7 @@ function createProgressListeners(client: LanguageClient) {
 		progressListener.startProgress(event.message);
 	});
 	client.onNotification(new NotificationType('java/reportProgress'), (event: ProgressMessage) => {
-		progressListener.reportProgress(event.message);
+		progressListener.reportProgress(event.message, event.increment);
 	});
 	client.onNotification(new NotificationType('java/endProgress'), () => {
 		progressListener.endProgress();

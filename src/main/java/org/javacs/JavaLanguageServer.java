@@ -182,4 +182,8 @@ class JavaLanguageServer implements LanguageServer {
     void installClient(CustomLanguageClient client) {
         this.client = client;
     }
+
+    CustomLanguageClient client() {
+        return this.client;
+    }
 }
