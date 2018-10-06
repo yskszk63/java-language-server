@@ -154,6 +154,11 @@ class Parser {
 
     /** Search `dir` for .java files containing important symbols matching `query` */
     static Stream<TreePath> findSymbols(Path dir, String query) {
+        if (!Files.exists(dir)) {
+            LOG.warning(dir + " does not exist");
+            return Stream.empty();
+        }
+
         var match = FileSystems.getDefault().getPathMatcher("glob:*.java");
 
         try {
