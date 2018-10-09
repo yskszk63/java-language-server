@@ -188,6 +188,7 @@
 				}
 			},
 			"end": "(?=;|\\)|,|:|}|\\+)",
+			"name": "meta.new.java",
 			"patterns": [
 				{
 					"include": "#comments"
@@ -1002,7 +1003,7 @@
 					]
 				},
 				{
-					"match": "\\b(?:[A-Z]\\w*\\s*(\\.)\\s*)*[A-Z]\\w*\\b((?=\\s*[A-Za-z$_\\n])|(?=\\s*\\.\\.\\.))",
+					"match": "\\b(?:[A-Z]\\w*\\s*(\\.)\\s*)*[A-Z]\\w*\\b",
 					"name": "entity.name.type.java",
 					"captures": {
 						"1": {
