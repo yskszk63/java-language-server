@@ -975,25 +975,34 @@
 			]
 		},
 		"variables": {
-			"begin": "(?x)\n(?=\n  (\n    (void|boolean|byte|char|short|int|float|long|double|var)\n    |\n    (?>(\\w+\\.)*[A-Z]+\\w*) # e.g. `javax.ws.rs.Response`, or `String`\n  )\n  (\n    <[\\w<>,\\.?\\s\\[\\]]*> # e.g. `HashMap<Integer, String>`, or `List<java.lang.String>`\n  )?\n  (\n    (\\[\\])* # int[][]\n  )?\n  \\s+\n  [A-Za-z_$][\\w$]* # At least one identifier after space\n  ([\\w\\[\\],$][\\w\\[\\],\\s]*)? # possibly primitive array or additional identifiers\n  \\s*(=|;)\n)",
+			"begin": "(void|boolean|byte|char|short|int|float|long|double|var|(\\w+\\.)*\\w+)(<[\\w<>,\\.?\\s\\[\\]]*)?(\\[\\])*\\s+(?=\\w+)",
 			"end": "(?=;)",
 			"name": "meta.definition.variable.java",
+			"beginCaptures": {
+				"1": {
+					"name": "entity.name.type.variable.java"
+				},
+				"3": {
+					"patterns": [
+						{
+							"include": "#generics"
+						}
+					]
+				}
+			},
 			"patterns": [
 				{
-					"include": "#all-types"
-				},
-				{
-					"match": "[\\w$]+",
-					"name": "variable.other.declaration.java"
-				},
-				{
-					"begin": "=",
+					"begin": "(\\w+)(\\[\\])*\\s*(=)",
+					"end": "(?=[;,])",
 					"beginCaptures": {
-						"0": {
+						"1": {
+							"name": "variable.other.declaration.java"
+						},
+						"3": {
 							"name": "keyword.operator.assignment.java"
 						}
 					},
-					"end": "(?=;)",
+					"name": "meta.definition.initializer.java",
 					"patterns": [
 						{
 							"include": "#code"
