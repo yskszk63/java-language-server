@@ -44,11 +44,11 @@
 			]
 		},
 		{
-			"match": "\\bthrow|return|break|continue|default|do|while|switch|case|if|else|const|goto\\b",
+			"match": "\\b(throw|return|break|continue|default|do|while|switch|case|if|else|const|goto)\\b",
 			"name": "keyword.java"
 		},
 		{
-			"match": "\\bprivate|public|protected|static|final|default",
+			"match": "\\b(private|public|protected|static|final|default)",
 			"name": "storage.modifier.java"
 		},
 		{
