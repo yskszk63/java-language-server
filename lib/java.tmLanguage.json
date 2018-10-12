@@ -57,6 +57,9 @@
 					"name": "entity.name.class.java"
 				}
 			}
+		},
+		{
+			"include": "#comments"
 		}
 	],
 	"repository": {
@@ -65,6 +68,42 @@
 				{
 					"match": "(\\w+\\.)*\\w+",
 					"name": "entity.name.class.java"
+				}
+			]
+		},
+		"comments": {
+			"patterns": [
+				
+				{
+					"begin": "/\\*",
+					"captures": {
+						"0": {
+							"name": "punctuation.definition.comment.java"
+						}
+					},
+					"end": "\\*/",
+					"name": "comment.block.java"
+				},
+				{
+					"begin": "(^[ \\t]+)?(?=//)",
+					"beginCaptures": {
+						"1": {
+							"name": "punctuation.whitespace.comment.leading.java"
+						}
+					},
+					"end": "(?!\\G)",
+					"patterns": [
+						{
+							"begin": "//",
+							"beginCaptures": {
+								"0": {
+									"name": "punctuation.definition.comment.java"
+								}
+							},
+							"end": "\\n",
+							"name": "comment.line.double-slash.java"
+						}
+					]
 				}
 			]
 		}
