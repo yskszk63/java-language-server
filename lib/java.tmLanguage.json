@@ -47,47 +47,16 @@
 			"include": "#keywords"
 		},
 		{
-			"match": "\\b(private|public|protected|static|final|default)\\b",
-			"name": "storage.modifier.java"
+			"include": "#modifiers"
 		},
 		{
-			"match": "\\b(instanceof)\\s+((\\w+\\.)*\\w+)",
-			"captures": {
-				"1": {
-					"name": "keyword.instanceof.java"
-				},
-				"2": {
-					"name": "entity.name.class.java"
-				}
-			},
-			"name": "meta.instanceof.java"
-		},
-		{
-			"begin": "\\b(new)\\s+((\\w+\\.)*\\w+)",
-			"beginCaptures": {
-				"1": {
-					"name": "keyword.new.java"
-				},
-				"2": {
-					"name": "entity.name.class.java"
-				}
-			},
-			"end": "\\(",
-			"name": "meta.new.java",
-			"patterns": [
-				{
-					"include": "#keywords"
-				},
-				{
-					"include": "#class-name"
-				}
-			]
+			"include": "#comments"
 		},
 		{
 			"include": "#constants"
 		},
 		{
-			"include": "#comments"
+			"include": "#builtins"
 		}
 	],
 	"repository": {
@@ -99,11 +68,11 @@
 				}
 			]
 		},
-		"class-name": {
+		"modifiers": {
 			"patterns": [
 				{
-					"match": "(\\w+\\.)*\\w+",
-					"name": "entity.name.class.java"
+					"match": "\\b(private|public|protected|static|final|default)\\b",
+					"name": "storage.modifier.java"
 				}
 			]
 		},
@@ -202,6 +171,51 @@
 							"name": "constant.character.escape.java"
 						}
 					]
+				}
+			]
+		},
+		"builtins": {
+			"patterns": [
+				{
+					"match": "\\b(instanceof)\\s+((\\w+\\.)*\\w+)",
+					"captures": {
+						"1": {
+							"name": "keyword.instanceof.java"
+						},
+						"2": {
+							"name": "entity.name.class.java"
+						}
+					},
+					"name": "meta.instanceof.java"
+				},
+				{
+					"begin": "\\b(new)\\s+((\\w+\\.)*\\w+)",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.new.java"
+						},
+						"2": {
+							"name": "entity.name.class.java"
+						}
+					},
+					"end": "\\(",
+					"name": "meta.new.java",
+					"patterns": [
+						{
+							"include": "#keywords"
+						},
+						{
+							"include": "#class-name"
+						}
+					]
+				}
+			]
+		},
+		"class-name": {
+			"patterns": [
+				{
+					"match": "(\\w+\\.)*\\w+",
+					"name": "entity.name.class.java"
 				}
 			]
 		}
