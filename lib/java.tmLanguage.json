@@ -44,8 +44,7 @@
 			]
 		},
 		{
-			"match": "\\b(throw|return|break|continue|default|do|while|switch|case|if|else|const|goto)\\b",
-			"name": "keyword.java"
+			"include": "#keywords"
 		},
 		{
 			"match": "\\b(private|public|protected|static|final|default)\\b",
@@ -64,6 +63,27 @@
 			"name": "meta.instanceof.java"
 		},
 		{
+			"begin": "\\b(new)\\s+((\\w+\\.)*\\w+)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.new.java"
+				},
+				"2": {
+					"name": "entity.name.class.java"
+				}
+			},
+			"end": "\\(",
+			"name": "meta.new.java",
+			"patterns": [
+				{
+					"include": "#keywords"
+				},
+				{
+					"include": "#class-name"
+				}
+			]
+		},
+		{
 			"include": "#constants"
 		},
 		{
@@ -71,6 +91,14 @@
 		}
 	],
 	"repository": {
+		"keywords":  {
+			"patterns": [
+				{
+					"match": "\\b(throw|return|break|continue|default|do|while|switch|case|if|else|const|goto|extends|implements)\\b",
+					"name": "keyword.java"
+				}
+			]
+		},
 		"class-name": {
 			"patterns": [
 				{
