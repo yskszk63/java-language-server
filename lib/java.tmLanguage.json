@@ -42,6 +42,10 @@
 					"include": "#comments"
 				}
 			]
+		},
+		{
+			"match": "\\bthrow|return|break|continue|default|do|while|switch|if|else|const|goto\\b",
+			"name": "keyword.java"
 		}
 	],
 	"repository": {
