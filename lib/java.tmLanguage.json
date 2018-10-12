@@ -46,12 +46,27 @@
 		{
 			"match": "\\bthrow|return|break|continue|default|do|while|switch|if|else|const|goto\\b",
 			"name": "keyword.java"
+		},
+		{
+			"match": "\\b(instanceof)\\s+((\\w+\\.)*\\w+)",
+			"captures": {
+				"1": {
+					"name": "keyword.instanceof.java"
+				},
+				"2": {
+					"name": "entity.name.class.java"
+				}
+			}
 		}
 	],
 	"repository": {
 		"class-name": {
-			"match": "(\\w+\\.)*\\w+",
-			"name": "entity.name.class.java"
+			"patterns": [
+				{
+					"match": "(\\w+\\.)*\\w+",
+					"name": "entity.name.class.java"
+				}
+			]
 		}
 	}
 }
