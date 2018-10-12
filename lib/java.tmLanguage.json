@@ -48,7 +48,7 @@
 			"name": "keyword.java"
 		},
 		{
-			"match": "\\b(private|public|protected|static|final|default)",
+			"match": "\\b(private|public|protected|static|final|default)\\b",
 			"name": "storage.modifier.java"
 		},
 		{
