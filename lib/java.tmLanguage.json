@@ -63,7 +63,7 @@
 		"keywords":  {
 			"patterns": [
 				{
-					"match": "\\b(throw|return|break|continue|default|do|while|switch|case|if|else|const|goto|extends|implements)\\b",
+					"match": "\\b(throw|return|break|continue|default|do|while|switch|case|if|else|const|goto)\\b",
 					"name": "keyword.java"
 				}
 			]
@@ -206,6 +206,63 @@
 						},
 						{
 							"include": "#class-name"
+						}
+					]
+				},
+				{
+					"begin": "\\b(class)\\s+(\\w+)",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.class.java"
+						},
+						"2": {
+							"name": "entity.name.class.java"
+						}
+					},
+					"end": "(?={)",
+					"name": "meta.class.java",
+					"patterns": [
+						{
+							"begin": "\\b(extends)\\s+((\\w+\\.)*\\w+)",
+							"beginCaptures": {
+								"1": {
+									"name": "keyword.extends.java"
+								},
+								"2": {
+									"name": "entity.name.class.java"
+								}
+							},
+							"end": "(?=\\bimplements\\b|{)",
+							"name": "meta.extends.java",
+							"patterns": [
+								{
+									"include": "#keywords"
+								},
+								{
+									"include": "#class-name"
+								}
+							]
+						},
+						{
+							"begin": "\\b(implements)\\s+((\\w+\\.)*\\w+)",
+							"beginCaptures": {
+								"1": {
+									"name": "keyword.implements.java"
+								},
+								"2": {
+									"name": "entity.name.class.java"
+								}
+							},
+							"end": "(?=\\bextends\\b|{)",
+							"name": "meta.implements.java",
+							"patterns": [
+								{
+									"include": "#keywords"
+								},
+								{
+									"include": "#class-name"
+								}
+							]
 						}
 					]
 				}
