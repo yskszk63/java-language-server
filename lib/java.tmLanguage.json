@@ -103,10 +103,7 @@
 					"include": "#class-declaration"
 				},
 				{
-					"include": "#new"
-				},
-				{
-					"include": "#builtins"
+					"include": "#catch"
 				},
 				{
 					"include": "#block"
@@ -119,11 +116,15 @@
 		"keywords":  {
 			"patterns": [
 				{
-					"match": "\\b(throw|return|break|continue|default|do|while|switch|case|if|else|const|goto|extends|implements)\\b",
-					"name": "keyword.java"
+					"match": "\\b(try|finally|throw|return|break|continue|default|do|for|while|switch|case|if|else|goto)\\b",
+					"name": "keyword.control.java"
 				},
 				{
-					"match": "\\b(private|public|protected|static|final|default)\\b",
+					"match": "\\b(new|instanceof)\\b",
+					"name": "keyword.other.java"
+				},
+				{
+					"match": "\\b(private|public|protected|static|final|const|extends|implements)\\b",
 					"name": "storage.modifier.java"
 				},
 				{
@@ -234,38 +235,28 @@
 				}
 			]
 		},
-		"builtins": {
+		"catch": {
 			"patterns": [
 				{
-					"match": "\\b(instanceof)\\s+((\\w+\\.)*\\w+)",
-					"captures": {
-						"1": {
-							"name": "keyword.instanceof.java"
-						},
-						"2": {
-							"name": "entity.name.class.java"
-						}
-					},
-					"name": "meta.instanceof.java"
-				},
-				{
-					"begin": "\\b(new)\\s+((\\w+\\.)*\\w+)",
+					"begin": "\\b(catch)\\s*(?=\\()",
 					"beginCaptures": {
 						"1": {
-							"name": "keyword.new.java"
-						},
-						"2": {
-							"name": "entity.name.class.java"
+							"name": "keyword.control.catch.java"
 						}
 					},
-					"end": "\\(",
-					"name": "meta.new.java",
+					"end": "(?={)",
+					"name": "meta.catch.java",
 					"patterns": [
 						{
-							"include": "#keywords"
+							"match": "(\\w+\\.)*[A-Z]\\w*",
+							"name": "entity.name.type.exception.java"
 						},
 						{
-							"include": "#class-name"
+							"match": "[a-z]\\w*",
+							"name": "variable.other.declaration.java"
+						},
+						{
+							"include": "#comments"
 						}
 					]
 				}
@@ -298,7 +289,7 @@
 							"patterns": [
 								{
 									"match": "extends|super",
-									"name": "keyword.other.java"
+									"name": "storage.modifier.java"
 								},
 								{
 									"match": "\\w+",
