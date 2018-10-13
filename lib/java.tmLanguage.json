@@ -332,7 +332,7 @@
 		"declaration": {
 			"patterns": [
 				{
-					"match": "\\b((\\w+\\.)*\\w+)\\b\\s*(<[\\w, <>\\[\\]\\?]*>)?\\s*[\\[\\]]*\\s*\\b(\\w+)\\b",
+					"match": "\\b((\\w+\\.)*\\w+)\\b\\s*(?<GROUP><([^<>]|\\g<GROUP>)+>)?\\s*[\\[\\]]*\\s*\\b(\\w+)\\b",
 					"captures": {	
 						"1": {
 							"name": "entity.name.type.java"
@@ -350,7 +350,7 @@
 								}
 							]
 						},
-						"4": {
+						"5": {
 							"name": "variable.other.declaration.java"
 						}
 					}
