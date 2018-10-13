@@ -44,32 +44,81 @@
 			]
 		},
 		{
-			"include": "#keywords"
-		},
-		{
-			"include": "#modifiers"
-		},
-		{
-			"include": "#comments"
-		},
-		{
-			"include": "#constants"
-		},
-		{
-			"include": "#builtins"
+			"include": "#class-declaration"
 		}
 	],
 	"repository": {
-		"keywords":  {
+		"class-declaration": {
+			"begin": "\\b(class|interface)\\b",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.class.java"
+				}
+			},
+			"end": "}",
+			"name": "meta.class.java",
 			"patterns": [
 				{
-					"match": "\\b(throw|return|break|continue|default|do|while|switch|case|if|else|const|goto)\\b",
-					"name": "keyword.java"
+					"begin": "\\b(\\w+)\\b",
+					"beginCaptures": {
+						"1": {
+							"name": "entity.name.class.java"
+						}
+					},
+					"end": "(?={)",
+					"name": "meta.class.header.java",
+					"patterns": [
+						{
+							"include": "#keywords"
+						},
+						{
+							"include": "#class-name"
+						}
+					]
+				},
+				{
+					"begin": "{",
+					"end": "(?=})",
+					"name": "meta.class.body.java",
+					"patterns": [
+						{
+							"include": "#code"
+						}
+					]
 				}
 			]
 		},
-		"modifiers": {
+		"code": {
 			"patterns": [
+				{
+					"include": "#keywords"
+				},
+				{
+					"include": "#comments"
+				},
+				{
+					"include": "#constants"
+				},
+				{
+					"include": "#class-declaration"
+				},
+				{
+					"include": "#new"
+				},
+				{
+					"include": "#builtins"
+				},
+				{
+					"include": "#block"
+				}
+			]
+		},
+		"keywords":  {
+			"patterns": [
+				{
+					"match": "\\b(throw|return|break|continue|default|do|while|switch|case|if|else|const|goto|extends|implements)\\b",
+					"name": "keyword.java"
+				},
 				{
 					"match": "\\b(private|public|protected|static|final|default)\\b",
 					"name": "storage.modifier.java"
@@ -208,61 +257,18 @@
 							"include": "#class-name"
 						}
 					]
-				},
+				}
+			]
+		},
+		"block": {
+			"patterns": [
 				{
-					"begin": "\\b(class)\\s+(\\w+)",
-					"beginCaptures": {
-						"1": {
-							"name": "keyword.class.java"
-						},
-						"2": {
-							"name": "entity.name.class.java"
-						}
-					},
-					"end": "(?={)",
-					"name": "meta.class.java",
+					"begin": "{",
+					"end": "}",
+					"name": "meta.block.java",
 					"patterns": [
 						{
-							"begin": "\\b(extends)\\s+((\\w+\\.)*\\w+)",
-							"beginCaptures": {
-								"1": {
-									"name": "keyword.extends.java"
-								},
-								"2": {
-									"name": "entity.name.class.java"
-								}
-							},
-							"end": "(?=\\bimplements\\b|{)",
-							"name": "meta.extends.java",
-							"patterns": [
-								{
-									"include": "#keywords"
-								},
-								{
-									"include": "#class-name"
-								}
-							]
-						},
-						{
-							"begin": "\\b(implements)\\s+((\\w+\\.)*\\w+)",
-							"beginCaptures": {
-								"1": {
-									"name": "keyword.implements.java"
-								},
-								"2": {
-									"name": "entity.name.class.java"
-								}
-							},
-							"end": "(?=\\bextends\\b|{)",
-							"name": "meta.implements.java",
-							"patterns": [
-								{
-									"include": "#keywords"
-								},
-								{
-									"include": "#class-name"
-								}
-							]
+							"include": "#code"
 						}
 					]
 				}
