@@ -44,12 +44,57 @@
 			]
 		},
 		{
+			"include": "#annotation"
+		},
+		{
 			"include": "#class-declaration"
 		}
 	],
 	"repository": {
+		"annotation": {
+			"patterns": [
+				{
+					"begin": "(@[^\\s(]+)(\\()",
+					"beginCaptures": {
+						"1": {
+							"name": "punctuation.definition.tag"
+						},
+						"2": {
+							"name": "punctuation.definition.tag.left"
+						}
+					},
+					"end": "\\)",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.definition.tag.right"
+						}
+					},
+					"name": "meta.declaration.annotation.java",
+					"patterns": [
+						{
+							"captures": {
+								"1": {
+									"name": "punctuation.definition.tag.key"
+								},
+								"2": {
+									"name": "punctuation.definition.tag.assign"
+								}
+							},
+							"match": "(\\w*)\\s*(=)"
+						},
+						{
+							"include": "#code"
+						}
+					]
+				},
+				{
+					"match": "@\\w+",
+					"name": "punctuation.definition.tag"
+				}
+			]
+		},
 		"class-declaration": {
-			"begin": "\\b(class|interface)\\b",
+			"begin": "\\b(class|interface|@interface)\\b",
 			"beginCaptures": {
 				"1": {
 					"name": "keyword.class.java"
@@ -98,6 +143,9 @@
 				},
 				{
 					"include": "#constants"
+				},
+				{
+					"include": "#annotation"
 				},
 				{
 					"include": "#class-declaration"
