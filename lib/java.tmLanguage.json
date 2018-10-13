@@ -44,10 +44,7 @@
 			]
 		},
 		{
-			"include": "#annotation"
-		},
-		{
-			"include": "#class-declaration"
+			"include": "#code"
 		}
 	],
 	"repository": {
@@ -94,7 +91,7 @@
 			]
 		},
 		"class-declaration": {
-			"begin": "\\b(class|interface|@interface)\\b",
+			"begin": "(?<!\\.)\\b(class|interface|@interface)\\b",
 			"beginCaptures": {
 				"1": {
 					"name": "keyword.class.java"
@@ -170,6 +167,14 @@
 				{
 					"match": "\\b(new|instanceof)\\b",
 					"name": "keyword.other.java"
+				},
+				{
+					"match": "\\.(class)\\b",
+					"captures": {
+						"1": {
+							"name": "keyword.other.java"
+						}
+					}
 				},
 				{
 					"match": "\\b(private|public|protected|static|final|const|extends|implements)\\b",
