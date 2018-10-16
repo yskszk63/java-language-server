@@ -363,14 +363,6 @@
 							"name": "variable.other.declaration.java"
 						}
 					}
-				},
-				{
-					"match": ",\\s*(\\w+)\\s*(?=[;=])",
-					"captures": {
-						"1": {
-							"name": "variable.other.declaration.java"
-						}
-					}
 				}
 			]
 		},
