@@ -151,6 +151,9 @@
 					"include": "#catch"
 				},
 				{
+					"include": "#throws"
+				},
+				{
 					"include": "#block"
 				},
 				{
@@ -307,6 +310,29 @@
 						{
 							"match": "[a-z]\\w*",
 							"name": "variable.other.declaration.java"
+						},
+						{
+							"include": "#comments"
+						}
+					]
+				}
+			]
+		},
+		"throws": {
+			"patterns": [
+				{
+					"begin": "\\b(throws)\\b",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.other.throws.java"
+						}
+					},
+					"end": "(?=[{;])",
+					"name": "meta.throws.java",
+					"patterns": [
+						{
+							"match": "(\\w+\\.)*[A-Z]\\w*",
+							"name": "entity.name.type.exception.java"
 						},
 						{
 							"include": "#comments"
