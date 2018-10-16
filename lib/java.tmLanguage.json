@@ -166,13 +166,13 @@
 				},
 				{
 					"match": "\\b(new|instanceof)\\b",
-					"name": "keyword.other.java"
+					"name": "keyword.control.java"
 				},
 				{
 					"match": "\\.(class)\\b",
 					"captures": {
 						"1": {
-							"name": "keyword.other.java"
+							"name": "keyword.control.java"
 						}
 					}
 				},
@@ -226,7 +226,7 @@
 			"patterns": [
 				{
 					"match": "\\b(null|true|false)\\b",
-					"name": "constant.language.null"
+					"name": "constant.numeric.java"
 				},
 				{
 					"match": "(?x)\n\\b(?<!\\$)\n0(x|X)\n(\n  (?<!\\.)[0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?[Ll]?(?!\\.)\n  |\n  (\n    [0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?\\.?\n    |\n    ([0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?)?\\.[0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?\n  )\n  [Pp][+-]?[0-9]([0-9_]*[0-9])?[FfDd]?\n)\n\\b(?!\\$)",
