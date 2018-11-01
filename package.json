@@ -55,6 +55,10 @@
         "configuration": {
             "title": "Java configuration",
             "properties": {
+                "java.home": {
+                    "type": "string",
+                    "description": "Absolute path to your Java home directory"
+                },
                 "java.classPath": {
                     "type": "array",
                     "items": {
