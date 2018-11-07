@@ -232,7 +232,16 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void references() {
-        var refs = compiler.references(URI.create("/GotoDefinition.java"), contents("/GotoDefinition.java"), 6, 13);
+        ReportReferencesProgress rrp = new ReportReferencesProgress() {
+            @Override
+            public void scanForPotentialReferences(int nScanned, int nFiles) {}
+
+            @Override
+            public void checkPotentialReferences(int nCompiled, int nPotential) {}
+        };
+    var refs =
+        compiler.references(
+            URI.create("/GotoDefinition.java"), contents("/GotoDefinition.java"), 6, 13, rrp);
         boolean found = false;
         for (var t : refs) {
             var unit = t.getCompilationUnit();
