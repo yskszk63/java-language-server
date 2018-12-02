@@ -59,20 +59,6 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    @Ignore // This has been subsumed by Javadocs
-    public void throwsSignature() {
-        var file = "/org/javacs/example/AutocompleteMember.java";
-
-        // Static methods
-        var items = items(file, 5, 14);
-        var suggestions = items.stream().map(i -> i.getLabel()).collect(Collectors.toSet());
-        var details = items.stream().map(i -> i.getDetail()).collect(Collectors.toSet());
-
-        assertThat(suggestions, hasItems("testMethods"));
-        assertThat(details, hasItems("String () throws Exception"));
-    }
-
-    @Test
     public void fieldFromInitBlock() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 
@@ -415,7 +401,6 @@ public class CompletionsTest extends CompletionsBase {
         // Static methods
         var items = items(file, 8, 17);
         var suggestions = items.stream().map(i -> i.getLabel()).collect(Collectors.toSet());
-        var details = items.stream().map(i -> i.getDetail()).collect(Collectors.toSet());
 
         assertThat(suggestions, hasItems("add", "addAll"));
     }
@@ -738,9 +723,9 @@ public class CompletionsTest extends CompletionsBase {
         var file = "/org/javacs/example/OverloadedMethod.java";
         var detail = detail(file, 9, 13);
 
-        assertThat("suggests empty method", detail, hasItem("overloaded()"));
-        assertThat("suggests int method", detail, hasItem("overloaded(i)"));
-        assertThat("suggests string method", detail, hasItem("overloaded(s)"));
+        assertThat("suggests empty method", detail, hasItem("void overloaded()"));
+        assertThat("suggests int method", detail, hasItem("void overloaded(i)"));
+        assertThat("suggests string method", detail, hasItem("void overloaded(s)"));
     }
 
     @Test
