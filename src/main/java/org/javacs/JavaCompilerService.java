@@ -850,69 +850,64 @@ public class JavaCompilerService {
                 // Add names of classes that haven't been imported
                 if (startsWithUpperCase) {
                     var packageName = Objects.toString(parse.getPackageName(), "");
+                    BooleanSupplier full = () -> {
+                        if (result.size() >= limitHint) {
+                            isIncomplete = true;
+                            return true;
+                        } 
+                        return false;
+                    };
                     Predicate<String> matchesPartialName =
                             qualifiedName -> {
                                 var className = Parser.lastName(qualifiedName);
                                 return className.startsWith(partialName);
                             };
                     Predicate<String> notAlreadyImported = className -> !alreadyImported.contains(className);
-                    var fromJdk =
-                            jdkClasses
-                                    .classes()
-                                    .stream()
-                                    .filter(matchesPartialName)
-                                    .filter(notAlreadyImported)
-                                    .filter(c -> jdkClasses.isAccessibleFromPackage(c, packageName));
-                    var fromClasspath =
-                            classPathClasses
-                                    .classes()
-                                    .stream()
-                                    .filter(matchesPartialName)
-                                    .filter(notAlreadyImported)
-                                    .filter(c -> classPathClasses.isAccessibleFromPackage(c, packageName));
-                    Function<Path, Stream<String>> classesInDir = dir -> {
-                        Predicate<Path> matchesFileName = 
-                                file -> file.getFileName().toString().startsWith(partialName);
-                        Predicate<Path> isPublic = 
-                            file -> {
-                                var fileName = file.getFileName().toString();
-                                if (!fileName.endsWith(".java")) return false;
-                                var simpleName = fileName.substring(0, fileName.length() - ".java".length());
-                                Stream<String> lines;
-                                try {
-                                    lines = Files.lines(file);
-                                } catch (IOException e) {
-                                    throw new RuntimeException(e);
-                                }
-                                return lines.anyMatch(line -> line.matches(".*public\\s+class\\s+" + simpleName + ".*"));
-                            };
+                    for (var c : jdkClasses.classes()) {
+                        if (matchesPartialName.test(c) && notAlreadyImported.test(c) && jdkClasses.isAccessibleFromPackage(c, packageName)) {
+                            if (full.getAsBoolean()) return;
+                            result.add(Completion.ofNotImportedClass(c));
+                        }
+                    }
+                    for (var c : classPathClasses.classes()) {
+                        if (matchesPartialName.test(c) && notAlreadyImported.test(c) && classPathClasses.isAccessibleFromPackage(c, packageName)) {
+                            if (full.getAsBoolean()) return;
+                            result.add(Completion.ofNotImportedClass(c));
+                        }
+                    }
+                    Predicate<Path> matchesFileName = 
+                            file -> file.getFileName().toString().startsWith(partialName);
+                    Predicate<Path> isPublic = 
+                        file -> {
+                            var fileName = file.getFileName().toString();
+                            if (!fileName.endsWith(".java")) return false;
+                            var simpleName = fileName.substring(0, fileName.length() - ".java".length());
+                            Stream<String> lines;
+                            try {
+                                lines = Files.lines(file);
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                            return lines.anyMatch(line -> line.matches(".*public\\s+class\\s+" + simpleName + ".*"));
+                        };
+                    for (var dir : sourcePath) {
                         Function<Path, String> qualifiedName = 
                                 file -> {
                                     var relative = dir.relativize(file).toString().replace('/', '.');
                                     if (!relative.endsWith(".java")) return "??? " + relative + " does not end in .java";
                                     return relative.substring(0, relative.length() - ".java".length());
                                 };
-                        return javaSourcesInDir(dir).filter(matchesFileName).filter(isPublic).map(qualifiedName);
-                    };
-                    var fromSourcePath = 
-                            sourcePath.stream()
-                            .flatMap(classesInDir)
-                            .filter(notAlreadyImported);
-                    Consumer<Stream<String>> addCompletions = qualifiedNames -> {
-                        Iterable<String> it = qualifiedNames::iterator;
-                        for (var name : it) {
-                            if (result.size() >= limitHint) {
-                                isIncomplete = true;
-                                return;
-                            } else {
-                                var completion = Completion.ofNotImportedClass(name);
-                                result.add(completion);
+                        for (var file : javaSourcesInDir(dir)) {
+                            if (matchesFileName.test(file) && isPublic.test(file)) {
+                                var c = qualifiedName.apply(file);
+                                if (result.size() >= limitHint) {
+                                    isIncomplete = true;
+                                    return;
+                                } 
+                                result.add(Completion.ofNotImportedClass(c));
                             }
                         }
-                    };
-                    addCompletions.accept(fromJdk);
-                    addCompletions.accept(fromClasspath);
-                    addCompletions.accept(fromSourcePath);
+                    }
                 }
             }
 
@@ -1147,26 +1142,23 @@ public class JavaCompilerService {
         return docs.classDoc(qualifiedName);
     }
 
-    private Stream<Path> javaSourcesInDir(Path dir) {
+    private Iterable<Path> javaSourcesInDir(Path dir) {
         var match = FileSystems.getDefault().getPathMatcher("glob:*.java");
 
         try {
             // TODO instead of looking at EVERY file, once you see a few files with the same source directory,
             // ignore all subsequent files in the directory
-            return Files.walk(dir).filter(java -> match.matches(java.getFileName()));
+            return Files.walk(dir).filter(java -> match.matches(java.getFileName()))::iterator;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private Stream<Path> javaSources() {
-        return sourcePath.stream().flatMap(dir -> javaSourcesInDir(dir));
-    }
-
     private List<Path> potentialReferences(Element to, ReportReferencesProgress progress) {
-        var allFiles = javaSources().collect(Collectors.toList());
         var name = to.getSimpleName().toString();
         var word = Pattern.compile("\\b\\w+\\b");
+        var result = new ArrayList<Path>();
+        int nScanned = 0;
         Predicate<String> containsWord =
                 line -> {
                     Matcher m = word.matcher(line);
@@ -1175,8 +1167,12 @@ public class JavaCompilerService {
                     }
                     return false;
                 };
-        var result = new ArrayList<Path>();
-        int nScanned = 0;
+        var allFiles = new ArrayList<Path>();
+        for (var dir : sourcePath) {
+            for (var file : javaSourcesInDir(dir)) {
+                allFiles.add(file);
+            }
+        }
         progress.scanForPotentialReferences(0, allFiles.size());
         for (var file : allFiles) {
             try {
