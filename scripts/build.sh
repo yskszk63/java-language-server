@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Installs locally
-# You will need java, maven, vsce, and visual studio code to run this script
 set -e
 
 # Needed if you have a java version other than 11 as default
