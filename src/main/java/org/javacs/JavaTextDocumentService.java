@@ -103,11 +103,12 @@ class JavaTextDocumentService implements TextDocumentService {
                 i.setKind(CompletionItemKind.Keyword);
                 i.setDetail("keyword");
                 i.setSortText(3 + i.getLabel());
-            } else if (c.notImportedClass != null) {
-                i.setLabel(Parser.lastName(c.notImportedClass));
+            } else if (c.className != null) {
+                i.setLabel(Parser.lastName(c.className.name));
                 i.setKind(CompletionItemKind.Class);
-                i.setDetail(c.notImportedClass);
-                i.setSortText(4 + i.getLabel());
+                i.setDetail(c.className.name);
+                if (c.className.isImported) i.setSortText(2 + i.getLabel());
+                else i.setSortText(4 + i.getLabel());
             } else if (c.snippet != null) {
                 i.setLabel(c.snippet.label);
                 i.setKind(CompletionItemKind.Snippet);
@@ -188,8 +189,8 @@ class JavaTextDocumentService implements TextDocumentService {
                 LOG.info("Don't know how to look up docs for element " + cached.element);
             }
             // TODO constructors, fields
-        } else if (cached.notImportedClass != null) {
-            var doc = server.compiler.classDoc(cached.notImportedClass);
+        } else if (cached.className != null) {
+            var doc = server.compiler.classDoc(cached.className.name);
             var markdown = doc.map(this::asMarkupContent);
             markdown.ifPresent(unresolved::setDocumentation);
         }

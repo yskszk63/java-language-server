@@ -10,15 +10,14 @@ public class Completion {
     public final Element element;
     public final PackagePart packagePart;
     public final String keyword;
-    public final String notImportedClass; // TODO this is a misnomer, all classes go down this path now
+    public final ClassName className;
     public final Snippet snippet; // TODO separate label and insertText
 
-    private Completion(
-            Element element, PackagePart packagePart, String keyword, String notImportedClass, Snippet snippet) {
+    private Completion(Element element, PackagePart packagePart, String keyword, ClassName className, Snippet snippet) {
         this.element = element;
         this.packagePart = packagePart;
         this.keyword = keyword;
-        this.notImportedClass = notImportedClass;
+        this.className = className;
         this.snippet = snippet;
     }
 
@@ -34,12 +33,22 @@ public class Completion {
         return new Completion(null, null, keyword, null, null);
     }
 
-    public static Completion ofNotImportedClass(String className) {
-        return new Completion(null, null, null, className, null);
+    public static Completion ofClassName(String className, boolean isImported) {
+        return new Completion(null, null, null, new ClassName(className, isImported), null);
     }
 
     public static Completion ofSnippet(String label, String snippet) {
         return new Completion(null, null, null, null, new Snippet(label, snippet));
+    }
+
+    public static class ClassName {
+        public final String name;
+        public final boolean isImported;
+
+        public ClassName(String name, boolean isImported) {
+            this.name = name;
+            this.isImported = isImported;
+        }
     }
 
     public static class PackagePart {

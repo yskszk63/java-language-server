@@ -517,6 +517,21 @@ public class JavaCompilerService {
         return result;
     }
 
+    private boolean isImported(String qualifiedName) {
+        var packageName = Parser.mostName(qualifiedName);
+        var className = Parser.lastName(qualifiedName);
+        for (var i : cache.root.getImports()) {
+            var importName = i.getQualifiedIdentifier().toString();
+            var importPackage = Parser.mostName(importName);
+            var importClass = Parser.lastName(importName);
+            if (importClass.equals("*") && importPackage.equals(packageName))
+                return true;
+            if (importClass.equals(className) && importPackage.equals(packageName))
+                return true;
+        }
+        return false;
+    }
+
     private List<TypeMirror> supersWithSelf(TypeMirror t) {
         var elements = cache.task.getElements();
         var types = cache.task.getTypes();
@@ -965,13 +980,13 @@ public class JavaCompilerService {
                     for (var c : jdkClasses.classes()) {
                         if (full.getAsBoolean()) return;
                         if (matchesPartialName.test(c) && jdkClasses.isAccessibleFromPackage(c, packageName)) {
-                            result.add(Completion.ofNotImportedClass(c));
+                            result.add(Completion.ofClassName(c, isImported(c)));
                         }
                     }
                     for (var c : classPathClasses.classes()) {
                         if (full.getAsBoolean()) return;
                         if (matchesPartialName.test(c) && classPathClasses.isAccessibleFromPackage(c, packageName)) {
-                            result.add(Completion.ofNotImportedClass(c));
+                            result.add(Completion.ofClassName(c, isImported(c)));
                         }
                     }
                     Predicate<Path> matchesFileName = 
@@ -1003,7 +1018,7 @@ public class JavaCompilerService {
                                 var c = qualifiedName.apply(file);
                                 // Slow check, open file
                                 if (matchesPartialName.test(c) && isPublic.test(file)) {
-                                    result.add(Completion.ofNotImportedClass(c));
+                                    result.add(Completion.ofClassName(c, isImported(c)));
                                 }
                             }
                         }

@@ -71,7 +71,7 @@ public class JavaCompilerServiceTest {
             if (c.element != null) result.add(c.element.getSimpleName().toString());
             else if (c.packagePart != null) result.add(c.packagePart.name);
             else if (c.keyword != null) result.add(c.keyword);
-            else if (c.notImportedClass != null) result.add(Parser.lastName(c.notImportedClass));
+            else if (c.className != null) result.add(Parser.lastName(c.className.name));
             else if (c.snippet != null) result.add(c.snippet.snippet);
         }
         return result;
