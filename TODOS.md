@@ -6,6 +6,7 @@
 - testMethod/testClass doesn't work for bazel
 - Find-all-references doesn't work on constructors
 - Files created in session don't autocomplete
+- EnumMap default methods don't autocomplete
 
 ## Autocomplete
 - Annotation fields

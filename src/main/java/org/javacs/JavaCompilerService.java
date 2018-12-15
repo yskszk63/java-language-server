@@ -177,6 +177,36 @@ public class JavaCompilerService {
         return Collections.unmodifiableList(new ArrayList<>(diags));
     }
 
+    class Profiler implements TaskListener {
+        Map<TaskEvent.Kind, Instant> started = new EnumMap<>(TaskEvent.Kind.class);
+        Map<TaskEvent.Kind, Duration> profile = new EnumMap<>(TaskEvent.Kind.class);
+
+        @Override
+        public void started(TaskEvent e) {
+            started.put(e.getKind(), Instant.now());
+        }
+
+        @Override
+        public void finished(TaskEvent e) {
+            var k = e.getKind();
+            var start = started.getOrDefault(k, Instant.now());
+            var elapsed = Duration.between(start, Instant.now());
+            var soFar = profile.getOrDefault(k, Duration.ZERO);
+            var total = soFar.plus(elapsed);
+            profile.put(k, total);
+        }
+
+        void print() {
+            var lines = new StringJoiner("\n\t");
+            for (var k : TaskEvent.Kind.values()) {
+                var elapsed = profile.getOrDefault(k, Duration.ZERO);
+                var ms = elapsed.getSeconds() * 1000 + elapsed.getNano() / 1000 / 1000;
+                lines.add(String.format("%s: %dms", k, ms));
+            }
+            LOG.info("Compilation profile:\n\t" + lines);
+        }
+    };
+
     /** Stores the compiled version of a single file */
     class Cache {
         final String contents;
@@ -199,6 +229,11 @@ public class JavaCompilerService {
             }
             this.file = file;
             this.task = singleFileTask(file, this.contents);
+            this.line = line;
+            this.character = character;
+            
+            var profiler = new Profiler();
+            task.addTaskListener(profiler);
             try {
                 var it = task.parse().iterator();
                 this.root = it.hasNext() ? it.next() : null;
@@ -208,8 +243,7 @@ public class JavaCompilerService {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            this.line = line;
-            this.character = character;
+            profiler.print();
         }
     }
 
@@ -1242,12 +1276,15 @@ public class JavaCompilerService {
     private Batch compileBatch(List<Path> files) {
         var task = batchTask(files, false);
         var result = new ArrayList<CompilationUnitTree>();
+        var profiler = new Profiler();
+        task.addTaskListener(profiler);
         try {
             for (var t : task.parse()) result.add(t);
             task.analyze();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        profiler.print();
 
         return new Batch(task, result);
     }
