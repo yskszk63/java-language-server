@@ -200,7 +200,8 @@ public class JavaCompilerService {
         void print() {
             var lines = new StringJoiner("\n\t");
             for (var k : TaskEvent.Kind.values()) {
-                var elapsed = profile.getOrDefault(k, Duration.ZERO);
+                if (!profile.containsKey(k)) continue;
+                var elapsed = profile.get(k);
                 var ms = elapsed.getSeconds() * 1000 + elapsed.getNano() / 1000 / 1000;
                 lines.add(String.format("%s: %dms", k, ms));
             }
