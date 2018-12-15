@@ -447,14 +447,36 @@ public class JavaCompilerService {
                 }
             }
 
+            StringBuilder profile = new StringBuilder();
+            Instant started = Instant.now();
+
+            void profileEnd(Scope s) {
+                var ended = Instant.now();
+                var elapsed = Duration.between(started, ended);
+                var ms = elapsed.getSeconds() * 1000 + elapsed.getNano() / 1000 / 1000;
+                profile.append("\n\t").append(s);
+                profile.append(String.format("\n\t\t%dms", ms));
+                started = ended;
+            }
+
+            void printProfile() {
+                LOG.info(profile.toString());
+            }
+
             // Walk each enclosing scope, placing its members into `results`
             List<Element> walkScopes() {
                 // TODO consider limiting how many ancestors we go through, and rely on sourcepath/classpath completions
                 for (var s = start; s != null; s = s.getEnclosingScope()) {
                     walkLocals(s);
-                    if (result.size() >= MAX_COMPLETION_ITEMS) return result;
+                    profileEnd(s);
+                    // Return early?
+                    if (result.size() >= MAX_COMPLETION_ITEMS) {
+                        printProfile();
+                        return result;
+                    }
                 }
 
+                printProfile();
                 return result;
             }
         }
