@@ -864,14 +864,14 @@ public class JavaCompilerService {
                             };
                     Predicate<String> notAlreadyImported = className -> !alreadyImported.contains(className);
                     for (var c : jdkClasses.classes()) {
+                        if (full.getAsBoolean()) return;
                         if (matchesPartialName.test(c) && notAlreadyImported.test(c) && jdkClasses.isAccessibleFromPackage(c, packageName)) {
-                            if (full.getAsBoolean()) return;
                             result.add(Completion.ofNotImportedClass(c));
                         }
                     }
                     for (var c : classPathClasses.classes()) {
+                        if (full.getAsBoolean()) return;
                         if (matchesPartialName.test(c) && notAlreadyImported.test(c) && classPathClasses.isAccessibleFromPackage(c, packageName)) {
-                            if (full.getAsBoolean()) return;
                             result.add(Completion.ofNotImportedClass(c));
                         }
                     }
@@ -898,13 +898,14 @@ public class JavaCompilerService {
                                     return relative.substring(0, relative.length() - ".java".length());
                                 };
                         for (var file : javaSourcesInDir(dir)) {
-                            if (matchesFileName.test(file) && isPublic.test(file)) {
+                            if (full.getAsBoolean()) return;
+                            // Fast check, file name only
+                            if (matchesFileName.test(file)) {
                                 var c = qualifiedName.apply(file);
-                                if (result.size() >= limitHint) {
-                                    isIncomplete = true;
-                                    return;
-                                } 
-                                result.add(Completion.ofNotImportedClass(c));
+                                // Slow check, open file
+                                if (matchesPartialName.test(c) && notAlreadyImported.test(c) && isPublic.test(file)) {
+                                    result.add(Completion.ofNotImportedClass(c));
+                                }
                             }
                         }
                     }

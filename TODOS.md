@@ -18,6 +18,7 @@
 - Convert {@tag ...} to `<tag>...</tag>` (see vscode-java)
 - Auto-collapse imports
 - Tooltip highlighting
+- Highlight // TODO yellow and italic
 
 ## Simplicity
 - Use module-info.java instead of build files to figure out classpath
