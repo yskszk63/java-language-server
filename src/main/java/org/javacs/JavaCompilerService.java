@@ -447,6 +447,7 @@ public class JavaCompilerService {
                 }
             }
 
+            // TODO profile info probably isn't necessary anymore now that we skip the slow stages
             StringBuilder profile = new StringBuilder();
             Instant started = Instant.now();
 
@@ -465,8 +466,16 @@ public class JavaCompilerService {
 
             // Walk each enclosing scope, placing its members into `results`
             List<Element> walkScopes() {
-                // TODO consider limiting how many ancestors we go through, and rely on sourcepath/classpath completions
+                var scopes = new ArrayList<Scope>();
                 for (var s = start; s != null; s = s.getEnclosingScope()) {
+                    scopes.add(s);
+                }
+                // Scopes may be contained in an enclosing scope. 
+                // The outermost scope contains those elements available via "star import" declarations; 
+                // the scope within that contains the top level elements of the compilation unit, including any named imports.
+                // https://docs.oracle.com/en/java/javase/11/docs/api/jdk.compiler/com/sun/source/tree/Scope.html
+                for (var i = 0; i < scopes.size() - 2; i++) {
+                    var s = scopes.get(i);
                     walkLocals(s);
                     profileEnd(s);
                     // Return early?
@@ -481,6 +490,31 @@ public class JavaCompilerService {
             }
         }
         return new Walk().walkScopes();
+    }
+
+    public List<Element> staticImports(URI file, String contents, String partialName) {
+        recompile(file, contents, cache.line, cache.character);
+
+        var trees = Trees.instance(cache.task);
+        var result = new ArrayList<Element>();
+        for (var i : cache.root.getImports()) {
+            if (!i.isStatic()) continue;
+            var id = (MemberSelectTree) i.getQualifiedIdentifier();
+            var path = trees.getPath(cache.root, id.getExpression());
+            var el = (TypeElement) trees.getElement(path);
+            if (id.getIdentifier().contentEquals("*")) {
+                for (var member : el.getEnclosedElements()) {
+                    if (member.getModifiers().contains(Modifier.STATIC))
+                        result.add(member);
+                }
+            } else {
+                for (var member : el.getEnclosedElements()) {
+                    if (matchesPartialName(member.getSimpleName(), partialName) && member.getModifiers().contains(Modifier.STATIC))
+                        result.add(member);
+                }
+            }
+        }
+        return result;
     }
 
     private List<TypeMirror> supersWithSelf(TypeMirror t) {
@@ -905,17 +939,15 @@ public class JavaCompilerService {
 
             private void completeScopeIdentifiers(String partialName) {
                 var startsWithUpperCase = partialName.length() > 0 && Character.isUpperCase(partialName.charAt(0));
-                var alreadyImported = new HashSet<String>();
-                // Add names that have already been imported
+                // Add locals
                 for (var m : scopeMembers(file, contents, line, character, partialName)) {
                     result.add(Completion.ofElement(m));
-
-                    if (m instanceof TypeElement && startsWithUpperCase) {
-                        var t = (TypeElement) m;
-                        alreadyImported.add(t.getQualifiedName().toString());
-                    }
                 }
-                // Add names of classes that haven't been imported
+                // Add static imports
+                for (var m : staticImports(file, contents, partialName)) {
+                    result.add(Completion.ofElement(m));
+                }
+                // Add classes
                 if (startsWithUpperCase) {
                     var packageName = Objects.toString(parse.getPackageName(), "");
                     BooleanSupplier full = () -> {
@@ -930,16 +962,15 @@ public class JavaCompilerService {
                                 var className = Parser.lastName(qualifiedName);
                                 return matchesPartialName(className, partialName);
                             };
-                    Predicate<String> notAlreadyImported = className -> !alreadyImported.contains(className);
                     for (var c : jdkClasses.classes()) {
                         if (full.getAsBoolean()) return;
-                        if (matchesPartialName.test(c) && notAlreadyImported.test(c) && jdkClasses.isAccessibleFromPackage(c, packageName)) {
+                        if (matchesPartialName.test(c) && jdkClasses.isAccessibleFromPackage(c, packageName)) {
                             result.add(Completion.ofNotImportedClass(c));
                         }
                     }
                     for (var c : classPathClasses.classes()) {
                         if (full.getAsBoolean()) return;
-                        if (matchesPartialName.test(c) && notAlreadyImported.test(c) && classPathClasses.isAccessibleFromPackage(c, packageName)) {
+                        if (matchesPartialName.test(c) && classPathClasses.isAccessibleFromPackage(c, packageName)) {
                             result.add(Completion.ofNotImportedClass(c));
                         }
                     }
@@ -971,7 +1002,7 @@ public class JavaCompilerService {
                             if (matchesFileName.test(file)) {
                                 var c = qualifiedName.apply(file);
                                 // Slow check, open file
-                                if (matchesPartialName.test(c) && notAlreadyImported.test(c) && isPublic.test(file)) {
+                                if (matchesPartialName.test(c) && isPublic.test(file)) {
                                     result.add(Completion.ofNotImportedClass(c));
                                 }
                             }

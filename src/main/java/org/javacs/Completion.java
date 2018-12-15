@@ -10,7 +10,7 @@ public class Completion {
     public final Element element;
     public final PackagePart packagePart;
     public final String keyword;
-    public final String notImportedClass;
+    public final String notImportedClass; // TODO this is a misnomer, all classes go down this path now
     public final Snippet snippet; // TODO separate label and insertText
 
     private Completion(
