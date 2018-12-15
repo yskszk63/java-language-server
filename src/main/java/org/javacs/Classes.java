@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 
 class Classes {
 
-    /** All exported modules in the JDK */
+    /** All exported modules that are present in JDK 10 or 11 */
     static String[] JDK_MODULES = {
         "java.activation",
         "java.base",
@@ -35,6 +35,7 @@ class Classes {
         "java.management",
         "java.management.rmi",
         "java.naming",
+        "java.net.http",
         "java.prefs",
         "java.rmi",
         "java.scripting",
@@ -46,6 +47,7 @@ class Classes {
         "java.sql",
         "java.sql.rowset",
         "java.transaction",
+        "java.transaction.xa",
         "java.xml",
         "java.xml.bind",
         "java.xml.crypto",
@@ -59,6 +61,7 @@ class Classes {
         "javafx.swing",
         "javafx.web",
         "jdk.accessibility",
+        "jdk.aot",
         "jdk.attach",
         "jdk.charsets",
         "jdk.compiler",
@@ -69,6 +72,13 @@ class Classes {
         "jdk.hotspot.agent",
         "jdk.httpserver",
         "jdk.incubator.httpclient",
+        "jdk.internal.ed",
+        "jdk.internal.jvmstat",
+        "jdk.internal.le",
+        "jdk.internal.opt",
+        "jdk.internal.vm.ci",
+        "jdk.internal.vm.compiler",
+        "jdk.internal.vm.compiler.management",
         "jdk.jartool",
         "jdk.javadoc",
         "jdk.jcmd",
@@ -94,10 +104,13 @@ class Classes {
         "jdk.packager.services",
         "jdk.rmic",
         "jdk.scripting.nashorn",
+        "jdk.scripting.nashorn.shell",
         "jdk.sctp",
         "jdk.security.auth",
         "jdk.security.jgss",
         "jdk.snmp",
+        "jdk.unsupported",
+        "jdk.unsupported.desktop",
         "jdk.xml.dom",
         "jdk.zipfs",
     };
@@ -123,7 +136,7 @@ class Classes {
                                     }
                                 });
             } catch (IOException e) {
-                LOG.log(Level.WARNING, "Failed indexing module " + m, e);
+                LOG.log(Level.WARNING, "Failed indexing module " + m + "(" + e.getMessage() + ")");
             }
         }
 
