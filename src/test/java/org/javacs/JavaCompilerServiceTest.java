@@ -85,7 +85,11 @@ public class JavaCompilerServiceTest {
     public void identifiers() {
         var found =
                 compiler.scopeMembers(
-                        URI.create("/CompleteIdentifiers.java"), contents("/CompleteIdentifiers.java"), 13, 21);
+                        URI.create("/CompleteIdentifiers.java"),
+                        contents("/CompleteIdentifiers.java"),
+                        13,
+                        21,
+                        "complete");
         var names = elementNames(found);
         assertThat(names, hasItem("completeLocal"));
         assertThat(names, hasItem("completeParam"));
@@ -95,13 +99,14 @@ public class JavaCompilerServiceTest {
         assertThat(names, hasItem("completeInnerField"));
         assertThat(names, hasItem("completeOuterField"));
         assertThat(names, hasItem("completeOuterStatic"));
-        assertThat(names, hasItem("CompleteIdentifiers"));
+        // assertThat(names, hasItem("CompleteIdentifiers"));
     }
 
     @Test
     public void identifiersInMiddle() {
         var found =
-                compiler.scopeMembers(URI.create("/CompleteInMiddle.java"), contents("/CompleteInMiddle.java"), 13, 21);
+                compiler.scopeMembers(
+                        URI.create("/CompleteInMiddle.java"), contents("/CompleteInMiddle.java"), 13, 21, "complete");
         var names = elementNames(found);
         assertThat(names, hasItem("completeLocal"));
         assertThat(names, hasItem("completeParam"));
@@ -111,18 +116,14 @@ public class JavaCompilerServiceTest {
         assertThat(names, hasItem("completeInnerField"));
         assertThat(names, hasItem("completeOuterField"));
         assertThat(names, hasItem("completeOuterStatic"));
-        assertThat(names, hasItem("CompleteInMiddle"));
+        // assertThat(names, hasItem("CompleteInMiddle"));
     }
 
     @Test
     public void completeIdentifiers() {
         var found =
                 compiler.completions(
-                                URI.create("/CompleteIdentifiers.java"),
-                                contents("/CompleteIdentifiers.java"),
-                                13,
-                                21,
-                                Integer.MAX_VALUE)
+                                URI.create("/CompleteIdentifiers.java"), contents("/CompleteIdentifiers.java"), 13, 21)
                         .items;
         var names = completionNames(found);
         assertThat(names, hasItem("completeLocal"));
@@ -149,12 +150,7 @@ public class JavaCompilerServiceTest {
     @Test
     public void completeMembers() {
         var found =
-                compiler.completions(
-                                URI.create("/CompleteMembers.java"),
-                                contents("/CompleteMembers.java"),
-                                3,
-                                15,
-                                Integer.MAX_VALUE)
+                compiler.completions(URI.create("/CompleteMembers.java"), contents("/CompleteMembers.java"), 3, 15)
                         .items;
         var names = completionNames(found);
         assertThat(names, hasItem("subMethod"));
@@ -166,11 +162,7 @@ public class JavaCompilerServiceTest {
     public void completeExpression() {
         var found =
                 compiler.completions(
-                                URI.create("/CompleteExpression.java"),
-                                contents("/CompleteExpression.java"),
-                                3,
-                                37,
-                                Integer.MAX_VALUE)
+                                URI.create("/CompleteExpression.java"), contents("/CompleteExpression.java"), 3, 37)
                         .items;
         var names = completionNames(found);
         assertThat(names, hasItem("instanceMethod"));
@@ -181,13 +173,7 @@ public class JavaCompilerServiceTest {
     @Test
     public void completeClass() {
         var found =
-                compiler.completions(
-                                URI.create("/CompleteClass.java"),
-                                contents("/CompleteClass.java"),
-                                3,
-                                23,
-                                Integer.MAX_VALUE)
-                        .items;
+                compiler.completions(URI.create("/CompleteClass.java"), contents("/CompleteClass.java"), 3, 23).items;
         var names = completionNames(found);
         assertThat(names, hasItems("staticMethod", "staticField"));
         assertThat(names, hasItems("class"));
@@ -198,12 +184,7 @@ public class JavaCompilerServiceTest {
     @Test
     public void completeImports() {
         var found =
-                compiler.completions(
-                                URI.create("/CompleteImports.java"),
-                                contents("/CompleteImports.java"),
-                                1,
-                                18,
-                                Integer.MAX_VALUE)
+                compiler.completions(URI.create("/CompleteImports.java"), contents("/CompleteImports.java"), 1, 18)
                         .items;
         var names = completionNames(found);
         assertThat(names, hasItem("List"));
@@ -232,16 +213,16 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void references() {
-        ReportReferencesProgress rrp = new ReportReferencesProgress() {
-            @Override
-            public void scanForPotentialReferences(int nScanned, int nFiles) {}
+        ReportReferencesProgress rrp =
+                new ReportReferencesProgress() {
+                    @Override
+                    public void scanForPotentialReferences(int nScanned, int nFiles) {}
 
-            @Override
-            public void checkPotentialReferences(int nCompiled, int nPotential) {}
-        };
-    var refs =
-        compiler.references(
-            URI.create("/GotoDefinition.java"), contents("/GotoDefinition.java"), 6, 13, rrp);
+                    @Override
+                    public void checkPotentialReferences(int nCompiled, int nPotential) {}
+                };
+        var refs =
+                compiler.references(URI.create("/GotoDefinition.java"), contents("/GotoDefinition.java"), 6, 13, rrp);
         boolean found = false;
         for (var t : refs) {
             var unit = t.getCompilationUnit();
@@ -290,5 +271,11 @@ public class JavaCompilerServiceTest {
         var qualifiedNames =
                 compiler.fixImports(resourceUri("/MissingImport.java"), contents("/MissingImport.java")).fixedImports;
         assertThat(qualifiedNames, hasItem("java.util.List"));
+    }
+
+    @Test
+    public void matchesPartialName() {
+        assertTrue(JavaCompilerService.matchesPartialName("foobar", "foo"));
+        assertFalse(JavaCompilerService.matchesPartialName("foo", "foobar"));
     }
 }

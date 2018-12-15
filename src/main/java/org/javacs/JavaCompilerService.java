@@ -25,6 +25,7 @@ import javax.tools.*;
 
 // TODO eliminate uses of URI in favor of Path
 public class JavaCompilerService {
+    public static final int MAX_COMPLETION_ITEMS = 50;
     private static final Logger LOG = Logger.getLogger("main");
     // Not modifiable! If you want to edit these, you need to create a new instance
     private final Set<Path> sourcePath, classPath, docPath;
@@ -362,8 +363,18 @@ public class JavaCompilerService {
         return result;
     }
 
+    static boolean matchesPartialName(CharSequence candidate, CharSequence partialName) {
+        if (candidate.length() < partialName.length())
+            return false;
+        for (int i = 0; i < partialName.length(); i++) {
+            if (candidate.charAt(i) != partialName.charAt(i))
+                return false;
+        }
+        return true;
+    }
+
     /** Find all identifiers in scope at line:character */
-    public List<Element> scopeMembers(URI file, String contents, int line, int character) {
+    public List<Element> scopeMembers(URI file, String contents, int line, int character, String partialName) {
         recompile(file, contents, line, character);
 
         var trees = Trees.instance(cache.task);
@@ -385,8 +396,8 @@ public class JavaCompilerService {
                 return e.getModifiers().contains(Modifier.STATIC);
             }
 
-            boolean isThisOrSuper(VariableElement ve) {
-                var name = ve.getSimpleName();
+            boolean isThisOrSuper(Element e) {
+                var name = e.getSimpleName();
                 return name.contentEquals("this") || name.contentEquals("super");
             }
 
@@ -403,6 +414,7 @@ public class JavaCompilerService {
                 for (var thisMember : thisElement.getEnclosedElements()) {
                     if (isStatic(start) && !isStatic(thisMember)) continue;
                     if (thisMember.getSimpleName().contentEquals("<init>")) continue;
+                    if (!matchesPartialName(thisMember.getSimpleName(), partialName)) continue;
 
                     // Check if member is accessible from original scope
                     if (trees.isAccessible(start, thisMember, thisDeclaredType)) {
@@ -415,20 +427,20 @@ public class JavaCompilerService {
             void walkLocals(Scope s) {
                 try {
                     for (var e : s.getLocalElements()) {
-                        if (e instanceof TypeElement) {
-                            var te = (TypeElement) e;
-                            if (trees.isAccessible(start, te)) result.add(te);
-                        } else if (e instanceof VariableElement) {
-                            var ve = (VariableElement) e;
-                            if (isThisOrSuper(ve)) {
-                                unwrapThisSuper(ve);
-                                if (!isStatic(s)) result.add(ve);
+                        if (matchesPartialName(e.getSimpleName(), partialName)) {
+                            if (e instanceof TypeElement) {
+                                var te = (TypeElement) e;
+                                if (trees.isAccessible(start, te)) result.add(te);
+                            } else if (isThisOrSuper(e)) {
+                                if (!isStatic(s)) result.add(e);
                             } else {
-                                result.add(ve);
+                                result.add(e);
                             }
-                        } else {
-                            result.add(e);
                         }
+                        if (isThisOrSuper(e)) {
+                            unwrapThisSuper((VariableElement) e);
+                        }
+                        if (result.size() >= MAX_COMPLETION_ITEMS) return;
                     }
                 } catch (Exception e) {
                     LOG.log(Level.WARNING, "error walking locals in scope", e);
@@ -437,8 +449,10 @@ public class JavaCompilerService {
 
             // Walk each enclosing scope, placing its members into `results`
             List<Element> walkScopes() {
+                // TODO consider limiting how many ancestors we go through, and rely on sourcepath/classpath completions
                 for (var s = start; s != null; s = s.getEnclosingScope()) {
                     walkLocals(s);
+                    if (result.size() >= MAX_COMPLETION_ITEMS) return result;
                 }
 
                 return result;
@@ -692,7 +706,7 @@ public class JavaCompilerService {
      * Complete members or identifiers at the cursor. Delegates to `members` or `scopeMembers`, depending on whether the
      * expression before the cursor looks like `foo.bar` or `foo`
      */
-    public CompletionResult completions(URI file, String contents, int line, int character, int limitHint) {
+    public CompletionResult completions(URI file, String contents, int line, int character) {
         var started = Instant.now();
         LOG.info(String.format("Completing at %s[%d,%d]...", file.getPath(), line, character));
         
@@ -861,7 +875,7 @@ public class JavaCompilerService {
 
             private void addKeywords(String[] keywords, String partialName) {
                 for (var k : keywords) {
-                    if (k.startsWith(partialName)) {
+                    if (matchesPartialName(k, partialName)) {
                         result.add(Completion.ofKeyword(k));
                     }
                 }
@@ -871,21 +885,19 @@ public class JavaCompilerService {
                 var startsWithUpperCase = partialName.length() > 0 && Character.isUpperCase(partialName.charAt(0));
                 var alreadyImported = new HashSet<String>();
                 // Add names that have already been imported
-                for (var m : scopeMembers(file, contents, line, character)) {
-                    if (m.getSimpleName().toString().startsWith(partialName)) {
-                        result.add(Completion.ofElement(m));
+                for (var m : scopeMembers(file, contents, line, character, partialName)) {
+                    result.add(Completion.ofElement(m));
 
-                        if (m instanceof TypeElement && startsWithUpperCase) {
-                            var t = (TypeElement) m;
-                            alreadyImported.add(t.getQualifiedName().toString());
-                        }
+                    if (m instanceof TypeElement && startsWithUpperCase) {
+                        var t = (TypeElement) m;
+                        alreadyImported.add(t.getQualifiedName().toString());
                     }
                 }
                 // Add names of classes that haven't been imported
                 if (startsWithUpperCase) {
                     var packageName = Objects.toString(parse.getPackageName(), "");
                     BooleanSupplier full = () -> {
-                        if (result.size() >= limitHint) {
+                        if (result.size() >= MAX_COMPLETION_ITEMS) {
                             isIncomplete = true;
                             return true;
                         } 
@@ -894,7 +906,7 @@ public class JavaCompilerService {
                     Predicate<String> matchesPartialName =
                             qualifiedName -> {
                                 var className = Parser.lastName(qualifiedName);
-                                return className.startsWith(partialName);
+                                return matchesPartialName(className, partialName);
                             };
                     Predicate<String> notAlreadyImported = className -> !alreadyImported.contains(className);
                     for (var c : jdkClasses.classes()) {
@@ -910,7 +922,7 @@ public class JavaCompilerService {
                         }
                     }
                     Predicate<Path> matchesFileName = 
-                            file -> file.getFileName().toString().startsWith(partialName);
+                            file -> matchesPartialName(file.getFileName().toString(), partialName);
                     Predicate<Path> isPublic = 
                         file -> {
                             var fileName = file.getFileName().toString();

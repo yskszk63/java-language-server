@@ -1,0 +1,1 @@
+All classes in this directory need to be added to the list in .circleci/test.sh

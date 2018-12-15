@@ -81,7 +81,7 @@ class JavaTextDocumentService implements TextDocumentService {
         var column = position.getPosition().getCharacter() + 1;
         var result = new ArrayList<CompletionItem>();
         lastCompletions.clear();
-        var completions = server.compiler.completions(uri, content, line, column, 50);
+        var completions = server.compiler.completions(uri, content, line, column);
         for (var c : completions.items) {
             var i = new CompletionItem();
             var id = UUID.randomUUID().toString();
