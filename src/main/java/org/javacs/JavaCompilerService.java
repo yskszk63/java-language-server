@@ -1370,6 +1370,47 @@ public class JavaCompilerService {
         return new Batch(task, result);
     }
 
+    private String className(TreePath path) {
+        var packageName = Objects.toString(path.getCompilationUnit().getPackageName(), "");
+        while (path != null) {
+            var leaf = path.getLeaf();
+            if (leaf instanceof ClassTree) {
+                var classTree = (ClassTree) leaf;
+                var className = Objects.toString(classTree.getSimpleName(), "");
+                if (packageName == "") return className;
+                else return packageName + "." + className;
+            }
+            path = path.getParentPath();
+        }
+        return "";
+    }
+
+    private List<Path> importsClass(List<Path> files, String className) {
+        var packageName = Parser.mostName(className);
+        var filtered = new ArrayList<Path>();
+        fileLoop:
+        for (var f : files) {
+            // Parse the file but don't compile it
+            // TODO do this as part of potentialReferences, parsing *only* the imports section of the file
+            var root = Parser.parse(f);
+            // If the file's package declaration matches the target package name, this file can see the target class
+            var currentPackageName = Objects.toString(root.getPackageName(), "");
+            if (currentPackageName.equals(packageName)) {
+                filtered.add(f);
+                continue fileLoop;
+            }
+            for (var i : root.getImports()) {
+                var importsName = Objects.toString(i.getQualifiedIdentifier(), "");
+                // If the file imports the target class, or star-imports the target package, this file can see the target class
+                if (importsName.equals(className) || importsName.equals(packageName + ".*")) {
+                    filtered.add(f);
+                    continue fileLoop;
+                }
+            }
+        }
+        return filtered;
+    }
+
     public List<TreePath> references(URI file, String contents, int line, int character, ReportReferencesProgress progress) {
         recompile(file, contents, -1, -1);
 
@@ -1379,16 +1420,20 @@ public class JavaCompilerService {
         // `to` is part of a different batch than `batch = compileBatch(possible)`,
         // so `to.equals(...thing from batch...)` shouldn't work
         var to = trees.getElement(path);
-        var possible = potentialReferences(to, progress);
-        progress.checkPotentialReferences(0, possible.size());
+        var containsName = potentialReferences(to, progress);
+        LOG.info(String.format("%d files contain the name `%s`", containsName.size(), to));
+        var targetClassName = className(path);
+        var importsThisClass = importsClass(containsName, targetClassName);
+        LOG.info(String.format("%d files also import %s", importsThisClass.size(), targetClassName));
+        progress.checkPotentialReferences(0, importsThisClass.size());
         // TODO optimize by pruning method bodies that don't contain potential references
-        var batch = compileBatch(possible);
+        var batch = compileBatch(importsThisClass);
         var result = new ArrayList<TreePath>();
         int nChecked = 0;
         for (var f : batch.roots) {
             result.addAll(batch.actualReferences(f, to));
             nChecked++;
-            progress.checkPotentialReferences(nChecked, possible.size());
+            progress.checkPotentialReferences(nChecked, importsThisClass.size());
         }
         return result;
     }

@@ -384,19 +384,21 @@ class JavaTextDocumentService implements TextDocumentService {
                     }
 
                     public void scanForPotentialReferences(int nScanned, int nFiles) {
+                        var message = String.format("Scan %,d files for potential references", nFiles);
                         if (nScanned == 0) {
-                            var message = String.format("Scan %,d files for potential references", nScanned, nFiles);
                             server.client().javaReportProgress(new JavaReportProgressParams(message));
+                        } else {
+                            var increment = percent(nScanned, nFiles) > percent(nScanned - 1, nFiles) ? 1 : 0;
+                            server.client().javaReportProgress(new JavaReportProgressParams(message, increment));
                         }
                     }
 
                     public void checkPotentialReferences(int nCompiled, int nPotential) {
+                        var message = String.format("Check %,d files", nPotential);
                         if (nCompiled == 0) {
-                            var message = String.format("Compile %,d files", nPotential);
                             server.client().javaReportProgress(new JavaReportProgressParams(message));
                         } else {
                             var increment = percent(nCompiled, nPotential) > percent(nCompiled - 1, nPotential) ? 1 : 0;
-                            var message = String.format("Check %,d files", nPotential);
                             server.client().javaReportProgress(new JavaReportProgressParams(message, increment));
                         }
                     }
