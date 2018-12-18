@@ -15,7 +15,6 @@ import java.util.*;
 import java.util.function.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -1270,19 +1269,34 @@ public class JavaCompilerService {
         }
     }
 
-    private List<Path> potentialReferences(Element to, ReportReferencesProgress progress) {
-        var name = to.getSimpleName().toString();
-        var word = Pattern.compile("\\b\\w+\\b");
-        var result = new ArrayList<Path>();
-        int nScanned = 0;
-        Predicate<String> containsWord =
-                line -> {
-                    Matcher m = word.matcher(line);
-                    while (m.find()) {
-                        if (m.group().equals(name)) return true;
-                    }
-                    return false;
-                };
+    private boolean containsWord(String toPackage, String toClass, String name, Path file) {
+        var samePackage = Pattern.compile("^package +" + toPackage + ";");
+        var importClass = Pattern.compile("^import +" + toPackage + "\\." + toClass + ";");
+        var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
+        var importStatic = Pattern.compile("^import +static +" + toPackage + "\\.");
+        var word = Pattern.compile("\\b" + name + "\\b");
+        var foundImport = toPackage.isEmpty();
+        var foundWord = false;
+        try (var read = Files.newBufferedReader(file)) {
+            while (true) {
+                var line = read.readLine();
+                if (line == null) break;
+                if (samePackage.matcher(line).find()) foundImport = true;
+                if (importClass.matcher(line).find()) foundImport = true;
+                if (importStar.matcher(line).find()) foundImport = true;
+                if (importStatic.matcher(line).find()) foundImport = true;
+                if (importClass.matcher(line).find()) foundImport = true;
+                // TODO this could be optimized by giving up if import isn't found and we're done processing imports
+                if (word.matcher(line).find()) foundWord = true;
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return foundImport && foundWord;
+    }
+
+    private List<Path> potentialReferences(String toPackage, String toClass, Element toEl, ReportReferencesProgress progress) {
+        // Enumerate all files on source path
         var allFiles = new ArrayList<Path>();
         for (var dir : sourcePath) {
             for (var file : javaSourcesInDir(dir)) {
@@ -1290,15 +1304,14 @@ public class JavaCompilerService {
             }
         }
         progress.scanForPotentialReferences(0, allFiles.size());
+        // Filter for files that import toPackage.toClass and contain the word el
+        var name = toEl.getSimpleName().toString();
+        var result = new ArrayList<Path>();
+        int nScanned = 0;
         for (var file : allFiles) {
-            try {
-                if (Files.lines(file).anyMatch(containsWord)) 
-                    result.add(file);
-                nScanned++;
-                progress.scanForPotentialReferences(nScanned, allFiles.size());
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            if (containsWord(toPackage, toClass, name, file)) 
+                result.add(file);
+            progress.scanForPotentialReferences(++nScanned, allFiles.size());
         }
         return result;
     }
@@ -1370,45 +1383,18 @@ public class JavaCompilerService {
         return new Batch(task, result);
     }
 
-    private String className(TreePath path) {
+    private QName className(TreePath path) {
         var packageName = Objects.toString(path.getCompilationUnit().getPackageName(), "");
         while (path != null) {
             var leaf = path.getLeaf();
             if (leaf instanceof ClassTree) {
                 var classTree = (ClassTree) leaf;
                 var className = Objects.toString(classTree.getSimpleName(), "");
-                if (packageName == "") return className;
-                else return packageName + "." + className;
+                return new QName(packageName, className);
             }
             path = path.getParentPath();
         }
-        return "";
-    }
-
-    private List<Path> importsClass(List<Path> files, String className) {
-        var packageName = Parser.mostName(className);
-        var filtered = new ArrayList<Path>();
-        fileLoop:
-        for (var f : files) {
-            // Parse the file but don't compile it
-            // TODO do this as part of potentialReferences, parsing *only* the imports section of the file
-            var root = Parser.parse(f);
-            // If the file's package declaration matches the target package name, this file can see the target class
-            var currentPackageName = Objects.toString(root.getPackageName(), "");
-            if (currentPackageName.equals(packageName)) {
-                filtered.add(f);
-                continue fileLoop;
-            }
-            for (var i : root.getImports()) {
-                var importsName = Objects.toString(i.getQualifiedIdentifier(), "");
-                // If the file imports the target class, or star-imports the target package, this file can see the target class
-                if (importsName.equals(className) || importsName.equals(packageName + ".*")) {
-                    filtered.add(f);
-                    continue fileLoop;
-                }
-            }
-        }
-        return filtered;
+        return new QName(packageName, "");
     }
 
     public List<TreePath> references(URI file, String contents, int line, int character, ReportReferencesProgress progress) {
@@ -1419,21 +1405,22 @@ public class JavaCompilerService {
         // It's sort of odd that this works
         // `to` is part of a different batch than `batch = compileBatch(possible)`,
         // so `to.equals(...thing from batch...)` shouldn't work
-        var to = trees.getElement(path);
-        var containsName = potentialReferences(to, progress);
-        LOG.info(String.format("%d files contain the name `%s`", containsName.size(), to));
-        var targetClassName = className(path);
-        var importsThisClass = importsClass(containsName, targetClassName);
-        LOG.info(String.format("%d files also import %s", importsThisClass.size(), targetClassName));
-        progress.checkPotentialReferences(0, importsThisClass.size());
+        var toEl = trees.getElement(path);
+        var toClass = className(path);
+        var possible = potentialReferences(toClass.packageName, toClass.className, toEl, progress);
+        if (possible.isEmpty()) {
+            LOG.info("No potential references to " + toEl);
+            return List.of();
+        }
+        progress.checkPotentialReferences(0, possible.size());
         // TODO optimize by pruning method bodies that don't contain potential references
-        var batch = compileBatch(importsThisClass);
+        var batch = compileBatch(possible);
         var result = new ArrayList<TreePath>();
         int nChecked = 0;
         for (var f : batch.roots) {
-            result.addAll(batch.actualReferences(f, to));
+            result.addAll(batch.actualReferences(f, toEl));
             nChecked++;
-            progress.checkPotentialReferences(nChecked, importsThisClass.size());
+            progress.checkPotentialReferences(nChecked, possible.size());
         }
         return result;
     }
