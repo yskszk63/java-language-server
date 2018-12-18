@@ -168,7 +168,7 @@
 		"keywords":  {
 			"patterns": [
 				{
-					"match": "\\b(try|finally|throw|return|break|continue|default|do|for|while|switch|case|if|else|goto)\\b",
+					"match": "\\b(try|finally|throw|return|break|continue|do|for|while|switch|case|if|else|goto)\\b",
 					"name": "keyword.control.java"
 				},
 				{
@@ -184,7 +184,7 @@
 					}
 				},
 				{
-					"match": "\\b(private|public|protected|static|final|const|extends|implements)\\b",
+					"match": "\\b(private|public|protected|default|static|final|const|extends|implements)\\b",
 					"name": "storage.modifier.java"
 				},
 				{
