@@ -1274,6 +1274,7 @@ public class JavaCompilerService {
         var importClass = Pattern.compile("^import +" + toPackage + "\\." + toClass + ";");
         var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
         var importStatic = Pattern.compile("^import +static +" + toPackage + "\\.");
+        var startOfClass = Pattern.compile("class +\\w+");
         var word = Pattern.compile("\\b" + name + "\\b");
         var foundImport = toPackage.isEmpty();
         var foundWord = false;
@@ -1281,12 +1282,12 @@ public class JavaCompilerService {
             while (true) {
                 var line = read.readLine();
                 if (line == null) break;
+                if (!foundImport && startOfClass.matcher(line).find()) break;
                 if (samePackage.matcher(line).find()) foundImport = true;
                 if (importClass.matcher(line).find()) foundImport = true;
                 if (importStar.matcher(line).find()) foundImport = true;
                 if (importStatic.matcher(line).find()) foundImport = true;
                 if (importClass.matcher(line).find()) foundImport = true;
-                // TODO this could be optimized by giving up if import isn't found and we're done processing imports
                 if (word.matcher(line).find()) foundWord = true;
             }
         } catch (IOException e) {
