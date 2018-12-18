@@ -115,6 +115,10 @@
 						},
 						{
 							"include": "#class-name"
+						},
+						{
+							"match": "[<>]",
+							"name": "keyword.other.generics.java"
 						}
 					]
 				},
@@ -382,6 +386,10 @@
 								{
 									"match": "\\w+",
 									"name": "entity.name.type.java"
+								},
+								{
+									"match": "[<>]",
+									"name": "keyword.other.generics.java"
 								}
 							]
 						},
