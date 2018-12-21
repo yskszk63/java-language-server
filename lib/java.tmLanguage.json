@@ -44,16 +44,7 @@
 			]
 		},
 		{
-			"include": "#annotation"
-		},
-		{
-			"include": "#keywords"
-		},
-		{
-			"include": "#comments"
-		},
-		{
-			"include": "#class-declaration"
+			"include": "#code"
 		}
 	],
 	"repository": {
@@ -99,176 +90,22 @@
 				}
 			]
 		},
-		"class-declaration": {
-			"patterns": [
-				{
-					"begin": "(?<!\\.)\\b(class|interface|@interface)\\b +(\\w+)\\b",
-					"beginCaptures": {
-						"1": {
-							"name": "keyword.class.java"
-						},
-						"2": {
-							"name": "entity.name.class.java"
-						}
-					},
-					"end": "}",
-					"name": "meta.class.java",
-					"patterns": [
-						{
-							"begin": "{",
-							"end": "(?=})",
-							"name": "meta.class.body.java",
-							"patterns": [
-								{
-									"include": "#class-body"
-								}
-							]
-						}
-					]
-				}
-			]
-		},
 		"class-body": {
-			"patterns": [
-				{
-					"include": "#comments"
-				},
-				{
-					"include": "#keywords"
-				},
-				{
-					"include": "#block"
-				},
-				{
-					"include": "#class-declaration"
-				},
-				{
-					"include": "#member-declaration"
-				},
-				{
-					"begin": "=",
-					"end": "(?=[,;])",
-					"name": "meta.initialize.java",
-					"beginCaptures": {
-						"0": {
-							"name": "keyword.other.set.java"
-						}
-					},
-					"patterns": [
-						{
-							"include": "#code"
-						}
-					]
-				},
-				{
-					"match": "\\w+ *(?=\\()",
-					"name": "variable.other.method.java"
-				},
-				{
-					"include": "#arguments"
-				},
-				{
-					"match": "[;,]",
-					"name": "keyword.other.punctuation.java"
-				}
-			]
-		},
-		"member-declaration": {
-			"patterns": [
-				{
-					"match": "\\b(\\w+) +(?=\\w)",
-					"captures": {
-						"1": {
-							"name": "entity.name.type.java"
-						}
-					}
-				},
-				{
-					"match": "\\b(\\w+) *(?=<)",
-					"captures": {
-						"1": {
-							"name": "entity.name.type.java"
-						}
-					}
-				},
-				{
-					"match": "\\b(\\w+) *(?=\\[)",
-					"captures": {
-						"1": {
-							"name": "entity.name.type.java"
-						}
-					}
-				},
-				{
-					"match": "(?<GROUP><([^<>]|\\g<GROUP>)+>)",
-					"name": "meta.type-parameters.java",
-					"captures": {
-						"1": {
-							"patterns": [
-								{
-									"match": "extends|super",
-									"name": "storage.modifier.java"
-								},
-								{
-									"match": "\\w+",
-									"name": "entity.name.type.java"
-								},
-								{
-									"match": "[<>]",
-									"name": "keyword.other.generics.java"
-								}
-							]
-						}
-					}
-				},
-				{
-					"match": "\\[\\]",
-					"name": "keyword.other.brackets.java"
-				},
-				{
-					"match": "\\w+ *(?=[,;=\\)])",
-					"name": "variable.other.field.java"
-				}
-			]
-		},
-		"arguments": {
 			"patterns": [
 				{
 					"begin": "\\(",
 					"end": "\\)",
 					"name": "meta.arguments.java",
 					"beginCaptures": {
-						"0": {"name": "keyword.other.java"}
+						"0": {
+							"name": "keyword.other.begin-args.java"
+						}
 					},
 					"endCaptures": {
-						"0": {"name": "keyword.other.java"}
-					},
-					"patterns": [
-						{
-							"include": "#comments"
-						},
-						{
-							"include": "#annotation"
-						},
-						{
-							"include": "#member-declaration"
-						}
-					]
-				}
-			]
-		},
-		"block-code": {
-			"patterns": [
-				{
-					"COMMENT": "prevent `) {` at the end of `if (...) {` from being interpreted as anonymous class",
-					"begin": "\\b(if) *(?=\\()",
-					"end": "(?={)",
-					"beginCaptures": {
-						"1": {
-							"name": "keyword.control.if.java"
+						"0": {
+							"name": "keyword.other.end-args.java"
 						}
 					},
-					"name": "meta.if.java",
 					"patterns": [
 						{
 							"include": "#code"
@@ -276,63 +113,21 @@
 					]
 				},
 				{
-					"COMMENT": "prevent `) {` at the end of `try (...) {` from being interpreted as anonymous class",
-					"begin": "\\b(try) *(?=\\()",
-					"end": "(?={)",
+					"begin": "\\b(throws)\\b",
+					"end": "(?=[{;])",
 					"beginCaptures": {
 						"1": {
-							"name": "keyword.control.try.java"
+							"name": "keyword.other.throws.java"
 						}
 					},
-					"name": "meta.try-with-resources.java",
-					"patterns": [
-						{
-							"include": "#code"
-						}
-					]
-				},
-				{
-					"COMMENT": "prevent `) {` at the end of `catch (...) {` from being interpreted as anonymous class",
-					"begin": "\\b(catch) *(?=\\()",
-					"end": "(?={)",
-					"beginCaptures": {
-						"1": {
-							"name": "keyword.control.catch.java"
-						}
-					},
-					"name": "meta.catch.java",
+					"name": "meta.throws.java",
 					"patterns": [
 						{
 							"match": "(\\w+\\.)*[A-Z]\\w*",
 							"name": "entity.name.type.exception.java"
 						},
 						{
-							"match": "[a-z]\\w*",
-							"name": "variable.other.declaration.java"
-						},
-						{
 							"include": "#comments"
-						}
-					]
-				},
-				{
-					"COMMENT": "otherwise, interpret `) {` as beginning of anonymous class",
-					"begin": "(?<=\\)) *({)",
-					"end": "}",
-					"beginCaptures": {
-						"1": {
-							"name": "markup.underline"
-						}
-					},
-					"endCaptures": {
-						"0": {
-							"name": "markup.underline"
-						}
-					},
-					"name": "meta.anonymous.class.java",
-					"patterns": [
-						{
-							"include": "#class-body"
 						}
 					]
 				},
@@ -344,16 +139,94 @@
 		"code": {
 			"patterns": [
 				{
-					"include": "#class-declaration"
+					"begin": "(?<!\\.)\\b(class|interface|@interface)\\b +(\\w+)\\b",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.class.java"
+						},
+						"2": {
+							"name": "entity.name.class.java"
+						}
+					},
+					"end": "$",
+					"name": "meta.class.java",
+					"patterns": [
+						{
+							"include": "#keywords"
+						},
+						{
+							"include": "#type-name"
+						},
+						{
+							"match": "[<>,]",
+							"name": "keyword.other.java"
+						},
+						{
+							"begin": "{",
+							"end": "}",
+							"beginCaptures": {
+								"0": {
+									"name": "keyword.other.begin-class-body.java"
+								}
+							},
+							"endCaptures": {
+								"0": {
+									"name": "keyword.other.end-class-body.java"
+								}
+							},
+							"name": "meta.class.body.java",
+							"patterns": [
+								{
+									"include": "#class-body"
+								}
+							]
+						}
+					]
 				},
 				{
-					"include": "#block"
+					"begin": "(new)",
+					"end": "$",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.other.new.java"
+						}
+					},
+					"name": "meta.new.java",
+					"patterns": [
+						{
+							"begin": "{",
+							"end": "}",
+							"name": "meta.anonymous-class.body.java",
+							"beginCaptures": {
+								"0": {
+									"name": "markup.underline"
+								}
+							},
+							"endCaptures": {
+								"0": {
+									"name": "markup.underline"
+								}
+							},
+							"patterns": [
+								{
+									"include": "#class-body"
+								}
+							]
+						},
+						{
+							"include": "#code"
+						}
+					]
 				},
 				{
-					"include": "#paren"
-				},
-				{
-					"include": "#throws"
+					"begin": "{",
+					"end": "}",
+					"name": "meta.block.java",
+					"patterns": [
+						{
+							"include": "#code"
+						}
+					]
 				},
 				{
 					"include": "#annotation"
@@ -394,6 +267,10 @@
 				{
 					"match": "\\b(this|super)\\b",
 					"name": "variable.language.java"
+				},
+				{
+					"match": "\\?",
+					"name": "keyword.other.q.java"
 				}
 			]
 		},
@@ -494,57 +371,6 @@
 						{
 							"match": "\\\\.",
 							"name": "constant.character.escape.java"
-						}
-					]
-				}
-			]
-		},
-		"throws": {
-			"patterns": [
-				{
-					"begin": "\\b(throws)\\b",
-					"end": "(?=[{;])",
-					"beginCaptures": {
-						"1": {
-							"name": "keyword.other.throws.java"
-						}
-					},
-					"name": "meta.throws.java",
-					"patterns": [
-						{
-							"match": "(\\w+\\.)*[A-Z]\\w*",
-							"name": "entity.name.type.exception.java"
-						},
-						{
-							"include": "#comments"
-						}
-					]
-				}
-			]
-		},
-		"block": {
-			"patterns": [
-				{
-					"begin": "{",
-					"end": "}",
-					"name": "meta.block.java",
-					"patterns": [
-						{
-							"include": "#block-code"
-						}
-					]
-				}
-			]
-		},
-		"paren": {
-			"patterns": [
-				{
-					"begin": "\\(",
-					"end": "\\)",
-					"name": "meta.paren.java",
-					"patterns": [
-						{
-							"include": "#code"
 						}
 					]
 				}
