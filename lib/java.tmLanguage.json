@@ -14,7 +14,7 @@
 			"name": "meta.package.java",
 			"patterns": [
 				{
-					"include": "#class-name"
+					"include": "#type-name"
 				},
 				{
 					"include": "#comments"
@@ -36,7 +36,7 @@
 			"contentName": "storage.modifier.import.java",
 			"patterns": [
 				{
-					"include": "#class-name"
+					"include": "#type-name"
 				},
 				{
 					"include": "#comments"
@@ -44,7 +44,16 @@
 			]
 		},
 		{
-			"include": "#code"
+			"include": "#annotation"
+		},
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#class-declaration"
 		}
 	],
 	"repository": {
@@ -91,44 +100,158 @@
 			]
 		},
 		"class-declaration": {
-			"begin": "(?<!\\.)\\b(class|interface|@interface)\\b",
-			"beginCaptures": {
-				"1": {
-					"name": "keyword.class.java"
-				}
-			},
-			"end": "}",
-			"name": "meta.class.java",
 			"patterns": [
 				{
-					"begin": "\\b(\\w+)\\b",
+					"begin": "(?<!\\.)\\b(class|interface|@interface)\\b +(\\w+)\\b",
 					"beginCaptures": {
 						"1": {
+							"name": "keyword.class.java"
+						},
+						"2": {
 							"name": "entity.name.class.java"
 						}
 					},
-					"end": "(?={)",
-					"name": "meta.class.header.java",
+					"end": "}",
+					"name": "meta.class.java",
 					"patterns": [
 						{
-							"include": "#keywords"
-						},
+							"begin": "{",
+							"end": "(?=})",
+							"name": "meta.class.body.java",
+							"patterns": [
+								{
+									"include": "#class-body"
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		"class-body": {
+			"patterns": [
+				{
+					"include": "#comments"
+				},
+				{
+					"include": "#keywords"
+				},
+				{
+					"include": "#block"
+				},
+				{
+					"include": "#class-declaration"
+				},
+				{
+					"include": "#member-declaration"
+				},
+				{
+					"begin": "=",
+					"end": "(?=[,;])",
+					"name": "meta.initialize.java",
+					"beginCaptures": {
+						"0": {
+							"name": "keyword.other.set.java"
+						}
+					},
+					"patterns": [
 						{
-							"include": "#class-name"
-						},
-						{
-							"match": "[<>]",
-							"name": "keyword.other.generics.java"
+							"include": "#code"
 						}
 					]
 				},
 				{
-					"begin": "{",
-					"end": "(?=})",
-					"name": "meta.class.body.java",
+					"match": "\\w+ *(?=\\()",
+					"name": "variable.other.method.java"
+				},
+				{
+					"include": "#arguments"
+				},
+				{
+					"match": "[;,]",
+					"name": "keyword.other.punctuation.java"
+				}
+			]
+		},
+		"member-declaration": {
+			"patterns": [
+				{
+					"match": "\\b(\\w+) +(?=\\w)",
+					"captures": {
+						"1": {
+							"name": "entity.name.type.java"
+						}
+					}
+				},
+				{
+					"match": "\\b(\\w+) *(?=<)",
+					"captures": {
+						"1": {
+							"name": "entity.name.type.java"
+						}
+					}
+				},
+				{
+					"match": "\\b(\\w+) *(?=\\[)",
+					"captures": {
+						"1": {
+							"name": "entity.name.type.java"
+						}
+					}
+				},
+				{
+					"match": "(?<GROUP><([^<>]|\\g<GROUP>)+>)",
+					"name": "meta.type-parameters.java",
+					"captures": {
+						"1": {
+							"patterns": [
+								{
+									"match": "extends|super",
+									"name": "storage.modifier.java"
+								},
+								{
+									"match": "\\w+",
+									"name": "entity.name.type.java"
+								},
+								{
+									"match": "[<>]",
+									"name": "keyword.other.generics.java"
+								}
+							]
+						}
+					}
+				},
+				{
+					"match": "\\[\\]",
+					"name": "keyword.other.brackets.java"
+				},
+				{
+					"match": "\\w+ *(?=[,;=\\)])",
+					"name": "variable.other.field.java"
+				}
+			]
+		},
+		"arguments": {
+			"patterns": [
+				{
+					"begin": "\\(",
+					"end": "\\)",
+					"name": "meta.arguments.java",
+					"beginCaptures": {
+						"0": {"name": "keyword.other.java"}
+					},
+					"endCaptures": {
+						"0": {"name": "keyword.other.java"}
+					},
 					"patterns": [
 						{
-							"include": "#code"
+							"include": "#comments"
+						},
+						{
+							"include": "#annotation"
+						},
+						{
+							"include": "#member-declaration"
 						}
 					]
 				}
@@ -136,6 +259,12 @@
 		},
 		"code": {
 			"patterns": [
+				{
+					"include": "#class-declaration"
+				},
+				{
+					"include": "#anonymous-class"
+				},
 				{
 					"include": "#keywords"
 				},
@@ -149,9 +278,6 @@
 					"include": "#annotation"
 				},
 				{
-					"include": "#class-declaration"
-				},
-				{
 					"include": "#catch"
 				},
 				{
@@ -159,9 +285,13 @@
 				},
 				{
 					"include": "#block"
-				},
+				}
+			]
+		},
+		"anonymous-class": {
+			"patterns": [
 				{
-					"include": "#declaration"
+					"TODO": "use begin/end to gain context?"
 				}
 			]
 		},
@@ -359,51 +489,14 @@
 				}
 			]
 		},
-		"declaration": {
+		"type-name": {
 			"patterns": [
 				{
-					"match": "\\b((\\w+\\.)*\\w+)\\b\\s*(?<GROUP><([^<>]|\\g<GROUP>)+>)?\\s*[\\[\\]]*\\s*\\b(\\w+)\\b\\s*(?=[,;:=\\(\\)])",
-					"captures": {	
-						"1": {
-							"patterns": [
-								{
-									"match": "\\bvar\\b",
-									"name": "keyword.other.var.java"
-								},
-								{
-									"match": "\\b\\w+\\b",
-									"name": "entity.name.type.java"
-								}
-							]
-						},
-						"3": {
-							"name": "meta.type-parameters.java",
-							"patterns": [
-								{
-									"match": "extends|super",
-									"name": "storage.modifier.java"
-								},
-								{
-									"match": "\\w+",
-									"name": "entity.name.type.java"
-								},
-								{
-									"match": "[<>]",
-									"name": "keyword.other.generics.java"
-								}
-							]
-						},
-						"5": {
-							"name": "variable.other.declaration.java"
-						}
-					}
-				}
-			]
-		},
-		"class-name": {
-			"patterns": [
+					"match": "\\.",
+					"name": "keyword.other.dot.java"
+				},
 				{
-					"match": "(\\w+\\.)*\\w+",
+					"match": "\\b\\w+\\b",
 					"name": "entity.name.class.java"
 				}
 			]
