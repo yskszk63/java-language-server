@@ -414,12 +414,15 @@
 					]
 				},
 				{
-					"begin": "^ *(final)\\b",
+					"begin": "^ *(final) +(\\w+)",
 					"end": "(?=;)|$",
 					"name": "meta.variable.final.java",
 					"beginCaptures": {
 						"1": {
 							"name": "keyword.other.final"
+						},
+						"2": {
+							"name": "storage.type.java"
 						}
 					},
 					"patterns": [
