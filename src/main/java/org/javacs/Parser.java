@@ -37,6 +37,8 @@ class Parser {
             compiler.getStandardFileManager(__ -> {}, null, Charset.defaultCharset());
 
     static JavacTask parseTask(JavaFileObject file) {
+        // TODO the fixed cost of creating a task is greater than the cost of parsing 1 file; eliminate the task
+        // creation
         return (JavacTask)
                 compiler.getTask(
                         null,

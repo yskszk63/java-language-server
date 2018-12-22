@@ -5,13 +5,18 @@
 	"patterns": [
 		{
 			"begin": "\\b(package)\\b *",
+			"end": ";|$",
+			"name": "meta.package.java",
 			"beginCaptures": {
 				"1": {
 					"name": "keyword.other.package"
 				}
 			},
-			"end": ";",
-			"name": "meta.package.java",
+			"endCaptures": {
+				"0": {
+					"name": "keyword.other.semi"
+				}
+			},
 			"patterns": [
 				{
 					"include": "#type-name"
@@ -23,6 +28,8 @@
 		},
 		{
 			"begin": "\\b(import)\\b *\\b(static)?\\b ",
+			"end": ";|$",
+			"name": "meta.import.java",
 			"beginCaptures": {
 				"1": {
 					"name": "keyword.other.import"
@@ -31,8 +38,11 @@
 					"name": "storage.modifier.java"
 				}
 			},
-			"end": ";",
-			"name": "meta.import.java",
+			"endCaptures": {
+				"0": {
+					"name": "keyword.other.semi"
+				}
+			},
 			"contentName": "storage.modifier.import.java",
 			"patterns": [
 				{
@@ -521,7 +531,7 @@
 						},
 						{
 							"match": "\\b[a-z]\\w*\\b",
-							"name": "storage.type.java"
+							"name": "variable.java"
 						}
 					]
 				},
