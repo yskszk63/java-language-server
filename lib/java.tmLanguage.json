@@ -66,7 +66,7 @@
 							"name": "punctuation.definition.tag.right"
 						}
 					},
-					"name": "meta.declaration.annotation.java",
+					"name": "meta.annotation.java",
 					"patterns": [
 						{
 							"captures": {
@@ -136,6 +136,112 @@
 				}
 			]
 		},
+		"line": {
+			"patterns": [
+				{
+					"begin": "^ *([A-Z]\\w*|byte|short|int|long|char|float|double|boolean) +(?=\\w)",
+					"end": "(?=[=,:;])|$",
+					"name": "markup.underline.simple.java",
+					"beginCaptures": {
+						"1": {
+							"name": "storage.type.java"
+						}
+					},
+					"patterns": [
+						{
+							"match": "\\b([a-z]\\w*)\\b",
+							"name": "variable.java"
+						}
+					]
+				},
+				{
+					"begin": "^ *([A-Z]\\w*|byte|short|int|long|char|float|double|boolean)(?=\\[\\])",
+					"end": "(?=[=,:;])|$",
+					"name": "markup.underline.array.java",
+					"beginCaptures": {
+						"1": {
+							"name": "storage.type.java"
+						}
+					},
+					"patterns": [
+						{
+							"match": "[\\[\\]]+",
+							"name": "keyword.other.java"
+						},
+						{
+							"match": "\\b([a-z]\\w*)\\b",
+							"name": "variable.java"
+						}
+					]
+				},
+				{
+					"begin": "^ *([A-Z]\\w*)(?=<[^>])",
+					"end": "(?=[=,:;])|$",
+					"name": "markup.underline.parameterized.java",
+					"beginCaptures": {
+						"1": {
+							"name": "storage.type.java"
+						}
+					},
+					"patterns": [
+						{
+							"match": "(?<GROUP><([^<>]|\\g<GROUP>)+>)",
+							"name": "meta.type-parameters.java",
+							"captures": {
+								"0": {
+									"patterns": [
+										{
+											"match": "\\b\\w+\\b",
+											"name": "storage.type.java"
+										},
+										{
+											"match": "[<>,\\.\\?]|extends|super",
+											"name": "keyword.other.java"
+										}
+									]
+								}
+							}
+						},
+						{
+							"match": "\\b([a-z]\\w*)\\b",
+							"name": "variable.java"
+						}
+					]
+				},
+				{
+					"begin": "^ *(var)\\b",
+					"end": "(?=[=,:;])|$",
+					"name": "markup.underline.var.java",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.other.var.java"
+						}
+					},
+					"patterns": [
+						{
+							"match": "\\b([a-z]\\w*)\\b",
+							"name": "variable.java"
+						}
+					]
+				},
+				{
+					"begin": "^ *(final)\\b",
+					"end": "(?=[=,:;])|$",
+					"name": "markup.underline.final.java",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.other.final.java"
+						}
+					},
+					"patterns": [
+
+					]
+				},
+				{
+					"include": "#code"
+				}
+			]
+		},
 		"code": {
 			"patterns": [
 				{
@@ -184,7 +290,7 @@
 					]
 				},
 				{
-					"begin": "(new)",
+					"begin": "\\b(new)\\b",
 					"end": "$",
 					"beginCaptures": {
 						"1": {
@@ -224,9 +330,32 @@
 					"name": "meta.block.java",
 					"patterns": [
 						{
-							"include": "#code"
+							"include": "#line"
 						}
 					]
+				},
+				{
+					"begin": "\\b(catch)\\b",
+					"end": "(?={)",
+					"name": "meta.catch.java",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.control.catch.java"
+						}
+					},
+					"patterns": [
+						{
+							"match": "\\b[A-Z]\\w*\\b",
+							"name": "storage.type.java"
+						},
+						{
+							"match": "\\b[a-z]\\w*\\b",
+							"name": "storage.type.java"
+						}
+					]
+				},
+				{
+					"include": "#declarations"
 				},
 				{
 					"include": "#annotation"
