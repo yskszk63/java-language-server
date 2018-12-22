@@ -136,11 +136,56 @@
 				}
 			]
 		},
+		"lhs": {
+			"patterns": [
+				{
+					"match": "\\b([a-z]\\w*)\\b",
+					"name": "variable.java"
+				},
+				{
+					"match": "[\\[\\]]+",
+					"name": "keyword.other.java"
+				},
+				{
+					"match": "(?<GROUP><([^<>]|\\g<GROUP>)+>)",
+					"name": "meta.type-parameters.java",
+					"captures": {
+						"0": {
+							"patterns": [
+								{
+									"match": "\\b\\w+\\b",
+									"name": "storage.type.java"
+								},
+								{
+									"match": "[<>,\\.\\?]|extends|super",
+									"name": "keyword.other.java"
+								}
+							]
+						}
+					}
+				},
+				{
+					"begin": "=",
+					"end": "(?=[,;])|$",
+					"name": "meta.rhs.java",
+					"beginCaptures": {
+						"0": {
+							"name": "keyword.other.set.java"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#code"
+						}
+					]
+				}
+			]
+		},
 		"code": {
 			"patterns": [
 				{
 					"begin": "^ *([A-Z]\\w*|byte|short|int|long|char|float|double|boolean) +(?=\\w)",
-					"end": "(?=[=,:;])|$",
+					"end": ";|$",
 					"name": "markup.underline.simple.java",
 					"beginCaptures": {
 						"1": {
@@ -149,14 +194,13 @@
 					},
 					"patterns": [
 						{
-							"match": "\\b([a-z]\\w*)\\b",
-							"name": "variable.java"
+							"include": "#lhs"
 						}
 					]
 				},
 				{
 					"begin": "^ *([A-Z]\\w*|byte|short|int|long|char|float|double|boolean)(?=\\[\\])",
-					"end": "(?=[=,:;])|$",
+					"end": ";|$",
 					"name": "markup.underline.array.java",
 					"beginCaptures": {
 						"1": {
@@ -165,18 +209,13 @@
 					},
 					"patterns": [
 						{
-							"match": "[\\[\\]]+",
-							"name": "keyword.other.java"
-						},
-						{
-							"match": "\\b([a-z]\\w*)\\b",
-							"name": "variable.java"
+							"include": "#lhs"
 						}
 					]
 				},
 				{
 					"begin": "^ *([A-Z]\\w*)(?=<[^>])",
-					"end": "(?=[=,:;])|$",
+					"end": ";|$",
 					"name": "markup.underline.parameterized.java",
 					"beginCaptures": {
 						"1": {
@@ -185,32 +224,13 @@
 					},
 					"patterns": [
 						{
-							"match": "(?<GROUP><([^<>]|\\g<GROUP>)+>)",
-							"name": "meta.type-parameters.java",
-							"captures": {
-								"0": {
-									"patterns": [
-										{
-											"match": "\\b\\w+\\b",
-											"name": "storage.type.java"
-										},
-										{
-											"match": "[<>,\\.\\?]|extends|super",
-											"name": "keyword.other.java"
-										}
-									]
-								}
-							}
-						},
-						{
-							"match": "\\b([a-z]\\w*)\\b",
-							"name": "variable.java"
+							"include": "#lhs"
 						}
 					]
 				},
 				{
 					"begin": "^ *(var)\\b",
-					"end": "(?=[=,:;])|$",
+					"end": ";|$",
 					"name": "markup.underline.var.java",
 					"beginCaptures": {
 						"1": {
@@ -219,14 +239,13 @@
 					},
 					"patterns": [
 						{
-							"match": "\\b([a-z]\\w*)\\b",
-							"name": "variable.java"
+							"include": "#lhs"
 						}
 					]
 				},
 				{
 					"begin": "^ *(final)\\b",
-					"end": "(?=[=,:;])|$",
+					"end": ";|$",
 					"name": "markup.underline.final.java",
 					"beginCaptures": {
 						"1": {
@@ -234,7 +253,9 @@
 						}
 					},
 					"patterns": [
-
+						{
+							"include": "#lhs"
+						}
 					]
 				},
 				{
@@ -321,6 +342,16 @@
 					"begin": "{",
 					"end": "}",
 					"name": "meta.block.java",
+					"patterns": [
+						{
+							"include": "#code"
+						}
+					]
+				},
+				{
+					"begin": "\\(",
+					"end": "\\)",
+					"name": "meta.paren.java",
 					"patterns": [
 						{
 							"include": "#code"
