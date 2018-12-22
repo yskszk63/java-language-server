@@ -44,7 +44,16 @@
 			]
 		},
 		{
-			"include": "#code"
+			"include": "#keywords"
+		},
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#annotation"
+		},
+		{
+			"include": "#class-declaration"
 		}
 	],
 	"repository": {
@@ -90,8 +99,68 @@
 				}
 			]
 		},
+		"class-declaration": {
+			"begin": "(?<!\\.)\\b(class|interface|@interface)\\b +(\\w+)\\b",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.class.java"
+				},
+				"2": {
+					"name": "entity.name.class.java"
+				}
+			},
+			"end": "$",
+			"name": "meta.class.java",
+			"patterns": [
+				{
+					"include": "#keywords"
+				},
+				{
+					"include": "#type-name"
+				},
+				{
+					"match": "[<>,]",
+					"name": "keyword.other.java"
+				},
+				{
+					"begin": "{",
+					"end": "}",
+					"beginCaptures": {
+						"0": {
+							"name": "keyword.other.begin-class-body.java"
+						}
+					},
+					"endCaptures": {
+						"0": {
+							"name": "keyword.other.end-class-body.java"
+						}
+					},
+					"name": "meta.class.body.java",
+					"patterns": [
+						{
+							"include": "#class-body"
+						}
+					]
+				}
+			]
+		},
 		"class-body": {
 			"patterns": [
+				{
+					"include": "#keywords"
+				},
+				{
+					"include": "#comments"
+				},
+				{
+					"include": "#annotation"
+				},
+				{
+					"include": "#type-parameters"
+				},
+				{
+					"include": "#class-declaration"
+				},
 				{
 					"begin": "\\(",
 					"end": "\\)",
@@ -108,7 +177,28 @@
 					},
 					"patterns": [
 						{
-							"include": "#code"
+							"include": "#keywords"
+						},
+						{
+							"include": "#comments"
+						},
+						{
+							"include": "#annotation"
+						},
+						{
+							"include": "#type-parameters"
+						},
+						{
+							"match": "[\\[\\]]+",
+							"name": "keyword.other.java"
+						},
+						{
+							"match": "[A-Z]\\w*|byte|short|int|long|char|float|double|boolean",
+							"name": "storage.type.java"
+						},
+						{
+							"match": "[a-z]\\w*",
+							"name": "variable.java"
 						}
 					]
 				},
@@ -132,7 +222,14 @@
 					]
 				},
 				{
-					"include": "#code"
+					"begin": "{",
+					"end": "}",
+					"name": "meta.method.body.java",
+					"patterns": [
+						{
+							"include": "#code"
+						}
+					]
 				}
 			]
 		},
@@ -143,22 +240,7 @@
 					"name": "keyword.other.java"
 				},
 				{
-					"match": "(?<GROUP><([^<>]|\\g<GROUP>)+>)",
-					"name": "meta.type-parameters.java",
-					"captures": {
-						"0": {
-							"patterns": [
-								{
-									"match": "\\b\\w+\\b",
-									"name": "storage.type.java"
-								},
-								{
-									"match": "[<>,\\.\\?]|extends|super",
-									"name": "keyword.other.java"
-								}
-							]
-						}
-					}
+					"include": "#type-parameters"
 				},
 				{
 					"begin": "\\b(\\w+)\\b",
@@ -180,7 +262,6 @@
 							},
 							"patterns": [
 								{
-									"TODO": "separate defs for class body",
 									"include": "#code"
 								}
 							]
@@ -282,49 +363,7 @@
 					]
 				},
 				{
-					"begin": "(?<!\\.)\\b(class|interface|@interface)\\b +(\\w+)\\b",
-					"beginCaptures": {
-						"1": {
-							"name": "keyword.class.java"
-						},
-						"2": {
-							"name": "entity.name.class.java"
-						}
-					},
-					"end": "$",
-					"name": "meta.class.java",
-					"patterns": [
-						{
-							"include": "#keywords"
-						},
-						{
-							"include": "#type-name"
-						},
-						{
-							"match": "[<>,]",
-							"name": "keyword.other.java"
-						},
-						{
-							"begin": "{",
-							"end": "}",
-							"beginCaptures": {
-								"0": {
-									"name": "keyword.other.begin-class-body.java"
-								}
-							},
-							"endCaptures": {
-								"0": {
-									"name": "keyword.other.end-class-body.java"
-								}
-							},
-							"name": "meta.class.body.java",
-							"patterns": [
-								{
-									"include": "#class-body"
-								}
-							]
-						}
-					]
+					"include": "#class-declaration"
 				},
 				{
 					"begin": "\\b(new)\\b",
@@ -561,6 +600,28 @@
 				{
 					"match": "\\b\\w+\\b",
 					"name": "entity.name.class.java"
+				}
+			]
+		},
+		"type-parameters": {
+			"patterns": [
+				{
+					"match": "(?<GROUP><([^<>]|\\g<GROUP>)+>)",
+					"name": "meta.type-parameters.java",
+					"captures": {
+						"0": {
+							"patterns": [
+								{
+									"match": "\\b\\w+\\b",
+									"name": "storage.type.java"
+								},
+								{
+									"match": "[<>,\\.\\?]|extends|super",
+									"name": "keyword.other.java"
+								}
+							]
+						}
+					}
 				}
 			]
 		}
