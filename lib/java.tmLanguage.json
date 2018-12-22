@@ -341,8 +341,7 @@
 			"patterns": [
 				{
 					"begin": "^ *([A-Z]\\w*|byte|short|int|long|char|float|double|boolean) +(?=\\w)",
-					"TODO": "consuming ; is dangerous",
-					"end": ";|$",
+					"end": "(?=;)|$",
 					"name": "meta.variable.simple.java",
 					"beginCaptures": {
 						"1": {
@@ -357,7 +356,7 @@
 				},
 				{
 					"begin": "^ *([A-Z]\\w*|byte|short|int|long|char|float|double|boolean)(?=\\[\\])",
-					"end": ";|$",
+					"end": "(?=;)|$",
 					"name": "meta.variable.array.java",
 					"beginCaptures": {
 						"1": {
@@ -372,7 +371,7 @@
 				},
 				{
 					"begin": "^ *([A-Z]\\w*)(?=<[^>])",
-					"end": ";|$",
+					"end": "(?=;)|$",
 					"name": "meta.variable.parameterized.java",
 					"beginCaptures": {
 						"1": {
@@ -387,7 +386,7 @@
 				},
 				{
 					"begin": "^ *(var)\\b",
-					"end": ";|$",
+					"end": "(?=;)|$",
 					"name": "meta.variable.var.java",
 					"beginCaptures": {
 						"1": {
@@ -402,7 +401,7 @@
 				},
 				{
 					"begin": "^ *(final)\\b",
-					"end": ";|$",
+					"end": "(?=;)|$",
 					"name": "meta.variable.final.java",
 					"beginCaptures": {
 						"1": {
