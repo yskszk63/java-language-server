@@ -162,6 +162,65 @@
 					"include": "#class-declaration"
 				},
 				{
+					"match": "\\b(\\w+)(?=\\()",
+					"name": "variable.other.constructor.java"
+				},
+				{
+					"begin": "\\b([A-Z]\\w*|byte|short|int|long|char|float|double|boolean)\\b",
+					"end": "\\b\\w+\\b",
+					"name": "meta.declaration.java",
+					"beginCaptures": {
+						"0": {
+							"name": "storage.type.java"
+						}
+					},
+					"endCaptures": {
+						"0": {
+							"name": "variable.java"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#comments"
+						},
+						{
+							"include": "#type-parameters"
+						},
+						{
+							"include": "#array-parameters"
+						}
+					]
+				},
+				{
+					"begin": ",",
+					"end": "\\w+",
+					"beginCaptures": {
+						"0": {
+							"name": "keyword.other.comma.java"
+						}
+					},
+					"endCaptures": {
+						"0": {
+							"name": "variable.java"
+						}
+					}
+				},
+				{
+					"begin": "=",
+					"end": "(?=[,;])",
+					"name": "meta.field-init.java",
+					"beginCaptures": {
+						"0": {
+							"name": "keyword.other.set.java"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#code"
+						}
+					]
+				},
+				{
 					"begin": "\\(",
 					"end": "\\)",
 					"name": "meta.arguments.java",
@@ -234,6 +293,12 @@
 		},
 		"lhs": {
 			"patterns": [
+				{
+					"include": "#keywords"
+				},
+				{
+					"include": "#comments"
+				},
 				{
 					"include": "#array-parameters"
 				},
@@ -365,7 +430,7 @@
 				},
 				{
 					"begin": "\\b(new)\\b",
-					"end": "$",
+					"end": "(?=[,;])|$",
 					"beginCaptures": {
 						"1": {
 							"name": "keyword.other.new.java"
@@ -409,8 +474,9 @@
 					},
 					"patterns": [
 						{
-							"begin": "(\\w+) +(?=\\w)",
-							"end": "[:;=]|$",
+							"begin": "\\b([A-Z]\\w*|byte|short|int|long|char|float|double|boolean|var) +(?=\\w)",
+							"end": "\\b\\w+\\b",
+							"name": "meta.declaration.java",
 							"beginCaptures": {
 								"1": {
 									"patterns": [
@@ -420,37 +486,80 @@
 									]
 								}
 							},
-							"patterns": [
-								{
-									"include": "#for-init"
-								}
-							]
-						},
-						{
-							"begin": "([A-Z]\\w*)(?=<[^>])",
-							"end": "[:;=]|$",
-							"beginCaptures": {
-								"1": {
-									"name": "storage.type.java"
+							"endCaptures": {
+								"0": {
+									"name": "variable.java"
 								}
 							},
 							"patterns": [
 								{
-									"include": "#for-init"
+									"include": "#comments"
+								},
+								{
+									"include": "#type-parameters"
+								},
+								{
+									"include": "#array-parameters"
 								}
 							]
 						},
 						{
-							"begin": "(\\w+)(?=\\[\\])",
-							"end": "[:;=]|$",
+							"begin": "\\b([A-Z]\\w*|byte|short|int|long|char|float|double|boolean)(?=\\[\\])",
+							"end": "\\b\\w+\\b",
+							"name": "meta.declaration.java",
 							"beginCaptures": {
 								"1": {
-									"name": "storage.type.java"
+									"patterns": [
+										{
+											"include": "#type-name"
+										}
+									]
+								}
+							},
+							"endCaptures": {
+								"0": {
+									"name": "variable.java"
 								}
 							},
 							"patterns": [
 								{
-									"include": "#for-init"
+									"include": "#comments"
+								},
+								{
+									"include": "#type-parameters"
+								},
+								{
+									"include": "#array-parameters"
+								}
+							]
+						},
+						{
+							"begin": "\\b([A-Z]\\w*)(?=<[^>])",
+							"end": "\\b\\w+\\b",
+							"name": "meta.declaration.java",
+							"beginCaptures": {
+								"1": {
+									"patterns": [
+										{
+											"include": "#type-name"
+										}
+									]
+								}
+							},
+							"endCaptures": {
+								"0": {
+									"name": "variable.java"
+								}
+							},
+							"patterns": [
+								{
+									"include": "#comments"
+								},
+								{
+									"include": "#type-parameters"
+								},
+								{
+									"include": "#array-parameters"
 								}
 							]
 						},
@@ -772,20 +881,6 @@
 				{
 					"match": "[\\[\\]]+",
 					"name": "keyword.other.array.java"
-				}
-			]
-		},
-		"for-init": {
-			"patterns": [
-				{
-					"include": "#type-parameters"
-				},
-				{
-					"include": "#array-parameters"
-				},
-				{
-					"mathc": "\\b\\w+\\b",
-					"name": "variable.java"
 				}
 			]
 		}
