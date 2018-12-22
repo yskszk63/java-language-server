@@ -702,19 +702,19 @@
 					"begin": "/\\*",
 					"captures": {
 						"0": {
-							"name": "punctuation.definition.comment.java"
+							"name": "punctuation.definition.comment"
 						}
 					},
 					"end": "\\*/",
-					"name": "comment.block.java"
+					"name": "comment.block"
 				},
 				{
 					"begin": "(//) *(TODO)",
 					"end": "$",
-					"contentName": "punctuation.definition.tag.java",
+					"contentName": "punctuation.definition.tag",
 					"beginCaptures": {
 						"1": {
-							"name": "punctuation.definition.tag.java"
+							"name": "punctuation.definition.tag"
 						},
 						"2": {
 							"name": "comment.block",
@@ -730,7 +730,7 @@
 				{
 					"begin": "//",
 					"end": "$",
-					"name": "punctuation.definition.tag.java"
+					"name": "punctuation.definition.tag"
 				}
 			]
 		},
@@ -738,42 +738,42 @@
 			"patterns": [
 				{
 					"match": "\\b(null|true|false)\\b",
-					"name": "constant.numeric.java"
+					"name": "constant.numeric"
 				},
 				{
 					"match": "(?x)\n\\b(?<!\\$)\n0(x|X)\n(\n  (?<!\\.)[0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?[Ll]?(?!\\.)\n  |\n  (\n    [0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?\\.?\n    |\n    ([0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?)?\\.[0-9a-fA-F]([0-9a-fA-F_]*[0-9a-fA-F])?\n  )\n  [Pp][+-]?[0-9]([0-9_]*[0-9])?[FfDd]?\n)\n\\b(?!\\$)",
-					"name": "constant.numeric.hex.java"
+					"name": "constant.numeric.hex"
 				},
 				{
 					"match": "\\b(?<!\\$)0(b|B)[01]([01_]*[01])?[Ll]?\\b(?!\\$)",
-					"name": "constant.numeric.binary.java"
+					"name": "constant.numeric.binary"
 				},
 				{
 					"match": "\\b(?<!\\$)0[0-7]([0-7_]*[0-7])?[Ll]?\\b(?!\\$)",
-					"name": "constant.numeric.octal.java"
+					"name": "constant.numeric.octal"
 				},
 				{
 					"match": "(?x)\n(?<!\\$)\n(\n  \\b[0-9]([0-9_]*[0-9])?\\.\\B(?!\\.)\n  |\n  \\b[0-9]([0-9_]*[0-9])?\\.([Ee][+-]?[0-9]([0-9_]*[0-9])?)[FfDd]?\\b\n  |\n  \\b[0-9]([0-9_]*[0-9])?\\.([Ee][+-]?[0-9]([0-9_]*[0-9])?)?[FfDd]\\b\n  |\n  \\b[0-9]([0-9_]*[0-9])?\\.([0-9]([0-9_]*[0-9])?)([Ee][+-]?[0-9]([0-9_]*[0-9])?)?[FfDd]?\\b\n  |\n  (?<!\\.)\\B\\.[0-9]([0-9_]*[0-9])?([Ee][+-]?[0-9]([0-9_]*[0-9])?)?[FfDd]?\\b\n  |\n  \\b[0-9]([0-9_]*[0-9])?([Ee][+-]?[0-9]([0-9_]*[0-9])?)[FfDd]?\\b\n  |\n  \\b[0-9]([0-9_]*[0-9])?([Ee][+-]?[0-9]([0-9_]*[0-9])?)?[FfDd]\\b\n  |\n  \\b(0|[1-9]([0-9_]*[0-9])?)(?!\\.)[Ll]?\\b\n)\n(?!\\$)",
-					"name": "constant.numeric.decimal.java"
+					"name": "constant.numeric.decimal"
 				},
 				{
 					"begin": "\"",
 					"beginCaptures": {
 						"0": {
-							"name": "punctuation.definition.string.begin.java"
+							"name": "punctuation.definition.string.begin"
 						}
 					},
 					"end": "\"",
 					"endCaptures": {
 						"0": {
-							"name": "punctuation.definition.string.end.java"
+							"name": "punctuation.definition.string.end"
 						}
 					},
 					"name": "string.quoted.double.java",
 					"patterns": [
 						{
 							"match": "\\\\.",
-							"name": "constant.character.escape.java"
+							"name": "constant.character.escape"
 						}
 					]
 				},
@@ -781,20 +781,20 @@
 					"begin": "'",
 					"beginCaptures": {
 						"0": {
-							"name": "punctuation.definition.string.begin.java"
+							"name": "punctuation.definition.string.begin"
 						}
 					},
 					"end": "'",
 					"endCaptures": {
 						"0": {
-							"name": "punctuation.definition.string.end.java"
+							"name": "punctuation.definition.string.end"
 						}
 					},
 					"name": "string.quoted.single.java",
 					"patterns": [
 						{
 							"match": "\\\\.",
-							"name": "constant.character.escape.java"
+							"name": "constant.character.escape"
 						}
 					]
 				}
