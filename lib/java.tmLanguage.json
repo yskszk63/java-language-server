@@ -136,7 +136,7 @@
 				}
 			]
 		},
-		"line": {
+		"code": {
 			"patterns": [
 				{
 					"begin": "^ *([A-Z]\\w*|byte|short|int|long|char|float|double|boolean) +(?=\\w)",
@@ -238,13 +238,6 @@
 					]
 				},
 				{
-					"include": "#code"
-				}
-			]
-		},
-		"code": {
-			"patterns": [
-				{
 					"begin": "(?<!\\.)\\b(class|interface|@interface)\\b +(\\w+)\\b",
 					"beginCaptures": {
 						"1": {
@@ -330,7 +323,7 @@
 					"name": "meta.block.java",
 					"patterns": [
 						{
-							"include": "#line"
+							"include": "#code"
 						}
 					]
 				},
