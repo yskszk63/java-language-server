@@ -709,26 +709,28 @@
 					"name": "comment.block.java"
 				},
 				{
-					"TODO": "different color",
-					"begin": "(^[ \\t]+)?(?=//)",
+					"begin": "(//) *(TODO)",
+					"end": "$",
+					"contentName": "punctuation.definition.tag.java",
 					"beginCaptures": {
 						"1": {
-							"name": "punctuation.whitespace.comment.leading.java"
-						}
-					},
-					"end": "(?!\\G)",
-					"patterns": [
-						{
-							"begin": "//",
-							"beginCaptures": {
-								"0": {
-									"name": "punctuation.definition.comment.java"
+							"name": "punctuation.definition.tag.java"
+						},
+						"2": {
+							"name": "comment.block",
+							"patterns": [
+								{
+									"match": "TODO",
+									"name": "markup.italic"
 								}
-							},
-							"end": "\\n",
-							"name": "comment.line.double-slash.java"
+							]
 						}
-					]
+					}
+				},
+				{
+					"begin": "//",
+					"end": "$",
+					"name": "punctuation.definition.tag.java"
 				}
 			]
 		},
