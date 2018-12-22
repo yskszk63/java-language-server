@@ -139,10 +139,6 @@
 		"lhs": {
 			"patterns": [
 				{
-					"match": "\\b([a-z]\\w*)\\b",
-					"name": "variable.java"
-				},
-				{
 					"match": "[\\[\\]]+",
 					"name": "keyword.other.java"
 				},
@@ -165,17 +161,44 @@
 					}
 				},
 				{
-					"begin": "=",
-					"end": "(?=[,;])|$",
-					"name": "meta.rhs.java",
+					"begin": "\\b(\\w+)\\b",
+					"end": "(?=;)|$",
 					"beginCaptures": {
-						"0": {
-							"name": "keyword.other.set.java"
+						"1": {
+							"name": "variable.java"
 						}
 					},
 					"patterns": [
 						{
-							"include": "#code"
+							"begin": "=",
+							"end": "(?=[,;])|$",
+							"name": "meta.rhs.java",
+							"beginCaptures": {
+								"0": {
+									"name": "keyword.other.set.java"
+								}
+							},
+							"patterns": [
+								{
+									"TODO": "separate defs for class body",
+									"include": "#code"
+								}
+							]
+						},
+						{
+							"begin": ",",
+							"end": "\\b(\\w+)\\b",
+							"name": "meta.continue.java",
+							"beginCaptures": {
+								"0": {
+									"name": "keyword.other.comma.java"
+								}
+							},
+							"endCaptures": {
+								"1": {
+									"name": "variable.java"
+								}
+							}
 						}
 					]
 				}
