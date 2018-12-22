@@ -189,8 +189,7 @@
 							"include": "#type-parameters"
 						},
 						{
-							"match": "[\\[\\]]+",
-							"name": "keyword.other.java"
+							"include": "#array-parameters"
 						},
 						{
 							"match": "[A-Z]\\w*|byte|short|int|long|char|float|double|boolean",
@@ -236,8 +235,7 @@
 		"lhs": {
 			"patterns": [
 				{
-					"match": "[\\[\\]]+",
-					"name": "keyword.other.java"
+					"include": "#array-parameters"
 				},
 				{
 					"include": "#type-parameters"
@@ -401,22 +399,139 @@
 					]
 				},
 				{
-					"begin": "{",
-					"end": "}",
-					"name": "meta.block.java",
+					"begin": "\\b(for) *\\(",
+					"end": "\\)",
+					"name": "meta.for.java",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.control.for.java"
+						}
+					},
 					"patterns": [
 						{
-							"include": "#code"
+							"begin": "(\\w+) +(?=\\w)",
+							"end": "[:;=]|$",
+							"beginCaptures": {
+								"1": {
+									"patterns": [
+										{
+											"include": "#type-name"
+										}
+									]
+								}
+							},
+							"patterns": [
+								{
+									"include": "#for-init"
+								}
+							]
+						},
+						{
+							"begin": "([A-Z]\\w*)(?=<[^>])",
+							"end": "[:;=]|$",
+							"beginCaptures": {
+								"1": {
+									"name": "storage.type.java"
+								}
+							},
+							"patterns": [
+								{
+									"include": "#for-init"
+								}
+							]
+						},
+						{
+							"begin": "(\\w+)(?=\\[\\])",
+							"end": "[:;=]|$",
+							"beginCaptures": {
+								"1": {
+									"name": "storage.type.java"
+								}
+							},
+							"patterns": [
+								{
+									"include": "#for-init"
+								}
+							]
+						},
+						{
+							"begin": "(?<=\\()",
+							"end": "(?=\\))",
+							"name": "meta.no-var-for.java",
+							"patterns": [
+								{
+									"include": "#expr"
+								}
+							]
 						}
 					]
 				},
 				{
-					"begin": "\\(",
+					"begin": "\\b(try) *\\(",
 					"end": "\\)",
-					"name": "meta.paren.java",
+					"name": "meta.try-with-resources.java",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.control.try.java"
+						}
+					},
 					"patterns": [
 						{
-							"include": "#code"
+							"include": "#keywords"
+						},
+						{
+							"include": "#comments"
+						},
+						{
+							"begin": "\\b\\w+\\b",
+							"end": ";|(?=\\))",
+							"name": "meta.create-resource.java",
+							"beginCaptures": {
+								"0": {
+									"patterns": [
+										{
+											"include": "#type-name"
+										}
+									]
+								}
+							},
+							"endCaptures": {
+								"0": {
+									"name": "keyword.other.end-resource.java"
+								}
+							},
+							"patterns": [
+								{
+									"include": "#keywords"
+								},
+								{
+									"include": "#comments"
+								},
+								{
+									"include": "#type-parameters"
+								},
+								{
+									"include": "#array-parameters"
+								},
+								{
+									"match": "\\b\\w+\\b",
+									"name": "variable.java"
+								},
+								{
+									"begin": "=",
+									"end": "(?=[;\\)])",
+									"beginCaptures": {
+										"0": {
+											"name": "keyword.other.set.java"
+										}
+									},
+									"patterns": [
+										{
+											"include": "#expr"
+										}
+									]
+								}
+							]
 						}
 					]
 				},
@@ -441,16 +556,40 @@
 					]
 				},
 				{
-					"include": "#declarations"
+					"include": "#expr"
+				}
+			]
+		},
+		"expr": {
+			"patterns": [
+				{
+					"begin": "{",
+					"end": "}",
+					"name": "meta.block.java",
+					"patterns": [
+						{
+							"include": "#code"
+						}
+					]
 				},
 				{
-					"include": "#annotation"
+					"begin": "\\(",
+					"end": "\\)",
+					"name": "meta.paren.java",
+					"patterns": [
+						{
+							"include": "#code"
+						}
+					]
 				},
 				{
 					"include": "#keywords"
 				},
 				{
 					"include": "#comments"
+				},
+				{
+					"include": "#annotation"
 				},
 				{
 					"include": "#constants"
@@ -491,7 +630,6 @@
 		},
 		"comments": {
 			"patterns": [
-				
 				{
 					"begin": "/\\*",
 					"captures": {
@@ -594,12 +732,16 @@
 		"type-name": {
 			"patterns": [
 				{
-					"match": "\\.",
-					"name": "keyword.other.dot.java"
+					"match": "\\bvar\\b",
+					"name": "keyword.other.var.java"
 				},
 				{
 					"match": "\\b\\w+\\b",
-					"name": "entity.name.class.java"
+					"name": "storage.type.java"
+				},
+				{
+					"match": "\\.",
+					"name": "keyword.other.dot.java"
 				}
 			]
 		},
@@ -622,6 +764,28 @@
 							]
 						}
 					}
+				}
+			]
+		},
+		"array-parameters": {
+			"patterns": [
+				{
+					"match": "[\\[\\]]+",
+					"name": "keyword.other.array.java"
+				}
+			]
+		},
+		"for-init": {
+			"patterns": [
+				{
+					"include": "#type-parameters"
+				},
+				{
+					"include": "#array-parameters"
+				},
+				{
+					"mathc": "\\b\\w+\\b",
+					"name": "variable.java"
 				}
 			]
 		}
