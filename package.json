@@ -37,6 +37,9 @@
                 "aliases": [
                     "Java"
                 ]
+            },
+            {
+                "id": "java.hover"
             }
         ],
         "grammars": [
@@ -44,6 +47,11 @@
                 "language": "java",
                 "scopeName": "source.java",
                 "path": "./lib/java.tmLanguage.json"
+            },
+            {
+                "language": "java.hover",
+                "scopeName": "source.java.hover",
+                "path": "./lib/java.hover.tmLanguage.json"
             }
         ],
         "snippets": [

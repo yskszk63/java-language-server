@@ -268,7 +268,7 @@ class JavaTextDocumentService implements TextDocumentService {
         var e = server.compiler.element(uri, content, line, column);
         if (e != null) {
             List<Either<String, MarkedString>> result = new ArrayList<>();
-            result.add(Either.forRight(new MarkedString("java", hoverCode(e))));
+            result.add(Either.forRight(new MarkedString("java.hover", hoverCode(e))));
             hoverDocs(e).ifPresent(doc -> result.add(Either.forLeft(doc)));
             return CompletableFuture.completedFuture(new Hover(result));
         } else return CompletableFuture.completedFuture(new Hover(Collections.emptyList()));
