@@ -7,7 +7,7 @@
 			"begin": "\\b(package)\\b *",
 			"beginCaptures": {
 				"1": {
-					"name": "keyword.other.package.java"
+					"name": "keyword.other.package"
 				}
 			},
 			"end": ";",
@@ -25,7 +25,7 @@
 			"begin": "\\b(import)\\b *\\b(static)?\\b ",
 			"beginCaptures": {
 				"1": {
-					"name": "keyword.other.import.java"
+					"name": "keyword.other.import"
 				},
 				"2": {
 					"name": "storage.modifier.java"
@@ -103,7 +103,7 @@
 			"begin": "(?<!\\.)\\b(class|interface|@interface)\\b +(\\w+)\\b",
 			"beginCaptures": {
 				"1": {
-					"name": "keyword.class.java"
+					"name": "keyword.class"
 				},
 				"2": {
 					"name": "entity.name.class.java"
@@ -120,19 +120,19 @@
 				},
 				{
 					"match": "[<>,]",
-					"name": "keyword.other.java"
+					"name": "keyword.other"
 				},
 				{
 					"begin": "{",
 					"end": "}",
 					"beginCaptures": {
 						"0": {
-							"name": "keyword.other.begin-class-body.java"
+							"name": "keyword.other.begin-class-body"
 						}
 					},
 					"endCaptures": {
 						"0": {
-							"name": "keyword.other.end-class-body.java"
+							"name": "keyword.other.end-class-body"
 						}
 					},
 					"name": "meta.class.body.java",
@@ -196,7 +196,7 @@
 					"end": "\\w+",
 					"beginCaptures": {
 						"0": {
-							"name": "keyword.other.comma.java"
+							"name": "keyword.other.comma"
 						}
 					},
 					"endCaptures": {
@@ -211,7 +211,7 @@
 					"name": "meta.field-init.java",
 					"beginCaptures": {
 						"0": {
-							"name": "keyword.other.set.java"
+							"name": "keyword.other.set"
 						}
 					},
 					"patterns": [
@@ -226,17 +226,21 @@
 					"name": "meta.arguments.java",
 					"beginCaptures": {
 						"0": {
-							"name": "keyword.other.begin-args.java"
+							"name": "keyword.other.begin-args"
 						}
 					},
 					"endCaptures": {
 						"0": {
-							"name": "keyword.other.end-args.java"
+							"name": "keyword.other.end-args"
 						}
 					},
 					"patterns": [
 						{
 							"include": "#keywords"
+						},
+						{
+							"match": ",",
+							"name": "keyword.other.comma"
 						},
 						{
 							"include": "#comments"
@@ -254,7 +258,7 @@
 					"end": "(?=[{;])",
 					"beginCaptures": {
 						"1": {
-							"name": "keyword.other.throws.java"
+							"name": "keyword.other.throws"
 						}
 					},
 					"name": "meta.throws.java",
@@ -309,7 +313,7 @@
 							"name": "meta.rhs.java",
 							"beginCaptures": {
 								"0": {
-									"name": "keyword.other.set.java"
+									"name": "keyword.other.set"
 								}
 							},
 							"patterns": [
@@ -324,7 +328,7 @@
 							"name": "meta.continue.java",
 							"beginCaptures": {
 								"0": {
-									"name": "keyword.other.comma.java"
+									"name": "keyword.other.comma"
 								}
 							},
 							"endCaptures": {
@@ -390,7 +394,7 @@
 					"name": "meta.variable.var.java",
 					"beginCaptures": {
 						"1": {
-							"name": "keyword.other.var.java"
+							"name": "keyword.other.var"
 						}
 					},
 					"patterns": [
@@ -405,7 +409,7 @@
 					"name": "meta.variable.final.java",
 					"beginCaptures": {
 						"1": {
-							"name": "keyword.other.final.java"
+							"name": "keyword.other.final"
 						}
 					},
 					"patterns": [
@@ -422,7 +426,7 @@
 					"end": "(?=[,;}\\)])|$",
 					"beginCaptures": {
 						"1": {
-							"name": "keyword.other.new.java"
+							"name": "keyword.other.new"
 						}
 					},
 					"name": "meta.new.java",
@@ -458,7 +462,7 @@
 					"name": "meta.for.java",
 					"beginCaptures": {
 						"1": {
-							"name": "keyword.control.for.java"
+							"name": "keyword.control.for"
 						}
 					},
 					"patterns": [
@@ -483,7 +487,7 @@
 					"name": "meta.try-with-resources.java",
 					"beginCaptures": {
 						"1": {
-							"name": "keyword.control.try.java"
+							"name": "keyword.control.try"
 						}
 					},
 					"patterns": [
@@ -507,7 +511,7 @@
 					"name": "meta.catch.java",
 					"beginCaptures": {
 						"1": {
-							"name": "keyword.control.catch.java"
+							"name": "keyword.control.catch"
 						}
 					},
 					"patterns": [
@@ -660,17 +664,17 @@
 			"patterns": [
 				{
 					"match": "\\b(try|finally|throw|return|break|continue|do|for|while|switch|case|if|else|goto)\\b",
-					"name": "keyword.control.java"
+					"name": "keyword.control"
 				},
 				{
 					"match": "\\b(new|instanceof)\\b",
-					"name": "keyword.control.java"
+					"name": "keyword.control"
 				},
 				{
 					"match": "\\.(class)\\b",
 					"captures": {
 						"1": {
-							"name": "keyword.control.java"
+							"name": "keyword.control"
 						}
 					}
 				},
@@ -678,7 +682,7 @@
 					"match": "\\b(default):",
 					"captures": {
 						"1": {
-							"name": "keyword.control.default.java"
+							"name": "keyword.control.default"
 						}
 					}
 				},
@@ -692,7 +696,7 @@
 				},
 				{
 					"match": "\\?",
-					"name": "keyword.other.q.java"
+					"name": "keyword.other.q"
 				}
 			]
 		},
@@ -804,7 +808,7 @@
 			"patterns": [
 				{
 					"match": "\\bvar\\b",
-					"name": "keyword.other.var.java"
+					"name": "keyword.other.var"
 				},
 				{
 					"match": "\\b\\w+\\b",
@@ -812,7 +816,7 @@
 				},
 				{
 					"match": "\\.",
-					"name": "keyword.other.dot.java"
+					"name": "keyword.other.dot"
 				}
 			]
 		},
@@ -830,7 +834,7 @@
 								},
 								{
 									"match": "[<>,\\.\\?]|extends|super",
-									"name": "keyword.other.java"
+									"name": "keyword.other"
 								}
 							]
 						}
@@ -842,7 +846,7 @@
 			"patterns": [
 				{
 					"match": "[\\[\\]]+",
-					"name": "keyword.other.array.java"
+					"name": "keyword.other.array"
 				}
 			]
 		}
