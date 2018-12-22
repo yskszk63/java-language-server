@@ -166,7 +166,7 @@
 					"name": "variable.other.constructor.java"
 				},
 				{
-					"begin": "\\b([A-Z]\\w*|byte|short|int|long|char|float|double|boolean)\\b",
+					"begin": "\\b([A-Z]\\w*|byte|short|int|long|char|float|double|boolean|void)\\b",
 					"end": "\\b\\w+\\b",
 					"name": "meta.declaration.java",
 					"beginCaptures": {
@@ -245,18 +245,7 @@
 							"include": "#annotation"
 						},
 						{
-							"include": "#type-parameters"
-						},
-						{
-							"include": "#array-parameters"
-						},
-						{
-							"match": "[A-Z]\\w*|byte|short|int|long|char|float|double|boolean",
-							"name": "storage.type.java"
-						},
-						{
-							"match": "[a-z]\\w*",
-							"name": "variable.java"
+							"include": "#simple-variable-declaration"
 						}
 					]
 				},
@@ -352,8 +341,9 @@
 			"patterns": [
 				{
 					"begin": "^ *([A-Z]\\w*|byte|short|int|long|char|float|double|boolean) +(?=\\w)",
+					"TODO": "consuming ; is dangerous",
 					"end": ";|$",
-					"name": "markup.underline.simple.java",
+					"name": "meta.variable.simple.java",
 					"beginCaptures": {
 						"1": {
 							"name": "storage.type.java"
@@ -368,7 +358,7 @@
 				{
 					"begin": "^ *([A-Z]\\w*|byte|short|int|long|char|float|double|boolean)(?=\\[\\])",
 					"end": ";|$",
-					"name": "markup.underline.array.java",
+					"name": "meta.variable.array.java",
 					"beginCaptures": {
 						"1": {
 							"name": "storage.type.java"
@@ -383,7 +373,7 @@
 				{
 					"begin": "^ *([A-Z]\\w*)(?=<[^>])",
 					"end": ";|$",
-					"name": "markup.underline.parameterized.java",
+					"name": "meta.variable.parameterized.java",
 					"beginCaptures": {
 						"1": {
 							"name": "storage.type.java"
@@ -398,7 +388,7 @@
 				{
 					"begin": "^ *(var)\\b",
 					"end": ";|$",
-					"name": "markup.underline.var.java",
+					"name": "meta.variable.var.java",
 					"beginCaptures": {
 						"1": {
 							"name": "keyword.other.var.java"
@@ -413,7 +403,7 @@
 				{
 					"begin": "^ *(final)\\b",
 					"end": ";|$",
-					"name": "markup.underline.final.java",
+					"name": "meta.variable.final.java",
 					"beginCaptures": {
 						"1": {
 							"name": "keyword.other.final.java"
@@ -430,7 +420,7 @@
 				},
 				{
 					"begin": "\\b(new)\\b",
-					"end": "(?=[,;])|$",
+					"end": "(?=[,;}\\)])|$",
 					"beginCaptures": {
 						"1": {
 							"name": "keyword.other.new.java"
@@ -444,12 +434,12 @@
 							"name": "meta.anonymous-class.body.java",
 							"beginCaptures": {
 								"0": {
-									"name": "markup.underline"
+									"name": "markup.underline.begin-anonymous-class"
 								}
 							},
 							"endCaptures": {
 								"0": {
-									"name": "markup.underline"
+									"name": "markup.underline.end-anonymous-class"
 								}
 							},
 							"patterns": [
@@ -474,94 +464,7 @@
 					},
 					"patterns": [
 						{
-							"begin": "\\b([A-Z]\\w*|byte|short|int|long|char|float|double|boolean|var) +(?=\\w)",
-							"end": "\\b\\w+\\b",
-							"name": "meta.declaration.java",
-							"beginCaptures": {
-								"1": {
-									"patterns": [
-										{
-											"include": "#type-name"
-										}
-									]
-								}
-							},
-							"endCaptures": {
-								"0": {
-									"name": "variable.java"
-								}
-							},
-							"patterns": [
-								{
-									"include": "#comments"
-								},
-								{
-									"include": "#type-parameters"
-								},
-								{
-									"include": "#array-parameters"
-								}
-							]
-						},
-						{
-							"begin": "\\b([A-Z]\\w*|byte|short|int|long|char|float|double|boolean)(?=\\[\\])",
-							"end": "\\b\\w+\\b",
-							"name": "meta.declaration.java",
-							"beginCaptures": {
-								"1": {
-									"patterns": [
-										{
-											"include": "#type-name"
-										}
-									]
-								}
-							},
-							"endCaptures": {
-								"0": {
-									"name": "variable.java"
-								}
-							},
-							"patterns": [
-								{
-									"include": "#comments"
-								},
-								{
-									"include": "#type-parameters"
-								},
-								{
-									"include": "#array-parameters"
-								}
-							]
-						},
-						{
-							"begin": "\\b([A-Z]\\w*)(?=<[^>])",
-							"end": "\\b\\w+\\b",
-							"name": "meta.declaration.java",
-							"beginCaptures": {
-								"1": {
-									"patterns": [
-										{
-											"include": "#type-name"
-										}
-									]
-								}
-							},
-							"endCaptures": {
-								"0": {
-									"name": "variable.java"
-								}
-							},
-							"patterns": [
-								{
-									"include": "#comments"
-								},
-								{
-									"include": "#type-parameters"
-								},
-								{
-									"include": "#array-parameters"
-								}
-							]
+							"include": "#simple-variable-declaration"
 						},
 						{
 							"begin": "(?<=\\()",
@@ -586,59 +489,14 @@
 					},
 					"patterns": [
 						{
-							"include": "#keywords"
+							"include": "#simple-variable-declaration"
 						},
 						{
-							"include": "#comments"
-						},
-						{
-							"begin": "\\b\\w+\\b",
-							"end": ";|(?=\\))",
-							"name": "meta.create-resource.java",
-							"beginCaptures": {
-								"0": {
-									"patterns": [
-										{
-											"include": "#type-name"
-										}
-									]
-								}
-							},
-							"endCaptures": {
-								"0": {
-									"name": "keyword.other.end-resource.java"
-								}
-							},
+							"begin": "=",
+							"end": "(?=[;)])",
 							"patterns": [
 								{
-									"include": "#keywords"
-								},
-								{
-									"include": "#comments"
-								},
-								{
-									"include": "#type-parameters"
-								},
-								{
-									"include": "#array-parameters"
-								},
-								{
-									"match": "\\b\\w+\\b",
-									"name": "variable.java"
-								},
-								{
-									"begin": "=",
-									"end": "(?=[;\\)])",
-									"beginCaptures": {
-										"0": {
-											"name": "keyword.other.set.java"
-										}
-									},
-									"patterns": [
-										{
-											"include": "#expr"
-										}
-									]
+									"include": "#expr"
 								}
 							]
 						}
@@ -705,6 +563,100 @@
 				}
 			]
 		},
+		"simple-variable-declaration": {
+			"patterns": [
+				{
+					"begin": "\\b([A-Z]\\w*|byte|short|int|long|char|float|double|boolean|var) +(?=\\w)",
+					"end": "\\b\\w+\\b",
+					"name": "meta.declaration.java",
+					"beginCaptures": {
+						"1": {
+							"patterns": [
+								{
+									"include": "#type-name"
+								}
+							]
+						}
+					},
+					"endCaptures": {
+						"0": {
+							"name": "variable.java"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#comments"
+						},
+						{
+							"include": "#type-parameters"
+						},
+						{
+							"include": "#array-parameters"
+						}
+					]
+				},
+				{
+					"begin": "\\b([A-Z]\\w*|byte|short|int|long|char|float|double|boolean)(?=\\[\\])",
+					"end": "\\b\\w+\\b",
+					"name": "meta.declaration.java",
+					"beginCaptures": {
+						"1": {
+							"patterns": [
+								{
+									"include": "#type-name"
+								}
+							]
+						}
+					},
+					"endCaptures": {
+						"0": {
+							"name": "variable.java"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#comments"
+						},
+						{
+							"include": "#type-parameters"
+						},
+						{
+							"include": "#array-parameters"
+						}
+					]
+				},
+				{
+					"begin": "\\b([A-Z]\\w*)(?=<[^>])",
+					"end": "\\b\\w+\\b",
+					"name": "meta.declaration.java",
+					"beginCaptures": {
+						"1": {
+							"patterns": [
+								{
+									"include": "#type-name"
+								}
+							]
+						}
+					},
+					"endCaptures": {
+						"0": {
+							"name": "variable.java"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#comments"
+						},
+						{
+							"include": "#type-parameters"
+						},
+						{
+							"include": "#array-parameters"
+						}
+					]
+				}
+			]
+		},
 		"keywords":  {
 			"patterns": [
 				{
@@ -724,7 +676,15 @@
 					}
 				},
 				{
-					"match": "\\b(private|public|protected|default|static|final|const|extends|implements)\\b",
+					"match": "\\b(default):",
+					"captures": {
+						"1": {
+							"name": "keyword.control.default.java"
+						}
+					}
+				},
+				{
+					"match": "\\b(private|public|protected|default(?!=:)|static|final|const|extends|implements)\\b",
 					"name": "storage.modifier.java"
 				},
 				{
@@ -750,6 +710,7 @@
 					"name": "comment.block.java"
 				},
 				{
+					"TODO": "different color",
 					"begin": "(^[ \\t]+)?(?=//)",
 					"beginCaptures": {
 						"1": {
