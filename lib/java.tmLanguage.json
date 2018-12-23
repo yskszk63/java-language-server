@@ -449,20 +449,7 @@
 							"name": "meta.constructor.name"
 						},
 						{
-							"begin": "<",
-							"end": ">",
-							"name": "meta.constructor.parameters",
-							"patterns": [
-								{
-									"TODO": "dedup",
-									"match": "\\b\\w+\\b",
-									"name": "storage.type.java"
-								},
-								{
-									"match": "[<>,\\.\\?]|extends|super",
-									"name": "keyword.other"
-								}
-							]
+							"include": "#type-parameters"
 						},
 						{
 							"begin": "\\(",
@@ -863,22 +850,28 @@
 		"type-parameters": {
 			"patterns": [
 				{
-					"match": "(?<GROUP><([^<>]|\\g<GROUP>)+>)",
+					"begin": "<",
+					"end": ">",
 					"name": "meta.type-parameters.java",
-					"captures": {
+					"beginCaptures": {
 						"0": {
-							"patterns": [
-								{
-									"match": "\\b\\w+\\b",
-									"name": "storage.type.java"
-								},
-								{
-									"match": "[<>,\\.\\?]|extends|super",
-									"name": "keyword.other"
-								}
-							]
+							"name": "keyword.other"
 						}
-					}
+					},
+					"endCaptures": {
+						"0": {
+							"name": "keyword.other"
+						}
+					},
+					"patterns": [
+						{
+							"match": "\\b\\w+\\b",
+							"name": "storage.type.java"
+						},
+						{
+							"include": "#type-parameters"
+						}
+					]
 				}
 			]
 		},
