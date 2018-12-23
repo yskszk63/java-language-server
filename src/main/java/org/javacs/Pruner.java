@@ -6,45 +6,17 @@ import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.Charset;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.ServiceLoader;
 import java.util.logging.Logger;
-import javax.tools.Diagnostic;
-import javax.tools.JavaCompiler;
-import javax.tools.JavaFileObject;
-import javax.tools.StandardJavaFileManager;
 
 class Pruner {
     private static final Logger LOG = Logger.getLogger("main");
-    // Parse-only compiler
-    // TODO this should come from Parser
-    private static final JavaCompiler COMPILER = ServiceLoader.load(JavaCompiler.class).iterator().next();
-    private static final StandardJavaFileManager FILE_MANAGER =
-            COMPILER.getStandardFileManager(Pruner::report, null, Charset.defaultCharset());
-
-    private static void report(Diagnostic<? extends JavaFileObject> diags) {
-        LOG.warning(diags.getMessage(null));
-    }
-
-    private static JavacTask singleFileTask(URI file, String contents) {
-        return (JavacTask)
-                COMPILER.getTask(
-                        null,
-                        FILE_MANAGER,
-                        Pruner::report,
-                        Arrays.asList("-proc:none", "-g"),
-                        Collections.emptyList(),
-                        Collections.singletonList(new StringFileObject(contents, file)));
-    }
 
     private final JavacTask task;
     private final CompilationUnitTree root;
     private final StringBuilder contents;
 
     Pruner(URI file, String contents) {
-        this.task = singleFileTask(file, contents);
+        this.task = Parser.parseTask(new StringFileObject(contents, file));
         try {
             this.root = task.parse().iterator().next();
         } catch (IOException e) {
