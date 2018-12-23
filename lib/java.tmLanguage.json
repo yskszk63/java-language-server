@@ -445,6 +445,36 @@
 					"name": "meta.new.java",
 					"patterns": [
 						{
+							"match": "\\b\\w+\\b",
+							"name": "meta.constructor.name"
+						},
+						{
+							"begin": "<",
+							"end": ">",
+							"name": "meta.constructor.parameters",
+							"patterns": [
+								{
+									"TODO": "dedup",
+									"match": "\\b\\w+\\b",
+									"name": "storage.type.java"
+								},
+								{
+									"match": "[<>,\\.\\?]|extends|super",
+									"name": "keyword.other"
+								}
+							]
+						},
+						{
+							"begin": "\\(",
+							"end": "\\)",
+							"name": "meta.constructor.arguments",
+							"patterns": [
+								{
+									"include": "#expr"
+								}
+							]
+						},
+						{
 							"begin": "{",
 							"end": "}",
 							"name": "meta.anonymous-class.body.java",
@@ -463,9 +493,6 @@
 									"include": "#class-body"
 								}
 							]
-						},
-						{
-							"include": "#code"
 						}
 					]
 				},
