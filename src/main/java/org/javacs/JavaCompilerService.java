@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.*;
+import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -1276,7 +1277,7 @@ public class JavaCompilerService {
         var importStatic = Pattern.compile("^import +static +" + toPackage + "\\.");
         var startOfClass = Pattern.compile("class +\\w+");
         var word = Pattern.compile("\\b" + name + "\\b");
-        var foundImport = toPackage.isEmpty();
+        var foundImport = toPackage.isEmpty(); // If package is empty, everyone imports it
         var foundWord = false;
         try (var read = Files.newBufferedReader(file)) {
             while (true) {
@@ -1296,25 +1297,100 @@ public class JavaCompilerService {
         return foundImport && foundWord;
     }
 
-    private List<Path> potentialReferences(String toPackage, String toClass, Element toEl, ReportReferencesProgress progress) {
-        // Enumerate all files on source path
+    private boolean importsAnyClass(String toPackage, List<String> toClasses, Path file) {
+        if (toPackage.isEmpty()) return true; // If package is empty, everyone imports it
+        var toClass = toClasses.stream().collect(Collectors.joining("|"));
+        var samePackage = Pattern.compile("^package +" + toPackage + ";");
+        var importClass = Pattern.compile("^import +" + toPackage + "\\.(" + toClass + ");");
+        var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
+        var importStatic = Pattern.compile("^import +static +" + toPackage + "\\.");
+        var startOfClass = Pattern.compile("class +\\w+");
+        try (var read = Files.newBufferedReader(file)) {
+            while (true) {
+                var line = read.readLine();
+                if (line == null) break;
+                if (startOfClass.matcher(line).find()) break;
+                if (samePackage.matcher(line).find()) return true;
+                if (importClass.matcher(line).find()) return true;
+                if (importStar.matcher(line).find()) return true;
+                if (importStatic.matcher(line).find()) return true;
+                if (importClass.matcher(line).find()) return true;
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return false;
+    }
+
+    private List<Path> allJavaSources() {
         var allFiles = new ArrayList<Path>();
         for (var dir : sourcePath) {
             for (var file : javaSourcesInDir(dir)) {
                 allFiles.add(file);
             }
         }
+        return allFiles;
+    }
+
+    private List<Path> potentialReferences(String toPackage, String toClass, Element toEl, ReportReferencesProgress progress) {
+        // Enumerate all files on source path
+        var allFiles = allJavaSources();
         progress.scanForPotentialReferences(0, allFiles.size());
         // Filter for files that import toPackage.toClass and contain the word el
+        // TODO should probably cache this
         var name = toEl.getSimpleName().toString();
         var result = new ArrayList<Path>();
         int nScanned = 0;
         for (var file : allFiles) {
-            if (containsWord(toPackage, toClass, name, file)) 
+            if (toPackage.isEmpty() || containsWord(toPackage, toClass, name, file)) 
                 result.add(file);
             progress.scanForPotentialReferences(++nScanned, allFiles.size());
         }
         return result;
+    }
+
+    private List<Path> potentialReferencesToClasses(String toPackage, List<String> toClasses, ReportReferencesProgress progress) {
+        // Enumerate all files on source path
+        var allFiles = allJavaSources();
+        progress.scanForPotentialReferences(0, allFiles.size());
+        // Filter for files that import toPackage.toClass
+        // TODO should probably cache this
+        var result = new ArrayList<Path>();
+        int nScanned = 0;
+        for (var dir : sourcePath) {
+            for (var file : javaSourcesInDir(dir)) {
+                if (importsAnyClass(toPackage, toClasses, file))
+                    result.add(file);
+                progress.scanForPotentialReferences(++nScanned, allFiles.size());
+            }
+        }
+        return result;
+    }
+    
+    private static String id(TreePath path) {
+        var parts = new ArrayList<String>();
+        while (path != null) {
+            var part = path.getLeaf();
+            if (part instanceof PackageTree) {
+                var pkg = (PackageTree) part;
+                var name = Objects.toString(pkg.getPackageName(), "");
+                parts.add(name);
+            } else if (part instanceof ClassTree) {
+                var cls = (ClassTree) part;
+                var name = Objects.toString(cls.getSimpleName(), "");
+                parts.add(name);
+            } else if (part instanceof MethodTree) {
+                var method = (MethodTree) part;
+                var name = Objects.toString(method.getName(), "");
+                parts.add(name);
+            } else if (part instanceof VariableTree) {
+                var variable = (VariableTree) part;
+                var name = Objects.toString(variable.getName(), "");
+                parts.add(name);
+            }
+            path = path.getParentPath();
+        }
+        return parts.stream().collect(Collectors.joining("."));
     }
 
     /**
@@ -1330,23 +1406,22 @@ public class JavaCompilerService {
             this.roots = roots;
         }
 
-        private boolean toStringEquals(Object left, Object right) {
+        boolean toStringEquals(Object left, Object right) {
             return Objects.equals(Objects.toString(left, ""), Objects.toString(right, ""));
         }
 
-        private boolean sameSymbol(Element target, Element symbol) {
-            return symbol != null
-                    && target != null
-                    && toStringEquals(symbol.getEnclosingElement(), target.getEnclosingElement())
-                    && toStringEquals(symbol, target);
+        boolean sameSymbol(Element from, Element to) {
+            return to != null
+                    && from != null
+                    && toStringEquals(to.getEnclosingElement(), from.getEnclosingElement())
+                    && toStringEquals(to, from);
         }
 
-        private List<TreePath> actualReferences(CompilationUnitTree from, Element to) {
+        List<TreePath> referencesToElement(CompilationUnitTree from, Element to) {
             var trees = Trees.instance(task);
-
-            class Finder extends TreeScanner<Void, Void> {
-                List<TreePath> results = new ArrayList<>();
-
+            var results = new ArrayList<TreePath>();
+            class FindReferencesElement extends TreeScanner<Void, Void> {
+                // TODO this scans a LOT, can this be more specific?
                 @Override
                 public Void scan(Tree leaf, Void nothing) {
                     if (leaf != null) {
@@ -1358,13 +1433,52 @@ public class JavaCompilerService {
                     }
                     return null;
                 }
+            }
+            from.accept(new FindReferencesElement(), null);
+            return results;
+        }
 
-                List<TreePath> run() {
-                    scan(from, null);
-                    return results;
+        List<Ref> index(CompilationUnitTree root) {
+            var trees = Trees.instance(task);
+            var pos = trees.getSourcePositions();
+            var lines = root.getLineMap();
+            var refs = new ArrayList<Ref>();
+            class IndexFile extends TreePathScanner<Void, Void> {
+                private void accept(TreePath from) {
+                    var to = trees.getElement(from);
+                    // TODO skip this for anything not on the source path
+                    if (to != null) {
+                        if (to.getSimpleName().contentEquals("<init>")) return;
+                        long start = pos.getStartPosition(root, from.getLeaf()), end = pos.getEndPosition(root, from.getLeaf());
+                        if (start == -1 || end == -1) {
+                            LOG.warning(String.format("Position of %s in %s is %d:%d", from.getLeaf(), root.getSourceFile(), start, end));
+                            return;
+                        }
+                        int startLine = (int) lines.getLineNumber(start) - 1, startCol = (int) lines.getColumnNumber(start) - 1;
+                        int endLine = (int) lines.getLineNumber(end) - 1, endCol = (int) lines.getColumnNumber(end) - 1;
+                        var toPath = trees.getPath(to);
+                        var toId = id(toPath);
+                        if (toId.isEmpty()) return;  // TODO log a warning if we can't get an ID for something on the source path
+                        var fromFile = root.getSourceFile().toUri();
+                        var toFile = toPath.getCompilationUnit().getSourceFile().toUri();
+                        var ref = new Ref(fromFile, startLine, startCol, endLine, endCol, toFile, toId);
+                        refs.add(ref);
+                    }
+                }
+
+                @Override
+                public Void visitClass(ClassTree node, Void nothing) {
+                    super.visitClass(node, nothing);
+                    accept(getCurrentPath());
+                    for (var t : node.getMembers()) {
+                        var child = new TreePath(getCurrentPath(), t);
+                        accept(child);
+                    }
+                    return null;
                 }
             }
-            return new Finder().run();
+            new IndexFile().scan(root, null);
+            return refs;
         }
     }
 
@@ -1384,18 +1498,31 @@ public class JavaCompilerService {
         return new Batch(task, result);
     }
 
-    private QName className(TreePath path) {
-        var packageName = Objects.toString(path.getCompilationUnit().getPackageName(), "");
+    private String className(TreePath path) {
         while (path != null) {
             var leaf = path.getLeaf();
             if (leaf instanceof ClassTree) {
                 var classTree = (ClassTree) leaf;
                 var className = Objects.toString(classTree.getSimpleName(), "");
-                return new QName(packageName, className);
+                return className;
             }
             path = path.getParentPath();
         }
-        return new QName(packageName, "");
+        return "";
+    }
+
+    private List<String> allClassNames(CompilationUnitTree root) {
+        var result = new ArrayList<String>();
+        class FindClasses extends TreeScanner<Void, Void> {
+            @Override
+            public Void visitClass(ClassTree classTree, Void __) {
+                var className = Objects.toString(classTree.getSimpleName(), "");
+                result.add(className);
+                return null;
+            }
+        }
+        root.accept(new FindClasses(), null);
+        return result;
     }
 
     public List<TreePath> references(URI file, String contents, int line, int character, ReportReferencesProgress progress) {
@@ -1407,8 +1534,9 @@ public class JavaCompilerService {
         // `to` is part of a different batch than `batch = compileBatch(possible)`,
         // so `to.equals(...thing from batch...)` shouldn't work
         var toEl = trees.getElement(path);
+        var toPackage = Objects.toString(path.getCompilationUnit().getPackageName(), "");
         var toClass = className(path);
-        var possible = potentialReferences(toClass.packageName, toClass.className, toEl, progress);
+        var possible = potentialReferences(toPackage, toClass, toEl, progress);
         if (possible.isEmpty()) {
             LOG.info("No potential references to " + toEl);
             return List.of();
@@ -1417,11 +1545,68 @@ public class JavaCompilerService {
         // TODO optimize by pruning method bodies that don't contain potential references
         var batch = compileBatch(possible);
         var result = new ArrayList<TreePath>();
-        int nChecked = 0;
+        var nChecked = 0;
         for (var f : batch.roots) {
-            result.addAll(batch.actualReferences(f, toEl));
+            result.addAll(batch.referencesToElement(f, toEl));
             nChecked++;
             progress.checkPotentialReferences(nChecked, possible.size());
+        }
+        return result;
+    }
+
+    private Map<Path, Index> index = new HashMap<>();
+
+    public List<Ref> referencesFile(URI file, String contents, ReportReferencesProgress progress) {
+        recompile(file, contents, -1, -1);
+        // List all files that import file
+        var toPackage = Objects.toString(cache.root.getPackageName(), "");
+        var toClasses = allClassNames(cache.root);
+        var possible = potentialReferencesToClasses(toPackage, toClasses, progress);
+        if (possible.isEmpty()) {
+            LOG.info("No potential references to " + file);
+            return List.of();
+        }
+        // Reindex only files that are out-of-date
+        var outOfDate = new ArrayList<Path>();
+        for (var p : possible) {
+            var i = index.getOrDefault(p, Index.EMPTY);
+            FileTime modified;
+            try {
+                modified = Files.getLastModifiedTime(p);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            if (modified.toInstant().isAfter(i.created)) {
+                outOfDate.add(p);
+            }
+        }
+        progress.checkPotentialReferences(0, outOfDate.size());
+        // Reindex
+        var batch = compileBatch(outOfDate);
+        var nChecked = 0;
+        for (var f : batch.roots) {
+            var uri = f.getSourceFile().toUri();
+            var path = Paths.get(uri);
+            var refs = batch.index(f);
+            FileTime modified;
+            try {
+                modified = Files.getLastModifiedTime(path);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            var i = new Index(refs, modified.toInstant());
+            index.put(path, i);
+            nChecked++;
+            progress.checkPotentialReferences(nChecked, possible.size());
+        }
+        // Assemble results
+        var result = new ArrayList<Ref>();
+        for (var p : possible) {
+            var i = index.get(p);
+            for (var r : i.refs) {
+                if (r.toFile.equals(file)) 
+                    result.add(r);
+            }
         }
         return result;
     }
@@ -1459,10 +1644,10 @@ public class JavaCompilerService {
                 if (id.matches("[A-Z]\\w+")) {
                     unresolved.add(id);
                 } else LOG.warning(id + " doesn't look like a class");
-            } else if (d.getMessage(null).contains("cannot find symbol")) {
+            } else if (d.getMessage(null).contains("cannot find to")) {
                 var lines = d.getMessage(null).split("\n");
                 var firstLine = lines.length > 0 ? lines[0] : "";
-                LOG.warning(String.format("%s %s doesn't look like symbol-not-found", d.getCode(), firstLine));
+                LOG.warning(String.format("%s %s doesn't look like to-not-found", d.getCode(), firstLine));
             }
         }
         // Look at imports in other classes to help us guess how to fix imports

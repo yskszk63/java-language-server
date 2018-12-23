@@ -53,14 +53,14 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void element() {
-        var found = compiler.element(URI.create("/HelloWorld.java"), contents("/HelloWorld.java"), 3, 24);
+        var found = compiler.element(resourceUri("/HelloWorld.java"), contents("/HelloWorld.java"), 3, 24);
 
         assertThat(found.getSimpleName(), hasToString(containsString("println")));
     }
 
     @Test
     public void elementWithError() {
-        var found = compiler.element(URI.create("/CompleteMembers.java"), contents("/CompleteMembers.java"), 3, 12);
+        var found = compiler.element(resourceUri("/CompleteMembers.java"), contents("/CompleteMembers.java"), 3, 12);
 
         assertThat(found, notNullValue());
     }
@@ -85,7 +85,7 @@ public class JavaCompilerServiceTest {
     public void identifiers() {
         var found =
                 compiler.scopeMembers(
-                        URI.create("/CompleteIdentifiers.java"),
+                        resourceUri("/CompleteIdentifiers.java"),
                         contents("/CompleteIdentifiers.java"),
                         13,
                         21,
@@ -106,7 +106,7 @@ public class JavaCompilerServiceTest {
     public void identifiersInMiddle() {
         var found =
                 compiler.scopeMembers(
-                        URI.create("/CompleteInMiddle.java"), contents("/CompleteInMiddle.java"), 13, 21, "complete");
+                        resourceUri("/CompleteInMiddle.java"), contents("/CompleteInMiddle.java"), 13, 21, "complete");
         var names = elementNames(found);
         assertThat(names, hasItem("completeLocal"));
         assertThat(names, hasItem("completeParam"));
@@ -123,7 +123,7 @@ public class JavaCompilerServiceTest {
     public void completeIdentifiers() {
         var found =
                 compiler.completions(
-                                URI.create("/CompleteIdentifiers.java"), contents("/CompleteIdentifiers.java"), 13, 21)
+                                resourceUri("/CompleteIdentifiers.java"), contents("/CompleteIdentifiers.java"), 13, 21)
                         .items;
         var names = completionNames(found);
         assertThat(names, hasItem("completeLocal"));
@@ -140,7 +140,7 @@ public class JavaCompilerServiceTest {
     @Test
     public void members() {
         var found =
-                compiler.members(URI.create("/CompleteMembers.java"), contents("/CompleteMembers.java"), 3, 14, false);
+                compiler.members(resourceUri("/CompleteMembers.java"), contents("/CompleteMembers.java"), 3, 14, false);
         var names = completionNames(found);
         assertThat(names, hasItem("subMethod"));
         assertThat(names, hasItem("superMethod"));
@@ -150,7 +150,7 @@ public class JavaCompilerServiceTest {
     @Test
     public void completeMembers() {
         var found =
-                compiler.completions(URI.create("/CompleteMembers.java"), contents("/CompleteMembers.java"), 3, 15)
+                compiler.completions(resourceUri("/CompleteMembers.java"), contents("/CompleteMembers.java"), 3, 15)
                         .items;
         var names = completionNames(found);
         assertThat(names, hasItem("subMethod"));
@@ -162,7 +162,7 @@ public class JavaCompilerServiceTest {
     public void completeExpression() {
         var found =
                 compiler.completions(
-                                URI.create("/CompleteExpression.java"), contents("/CompleteExpression.java"), 3, 37)
+                                resourceUri("/CompleteExpression.java"), contents("/CompleteExpression.java"), 3, 37)
                         .items;
         var names = completionNames(found);
         assertThat(names, hasItem("instanceMethod"));
@@ -173,7 +173,7 @@ public class JavaCompilerServiceTest {
     @Test
     public void completeClass() {
         var found =
-                compiler.completions(URI.create("/CompleteClass.java"), contents("/CompleteClass.java"), 3, 23).items;
+                compiler.completions(resourceUri("/CompleteClass.java"), contents("/CompleteClass.java"), 3, 23).items;
         var names = completionNames(found);
         assertThat(names, hasItems("staticMethod", "staticField"));
         assertThat(names, hasItems("class"));
@@ -184,7 +184,7 @@ public class JavaCompilerServiceTest {
     @Test
     public void completeImports() {
         var found =
-                compiler.completions(URI.create("/CompleteImports.java"), contents("/CompleteImports.java"), 1, 18)
+                compiler.completions(resourceUri("/CompleteImports.java"), contents("/CompleteImports.java"), 1, 18)
                         .items;
         var names = completionNames(found);
         assertThat(names, hasItem("List"));
@@ -195,7 +195,7 @@ public class JavaCompilerServiceTest {
     @Test
     public void gotoDefinition() {
         var def =
-                compiler.definition(URI.create("/GotoDefinition.java"), 3, 12, uri -> Files.readAllText(uri));
+                compiler.definition("/GotoDefinition.java";
         assertTrue(def.isPresent());
 
         var t = def.get();
@@ -211,36 +211,49 @@ public class JavaCompilerServiceTest {
     }
     */
 
+    private final ReportReferencesProgress rrp =
+            new ReportReferencesProgress() {
+                @Override
+                public void scanForPotentialReferences(int nScanned, int nFiles) {}
+
+                @Override
+                public void checkPotentialReferences(int nCompiled, int nPotential) {}
+            };
+
     @Test
     public void references() {
-        ReportReferencesProgress rrp =
-                new ReportReferencesProgress() {
-                    @Override
-                    public void scanForPotentialReferences(int nScanned, int nFiles) {}
-
-                    @Override
-                    public void checkPotentialReferences(int nCompiled, int nPotential) {}
-                };
-        var refs =
-                compiler.references(URI.create("/GotoDefinition.java"), contents("/GotoDefinition.java"), 6, 13, rrp);
-        boolean found = false;
+        var file = "/GotoDefinition.java";
+        var refs = compiler.references(resourceUri(file), contents(file), 6, 13, rrp);
+        var stringify = new ArrayList<String>();
         for (var t : refs) {
             var unit = t.getCompilationUnit();
             var name = unit.getSourceFile().getName();
             var trees = compiler.trees();
             var pos = trees.getSourcePositions();
             var lines = unit.getLineMap();
-            long start = pos.getStartPosition(unit, t.getLeaf());
-            long line = lines.getLineNumber(start);
-            if (name.endsWith("GotoDefinition.java") && line == 3) found = true;
+            var start = pos.getStartPosition(unit, t.getLeaf());
+            var line = lines.getLineNumber(start);
+            if (name.endsWith("GotoDefinition.java") && line == 3) return;
+            stringify.add(String.format("%s:%d", name, line));
         }
+        fail(String.format("No GotoDefinition.java:3 in %s", stringify));
+    }
 
-        if (!found) fail(String.format("No GotoDefinition.java line 3 in %s", refs));
+    @Test
+    public void referencesFile() {
+        var file = "/GotoDefinition.java";
+        var refs = compiler.referencesFile(resourceUri(file), contents(file), rrp);
+        var stringify = new ArrayList<String>();
+        for (var r : refs) {
+            if (r.fromFile.toString().endsWith("GotoDefinition.java")) return;
+            stringify.add(String.format("%s:%d", r.fromFile, r.startLine));
+        }
+        fail(String.format("No GotoDefinition.java in %s", stringify));
     }
 
     @Test
     public void overloads() {
-        var found = compiler.methodInvocation(URI.create("/Overloads.java"), contents("/Overloads.java"), 3, 15).get();
+        var found = compiler.methodInvocation(resourceUri("/Overloads.java"), contents("/Overloads.java"), 3, 15).get();
         var strings = found.overloads.stream().map(Object::toString).collect(Collectors.toList());
 
         assertThat(strings, hasItem(containsString("print(int)")));
@@ -257,7 +270,7 @@ public class JavaCompilerServiceTest {
     @Test
     public void localDoc() {
         var method =
-                compiler.methodInvocation(URI.create("/LocalMethodDoc.java"), contents("/LocalMethodDoc.java"), 3, 21)
+                compiler.methodInvocation(resourceUri("/LocalMethodDoc.java"), contents("/LocalMethodDoc.java"), 3, 21)
                         .get()
                         .activeMethod
                         .get();
