@@ -1448,13 +1448,15 @@ public class JavaCompilerService {
                     && toStringEquals(to, from);
         }
 
-        List<TreePath> referencesToElement(CompilationUnitTree root, Element to) {
+        List<Ref> referencesToElement(CompilationUnitTree root, Element to) {
             var trees = Trees.instance(task);
-            var results = new ArrayList<TreePath>();
+            var results = new ArrayList<Ref>();
             class FindReferencesElement extends TreePathScanner<Void, Void> {
                 void check(TreePath from) {
                     var found = trees.getElement(from);
-                    if (sameSymbol(found, to)) results.add(from);
+                    if (sameSymbol(found, to)) {
+                        ref(from).ifPresent(results::add);
+                    }
                 }
 
                 @Override
@@ -1479,36 +1481,41 @@ public class JavaCompilerService {
             return results;
         }
 
-        List<Ref> index(CompilationUnitTree root) {
+        private Optional<Ref> ref(TreePath from) {
             var trees = Trees.instance(task);
             var pos = trees.getSourcePositions();
+            var root = from.getCompilationUnit();
             var lines = root.getLineMap();
+            var to = trees.getElement(from);
+            // Skip elements we can't find
+            if (to == null) {
+                LOG.warning(String.format("No element for %s", from.getLeaf()));
+                return Optional.empty();
+            }
+            // Skip non-methods
+            if (!(to instanceof ExecutableElement)) {
+                return Optional.empty();
+            }
+            // TODO skip anything not on source path
+            var toEl = idEl(to);
+            long start = pos.getStartPosition(root, from.getLeaf()), end = pos.getEndPosition(root, from.getLeaf());
+            if (start == -1) {
+                LOG.warning(String.format("No position for %s", from.getLeaf()));
+                return Optional.empty();
+            }
+            if (end == -1) end = start + from.getLeaf().toString().length();
+            int startLine = (int) lines.getLineNumber(start), startCol = (int) lines.getColumnNumber(start);
+            int endLine = (int) lines.getLineNumber(end), endCol = (int) lines.getColumnNumber(end);
+            var fromFile = root.getSourceFile().toUri();
+            var ref = new Ref(fromFile, startLine, startCol, endLine, endCol, toEl);
+            return Optional.of(ref);
+        }
+
+        List<Ref> index(CompilationUnitTree root) {
             var refs = new ArrayList<Ref>();
             class IndexFile extends TreePathScanner<Void, Void> {
                 void check(TreePath from) {
-                    var to = trees.getElement(from);
-                    // Skip elements we can't find
-                    if (to == null) {
-                        LOG.warning(String.format("No element for %s", from.getLeaf()));
-                        return;
-                    }
-                    // Skip non-methods
-                    if (!(to instanceof ExecutableElement)) {
-                        return;
-                    }
-                    // TODO skip anything not on source path
-                    var toEl = idEl(to);
-                    long start = pos.getStartPosition(root, from.getLeaf()), end = pos.getEndPosition(root, from.getLeaf());
-                    if (start == -1) {
-                        LOG.warning(String.format("No position for %s", from.getLeaf()));
-                        return;
-                    }
-                    if (end == -1) end = start + from.getLeaf().toString().length();
-                    int startLine = (int) lines.getLineNumber(start), startCol = (int) lines.getColumnNumber(start);
-                    int endLine = (int) lines.getLineNumber(end), endCol = (int) lines.getColumnNumber(end);
-                    var fromFile = root.getSourceFile().toUri();
-                    var ref = new Ref(fromFile, startLine, startCol, endLine, endCol, toEl);
-                    refs.add(ref);
+                    ref(from).ifPresent(refs::add);
                 }
 
                 @Override
@@ -1578,7 +1585,7 @@ public class JavaCompilerService {
         return result;
     }
 
-    public List<TreePath> references(URI file, String contents, int line, int character, ReportReferencesProgress progress) {
+    public List<Ref> references(URI file, String contents, int line, int character, ReportReferencesProgress progress) {
         recompile(file, contents, -1, -1);
 
         var trees = Trees.instance(cache.task);
@@ -1597,7 +1604,7 @@ public class JavaCompilerService {
         progress.checkPotentialReferences(0, possible.size());
         // TODO optimize by pruning method bodies that don't contain potential references
         var batch = compileBatch(possible);
-        var result = new ArrayList<TreePath>();
+        var result = new ArrayList<Ref>();
         var nChecked = 0;
         for (var f : batch.roots) {
             result.addAll(batch.referencesToElement(f, toEl));

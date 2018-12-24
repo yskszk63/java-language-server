@@ -225,15 +225,9 @@ public class JavaCompilerServiceTest {
         var file = "/GotoDefinition.java";
         var refs = compiler.references(resourceUri(file), contents(file), 6, 13, rrp);
         var stringify = new ArrayList<String>();
-        for (var t : refs) {
-            var unit = t.getCompilationUnit();
-            var name = Paths.get(unit.getSourceFile().toUri()).getFileName();
-            var trees = compiler.trees();
-            var pos = trees.getSourcePositions();
-            var lines = unit.getLineMap();
-            var start = pos.getStartPosition(unit, t.getLeaf());
-            var line = lines.getLineNumber(start);
-            stringify.add(String.format("%s:%d", name, line));
+        for (var r : refs) {
+            var fileName = Paths.get(r.fromFile).getFileName();
+            stringify.add(String.format("%s:%d", fileName, r.startLine));
         }
         assertThat(stringify, hasItem("GotoDefinition.java:3"));
         assertThat(stringify, not(hasItem("GotoDefinition.java:6")));
