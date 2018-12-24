@@ -5,6 +5,7 @@ import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.doctree.DocTree;
 import com.sun.source.doctree.ParamTree;
 import com.sun.source.tree.MethodTree;
+import com.sun.source.util.TreePath;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
@@ -441,19 +442,6 @@ class JavaTextDocumentService implements TextDocumentService {
         return null;
     }
 
-    private Range asRange(SourceRange pos) {
-        var start = new Position(pos.startLine - 1, pos.startCol - 1);
-        var end = new Position(pos.endLine - 1, pos.endCol - 1);
-        return new Range(start, end);
-    }
-
-    private Location asLocation(Ref ref) {
-        var start = new Position(ref.startLine - 1, ref.startCol - 1);
-        var end = new Position(ref.endLine - 1, ref.endCol - 1);
-        var range = new Range(start, end);
-        return new Location(ref.fromFile.toString(), range);
-    }
-
     private List<CodeLens> testMethods(URI uri) {
         var content = contents(uri).content;
         var tests = server.compiler.testMethods(uri, content);
@@ -489,7 +477,7 @@ class JavaTextDocumentService implements TextDocumentService {
         try (var progress = new ReportProgress(startMessage, scanMessage, checkMessage)) {
             // Organize by method
             var refs = server.compiler.referencesFile(uri, content, progress);
-            var byId = new HashMap<String, List<Ref>>();
+            var byId = new HashMap<String, List<TreePath>>();
             for (var r : refs) {
                 byId.computeIfAbsent(r.toEl, __ -> new ArrayList<>()).add(r);
             }
