@@ -6,7 +6,6 @@ import com.sun.source.doctree.DocTree;
 import com.sun.source.doctree.ParamTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.util.TreePath;
-import com.sun.source.util.Trees;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
@@ -16,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.element.*;
@@ -344,17 +344,28 @@ class JavaTextDocumentService implements TextDocumentService {
         return CompletableFuture.completedFuture(help);
     }
 
-    private Location location(TreePath p) {
+    // TODO this is very duplicative with code in JavaCompilerService
+    // Maybe we shouldn't be passing around TreePath
+    private Optional<Location> location(TreePath p) {
         var trees = server.compiler.trees();
         var pos = trees.getSourcePositions();
         var cu = p.getCompilationUnit();
         var lines = cu.getLineMap();
         long start = pos.getStartPosition(cu, p.getLeaf()), end = pos.getEndPosition(cu, p.getLeaf());
+        if (start == -1) {
+            LOG.warning(String.format("No position for %s", p.getLeaf()));
+            return Optional.empty();
+        }
+        if (end == -1) {
+            end = start + p.getLeaf().toString().length();
+        }
         int startLine = (int) lines.getLineNumber(start) - 1, startCol = (int) lines.getColumnNumber(start) - 1;
         int endLine = (int) lines.getLineNumber(end) - 1, endCol = (int) lines.getColumnNumber(end) - 1;
         var dUri = cu.getSourceFile().toUri();
-        return new Location(
-                dUri.toString(), new Range(new Position(startLine, startCol), new Position(endLine, endCol)));
+        var startPos = new Position(startLine, startCol);
+        var endPos = new Position(endLine, endCol);
+        var loc = new Location(dUri.toString(), new Range(startPos, endPos));
+        return Optional.of(loc);
     }
 
     @Override
@@ -362,9 +373,47 @@ class JavaTextDocumentService implements TextDocumentService {
         var uri = URI.create(position.getTextDocument().getUri());
         var line = position.getPosition().getLine() + 1;
         var column = position.getPosition().getCharacter() + 1;
-        var result = new ArrayList<Location>();
-        server.compiler.definition(uri, line, column, f -> contents(f).content).ifPresent(d -> result.add(location(d)));
-        return CompletableFuture.completedFuture(result);
+        Function<URI, String> findContent = f -> contents(f).content;
+        var def = server.compiler.definition(uri, line, column, findContent);
+        if (!def.isPresent()) return CompletableFuture.completedFuture(List.of());
+        var loc = location(def.get());
+        if (!loc.isPresent()) return CompletableFuture.completedFuture(List.of());
+        return CompletableFuture.completedFuture(List.of(loc.get()));
+    }
+
+    class ReportProgress implements ReportReferencesProgress {
+        private final Function<Integer, String> scanMessage, checkMessage;
+
+        ReportProgress(Function<Integer, String> scanMessage, Function<Integer, String> checkMessage) {
+            this.scanMessage = scanMessage;
+            this.checkMessage = checkMessage;
+        }
+
+        private int percent(int n, int d) {
+            double nD = n, dD = d;
+            double ratio = nD / dD;
+            return (int) (ratio * 100);
+        }
+
+        public void scanForPotentialReferences(int nScanned, int nFiles) {
+            var message = scanMessage.apply(nFiles);
+            if (nScanned == 0) {
+                server.client().javaReportProgress(new JavaReportProgressParams(message));
+            } else {
+                var increment = percent(nScanned, nFiles) > percent(nScanned - 1, nFiles) ? 1 : 0;
+                server.client().javaReportProgress(new JavaReportProgressParams(message, increment));
+            }
+        }
+
+        public void checkPotentialReferences(int nCompiled, int nPotential) {
+            var message = checkMessage.apply(nCompiled);
+            if (nCompiled == 0) {
+                server.client().javaReportProgress(new JavaReportProgressParams(message));
+            } else {
+                var increment = percent(nCompiled, nPotential) > percent(nCompiled - 1, nPotential) ? 1 : 0;
+                server.client().javaReportProgress(new JavaReportProgressParams(message, increment));
+            }
+        }
     }
 
     @Override
@@ -375,36 +424,13 @@ class JavaTextDocumentService implements TextDocumentService {
         var column = position.getPosition().getCharacter() + 1;
         var result = new ArrayList<Location>();
         server.client().javaStartProgress(new JavaStartProgressParams("Find references"));
-        var progress =
-                new ReportReferencesProgress() {
-                    private int percent(int n, int d) {
-                        double nD = n, dD = d;
-                        double ratio = nD / dD;
-                        return (int) (ratio * 100);
-                    }
-
-                    public void scanForPotentialReferences(int nScanned, int nFiles) {
-                        var message = String.format("Scan %,d files for potential references", nFiles);
-                        if (nScanned == 0) {
-                            server.client().javaReportProgress(new JavaReportProgressParams(message));
-                        } else {
-                            var increment = percent(nScanned, nFiles) > percent(nScanned - 1, nFiles) ? 1 : 0;
-                            server.client().javaReportProgress(new JavaReportProgressParams(message, increment));
-                        }
-                    }
-
-                    public void checkPotentialReferences(int nCompiled, int nPotential) {
-                        var message = String.format("Check %,d files", nPotential);
-                        if (nCompiled == 0) {
-                            server.client().javaReportProgress(new JavaReportProgressParams(message));
-                        } else {
-                            var increment = percent(nCompiled, nPotential) > percent(nCompiled - 1, nPotential) ? 1 : 0;
-                            server.client().javaReportProgress(new JavaReportProgressParams(message, increment));
-                        }
-                    }
-                };
+        Function<Integer, String> scanMessage =
+                nFiles -> String.format("Scan %,d files for potential references", nFiles);
+        Function<Integer, String> checkMessage = nPotential -> String.format("Check %,d files", nPotential);
+        var progress = new ReportProgress(scanMessage, checkMessage);
         for (var r : server.compiler.references(uri, content, line, column, progress)) {
-            result.add(location(r));
+            var loc = location(r);
+            if (loc.isPresent()) result.add(loc.get());
         }
         server.client().javaEndProgress();
         return CompletableFuture.completedFuture(result);
@@ -434,40 +460,81 @@ class JavaTextDocumentService implements TextDocumentService {
         return null;
     }
 
-    @Override
-    public CompletableFuture<List<? extends CodeLens>> codeLens(CodeLensParams params) {
-        var uri = URI.create(params.getTextDocument().getUri());
+    private Range asRange(SourceRange pos) {
+        var start = new Position(pos.startLine - 1, pos.startCol - 1);
+        var end = new Position(pos.endLine - 1, pos.endCol - 1);
+        return new Range(start, end);
+    }
+
+    private List<CodeLens> testMethods(URI uri) {
         var content = contents(uri).content;
         var tests = server.compiler.testMethods(uri, content);
-
         var result = new ArrayList<CodeLens>();
         for (var test : tests) {
-            var trees = Trees.instance(test.parseTask);
-            var pos = trees.getSourcePositions();
-            long start, end;
-            if (test.method.isPresent()) {
-                start = pos.getStartPosition(test.compilationUnit, test.method.get());
-                end = pos.getEndPosition(test.compilationUnit, test.method.get());
-            } else {
-                start = pos.getStartPosition(test.compilationUnit, test.enclosingClass);
-                end = pos.getEndPosition(test.compilationUnit, test.enclosingClass);
+            var maybePos = server.compiler.position(uri, content, test);
+            if (!maybePos.isPresent()) {
+                LOG.warning(String.format("No position for %s", test));
+                continue;
             }
-            var lines = test.compilationUnit.getLineMap();
-            var startLine = (int) lines.getLineNumber(start) - 1;
-            var startCol = (int) lines.getColumnNumber(start) - 1;
-            var endLine = (int) lines.getLineNumber(end) - 1;
-            var endCol = (int) lines.getColumnNumber(end) - 1;
-            var range = new Range(new Position(startLine, startCol), new Position(endLine, endCol));
-            var sourceUri = test.compilationUnit.getSourceFile().toUri();
-            var className = test.enclosingClass.getSimpleName().toString();
-            var methodName = test.method.map(m -> m.getName().toString()).orElse(null);
-            var message = test.method.isPresent() ? "Run Test" : "Run All Tests";
-            var command =
-                    new Command(message, "java.command.test.run", Arrays.asList(sourceUri, className, methodName));
-            result.add(new CodeLens(range, command, null));
+            var pos = maybePos.get();
+            var range = asRange(pos);
+            var message = pos.memberName.isPresent() ? "Run Test" : "Run All Tests";
+            var command = new Command(message, "java.command.test.run", List.of(uri, pos.className, pos.memberName));
+            var lens = new CodeLens(range, command, null);
+            result.add(lens);
         }
         // TODO run all tests in file
         // TODO run all tests in package
+        return result;
+    }
+
+    private List<CodeLens> allReferences(URI uri) {
+        var content = contents(uri).content;
+        Function<Integer, String> scanMessage = nFiles -> String.format("Scan %,d files for imports", nFiles);
+        Function<Integer, String> checkMessage = nPotential -> String.format("Index %,d files", nPotential);
+        var progress = new ReportProgress(scanMessage, checkMessage);
+        // Organize by method
+        var refs = server.compiler.referencesFile(uri, content, progress);
+        var byId = new HashMap<String, List<Ref>>();
+        for (var r : refs) {
+            byId.computeIfAbsent(r.toEl, __ -> new ArrayList<>()).add(r);
+        }
+        // Convert into CodeLens messages
+        var result = new ArrayList<CodeLens>();
+        for (var kv : byId.entrySet()) {
+            // Figure out command
+            var id = kv.getKey();
+            var rs = kv.getValue();
+            // Figure out where to place command
+            var r = rs.get(0);
+            var pos = server.compiler.position(uri, content, r.toEl);
+            if (!pos.isPresent()) {
+                LOG.warning(String.format("No position for %s", r.toEl));
+                continue;
+            }
+            var range = asRange(pos.get());
+            String message;
+            if (rs.isEmpty()) message = "0 references";
+            else if (rs.size() == 1) message = "1 reference";
+            else message = String.format("%d references", rs.size());
+            var command =
+                    new Command(
+                            message,
+                            "java.command.findReferences",
+                            List.of(uri, range.getStart().getLine(), range.getStart().getCharacter()));
+            var lens = new CodeLens(range, command, null);
+            result.add(lens);
+        }
+        return result;
+    }
+
+    @Override
+    public CompletableFuture<List<? extends CodeLens>> codeLens(CodeLensParams params) {
+        // TODO just create a blank code lens on every method, then resolve it async
+        var uri = URI.create(params.getTextDocument().getUri());
+        var result = new ArrayList<CodeLens>();
+        result.addAll(testMethods(uri));
+        result.addAll(allReferences(uri));
         return CompletableFuture.completedFuture(result);
     }
 

@@ -103,7 +103,8 @@ export function activate(context: ExtensionContext) {
     context.subscriptions.push(disposable);
 
     // Register test commands
-	commands.registerCommand('java.command.test.run', runTest);
+    commands.registerCommand('java.command.test.run', runTest);
+    commands.registerCommand('java.command.findReferences', runFindReferences);
 
 	// When the language client activates, register a progress-listener
 	client.onReady().then(() => createProgressListeners(client));
@@ -175,6 +176,11 @@ function findJavaExecutableInJavaHome(javaHome: string, binname: string) {
 
 // this method is called when your extension is deactivated
 export function deactivate() {
+}
+
+function runFindReferences(uri: string, lineNumber: number, column: number) {
+    // LSP is 0-based but VSCode is 1-based
+    return commands.executeCommand('editor.action.findReferences', Uri.parse(uri), {lineNumber: lineNumber+1, column: column+1});
 }
 
 interface JavaTestTask extends TaskDefinition {

@@ -6,6 +6,7 @@ import static org.junit.Assert.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.concurrent.ExecutionException;
 import org.eclipse.lsp4j.CodeLens;
@@ -32,6 +33,7 @@ public class CodeLensTest {
         for (var lens : lenses) {
             var command = new StringJoiner(", ");
             for (var arg : lens.getCommand().getArguments()) {
+                if (arg instanceof Optional) arg = ((Optional) arg).orElse(null);
                 command.add(Objects.toString(arg));
             }
             commands.add(command.toString());

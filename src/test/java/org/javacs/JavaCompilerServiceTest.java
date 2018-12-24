@@ -227,16 +227,16 @@ public class JavaCompilerServiceTest {
         var stringify = new ArrayList<String>();
         for (var t : refs) {
             var unit = t.getCompilationUnit();
-            var name = unit.getSourceFile().getName();
+            var name = Paths.get(unit.getSourceFile().toUri()).getFileName();
             var trees = compiler.trees();
             var pos = trees.getSourcePositions();
             var lines = unit.getLineMap();
             var start = pos.getStartPosition(unit, t.getLeaf());
             var line = lines.getLineNumber(start);
-            if (name.endsWith("GotoDefinition.java") && line == 3) return;
             stringify.add(String.format("%s:%d", name, line));
         }
-        fail(String.format("No GotoDefinition.java:3 in %s", stringify));
+        assertThat(stringify, hasItem("GotoDefinition.java:3"));
+        assertThat(stringify, not(hasItem("GotoDefinition.java:6")));
     }
 
     @Test
@@ -245,10 +245,10 @@ public class JavaCompilerServiceTest {
         var refs = compiler.referencesFile(resourceUri(file), contents(file), rrp);
         var stringify = new ArrayList<String>();
         for (var r : refs) {
-            if (r.fromFile.toString().endsWith("GotoDefinition.java")) return;
-            stringify.add(String.format("%s:%d", r.fromFile, r.startLine));
+            var fileName = Paths.get(r.fromFile).getFileName();
+            stringify.add(String.format("%s:%d", fileName, r.startLine));
         }
-        fail(String.format("No GotoDefinition.java in %s", stringify));
+        assertThat(stringify, hasItem("GotoDefinition.java:3"));
     }
 
     @Test

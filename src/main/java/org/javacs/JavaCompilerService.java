@@ -1366,31 +1366,62 @@ public class JavaCompilerService {
         }
         return result;
     }
+
+    private static String reverseAndJoin(List<CharSequence> parts, String sep) {
+        var join = new StringJoiner(sep);
+        for (var i = parts.size() - 1; i >= 0; i--) {
+            join.add(parts.get(i));
+        }
+        return join.toString();
+    }
     
-    private static String id(TreePath path) {
-        var parts = new ArrayList<String>();
+    private static String idPath(TreePath path) {
+        var packageName = path.getCompilationUnit().getPackageName();
+        var rev = new ArrayList<CharSequence>();
         while (path != null) {
             var part = path.getLeaf();
-            if (part instanceof PackageTree) {
-                var pkg = (PackageTree) part;
-                var name = Objects.toString(pkg.getPackageName(), "");
-                parts.add(name);
-            } else if (part instanceof ClassTree) {
+            if (part instanceof ClassTree) {
                 var cls = (ClassTree) part;
-                var name = Objects.toString(cls.getSimpleName(), "");
-                parts.add(name);
+                rev.add(cls.getSimpleName());
             } else if (part instanceof MethodTree) {
                 var method = (MethodTree) part;
-                var name = Objects.toString(method.getName(), "");
-                parts.add(name);
+                // TODO overloads
+                rev.add(method.getName());
             } else if (part instanceof VariableTree) {
                 var variable = (VariableTree) part;
-                var name = Objects.toString(variable.getName(), "");
-                parts.add(name);
+                rev.add(variable.getName());
             }
             path = path.getParentPath();
         }
-        return parts.stream().collect(Collectors.joining("."));
+        if (packageName != null) rev.add(packageName.toString());
+        var name = reverseAndJoin(rev, ".");
+        if (!name.matches("(\\w+\\.)*(\\w+|<init>)")) LOG.warning(String.format("`%s` doesn't look like a name", name));
+        return name;
+    }
+
+    private static String idEl(Element e) {
+        var rev = new ArrayList<CharSequence>();
+        while (e != null) {
+            if (e instanceof PackageElement) {
+                var pkg = (PackageElement) e;
+                if (!pkg.isUnnamed())
+                    rev.add(pkg.getQualifiedName());
+            } else if (e instanceof TypeElement) {
+                var type = (TypeElement) e;
+                rev.add(type.getSimpleName());
+            } else if (e instanceof ExecutableElement) {
+                var method = (ExecutableElement) e;
+                // TODO overloads
+                rev.add(method.getSimpleName());
+            } else if (e instanceof VariableElement) {
+                var field = (VariableElement) e;
+                rev.add(field.getSimpleName());
+            }
+            e = e.getEnclosingElement();
+        }
+        var name = reverseAndJoin(rev, ".");
+        if (!name.matches("(\\w+\\.)*(\\w+|<init>)")) LOG.warning(String.format("`%s` doesn't look like a name", name));
+        return name;
     }
 
     /**
@@ -1417,24 +1448,34 @@ public class JavaCompilerService {
                     && toStringEquals(to, from);
         }
 
-        List<TreePath> referencesToElement(CompilationUnitTree from, Element to) {
+        List<TreePath> referencesToElement(CompilationUnitTree root, Element to) {
             var trees = Trees.instance(task);
             var results = new ArrayList<TreePath>();
-            class FindReferencesElement extends TreeScanner<Void, Void> {
-                // TODO this scans a LOT, can this be more specific?
-                @Override
-                public Void scan(Tree leaf, Void nothing) {
-                    if (leaf != null) {
-                        var path = trees.getPath(from, leaf);
-                        var found = trees.getElement(path);
+            class FindReferencesElement extends TreePathScanner<Void, Void> {
+                void check(TreePath from) {
+                    var found = trees.getElement(from);
+                    if (sameSymbol(found, to)) results.add(from);
+                }
 
-                        if (sameSymbol(found, to)) results.add(path);
-                        else super.scan(leaf, nothing);
-                    }
-                    return null;
+                @Override
+                public Void visitMemberReference(MemberReferenceTree t, Void __) {
+                    check(getCurrentPath());
+                    return super.visitMemberReference(t, null);
+                }
+
+                @Override
+                public Void visitMemberSelect(MemberSelectTree t, Void __) {
+                    check(getCurrentPath());
+                    return super.visitMemberSelect(t, null);
+                }
+
+                @Override
+                public Void visitIdentifier(IdentifierTree t, Void __) {
+                    check(getCurrentPath());
+                    return super.visitIdentifier(t, null);
                 }
             }
-            from.accept(new FindReferencesElement(), null);
+            new FindReferencesElement().scan(root, null);
             return results;
         }
 
@@ -1444,40 +1485,52 @@ public class JavaCompilerService {
             var lines = root.getLineMap();
             var refs = new ArrayList<Ref>();
             class IndexFile extends TreePathScanner<Void, Void> {
-                private void accept(TreePath from) {
+                void check(TreePath from) {
                     var to = trees.getElement(from);
-                    // TODO skip this for anything not on the source path
-                    if (to != null) {
-                        if (to.getSimpleName().contentEquals("<init>")) return;
-                        long start = pos.getStartPosition(root, from.getLeaf()), end = pos.getEndPosition(root, from.getLeaf());
-                        if (start == -1 || end == -1) {
-                            LOG.warning(String.format("Position of %s in %s is %d:%d", from.getLeaf(), root.getSourceFile(), start, end));
-                            return;
-                        }
-                        int startLine = (int) lines.getLineNumber(start) - 1, startCol = (int) lines.getColumnNumber(start) - 1;
-                        int endLine = (int) lines.getLineNumber(end) - 1, endCol = (int) lines.getColumnNumber(end) - 1;
-                        var toPath = trees.getPath(to);
-                        var toId = id(toPath);
-                        if (toId.isEmpty()) return;  // TODO log a warning if we can't get an ID for something on the source path
-                        var fromFile = root.getSourceFile().toUri();
-                        var toFile = toPath.getCompilationUnit().getSourceFile().toUri();
-                        var ref = new Ref(fromFile, startLine, startCol, endLine, endCol, toFile, toId);
-                        refs.add(ref);
+                    // Skip elements we can't find
+                    if (to == null) {
+                        LOG.warning(String.format("No element for %s", from.getLeaf()));
+                        return;
                     }
+                    // Skip non-methods
+                    if (!(to instanceof ExecutableElement)) {
+                        return;
+                    }
+                    // TODO skip anything not on source path
+                    var toEl = idEl(to);
+                    long start = pos.getStartPosition(root, from.getLeaf()), end = pos.getEndPosition(root, from.getLeaf());
+                    if (start == -1) {
+                        LOG.warning(String.format("No position for %s", from.getLeaf()));
+                        return;
+                    }
+                    if (end == -1) end = start + from.getLeaf().toString().length();
+                    int startLine = (int) lines.getLineNumber(start), startCol = (int) lines.getColumnNumber(start);
+                    int endLine = (int) lines.getLineNumber(end), endCol = (int) lines.getColumnNumber(end);
+                    var fromFile = root.getSourceFile().toUri();
+                    var ref = new Ref(fromFile, startLine, startCol, endLine, endCol, toEl);
+                    refs.add(ref);
                 }
 
                 @Override
-                public Void visitClass(ClassTree node, Void nothing) {
-                    super.visitClass(node, nothing);
-                    accept(getCurrentPath());
-                    for (var t : node.getMembers()) {
-                        var child = new TreePath(getCurrentPath(), t);
-                        accept(child);
-                    }
-                    return null;
+                public Void visitMemberReference(MemberReferenceTree t, Void __) {
+                    check(getCurrentPath());
+                    return super.visitMemberReference(t, null);
+                }
+
+                @Override
+                public Void visitMemberSelect(MemberSelectTree t, Void __) {
+                    check(getCurrentPath());
+                    return super.visitMemberSelect(t, null);
+                }
+
+                @Override
+                public Void visitIdentifier(IdentifierTree t, Void __) {
+                    check(getCurrentPath());
+                    return super.visitIdentifier(t, null);
                 }
             }
             new IndexFile().scan(root, null);
+            LOG.info(String.format("Found %d refs in %s", refs.size(), Paths.get(root.getSourceFile().toUri()).getFileName()));
             return refs;
         }
     }
@@ -1556,17 +1609,18 @@ public class JavaCompilerService {
 
     private Map<Path, Index> index = new HashMap<>();
 
-    public List<Ref> referencesFile(URI file, String contents, ReportReferencesProgress progress) {
-        recompile(file, contents, -1, -1);
-        // List all files that import file
-        var toPackage = Objects.toString(cache.root.getPackageName(), "");
-        var toClasses = allClassNames(cache.root);
-        var possible = potentialReferencesToClasses(toPackage, toClasses, progress);
-        if (possible.isEmpty()) {
-            LOG.info("No potential references to " + file);
-            return List.of();
+    private boolean referencesAnyClass(Ref r, String packageName, List<String> classNames) {
+        if (!r.toEl.startsWith(packageName))
+            return false;
+        for (var c : classNames) {
+            var qualifiedName = packageName.isEmpty() ? c : packageName + "." + c;
+            if (r.toEl.startsWith(qualifiedName))
+                return true;
         }
-        // Reindex only files that are out-of-date
+        return false;
+    }
+
+    private void updateIndex(List<Path> possible, ReportReferencesProgress progress) {
         var outOfDate = new ArrayList<Path>();
         for (var p : possible) {
             var i = index.getOrDefault(p, Index.EMPTY);
@@ -1581,6 +1635,8 @@ public class JavaCompilerService {
             }
         }
         progress.checkPotentialReferences(0, outOfDate.size());
+        // If there's nothing to update, return
+        if (outOfDate.isEmpty()) return;
         // Reindex
         var batch = compileBatch(outOfDate);
         var nChecked = 0;
@@ -1599,12 +1655,28 @@ public class JavaCompilerService {
             nChecked++;
             progress.checkPotentialReferences(nChecked, possible.size());
         }
+    }
+
+    public List<Ref> referencesFile(URI file, String contents, ReportReferencesProgress progress) {
+        LOG.info(String.format("Finding all references to %s", Paths.get(file).getFileName()));
+
+        recompile(file, contents, -1, -1);
+        // List all files that import file
+        var toPackage = Objects.toString(cache.root.getPackageName(), "");
+        var toClasses = allClassNames(cache.root);
+        var possible = potentialReferencesToClasses(toPackage, toClasses, progress);
+        if (possible.isEmpty()) {
+            LOG.info("No potential references to " + file);
+            return List.of();
+        }
+        // Reindex only files that are out-of-date
+        updateIndex(possible, progress);
         // Assemble results
         var result = new ArrayList<Ref>();
         for (var p : possible) {
             var i = index.get(p);
             for (var r : i.refs) {
-                if (r.toFile.equals(file)) 
+                if (referencesAnyClass(r, toPackage, toClasses)) 
                     result.add(r);
             }
         }
@@ -1700,56 +1772,135 @@ public class JavaCompilerService {
         return new FixImports(tree, trees.getSourcePositions(), qualifiedNames);
     }
 
-    public List<TestMethod> testMethods(URI file, String contents) {
-        LOG.info(String.format("Finding test methods in %s", file.getPath()));
+    public Set<String> testMethods(URI file, String contents) {
+        LOG.info(String.format("Finding test methods in %s", Paths.get(file).getFileName()));
 
-        var task = singleFileTask(file, contents);
-        CompilationUnitTree parse;
-        try {
-            parse = task.parse().iterator().next();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        class Find extends TreeScanner<Void, Void> {
-            ClassTree enclosingClass = null;
-            Set<ClassTree> testClasses = new HashSet<>();
-            List<TestMethod> found = new ArrayList<>();
-
-            @Override 
-            public Void visitClass​(ClassTree node, Void nothing) {
-                var shadowed = enclosingClass;
-                enclosingClass = node;
-                super.visitClass(node, null);
-                enclosingClass = shadowed;
-                return null;
-            }
-
-            @Override
-            public Void visitMethod(MethodTree node, Void aVoid) {
+        var root = Parser.parse(new StringFileObject(contents, file));
+        var found = new LinkedHashSet<String>();
+        class FindTestMethods extends TreePathScanner<Void, Void> {
+            boolean isTestMethod(MethodTree node) {
                 for (var ann : node.getModifiers().getAnnotations()) {
                     var type = ann.getAnnotationType();
                     if (type instanceof IdentifierTree) {
                         var id = (IdentifierTree) type;
                         var name = id.getName();
                         if (name.contentEquals("Test") || name.contentEquals("org.junit.Test")) {
-                            found.add(new TestMethod(task, parse, enclosingClass, Optional.of(node)));
-                            if (!testClasses.contains(enclosingClass)) {
-                                found.add(new TestMethod(task, parse, enclosingClass, Optional.empty()));
-                                testClasses.add(enclosingClass);
-                            }
+                            return true;
                         }
                     }
                 }
-                return super.visitMethod(node, aVoid);
+                return false;
             }
 
-            List<TestMethod> run() {
-                scan(parse, null);
-                return found;
+            boolean isTestClass(ClassTree node) {
+                for (var m : node.getMembers()) {
+                    if (m instanceof MethodTree) {
+                        if (isTestMethod((MethodTree) m))
+                            return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override 
+            public Void visitClass​(ClassTree node, Void __) {
+                if (isTestClass(node)) found.add(idPath(getCurrentPath()));
+                return super.visitClass(node, null);
+            }
+
+            @Override
+            public Void visitMethod(MethodTree node, Void __) {
+                if (isTestMethod(node)) found.add(idPath(getCurrentPath()));
+                return null;
             }
         }
+        new FindTestMethods().scan(root, null);
+        
+        return found;
+    }
 
-        return new Find().run();
+    public Optional<SourceRange> position(URI file, String contents, String id) {
+        var task = Parser.parseTask(new StringFileObject(contents, file));
+        CompilationUnitTree root;
+        try {
+            root = task.parse().iterator().next();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        var trees = Trees.instance(task);
+        var lines = root.getLineMap();
+        var pos = trees.getSourcePositions();
+        class FindPosition extends TreePathScanner<Void, Void> {
+            TreePath found;
+            String className, memberName;
+            
+            void check(TreePath path) {
+                 found = path;
+            }
+
+            String memberName(Tree m) {
+                if (m instanceof MethodTree) {
+                    var method = (MethodTree) m;
+                    return method.getName().toString();
+                } else if (m instanceof VariableTree) {
+                    var field = (VariableTree) m;
+                    return field.getName().toString();
+                } else {
+                    return "";
+                }
+            }
+
+            @Override
+            public Void visitClass(ClassTree c, Void nothing) {
+                // Check if id references this class
+                var path = getCurrentPath();
+                if (idPath(path).equals(id)) {
+                    found = path;
+                    className = c.getSimpleName().toString();
+                    memberName = null;
+                }
+                // Check if id references each method of this class
+                for (var m : c.getMembers()) {
+                    var child = new TreePath(path, m);
+                    if (idPath(child).equals(id)) {
+                        found = child;
+                        className = c.getSimpleName().toString();
+                        memberName = memberName(m);
+                    }
+                }
+                // TODO this could be optimized by testing if this class is a prefix of id
+                return super.visitClass(c, nothing);
+            }
+        }
+        var finder = new FindPosition();
+        finder.scan(root, null);
+        if (finder.found == null) return Optional.empty();
+        // Find position of className or memberName in the source
+        var start = (int) pos.getStartPosition(root, finder.found.getLeaf());
+        String searchFor;
+        if (finder.memberName == null) searchFor = finder.className;
+        else if (finder.memberName.equals("<init>")) searchFor = finder.className;
+        else searchFor = finder.memberName;
+        while (start + searchFor.length() < contents.length()) {
+            var end = start + searchFor.length();
+            var candidate = contents.substring(start, end);
+            if (candidate.equals(searchFor)) {
+                var startLine = (int) lines.getLineNumber(start);
+                var startCol = (int) lines.getColumnNumber(start);
+                var endLine = (int) lines.getLineNumber(end);
+                var endCol = (int) lines.getColumnNumber(end);
+                var c = Optional.of(finder.className);
+                var m = Optional.ofNullable(finder.memberName);
+                var range = new SourceRange(file, startLine, startCol, endLine, endCol, c, m);
+                return Optional.of(range);
+            }
+            start++;
+        }
+        // Log a warning saying we couldn't find className or memberName in the source
+        var offset = pos.getStartPosition(root, finder.found.getLeaf());
+        var line = (int) lines.getLineNumber(start);
+        LOG.warning(String.format("Couldn't find identifier `%s` in %s:%d", searchFor, file, line));
+
+        return Optional.empty();
     }
 }

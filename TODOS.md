@@ -12,7 +12,8 @@
 - Annotation fields
 - cc should match CamelCase
 - Detail of fields, vars should be type
-- Autocomplete this.x = x; this.y = y; ... in constructor
+- Autocomplete POJO constructor This(T f, U g) { this.f = f; ... }
+- Deprioritize Object fields
 
 ## Navigation
 - Go-to-subclasses
@@ -22,14 +23,17 @@
 - Auto-collapse imports
 - Hover constructor should show constructor, not class
 - String.format(...) coloring
+- `new` should be a control keyword, not a regular keyword
 
 ## Simplicity
 - Use module-info.java instead of build files to figure out classpath
 - Link a standalone executable with jlink (scripts/link.sh)
+- Reduce use of TreePath, use ids instead
 
 ## JShell
 - Support .jshell extension as "scratch pad"
 
 # Coloring
-- new Foo< shouldn't make everything gree
+- new Foo< shouldn't make everything green
 - void f() shouldn't mess up next line as you type it
+- { on next line breaks coloring
