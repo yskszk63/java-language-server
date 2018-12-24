@@ -381,12 +381,14 @@ class JavaTextDocumentService implements TextDocumentService {
         return CompletableFuture.completedFuture(List.of(loc.get()));
     }
 
-    class ReportProgress implements ReportReferencesProgress {
+    class ReportProgress implements ReportReferencesProgress, AutoCloseable {
         private final Function<Integer, String> scanMessage, checkMessage;
 
-        ReportProgress(Function<Integer, String> scanMessage, Function<Integer, String> checkMessage) {
+        ReportProgress(
+                String startMessage, Function<Integer, String> scanMessage, Function<Integer, String> checkMessage) {
             this.scanMessage = scanMessage;
             this.checkMessage = checkMessage;
+            server.client().javaStartProgress(new JavaStartProgressParams(startMessage));
         }
 
         private int percent(int n, int d) {
@@ -414,6 +416,11 @@ class JavaTextDocumentService implements TextDocumentService {
                 server.client().javaReportProgress(new JavaReportProgressParams(message, increment));
             }
         }
+
+        @Override
+        public void close() {
+            server.client().javaEndProgress();
+        }
     }
 
     @Override
@@ -423,17 +430,18 @@ class JavaTextDocumentService implements TextDocumentService {
         var line = position.getPosition().getLine() + 1;
         var column = position.getPosition().getCharacter() + 1;
         var result = new ArrayList<Location>();
-        server.client().javaStartProgress(new JavaStartProgressParams("Find references"));
+        var fileName = Paths.get(uri).getFileName();
+        var startMessage = String.format("%s:%d", fileName, line);
         Function<Integer, String> scanMessage =
                 nFiles -> String.format("Scan %,d files for potential references", nFiles);
         Function<Integer, String> checkMessage = nPotential -> String.format("Check %,d files", nPotential);
-        var progress = new ReportProgress(scanMessage, checkMessage);
-        for (var r : server.compiler.references(uri, content, line, column, progress)) {
-            var loc = location(r);
-            if (loc.isPresent()) result.add(loc.get());
+        try (var progress = new ReportProgress(startMessage, scanMessage, checkMessage)) {
+            for (var r : server.compiler.references(uri, content, line, column, progress)) {
+                var loc = location(r);
+                if (loc.isPresent()) result.add(loc.get());
+            }
+            return CompletableFuture.completedFuture(result);
         }
-        server.client().javaEndProgress();
-        return CompletableFuture.completedFuture(result);
     }
 
     @Override
@@ -490,42 +498,45 @@ class JavaTextDocumentService implements TextDocumentService {
 
     private List<CodeLens> allReferences(URI uri) {
         var content = contents(uri).content;
+        var fileName = Paths.get(uri).getFileName();
+        var startMessage = String.format("%s", fileName);
         Function<Integer, String> scanMessage = nFiles -> String.format("Scan %,d files for imports", nFiles);
         Function<Integer, String> checkMessage = nPotential -> String.format("Index %,d files", nPotential);
-        var progress = new ReportProgress(scanMessage, checkMessage);
-        // Organize by method
-        var refs = server.compiler.referencesFile(uri, content, progress);
-        var byId = new HashMap<String, List<Ref>>();
-        for (var r : refs) {
-            byId.computeIfAbsent(r.toEl, __ -> new ArrayList<>()).add(r);
-        }
-        // Convert into CodeLens messages
-        var result = new ArrayList<CodeLens>();
-        for (var kv : byId.entrySet()) {
-            // Figure out command
-            var id = kv.getKey();
-            var rs = kv.getValue();
-            // Figure out where to place command
-            var r = rs.get(0);
-            var pos = server.compiler.position(uri, content, r.toEl);
-            if (!pos.isPresent()) {
-                LOG.warning(String.format("No position for %s", r.toEl));
-                continue;
+        try (var progress = new ReportProgress(startMessage, scanMessage, checkMessage)) {
+            // Organize by method
+            var refs = server.compiler.referencesFile(uri, content, progress);
+            var byId = new HashMap<String, List<Ref>>();
+            for (var r : refs) {
+                byId.computeIfAbsent(r.toEl, __ -> new ArrayList<>()).add(r);
             }
-            var range = asRange(pos.get());
-            String message;
-            if (rs.isEmpty()) message = "0 references";
-            else if (rs.size() == 1) message = "1 reference";
-            else message = String.format("%d references", rs.size());
-            var command =
-                    new Command(
-                            message,
-                            "java.command.findReferences",
-                            List.of(uri, range.getStart().getLine(), range.getStart().getCharacter()));
-            var lens = new CodeLens(range, command, null);
-            result.add(lens);
+            // Convert into CodeLens messages
+            var result = new ArrayList<CodeLens>();
+            for (var kv : byId.entrySet()) {
+                // Figure out command
+                var id = kv.getKey();
+                var rs = kv.getValue();
+                // Figure out where to place command
+                var r = rs.get(0);
+                var pos = server.compiler.position(uri, content, r.toEl);
+                if (!pos.isPresent()) {
+                    LOG.warning(String.format("No position for %s", r.toEl));
+                    continue;
+                }
+                var range = asRange(pos.get());
+                String message;
+                if (rs.isEmpty()) message = "0 references";
+                else if (rs.size() == 1) message = "1 reference";
+                else message = String.format("%d references", rs.size());
+                var command =
+                        new Command(
+                                message,
+                                "java.command.findReferences",
+                                List.of(uri, range.getStart().getLine(), range.getStart().getCharacter()));
+                var lens = new CodeLens(range, command, null);
+                result.add(lens);
+            }
+            return result;
         }
-        return result;
     }
 
     @Override

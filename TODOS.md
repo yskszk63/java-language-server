@@ -7,6 +7,7 @@
 - Find-all-references doesn't work on constructors
 - Files created in session don't autocomplete
 - EnumMap default methods don't autocomplete
+- Crashes when you create the first file in a new maven project
 
 ## Autocomplete
 - Annotation fields
