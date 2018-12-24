@@ -4,122 +4,118 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
 import java.net.URI;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.logging.Logger;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.TextDocumentPositionParams;
 import org.junit.Ignore;
 import org.junit.Test;
 
 public class GotoTest {
-    private static final Logger LOG = Logger.getLogger("main");
     private static final String file = "/org/javacs/example/Goto.java";
-    private static final URI uri = FindResource.uri(file),
-            other = FindResource.uri("/org/javacs/example/GotoOther.java");
     private static final String defaultConstructorFile = "/org/javacs/example/GotoDefaultConstructor.java";
-    private static final URI defaultConstructorUri = FindResource.uri(defaultConstructorFile);
 
     @Test
     public void localVariable() {
-        List<? extends Location> suggestions = doGoto(file, 9, 8);
+        var suggestions = doGoto(file, 9, 8);
 
-        assertThat(suggestions, contains(location(uri, 4, 8, 4, 21)));
+        assertThat(suggestions, contains("Goto.java:5(9)"));
     }
 
     @Test
     public void defaultConstructor() {
-        List<? extends Location> suggestions = doGoto(defaultConstructorFile, 4, 45);
+        var suggestions = doGoto(defaultConstructorFile, 4, 45);
 
-        assertThat(suggestions, contains(location(defaultConstructorUri, 2, 0, 6, 1)));
+        assertThat(suggestions, contains("GotoDefaultConstructor.java:3(1)"));
     }
 
     @Test
     public void constructor() {
-        List<? extends Location> suggestions = doGoto(file, 10, 20);
+        var suggestions = doGoto(file, 10, 20);
 
-        assertThat(suggestions, contains(location(uri, 2, 0, 47, 1)));
+        assertThat(suggestions, contains("Goto.java:3(1)"));
     }
 
     @Test
     public void className() {
-        List<? extends Location> suggestions = doGoto(file, 15, 8);
+        var suggestions = doGoto(file, 15, 8);
 
-        assertThat(suggestions, contains(location(uri, 2, 0, 47, 1)));
+        assertThat(suggestions, contains("Goto.java:3(1)"));
     }
 
     @Test
     public void staticField() {
-        List<? extends Location> suggestions = doGoto(file, 12, 21);
+        var suggestions = doGoto(file, 12, 21);
 
-        assertThat(suggestions, contains(location(uri, 35, 4, 35, 37)));
+        assertThat(suggestions, contains("Goto.java:36(5)"));
     }
 
     @Test
     public void field() {
-        List<? extends Location> suggestions = doGoto(file, 13, 21);
+        var suggestions = doGoto(file, 13, 21);
 
-        assertThat(suggestions, contains(location(uri, 36, 4, 36, 24)));
+        assertThat(suggestions, contains("Goto.java:37(5)"));
     }
 
     @Test
     public void staticMethod() {
-        List<? extends Location> suggestions = doGoto(file, 15, 13);
+        var suggestions = doGoto(file, 15, 13);
 
-        assertThat(suggestions, contains(location(uri, 37, 4, 39, 5)));
+        assertThat(suggestions, contains("Goto.java:38(5)"));
     }
 
     @Test
     public void method() {
-        List<? extends Location> suggestions = doGoto(file, 16, 13);
+        var suggestions = doGoto(file, 16, 13);
 
-        assertThat(suggestions, contains(location(uri, 40, 4, 42, 5)));
+        assertThat(suggestions, contains("Goto.java:41(5)"));
     }
 
     @Test
     public void staticMethodReference() {
-        List<? extends Location> suggestions = doGoto(file, 18, 26);
+        var suggestions = doGoto(file, 18, 26);
 
-        assertThat(suggestions, contains(location(uri, 37, 4, 39, 5)));
+        assertThat(suggestions, contains("Goto.java:38(5)"));
     }
 
     @Test
     public void methodReference() {
-        List<? extends Location> suggestions = doGoto(file, 19, 26);
+        var suggestions = doGoto(file, 19, 26);
 
-        assertThat(suggestions, contains(location(uri, 40, 4, 42, 5)));
+        assertThat(suggestions, contains("Goto.java:41(5)"));
     }
 
     @Test
     public void otherStaticMethod() {
-        List<? extends Location> suggestions = doGoto(file, 28, 24);
+        var suggestions = doGoto(file, 28, 24);
 
-        assertThat(suggestions, contains(hasProperty("uri", equalTo(other.toString()))));
+        assertThat(suggestions, contains(startsWith("GotoOther.java:")));
     }
 
     @Test
     public void otherMethod() {
-        List<? extends Location> suggestions = doGoto(file, 29, 17);
+        var suggestions = doGoto(file, 29, 17);
 
-        assertThat(suggestions, contains(hasProperty("uri", equalTo(other.toString()))));
+        assertThat(suggestions, contains(startsWith("GotoOther.java:")));
     }
 
     @Test
     public void otherCompiledFile() {
-        List<? extends Location> suggestions = doGoto(file, 28, 24);
+        var suggestions = doGoto(file, 28, 24);
 
-        assertThat(suggestions, contains(hasProperty("uri", equalTo(other.toString()))));
+        assertThat(suggestions, contains(startsWith("GotoOther.java:")));
     }
 
     @Test
     @Ignore // TODO
     public void typeParam() {
-        List<? extends Location> suggestions = doGoto(file, 45, 11);
+        var suggestions = doGoto(file, 45, 11);
 
-        assertThat(suggestions, contains(location(uri, 2, 18, 2, 23)));
+        assertThat(suggestions, contains("Goto.java:3(19)"));
     }
 
     @Test
@@ -130,29 +126,9 @@ public class GotoTest {
         assertThat(doGoto(file, 5, 35), not(empty()));
     }
 
-    private Location location(URI uri, int startRow, int startColumn, int endRow, int endColumn) {
-        Position start = new Position();
-        start.setLine(startRow);
-        start.setCharacter(startColumn);
-
-        Position end = new Position();
-        end.setLine(endRow);
-        end.setCharacter(endColumn);
-
-        Range range = new Range();
-        range.setStart(start);
-        range.setEnd(end);
-
-        Location location = new Location();
-        location.setUri(uri.toString());
-        location.setRange(range);
-
-        return location;
-    }
-
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
-    private List<? extends Location> doGoto(String file, int row, int column) {
+    private List<String> doGoto(String file, int row, int column) {
         TextDocumentIdentifier document = new TextDocumentIdentifier();
 
         document.setUri(FindResource.uri(file).toString());
@@ -167,10 +143,19 @@ public class GotoTest {
         p.setTextDocument(document);
         p.setPosition(position);
 
+        // TODO extends is not coloring correctly
+        List<? extends Location> locations;
         try {
-            return server.getTextDocumentService().definition(p).get();
+            locations = server.getTextDocumentService().definition(p).get();
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
+        var strings = new ArrayList<String>();
+        for (var l : locations) {
+            var fileName = Paths.get(URI.create(l.getUri())).getFileName();
+            var start = l.getRange().getStart();
+            strings.add(String.format("%s:%d(%d)", fileName, start.getLine() + 1, start.getCharacter() + 1));
+        }
+        return strings;
     }
 }

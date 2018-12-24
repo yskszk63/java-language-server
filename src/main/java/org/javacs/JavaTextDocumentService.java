@@ -5,7 +5,6 @@ import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.doctree.DocTree;
 import com.sun.source.doctree.ParamTree;
 import com.sun.source.tree.MethodTree;
-import com.sun.source.util.TreePath;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
@@ -344,30 +343,6 @@ class JavaTextDocumentService implements TextDocumentService {
         return CompletableFuture.completedFuture(help);
     }
 
-    // TODO this is very duplicative with code in JavaCompilerService
-    // Maybe we shouldn't be passing around TreePath
-    private Optional<Location> location(TreePath p) {
-        var trees = server.compiler.trees();
-        var pos = trees.getSourcePositions();
-        var cu = p.getCompilationUnit();
-        var lines = cu.getLineMap();
-        long start = pos.getStartPosition(cu, p.getLeaf()), end = pos.getEndPosition(cu, p.getLeaf());
-        if (start == -1) {
-            LOG.warning(String.format("No position for %s", p.getLeaf()));
-            return Optional.empty();
-        }
-        if (end == -1) {
-            end = start + p.getLeaf().toString().length();
-        }
-        int startLine = (int) lines.getLineNumber(start) - 1, startCol = (int) lines.getColumnNumber(start) - 1;
-        int endLine = (int) lines.getLineNumber(end) - 1, endCol = (int) lines.getColumnNumber(end) - 1;
-        var dUri = cu.getSourceFile().toUri();
-        var startPos = new Position(startLine, startCol);
-        var endPos = new Position(endLine, endCol);
-        var loc = new Location(dUri.toString(), new Range(startPos, endPos));
-        return Optional.of(loc);
-    }
-
     @Override
     public CompletableFuture<List<? extends Location>> definition(TextDocumentPositionParams position) {
         var uri = URI.create(position.getTextDocument().getUri());
@@ -376,9 +351,8 @@ class JavaTextDocumentService implements TextDocumentService {
         Function<URI, String> findContent = f -> contents(f).content;
         var def = server.compiler.definition(uri, line, column, findContent);
         if (!def.isPresent()) return CompletableFuture.completedFuture(List.of());
-        var loc = location(def.get());
-        if (!loc.isPresent()) return CompletableFuture.completedFuture(List.of());
-        return CompletableFuture.completedFuture(List.of(loc.get()));
+        var loc = asLocation(def.get());
+        return CompletableFuture.completedFuture(List.of(loc));
     }
 
     class ReportProgress implements ReportReferencesProgress, AutoCloseable {
@@ -493,7 +467,11 @@ class JavaTextDocumentService implements TextDocumentService {
             var pos = maybePos.get();
             var range = asRange(pos);
             var message = pos.memberName.isPresent() ? "Run Test" : "Run All Tests";
-            var command = new Command(message, "java.command.test.run", List.of(uri, pos.className, pos.memberName));
+            var command =
+                    new Command(
+                            message,
+                            "java.command.test.run",
+                            Arrays.asList(uri, pos.className.orElse(null), pos.memberName.orElse(null)));
             var lens = new CodeLens(range, command, null);
             result.add(lens);
         }

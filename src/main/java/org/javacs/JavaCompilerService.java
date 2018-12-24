@@ -1160,8 +1160,38 @@ public class JavaCompilerService {
         return Optional.empty();
     }
 
+    private static Optional<Ref> ref(TreePath from, JavacTask task) {
+        var trees = Trees.instance(task);
+        var pos = trees.getSourcePositions();
+        var root = from.getCompilationUnit();
+        var lines = root.getLineMap();
+        var to = trees.getElement(from);
+        // Skip elements we can't find
+        if (to == null) {
+            LOG.warning(String.format("No element for %s", from.getLeaf()));
+            return Optional.empty();
+        }
+        // Skip non-methods
+        if (!(to instanceof ExecutableElement || to instanceof TypeElement || to instanceof VariableElement)) {
+            return Optional.empty();
+        }
+        // TODO skip anything not on source path
+        var toEl = idEl(to);
+        long start = pos.getStartPosition(root, from.getLeaf()), end = pos.getEndPosition(root, from.getLeaf());
+        if (start == -1) {
+            LOG.warning(String.format("No position for %s", from.getLeaf()));
+            return Optional.empty();
+        }
+        if (end == -1) end = start + from.getLeaf().toString().length();
+        int startLine = (int) lines.getLineNumber(start), startCol = (int) lines.getColumnNumber(start);
+        int endLine = (int) lines.getLineNumber(end), endCol = (int) lines.getColumnNumber(end);
+        var fromFile = root.getSourceFile().toUri();
+        var ref = new Ref(fromFile, startLine, startCol, endLine, endCol, toEl);
+        return Optional.of(ref);
+    }
+
     /** Compile `file` and locate `e` in it */
-    private Optional<TreePath> findIn(Element e, Path file, String contents) {
+    private Optional<Ref> findIn(Element e, Path file, String contents) {
         var task = singleFileTask(file.toUri(), contents);
         CompilationUnitTree tree;
         try {
@@ -1172,7 +1202,7 @@ public class JavaCompilerService {
         }
         var trees = Trees.instance(task);
         class Find extends TreePathScanner<Void, Void> {
-            Optional<TreePath> found = Optional.empty();
+            Optional<Ref> found = Optional.empty();
 
             boolean toStringEquals(Object left, Object right) {
                 return Objects.equals(Objects.toString(left, ""), Objects.toString(right, ""));
@@ -1188,7 +1218,7 @@ public class JavaCompilerService {
 
             void check() {
                 if (sameSymbol()) {
-                    found = Optional.of(getCurrentPath());
+                    found = ref(getCurrentPath(), cache.task);
                 }
             }
 
@@ -1210,7 +1240,7 @@ public class JavaCompilerService {
                 return super.visitVariable(node, aVoid);
             }
 
-            Optional<TreePath> run() {
+            Optional<Ref> run() {
                 scan(tree, null);
                 return found;
             }
@@ -1218,7 +1248,7 @@ public class JavaCompilerService {
         return new Find().run();
     }
 
-    public Optional<TreePath> definition(URI file, int line, int character, Function<URI, String> contents) {
+    public Optional<Ref> definition(URI file, int line, int character, Function<URI, String> contents) {
         recompile(file, contents.apply(file), line, character);
 
         var trees = Trees.instance(cache.task);
@@ -1455,7 +1485,7 @@ public class JavaCompilerService {
                 void check(TreePath from) {
                     var found = trees.getElement(from);
                     if (sameSymbol(found, to)) {
-                        ref(from).ifPresent(results::add);
+                        ref(from, task).ifPresent(results::add);
                     }
                 }
 
@@ -1481,41 +1511,11 @@ public class JavaCompilerService {
             return results;
         }
 
-        private Optional<Ref> ref(TreePath from) {
-            var trees = Trees.instance(task);
-            var pos = trees.getSourcePositions();
-            var root = from.getCompilationUnit();
-            var lines = root.getLineMap();
-            var to = trees.getElement(from);
-            // Skip elements we can't find
-            if (to == null) {
-                LOG.warning(String.format("No element for %s", from.getLeaf()));
-                return Optional.empty();
-            }
-            // Skip non-methods
-            if (!(to instanceof ExecutableElement)) {
-                return Optional.empty();
-            }
-            // TODO skip anything not on source path
-            var toEl = idEl(to);
-            long start = pos.getStartPosition(root, from.getLeaf()), end = pos.getEndPosition(root, from.getLeaf());
-            if (start == -1) {
-                LOG.warning(String.format("No position for %s", from.getLeaf()));
-                return Optional.empty();
-            }
-            if (end == -1) end = start + from.getLeaf().toString().length();
-            int startLine = (int) lines.getLineNumber(start), startCol = (int) lines.getColumnNumber(start);
-            int endLine = (int) lines.getLineNumber(end), endCol = (int) lines.getColumnNumber(end);
-            var fromFile = root.getSourceFile().toUri();
-            var ref = new Ref(fromFile, startLine, startCol, endLine, endCol, toEl);
-            return Optional.of(ref);
-        }
-
         List<Ref> index(CompilationUnitTree root) {
             var refs = new ArrayList<Ref>();
             class IndexFile extends TreePathScanner<Void, Void> {
                 void check(TreePath from) {
-                    ref(from).ifPresent(refs::add);
+                    ref(from, task).ifPresent(refs::add);
                 }
 
                 @Override
