@@ -84,50 +84,6 @@ public class ParseFile {
         return found;
     }
     
-    public Optional<TreePath> find(Ptr id) {
-        class FindPosition extends TreePathScanner<Void, Void> {
-            TreePath found;
-            String className, memberName;
-
-            String memberName(Tree m) {
-                if (m instanceof MethodTree) {
-                    var method = (MethodTree) m;
-                    return method.getName().toString();
-                } else if (m instanceof VariableTree) {
-                    var field = (VariableTree) m;
-                    return field.getName().toString();
-                } else {
-                    return "";
-                }
-            }
-
-            @Override
-            public Void visitClass(ClassTree c, Void nothing) {
-                // Check if id references this class
-                var path = getCurrentPath();
-                if (new Ptr(path).equals(id)) {
-                    found = path;
-                    className = c.getSimpleName().toString();
-                    memberName = null;
-                }
-                // Check if id references each method of this class
-                for (var m : c.getMembers()) {
-                    var child = new TreePath(path, m);
-                    if (new Ptr(child).equals(id)) {
-                        found = child;
-                        className = c.getSimpleName().toString();
-                        memberName = memberName(m);
-                    }
-                }
-                // TODO this could be optimized by testing if this class is a prefix of id
-                return super.visitClass(c, nothing);
-            }
-        }
-        var finder = new FindPosition();
-        finder.scan(root, null);
-        return Optional.ofNullable(finder.found);
-    }
-
     public Optional<Range> range(TreePath path) {
         return range(task, contents, path);
     }
