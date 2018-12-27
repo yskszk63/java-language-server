@@ -10,7 +10,9 @@ import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreePathScanner;
 import com.sun.source.util.Trees;
+import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -31,6 +33,8 @@ import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.SymbolKind;
 
 class Parser {
+
+    // TODO merge Parser with ParseFile
 
     private static final JavaCompiler compiler = ServiceLoader.load(JavaCompiler.class).iterator().next();
     private static final StandardJavaFileManager fileManager =
@@ -383,6 +387,12 @@ class Parser {
             resolveSymbol(s, imports, classPath).ifPresent(resolved -> result.put(s, resolved));
         }
         return result;
+    }
+
+    static String fileName(URI uri) {
+        var parts = uri.getPath().split(File.separator);
+        if (parts.length == 0) return "";
+        return parts[parts.length - 1];
     }
 
     private static final Logger LOG = Logger.getLogger("main");

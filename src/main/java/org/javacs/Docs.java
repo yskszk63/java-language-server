@@ -12,9 +12,11 @@ import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
 import javax.tools.*;
 
-class Docs {
+public class Docs {
 
     /** File manager with source-path + platform sources, which we will use to look up individual source files */
     private final StandardJavaFileManager fileManager;
@@ -41,6 +43,35 @@ class Docs {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /** Look up the javadoc associated with `method` */
+    public Optional<DocCommentTree> methodDoc(ExecutableElement method) {
+        var classElement = (TypeElement) method.getEnclosingElement();
+        var className = classElement.getQualifiedName().toString();
+        var methodName = method.getSimpleName().toString();
+        return memberDoc(className, methodName);
+    }
+
+    /** Find and root the source code associated with `method` */
+    public Optional<MethodTree> methodTree(ExecutableElement method) {
+        var classElement = (TypeElement) method.getEnclosingElement();
+        var className = classElement.getQualifiedName().toString();
+        var methodName = method.getSimpleName().toString();
+        var parameterTypes =
+                method.getParameters().stream().map(p -> p.asType().toString()).collect(Collectors.toList());
+        return findMethod(className, methodName, parameterTypes);
+    }
+
+    /** Look up the javadoc associated with `type` */
+    public Optional<DocCommentTree> classDoc(TypeElement type) {
+        return classDoc(type.getQualifiedName().toString());
+    }
+
+    public Optional<DocCommentTree> classDoc(String qualifiedName) {
+        Objects.requireNonNull(qualifiedName);
+
+        return findDoc(qualifiedName, null);
     }
 
     private Optional<JavaFileObject> file(String className) {
@@ -123,12 +154,6 @@ class Docs {
         return findDoc(className, memberName);
     }
 
-    Optional<DocCommentTree> classDoc(String className) {
-        Objects.requireNonNull(className);
-
-        return findDoc(className, null);
-    }
-
     private boolean sameMethod(MethodTree candidate, String methodName, List<String> parameterTypes) {
         if (!candidate.getName().contentEquals(methodName)) return false;
         var params = candidate.getParameters();
@@ -151,7 +176,7 @@ class Docs {
         return true;
     }
 
-    Optional<MethodTree> findMethod(String className, String methodName, List<String> parameterTypes) {
+    private Optional<MethodTree> findMethod(String className, String methodName, List<String> parameterTypes) {
         Objects.requireNonNull(className);
         Objects.requireNonNull(methodName);
 

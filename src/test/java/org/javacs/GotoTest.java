@@ -23,70 +23,70 @@ public class GotoTest {
     public void localVariable() {
         var suggestions = doGoto(file, 9, 8);
 
-        assertThat(suggestions, contains("Goto.java:5(9)"));
+        assertThat(suggestions, contains("Goto.java:5"));
     }
 
     @Test
     public void defaultConstructor() {
         var suggestions = doGoto(defaultConstructorFile, 4, 45);
 
-        assertThat(suggestions, contains("GotoDefaultConstructor.java:3(1)"));
+        assertThat(suggestions, contains("GotoDefaultConstructor.java:3"));
     }
 
     @Test
     public void constructor() {
         var suggestions = doGoto(file, 10, 20);
 
-        assertThat(suggestions, contains("Goto.java:3(1)"));
+        assertThat(suggestions, contains("Goto.java:3"));
     }
 
     @Test
     public void className() {
         var suggestions = doGoto(file, 15, 8);
 
-        assertThat(suggestions, contains("Goto.java:3(1)"));
+        assertThat(suggestions, contains("Goto.java:3"));
     }
 
     @Test
     public void staticField() {
         var suggestions = doGoto(file, 12, 21);
 
-        assertThat(suggestions, contains("Goto.java:36(5)"));
+        assertThat(suggestions, contains("Goto.java:36"));
     }
 
     @Test
     public void field() {
         var suggestions = doGoto(file, 13, 21);
 
-        assertThat(suggestions, contains("Goto.java:37(5)"));
+        assertThat(suggestions, contains("Goto.java:37"));
     }
 
     @Test
     public void staticMethod() {
         var suggestions = doGoto(file, 15, 13);
 
-        assertThat(suggestions, contains("Goto.java:38(5)"));
+        assertThat(suggestions, contains("Goto.java:38"));
     }
 
     @Test
     public void method() {
         var suggestions = doGoto(file, 16, 13);
 
-        assertThat(suggestions, contains("Goto.java:41(5)"));
+        assertThat(suggestions, contains("Goto.java:41"));
     }
 
     @Test
     public void staticMethodReference() {
         var suggestions = doGoto(file, 18, 26);
 
-        assertThat(suggestions, contains("Goto.java:38(5)"));
+        assertThat(suggestions, contains("Goto.java:38"));
     }
 
     @Test
     public void methodReference() {
         var suggestions = doGoto(file, 19, 26);
 
-        assertThat(suggestions, contains("Goto.java:41(5)"));
+        assertThat(suggestions, contains("Goto.java:41"));
     }
 
     @Test
@@ -115,7 +115,7 @@ public class GotoTest {
     public void typeParam() {
         var suggestions = doGoto(file, 45, 11);
 
-        assertThat(suggestions, contains("Goto.java:3(19)"));
+        assertThat(suggestions, contains("Goto.java:3"));
     }
 
     @Test
@@ -154,7 +154,7 @@ public class GotoTest {
         for (var l : locations) {
             var fileName = Paths.get(URI.create(l.getUri())).getFileName();
             var start = l.getRange().getStart();
-            strings.add(String.format("%s:%d(%d)", fileName, start.getLine() + 1, start.getCharacter() + 1));
+            strings.add(String.format("%s:%d", fileName, start.getLine() + 1));
         }
         return strings;
     }

@@ -87,12 +87,8 @@ public class Ptr {
         return Objects.hash(path);
     }
 
-    public boolean inPackage(String packageName) {
-        return path.startsWith(packageName);
-    }
-
-    public boolean inClass(String qualifiedName) {
-        return path.startsWith(qualifiedName);
+    public String toString() {
+        return path;
     }
 
     private static final Logger LOG = Logger.getLogger("main");

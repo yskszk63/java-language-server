@@ -12,16 +12,19 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
-import javax.tools.Diagnostic;
-import javax.tools.JavaFileObject;
 import org.junit.Test;
 
 public class JavaCompilerServiceTest {
     private static final Logger LOG = Logger.getLogger("main");
+
+    static {
+        Main.setRootFormat();
+    }
 
     private JavaCompilerService compiler =
             new JavaCompilerService(
@@ -53,14 +56,18 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void element() {
-        var found = compiler.element(resourceUri("/HelloWorld.java"), contents("/HelloWorld.java"), 3, 24);
+        var uri = resourceUri("/HelloWorld.java");
+        var contents = contents("/HelloWorld.java");
+        var found = compiler.compileFocus(uri, contents, 3, 24).element();
 
         assertThat(found.getSimpleName(), hasToString(containsString("println")));
     }
 
     @Test
     public void elementWithError() {
-        var found = compiler.element(resourceUri("/CompleteMembers.java"), contents("/CompleteMembers.java"), 3, 12);
+        var uri = resourceUri("/CompleteMembers.java");
+        var contents = contents("/CompleteMembers.java");
+        var found = compiler.compileFocus(uri, contents, 3, 12).element();
 
         assertThat(found, notNullValue());
     }
@@ -83,13 +90,10 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void identifiers() {
-        var found =
-                compiler.scopeMembers(
-                        resourceUri("/CompleteIdentifiers.java"),
-                        contents("/CompleteIdentifiers.java"),
-                        13,
-                        21,
-                        "complete");
+        var uri = resourceUri("/CompleteIdentifiers.java");
+        var contents = contents("/CompleteIdentifiers.java");
+        var focus = compiler.compileFocus(uri, contents, 13, 21);
+        var found = focus.scopeMembers("complete");
         var names = elementNames(found);
         assertThat(names, hasItem("completeLocal"));
         assertThat(names, hasItem("completeParam"));
@@ -104,9 +108,10 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void identifiersInMiddle() {
-        var found =
-                compiler.scopeMembers(
-                        resourceUri("/CompleteInMiddle.java"), contents("/CompleteInMiddle.java"), 13, 21, "complete");
+        var uri = resourceUri("/CompleteInMiddle.java");
+        var contents = contents("/CompleteInMiddle.java");
+        var focus = compiler.compileFocus(uri, contents, 13, 21);
+        var found = focus.scopeMembers("complete");
         var names = elementNames(found);
         assertThat(names, hasItem("completeLocal"));
         assertThat(names, hasItem("completeParam"));
@@ -121,10 +126,11 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void completeIdentifiers() {
-        var found =
-                compiler.completions(
-                                resourceUri("/CompleteIdentifiers.java"), contents("/CompleteIdentifiers.java"), 13, 21)
-                        .items;
+        var uri = resourceUri("/CompleteIdentifiers.java");
+        var contents = contents("/CompleteIdentifiers.java");
+        var ctx = compiler.parseFile(uri, contents).completionPosition(13, 21).get();
+        var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
+        var found = focus.completeIdentifiers(ctx.inClass, ctx.inMethod, ctx.partialName);
         var names = completionNames(found);
         assertThat(names, hasItem("completeLocal"));
         assertThat(names, hasItem("completeParam"));
@@ -139,8 +145,10 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void members() {
-        var found =
-                compiler.members(resourceUri("/CompleteMembers.java"), contents("/CompleteMembers.java"), 3, 14, false);
+        var uri = resourceUri("/CompleteMembers.java");
+        var contents = contents("/CompleteMembers.java");
+        var focus = compiler.compileFocus(uri, contents, 3, 14);
+        var found = focus.completeMembers(false);
         var names = completionNames(found);
         assertThat(names, hasItem("subMethod"));
         assertThat(names, hasItem("superMethod"));
@@ -149,9 +157,11 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void completeMembers() {
-        var found =
-                compiler.completions(resourceUri("/CompleteMembers.java"), contents("/CompleteMembers.java"), 3, 15)
-                        .items;
+        var uri = resourceUri("/CompleteMembers.java");
+        var contents = contents("/CompleteMembers.java");
+        var ctx = compiler.parseFile(uri, contents).completionPosition(3, 15).get();
+        var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
+        var found = focus.completeMembers(false);
         var names = completionNames(found);
         assertThat(names, hasItem("subMethod"));
         assertThat(names, hasItem("superMethod"));
@@ -160,10 +170,11 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void completeExpression() {
-        var found =
-                compiler.completions(
-                                resourceUri("/CompleteExpression.java"), contents("/CompleteExpression.java"), 3, 37)
-                        .items;
+        var uri = resourceUri("/CompleteExpression.java");
+        var contents = contents("/CompleteExpression.java");
+        var ctx = compiler.parseFile(uri, contents).completionPosition(3, 37).get();
+        var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
+        var found = focus.completeMembers(false);
         var names = completionNames(found);
         assertThat(names, hasItem("instanceMethod"));
         assertThat(names, not(hasItem("create")));
@@ -172,8 +183,11 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void completeClass() {
-        var found =
-                compiler.completions(resourceUri("/CompleteClass.java"), contents("/CompleteClass.java"), 3, 23).items;
+        var uri = resourceUri("/CompleteClass.java");
+        var contents = contents("/CompleteClass.java");
+        var ctx = compiler.parseFile(uri, contents).completionPosition(3, 23).get();
+        var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
+        var found = focus.completeMembers(false);
         var names = completionNames(found);
         assertThat(names, hasItems("staticMethod", "staticField"));
         assertThat(names, hasItems("class"));
@@ -183,9 +197,11 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void completeImports() {
-        var found =
-                compiler.completions(resourceUri("/CompleteImports.java"), contents("/CompleteImports.java"), 1, 18)
-                        .items;
+        var uri = resourceUri("/CompleteImports.java");
+        var contents = contents("/CompleteImports.java");
+        var ctx = compiler.parseFile(uri, contents).completionPosition(1, 18).get();
+        var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
+        var found = focus.completeMembers(false);
         var names = completionNames(found);
         assertThat(names, hasItem("List"));
         assertThat(names, hasItem("concurrent"));
@@ -211,43 +227,46 @@ public class JavaCompilerServiceTest {
     }
     */
 
-    private final ReportReferencesProgress rrp =
-            new ReportReferencesProgress() {
-                @Override
-                public void scanForPotentialReferences(int nScanned, int nFiles) {}
-
-                @Override
-                public void checkPotentialReferences(int nCompiled, int nPotential) {}
-            };
-
     @Test
     public void references() {
         var file = "/GotoDefinition.java";
-        var refs = compiler.references(resourceUri(file), contents(file), 6, 13, rrp);
+        var to = compiler.compileFocus(resourceUri(file), contents(file), 6, 13).element();
+        var possible = compiler.potentialReferences(to);
+        assertThat(
+                "GotoDefinition.java can have refernces to itself",
+                possible,
+                hasItem(hasToString(endsWith("/GotoDefinition.java"))));
+
+        var batch = compiler.compileBatch(possible);
+        var refs = batch.references(to);
         var stringify = new ArrayList<String>();
         for (var r : refs) {
-            var fileName = Paths.get(r.fromFile).getFileName();
-            stringify.add(String.format("%s:%d", fileName, r.startLine));
+            var uri = r.getCompilationUnit().getSourceFile().toUri();
+            var fileName = Paths.get(uri).getFileName();
+            var range = batch.range(r).get();
+            stringify.add(String.format("%s:%d", fileName, range.getStart().getLine() + 1));
         }
         assertThat(stringify, hasItem("GotoDefinition.java:3"));
         assertThat(stringify, not(hasItem("GotoDefinition.java:6")));
     }
 
     @Test
-    public void referencesFile() {
+    public void countReferences() {
         var file = "/GotoDefinition.java";
-        var refs = compiler.referencesFile(resourceUri(file), contents(file), rrp);
-        var stringify = new ArrayList<String>();
-        for (var r : refs) {
-            var fileName = Paths.get(r.fromFile).getFileName();
-            stringify.add(String.format("%s:%d", fileName, r.startLine));
+        var refs = compiler.countReferences(resourceUri(file), contents(file));
+        var stringify = new HashMap<String, Integer>();
+        for (var kv : refs.entrySet()) {
+            var key = kv.getKey().toString();
+            stringify.put(key, kv.getValue());
         }
-        assertThat(stringify, hasItem("GotoDefinition.java:3"));
+        assertThat(stringify, hasEntry("GotoDefinition.goToHere", 1));
     }
 
     @Test
     public void overloads() {
-        var found = compiler.methodInvocation(resourceUri("/Overloads.java"), contents("/Overloads.java"), 3, 15).get();
+        var uri = resourceUri("/Overloads.java");
+        var contents = contents("/Overloads.java");
+        var found = compiler.compileFocus(uri, contents, 3, 15).methodInvocation().get();
         var strings = found.overloads.stream().map(Object::toString).collect(Collectors.toList());
 
         assertThat(strings, hasItem(containsString("print(int)")));
@@ -256,33 +275,33 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void lint() {
-        List<Diagnostic<? extends JavaFileObject>> diags =
-                compiler.lint(Collections.singleton(Paths.get(resourceUri("/HasError.java"))));
+        var uri = resourceUri("/HasError.java");
+        var files = Collections.singleton(uri);
+        var diags = compiler.compileBatch(files).lint();
         assertThat(diags, not(empty()));
     }
 
     @Test
     public void localDoc() {
-        var method =
-                compiler.methodInvocation(resourceUri("/LocalMethodDoc.java"), contents("/LocalMethodDoc.java"), 3, 21)
-                        .get()
-                        .activeMethod
-                        .get();
-        var doc = compiler.methodDoc(method);
+        var uri = resourceUri("/LocalMethodDoc.java");
+        var contents = contents("/LocalMethodDoc.java");
+        var method = compiler.compileFocus(uri, contents, 3, 21).methodInvocation().get().activeMethod.get();
+        var doc = compiler.docs().methodDoc(method);
         assertTrue(doc.isPresent());
         assertThat(doc.toString(), containsString("A great method"));
     }
 
     @Test
     public void fixImports() {
-        var qualifiedNames =
-                compiler.fixImports(resourceUri("/MissingImport.java"), contents("/MissingImport.java")).fixedImports;
+        var uri = resourceUri("/MissingImport.java");
+        var contents = contents("/MissingImport.java");
+        var qualifiedNames = compiler.compileFile(uri, contents).fixImports().fixedImports;
         assertThat(qualifiedNames, hasItem("java.util.List"));
     }
 
     @Test
     public void matchesPartialName() {
-        assertTrue(JavaCompilerService.matchesPartialName("foobar", "foo"));
-        assertFalse(JavaCompilerService.matchesPartialName("foo", "foobar"));
+        assertTrue(CompileFocus.matchesPartialName("foobar", "foo"));
+        assertFalse(CompileFocus.matchesPartialName("foo", "foobar"));
     }
 }

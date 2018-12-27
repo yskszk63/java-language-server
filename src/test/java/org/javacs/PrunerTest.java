@@ -22,33 +22,30 @@ public class PrunerTest {
 
     @Test
     public void pruneMethods() {
-        var pruner = new Pruner(URI.create("/PruneMethods.java"), contents("/PruneMethods.java"));
-        pruner.prune(6, 19);
+        var actual = new Pruner(URI.create("/PruneMethods.java"), contents("/PruneMethods.java")).prune(6, 19);
         var expected = contents("/PruneMethods_erased.java");
-        assertThat(pruner.contents(), equalToIgnoringWhiteSpace(expected));
+        assertThat(actual, equalToIgnoringWhiteSpace(expected));
     }
 
     @Test
     public void pruneToEndOfBlock() {
-        var pruner = new Pruner(URI.create("/PruneToEndOfBlock.java"), contents("/PruneToEndOfBlock.java"));
-        pruner.prune(4, 18);
+        var actual =
+                new Pruner(URI.create("/PruneToEndOfBlock.java"), contents("/PruneToEndOfBlock.java")).prune(4, 18);
         var expected = contents("/PruneToEndOfBlock_erased.java");
-        assertThat(pruner.contents(), equalToIgnoringWhiteSpace(expected));
+        assertThat(actual, equalToIgnoringWhiteSpace(expected));
     }
 
     @Test
     public void pruneMiddle() {
-        var pruner = new Pruner(URI.create("/PruneMiddle.java"), contents("/PruneMiddle.java"));
-        pruner.prune(4, 12);
+        var actual = new Pruner(URI.create("/PruneMiddle.java"), contents("/PruneMiddle.java")).prune(4, 12);
         var expected = contents("/PruneMiddle_erased.java");
-        assertThat(pruner.contents(), equalToIgnoringWhiteSpace(expected));
+        assertThat(actual, equalToIgnoringWhiteSpace(expected));
     }
 
     @Test
     public void pruneDot() {
-        var pruner = new Pruner(URI.create("/PruneDot.java"), contents("/PruneDot.java"));
-        pruner.prune(3, 11);
+        var actual = new Pruner(URI.create("/PruneDot.java"), contents("/PruneDot.java")).prune(3, 11);
         var expected = contents("/PruneDot_erased.java");
-        assertThat(pruner.contents(), equalToIgnoringWhiteSpace(expected));
+        assertThat(actual, equalToIgnoringWhiteSpace(expected));
     }
 }

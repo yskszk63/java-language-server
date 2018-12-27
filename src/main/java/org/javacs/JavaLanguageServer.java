@@ -9,9 +9,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
 import org.eclipse.lsp4j.*;
@@ -82,13 +82,14 @@ class JavaLanguageServer implements LanguageServer {
     }
 
     void lint(Collection<URI> uris) {
-        var paths =
-                uris.stream()
-                        .filter(uri -> uri.getScheme().equals("file"))
-                        .map(uri -> Paths.get(uri))
-                        .collect(Collectors.toList());
-        LOG.info("Lint " + paths.stream().map(p -> p.getFileName().toString()).collect(Collectors.joining(", ")));
-        publishDiagnostics(uris, compiler.lint(paths));
+        var message = new StringJoiner(", ");
+        for (var uri : uris) {
+            var path = uri.getPath();
+            var name = Paths.get(path).getFileName();
+            message.add(name.toString());
+        }
+        LOG.info("Lint " + message);
+        publishDiagnostics(uris, compiler.compileBatch(uris).lint());
     }
 
     private JavaCompilerService createCompiler() {

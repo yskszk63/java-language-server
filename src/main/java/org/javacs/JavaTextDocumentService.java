@@ -5,7 +5,6 @@ import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.doctree.DocTree;
 import com.sun.source.doctree.ParamTree;
 import com.sun.source.tree.MethodTree;
-import com.sun.source.util.TreePath;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
@@ -79,10 +78,50 @@ class JavaTextDocumentService implements TextDocumentService {
         var content = contents(uri).content;
         var line = position.getPosition().getLine() + 1;
         var column = position.getPosition().getCharacter() + 1;
-        var result = new ArrayList<CompletionItem>();
         lastCompletions.clear();
-        var completions = server.compiler.completions(uri, content, line, column);
-        for (var c : completions.items) {
+        var maybeCtx = server.compiler.parseFile(uri, content).completionPosition(line, column);
+        if (!maybeCtx.isPresent()) {
+            var items = new ArrayList<CompletionItem>();
+            for (var name : CompileFocus.TOP_LEVEL_KEYWORDS) {
+                var i = new CompletionItem();
+                i.setLabel(name);
+                i.setKind(CompletionItemKind.Keyword);
+                i.setDetail("keyword");
+                items.add(i);
+            }
+            var list = new CompletionList(true, items);
+            return CompletableFuture.completedFuture(Either.forRight(list));
+        }
+        var ctx = maybeCtx.get();
+        var focus = server.compiler.compileFocus(uri, content, ctx.line, ctx.character);
+        List<Completion> cs;
+        boolean isIncomplete;
+        switch (ctx.kind) {
+            case MemberSelect:
+                cs = focus.completeMembers(false);
+                isIncomplete = false;
+                break;
+            case MemberReference:
+                cs = focus.completeMembers(true);
+                isIncomplete = false;
+                break;
+            case Identifier:
+                cs = focus.completeIdentifiers(ctx.inClass, ctx.inMethod, ctx.partialName);
+                isIncomplete = cs.size() >= CompileFocus.MAX_COMPLETION_ITEMS;
+                break;
+            case Annotation:
+                cs = focus.completeAnnotations(ctx.partialName);
+                isIncomplete = cs.size() >= CompileFocus.MAX_COMPLETION_ITEMS;
+                break;
+            case Case:
+                cs = focus.completeCases();
+                isIncomplete = false;
+                break;
+            default:
+                throw new RuntimeException("Unexpected completion context " + ctx.kind);
+        }
+        var result = new ArrayList<CompletionItem>();
+        for (var c : cs) {
             var i = new CompletionItem();
             var id = UUID.randomUUID().toString();
             i.setData(id);
@@ -119,7 +158,7 @@ class JavaTextDocumentService implements TextDocumentService {
 
             result.add(i);
         }
-        return CompletableFuture.completedFuture(Either.forRight(new CompletionList(completions.isIncomplete, result)));
+        return CompletableFuture.completedFuture(Either.forRight(new CompletionList(isIncomplete, result)));
     }
 
     private String resolveDocDetail(MethodTree doc) {
@@ -173,16 +212,16 @@ class JavaTextDocumentService implements TextDocumentService {
         if (cached.element != null) {
             if (cached.element instanceof ExecutableElement) {
                 var method = (ExecutableElement) cached.element;
-                var tree = server.compiler.methodTree(method);
+                var tree = server.compiler.docs().methodTree(method);
                 var detail = tree.map(this::resolveDocDetail).orElse(resolveDefaultDetail(method));
                 unresolved.setDetail(detail);
 
-                var doc = server.compiler.methodDoc(method);
+                var doc = server.compiler.docs().methodDoc(method);
                 var markdown = doc.map(this::asMarkupContent);
                 markdown.ifPresent(unresolved::setDocumentation);
             } else if (cached.element instanceof TypeElement) {
                 var type = (TypeElement) cached.element;
-                var doc = server.compiler.classDoc(type);
+                var doc = server.compiler.docs().classDoc(type);
                 var markdown = doc.map(this::asMarkupContent);
                 markdown.ifPresent(unresolved::setDocumentation);
             } else {
@@ -190,7 +229,7 @@ class JavaTextDocumentService implements TextDocumentService {
             }
             // TODO constructors, fields
         } else if (cached.className != null) {
-            var doc = server.compiler.classDoc(cached.className.name);
+            var doc = server.compiler.docs().classDoc(cached.className.name);
             var markdown = doc.map(this::asMarkupContent);
             markdown.ifPresent(unresolved::setDocumentation);
         }
@@ -252,10 +291,10 @@ class JavaTextDocumentService implements TextDocumentService {
     private Optional<String> hoverDocs(Element e) {
         if (e instanceof ExecutableElement) {
             var m = (ExecutableElement) e;
-            return server.compiler.methodDoc(m).map(this::asMarkdown);
+            return server.compiler.docs().methodDoc(m).map(this::asMarkdown);
         } else if (e instanceof TypeElement) {
             var t = (TypeElement) e;
-            return server.compiler.classDoc(t).map(this::asMarkdown);
+            return server.compiler.docs().classDoc(t).map(this::asMarkdown);
         } else return Optional.empty();
     }
 
@@ -265,7 +304,7 @@ class JavaTextDocumentService implements TextDocumentService {
         var content = contents(uri).content;
         var line = position.getPosition().getLine() + 1;
         var column = position.getPosition().getCharacter() + 1;
-        var e = server.compiler.element(uri, content, line, column);
+        var e = server.compiler.compileFocus(uri, content, line, column).element();
         if (e != null) {
             List<Either<String, MarkedString>> result = new ArrayList<>();
             result.add(Either.forRight(new MarkedString("java.hover", hoverCode(e))));
@@ -309,8 +348,8 @@ class JavaTextDocumentService implements TextDocumentService {
     private SignatureInformation asSignatureInformation(ExecutableElement e) {
         var i = new SignatureInformation();
         var ps = signatureParamsFromMethod(e);
-        var doc = server.compiler.methodDoc(e);
-        var tree = server.compiler.methodTree(e);
+        var doc = server.compiler.docs().methodDoc(e);
+        var tree = server.compiler.docs().methodTree(e);
         if (doc.isPresent() && tree.isPresent()) ps = signatureParamsFromDocs(tree.get(), doc.get());
         var args = ps.stream().map(p -> p.getLabel()).collect(Collectors.joining(", "));
         var name = e.getSimpleName().toString();
@@ -338,7 +377,8 @@ class JavaTextDocumentService implements TextDocumentService {
         var column = position.getPosition().getCharacter() + 1;
         var help =
                 server.compiler
-                        .methodInvocation(uri, content, line, column)
+                        .compileFocus(uri, content, line, column)
+                        .methodInvocation()
                         .map(this::asSignatureHelp)
                         .orElse(new SignatureHelp());
         return CompletableFuture.completedFuture(help);
@@ -346,14 +386,23 @@ class JavaTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<List<? extends Location>> definition(TextDocumentPositionParams position) {
-        var uri = URI.create(position.getTextDocument().getUri());
-        var line = position.getPosition().getLine() + 1;
-        var column = position.getPosition().getCharacter() + 1;
-        Function<URI, String> findContent = f -> contents(f).content;
-        var def = server.compiler.definition(uri, line, column, findContent);
-        if (!def.isPresent()) return CompletableFuture.completedFuture(List.of());
-        var loc = asLocation(def.get());
-        return CompletableFuture.completedFuture(List.of(loc));
+        var fromUri = URI.create(position.getTextDocument().getUri());
+        var fromLine = position.getPosition().getLine() + 1;
+        var fromColumn = position.getPosition().getCharacter() + 1;
+        var fromContent = contents(fromUri).content;
+        var toPath = server.compiler.compileFocus(fromUri, fromContent, fromLine, fromColumn).definition();
+        if (!toPath.isPresent()) return CompletableFuture.completedFuture(List.of());
+        // Figure out what file definition is in
+        var toUri = toPath.get().getCompilationUnit().getSourceFile().toUri();
+        // Parse that file
+        var toContent = contents(toUri).content;
+        var parse = server.compiler.parseFile(toUri, toContent);
+        // Figure out where in the file the definition is
+        // NOTE: toPath is from a different compilation than parse, but this seems to work
+        var toRange = parse.range(toPath.get());
+        if (!toRange.isPresent()) return CompletableFuture.completedFuture(List.of());
+        var to = new Location(toUri.toString(), toRange.get());
+        return CompletableFuture.completedFuture(List.of(to));
     }
 
     class ReportProgress implements ReportReferencesProgress, AutoCloseable {
@@ -400,22 +449,23 @@ class JavaTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<List<? extends Location>> references(ReferenceParams position) {
-        var uri = URI.create(position.getTextDocument().getUri());
-        var content = contents(uri).content;
-        var line = position.getPosition().getLine() + 1;
-        var column = position.getPosition().getCharacter() + 1;
+        var toUri = URI.create(position.getTextDocument().getUri());
+        var toContent = contents(toUri).content;
+        var toLine = position.getPosition().getLine() + 1;
+        var toColumn = position.getPosition().getCharacter() + 1;
+        var toEl = server.compiler.compileFocus(toUri, toContent, toLine, toColumn).element();
+        var fromFiles = server.compiler.potentialReferences(toEl);
+        var batch = server.compiler.compileBatch(fromFiles);
+        var fromTreePaths = batch.references(toEl);
         var result = new ArrayList<Location>();
-        var fileName = Paths.get(uri).getFileName();
-        var startMessage = String.format("%s:%d", fileName, line);
-        Function<Integer, String> scanMessage =
-                nFiles -> String.format("Scan %,d files for potential references", nFiles);
-        Function<Integer, String> checkMessage = nPotential -> String.format("Check %,d files", nPotential);
-        try (var progress = new ReportProgress(startMessage, scanMessage, checkMessage)) {
-            for (var r : server.compiler.references(uri, content, line, column, progress)) {
-                result.add(asLocation(r));
-            }
-            return CompletableFuture.completedFuture(result);
+        for (var path : fromTreePaths) {
+            var fromUri = path.getCompilationUnit().getSourceFile().toUri();
+            var fromRange = batch.range(path);
+            if (!fromRange.isPresent()) continue;
+            var from = new Location(fromUri.toString(), fromRange.get());
+            result.add(from);
         }
+        return CompletableFuture.completedFuture(result);
     }
 
     @Override
@@ -442,93 +492,55 @@ class JavaTextDocumentService implements TextDocumentService {
         return null;
     }
 
-    private List<CodeLens> testMethods(URI uri) {
-        var content = contents(uri).content;
-        var tests = server.compiler.testMethods(uri, content);
-        var result = new ArrayList<CodeLens>();
-        for (var test : tests) {
-            var maybePos = server.compiler.position(uri, content, test);
-            if (!maybePos.isPresent()) {
-                LOG.warning(String.format("No position for %s", test));
-                continue;
-            }
-            var pos = maybePos.get();
-            var range = asRange(pos);
-            var message = pos.memberName.isPresent() ? "Run Test" : "Run All Tests";
-            var command =
-                    new Command(
-                            message,
-                            "java.command.test.run",
-                            Arrays.asList(uri, pos.className.orElse(null), pos.memberName.orElse(null)));
-            var lens = new CodeLens(range, command, null);
-            result.add(lens);
-        }
-        // TODO run all tests in file
-        // TODO run all tests in package
-        return result;
-    }
-
-    private List<CodeLens> allReferences(URI uri) {
-        var content = contents(uri).content;
-        var fileName = Paths.get(uri).getFileName();
-        var startMessage = String.format("%s", fileName);
-        Function<Integer, String> scanMessage = nFiles -> String.format("Scan %,d files for imports", nFiles);
-        Function<Integer, String> checkMessage = nPotential -> String.format("Index %,d files", nPotential);
-        try (var progress = new ReportProgress(startMessage, scanMessage, checkMessage)) {
-            // Organize by method
-            var refs = server.compiler.referencesFile(uri, content, progress);
-            var byId = new HashMap<String, List<TreePath>>();
-            for (var r : refs) {
-                byId.computeIfAbsent(r.toEl, __ -> new ArrayList<>()).add(r);
-            }
-            // Convert into CodeLens messages
-            var result = new ArrayList<CodeLens>();
-            for (var kv : byId.entrySet()) {
-                // Figure out command
-                var id = kv.getKey();
-                var rs = kv.getValue();
-                // Figure out where to place command
-                var r = rs.get(0);
-                var pos = server.compiler.position(uri, content, r.toEl);
-                if (!pos.isPresent()) {
-                    LOG.warning(String.format("No position for %s", r.toEl));
-                    continue;
-                }
-                var range = asRange(pos.get());
-                String message;
-                if (rs.isEmpty()) message = "0 references";
-                else if (rs.size() == 1) message = "1 reference";
-                else message = String.format("%d references", rs.size());
-                var command =
-                        new Command(
-                                message,
-                                "java.command.findReferences",
-                                List.of(uri, range.getStart().getLine(), range.getStart().getCharacter()));
-                var lens = new CodeLens(range, command, null);
-                result.add(lens);
-            }
-            return result;
-        }
-    }
-
     @Override
     public CompletableFuture<List<? extends CodeLens>> codeLens(CodeLensParams params) {
         // TODO just create a blank code lens on every method, then resolve it async
         var uri = URI.create(params.getTextDocument().getUri());
+        var content = contents(uri).content;
+        var parse = server.compiler.parseFile(uri, content);
+        var declarations = parse.declarations();
         var result = new ArrayList<CodeLens>();
-        result.addAll(testMethods(uri));
-        result.addAll(allReferences(uri));
+        for (var d : declarations) {
+            var range = parse.range(d);
+            if (!range.isPresent()) continue;
+            var className = JavaCompilerService.className(d);
+            var memberName = JavaCompilerService.memberName(d);
+            // If method or field, add an unresolved "_ references" code lens
+            if (memberName.isPresent()) {
+                var start = range.get().getStart();
+                var line = start.getLine();
+                var character = start.getCharacter();
+                var command = new Command("_ references", "java.command.findReferences", List.of(uri, line, character));
+                var lens = new CodeLens(range.get(), command, null);
+                result.add(lens);
+            }
+            // If test class or method, add "Run Test" code lens
+            if (parse.isTestClass(d)) {
+                var command =
+                        new Command("Run All Tests", "java.command.test.run", Arrays.asList(uri, className, null));
+                var lens = new CodeLens(range.get(), command, null);
+                result.add(lens);
+                // TODO run all tests in file
+                // TODO run all tests in package
+            } else if (parse.isTestMethod(d)) {
+                var command =
+                        new Command("Run Test", "java.command.test.run", Arrays.asList(uri, className, memberName));
+                var lens = new CodeLens(range.get(), command, null);
+                result.add(lens);
+            }
+        }
         return CompletableFuture.completedFuture(result);
     }
 
     @Override
     public CompletableFuture<CodeLens> resolveCodeLens(CodeLens unresolved) {
+        // TODO resolve java.command.findReferences
         return null;
     }
 
     private List<TextEdit> fixImports(URI java) {
         var contents = server.textDocuments.contents(java).content;
-        var fix = server.compiler.fixImports(java, contents);
+        var fix = server.compiler.compileFile(java, contents).fixImports();
         // TODO if imports already match fixed-imports, return empty list
         // TODO preserve comments and other details of existing imports
         var edits = new ArrayList<TextEdit>();

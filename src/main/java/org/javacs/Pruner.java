@@ -15,6 +15,7 @@ class Pruner {
     private final CompilationUnitTree root;
     private final StringBuilder contents;
 
+    // TODO this should really just be a static function
     Pruner(URI file, String contents) {
         this.task = Parser.parseTask(new StringFileObject(contents, file));
         try {
@@ -25,7 +26,7 @@ class Pruner {
         this.contents = new StringBuilder(contents);
     }
 
-    void prune(int line, int character) {
+    String prune(int line, int character) {
         var sourcePositions = Trees.instance(task).getSourcePositions();
         var lines = root.getLineMap();
         var cursor = lines.getPosition(line, character);
@@ -97,9 +98,7 @@ class Pruner {
         }
 
         new Scan().scan(root, null);
-    }
 
-    String contents() {
         return contents.toString();
     }
 }
