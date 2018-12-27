@@ -10,8 +10,6 @@
 - Crashes when you create the first file in a new maven project
 - Deleted files remain in compiler, even when you restart (via classpath?)
 - Always shows last javadoc
-- @Test is not autocompleting
-- new Test is not autocompleting
 
 ## Autocomplete
 - Annotation fields

@@ -10,6 +10,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -80,7 +81,8 @@ class JavaTextDocumentService implements TextDocumentService {
         var line = position.getPosition().getLine() + 1;
         var column = position.getPosition().getCharacter() + 1;
         lastCompletions.clear();
-        var maybeCtx = server.compiler.parseFile(uri, content).completionPosition(line, column);
+        // Figure out what kind of completion we want to do
+        var maybeCtx = server.compiler.parseFile(uri, content).completionContext(line, column);
         if (!maybeCtx.isPresent()) {
             var items = new ArrayList<CompletionItem>();
             for (var name : CompileFocus.TOP_LEVEL_KEYWORDS) {
@@ -93,8 +95,10 @@ class JavaTextDocumentService implements TextDocumentService {
             var list = new CompletionList(true, items);
             return CompletableFuture.completedFuture(Either.forRight(list));
         }
+        // Compile again, focusing on a region that depends on what type of completion we want to do
         var ctx = maybeCtx.get();
         var focus = server.compiler.compileFocus(uri, content, ctx.line, ctx.character);
+        // Do a specific type of completion
         List<Completion> cs;
         boolean isIncomplete;
         switch (ctx.kind) {
@@ -121,6 +125,7 @@ class JavaTextDocumentService implements TextDocumentService {
             default:
                 throw new RuntimeException("Unexpected completion context " + ctx.kind);
         }
+        // Convert to CompletionItem
         var result = new ArrayList<CompletionItem>();
         for (var c : cs) {
             var i = new CompletionItem();

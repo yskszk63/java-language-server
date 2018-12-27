@@ -132,7 +132,8 @@ public class CompileFocus {
     }
 
     public List<Completion> completeIdentifiers(boolean insideClass, boolean insideMethod, String partialName) {
-        LOG.info("...completing identifiers");
+        LOG.info(String.format("Completing identifiers starting with `%s`...", partialName));
+
         var result = new ArrayList<Completion>();
 
         // Add snippets
@@ -581,7 +582,7 @@ public class CompileFocus {
                         if (isThisOrSuper(e)) {
                             unwrapThisSuper((VariableElement) e);
                         }
-                        if (result.size() >= MAX_COMPLETION_ITEMS) return;
+                        if (tooManyItems(result.size())) return;
                     }
                 } catch (Exception e) {
                     LOG.log(Level.WARNING, "error walking locals in scope", e);
@@ -621,7 +622,7 @@ public class CompileFocus {
                     walkLocals(s);
                     profileEnd(s);
                     // Return early?
-                    if (result.size() >= MAX_COMPLETION_ITEMS) {
+                    if (tooManyItems(result.size())) {
                         printProfile();
                         return result;
                     }
@@ -632,6 +633,12 @@ public class CompileFocus {
             }
         }
         return new Walk().walkScopes();
+    }
+
+    private boolean tooManyItems(int count) {
+        var test = count >= MAX_COMPLETION_ITEMS;
+        if (test) LOG.warning(String.format("...# of items %d reached max %s", count, MAX_COMPLETION_ITEMS));
+        return test;
     }
 
     private Set<String> subPackages(String parentPackage) {
@@ -661,16 +668,22 @@ public class CompileFocus {
     }
 
     private void completeScopeIdentifiers(String partialName, List<Completion> result) {
-        var startsWithUpperCase = partialName.length() > 0 && Character.isUpperCase(partialName.charAt(0));
         // Add locals
-        for (var m : scopeMembers(partialName)) {
+        var locals = scopeMembers(partialName);
+        for (var m : locals) {
             result.add(Completion.ofElement(m));
         }
+        LOG.info(String.format("...found %d locals", locals.size()));
+
         // Add static imports
-        for (var m : staticImports(file, contents, partialName)) {
+        var staticImports = staticImports(file, contents, partialName);
+        for (var m : staticImports) {
             result.add(Completion.ofElement(m));
         }
+        LOG.info(String.format("...found %d static imports", staticImports.size()));
+
         // Add classes
+        var startsWithUpperCase = partialName.length() > 0 && Character.isUpperCase(partialName.charAt(0));
         if (startsWithUpperCase) {
             var packageName = Objects.toString(root.getPackageName(), "");
             Predicate<String> matchesPartialName =
@@ -678,18 +691,27 @@ public class CompileFocus {
                         var className = Parser.lastName(qualifiedName);
                         return matchesPartialName(className, partialName);
                     };
+
+            // Check JDK
+            LOG.info("...checking JDK");
             for (var c : parent.jdkClasses.classes()) {
-                if (result.size() >= MAX_COMPLETION_ITEMS) return;
+                if (tooManyItems(result.size())) return;
                 if (matchesPartialName.test(c) && parent.jdkClasses.isAccessibleFromPackage(c, packageName)) {
                     result.add(Completion.ofClassName(c, isImported(c)));
                 }
             }
+
+            // Check classpath
+            LOG.info("...checking classpath");
             for (var c : parent.classPathClasses.classes()) {
-                if (result.size() >= MAX_COMPLETION_ITEMS) return;
+                if (tooManyItems(result.size())) return;
                 if (matchesPartialName.test(c) && parent.classPathClasses.isAccessibleFromPackage(c, packageName)) {
                     result.add(Completion.ofClassName(c, isImported(c)));
                 }
             }
+
+            // Check sourcepath
+            LOG.info("...checking source path");
             Predicate<Path> matchesFileName = file -> matchesPartialName(file.getFileName().toString(), partialName);
             Predicate<Path> isPublic =
                     file -> {
@@ -712,7 +734,7 @@ public class CompileFocus {
                             return relative.substring(0, relative.length() - ".java".length());
                         };
                 for (var file : JavaCompilerService.javaSourcesInDir(dir)) {
-                    if (result.size() >= MAX_COMPLETION_ITEMS) return;
+                    if (tooManyItems(result.size())) return;
                     // Fast check, file name only
                     if (matchesFileName.test(file)) {
                         var c = qualifiedName.apply(file);
@@ -735,12 +757,19 @@ public class CompileFocus {
             var el = (TypeElement) trees.getElement(path);
             if (id.getIdentifier().contentEquals("*")) {
                 for (var member : el.getEnclosedElements()) {
-                    if (member.getModifiers().contains(Modifier.STATIC)) result.add(member);
+                    if (matchesPartialName(member.getSimpleName(), partialName)
+                            && member.getModifiers().contains(Modifier.STATIC)) {
+                        result.add(member);
+                        if (tooManyItems(result.size())) return result;
+                    }
                 }
             } else {
                 for (var member : el.getEnclosedElements()) {
                     if (matchesPartialName(member.getSimpleName(), partialName)
-                            && member.getModifiers().contains(Modifier.STATIC)) result.add(member);
+                            && member.getModifiers().contains(Modifier.STATIC)) {
+                        result.add(member);
+                        if (tooManyItems(result.size())) return result;
+                    }
                 }
             }
         }

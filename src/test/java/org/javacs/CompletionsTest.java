@@ -452,6 +452,11 @@ public class CompletionsTest extends CompletionsBase {
         suggestions = insertText(file, 6, 13);
 
         assertThat(suggestions, hasItems("SomeInnerClass"));
+
+        // List?
+        suggestions = insertText(file, 7, 12);
+
+        assertThat(suggestions, hasItems("List"));
     }
 
     @Test

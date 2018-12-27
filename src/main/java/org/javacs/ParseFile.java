@@ -89,8 +89,9 @@ public class ParseFile {
     }
 
     // TODO maybe this should return TreePath?
-    public Optional<CompletionContext> completionPosition(int line, int character) {
+    public Optional<CompletionContext> completionContext(int line, int character) {
         LOG.info(String.format("Finding completion position near %s(%d,%d)...", file, line, character));
+        
         var pos = trees.getSourcePositions();
         var lines = root.getLineMap();
         var cursor = lines.getPosition(line, character);

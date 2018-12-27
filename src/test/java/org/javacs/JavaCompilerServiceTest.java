@@ -128,7 +128,7 @@ public class JavaCompilerServiceTest {
     public void completeIdentifiers() {
         var uri = resourceUri("/CompleteIdentifiers.java");
         var contents = contents("/CompleteIdentifiers.java");
-        var ctx = compiler.parseFile(uri, contents).completionPosition(13, 21).get();
+        var ctx = compiler.parseFile(uri, contents).completionContext(13, 21).get();
         var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
         var found = focus.completeIdentifiers(ctx.inClass, ctx.inMethod, ctx.partialName);
         var names = completionNames(found);
@@ -159,7 +159,7 @@ public class JavaCompilerServiceTest {
     public void completeMembers() {
         var uri = resourceUri("/CompleteMembers.java");
         var contents = contents("/CompleteMembers.java");
-        var ctx = compiler.parseFile(uri, contents).completionPosition(3, 15).get();
+        var ctx = compiler.parseFile(uri, contents).completionContext(3, 15).get();
         var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
         var found = focus.completeMembers(false);
         var names = completionNames(found);
@@ -172,7 +172,7 @@ public class JavaCompilerServiceTest {
     public void completeExpression() {
         var uri = resourceUri("/CompleteExpression.java");
         var contents = contents("/CompleteExpression.java");
-        var ctx = compiler.parseFile(uri, contents).completionPosition(3, 37).get();
+        var ctx = compiler.parseFile(uri, contents).completionContext(3, 37).get();
         var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
         var found = focus.completeMembers(false);
         var names = completionNames(found);
@@ -185,7 +185,7 @@ public class JavaCompilerServiceTest {
     public void completeClass() {
         var uri = resourceUri("/CompleteClass.java");
         var contents = contents("/CompleteClass.java");
-        var ctx = compiler.parseFile(uri, contents).completionPosition(3, 23).get();
+        var ctx = compiler.parseFile(uri, contents).completionContext(3, 23).get();
         var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
         var found = focus.completeMembers(false);
         var names = completionNames(found);
@@ -199,7 +199,7 @@ public class JavaCompilerServiceTest {
     public void completeImports() {
         var uri = resourceUri("/CompleteImports.java");
         var contents = contents("/CompleteImports.java");
-        var ctx = compiler.parseFile(uri, contents).completionPosition(1, 18).get();
+        var ctx = compiler.parseFile(uri, contents).completionContext(1, 18).get();
         var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
         var found = focus.completeMembers(false);
         var names = completionNames(found);
