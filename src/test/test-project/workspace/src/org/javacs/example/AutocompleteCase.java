@@ -2,11 +2,13 @@ package org.javacs.example;
 
 class AutocompleteCase {
     void test() {
-        var e = MyEnum.Foo;
-
-        switch (e) {
+        switch (myEnum()) {
             case 
         }
+    }
+
+    MyEnum myEnum() {
+        return MyEnum.Foo;
     }
 
     enum MyEnum {

@@ -13,8 +13,8 @@ import org.eclipse.lsp4j.Range;
 
 public class CompileFile {
     private final JavaCompilerService parent;
-    private final URI file;
-    private final String contents;
+    final URI file;
+    final String contents;
     private final JavacTask task;
     private final Trees trees;
     private final CompilationUnitTree root;
@@ -37,6 +37,12 @@ public class CompileFile {
             throw new RuntimeException(e);
         }
         profiler.print();
+    }
+
+    public Optional<Element> element(int line, int character) {
+        var path = CompileFocus.findPath(task, root, line, character);
+        var el = trees.getElement(path);
+        return Optional.ofNullable(el);
     }
 
     public Optional<TreePath> find(Ptr target) {

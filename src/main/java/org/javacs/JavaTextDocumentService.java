@@ -10,7 +10,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -254,6 +253,9 @@ class JavaTextDocumentService implements TextDocumentService {
             case CLASS:
                 result.append("class");
                 break;
+            case ENUM:
+                result.append("enum");
+                break;
             default:
                 LOG.warning("Don't know what to call type element " + t);
                 result.append("???");
@@ -304,19 +306,39 @@ class JavaTextDocumentService implements TextDocumentService {
         } else return Optional.empty();
     }
 
+    private CompileFile hoverCache;
+
+    private void updateHoverCache(URI uri, String contents) {
+        if (hoverCache == null || !hoverCache.file.equals(uri) || !hoverCache.contents.equals(contents)) {
+            LOG.info("File has changed since last hover, recompiling");
+            hoverCache = server.compiler.compileFile(uri, contents);
+        }
+    }
+
     @Override
     public CompletableFuture<Hover> hover(TextDocumentPositionParams position) {
+        // Compile entire file if it's changed since last hover
         var uri = URI.create(position.getTextDocument().getUri());
         var content = contents(uri).content;
+        updateHoverCache(uri, content);
+
+        // Find element undeer cursor
         var line = position.getPosition().getLine() + 1;
         var column = position.getPosition().getCharacter() + 1;
-        var e = server.compiler.compileFocus(uri, content, line, column).element();
-        if (e != null) {
-            List<Either<String, MarkedString>> result = new ArrayList<>();
-            result.add(Either.forRight(new MarkedString("java.hover", hoverCode(e))));
-            hoverDocs(e).ifPresent(doc -> result.add(Either.forLeft(doc)));
-            return CompletableFuture.completedFuture(new Hover(result));
-        } else return CompletableFuture.completedFuture(new Hover(Collections.emptyList()));
+        var el = hoverCache.element(line, column);
+        if (el.isEmpty()) return CompletableFuture.completedFuture(new Hover(Collections.emptyList()));
+
+        // Add code hover message
+        var result = new ArrayList<Either<String, MarkedString>>();
+        var code = hoverCode(el.get());
+        result.add(Either.forRight(new MarkedString("java.hover", code)));
+        // Add docs hover message
+        var docs = hoverDocs(el.get());
+        if (docs.isPresent()) {
+            result.add(Either.forLeft(docs.get()));
+        }
+
+        return CompletableFuture.completedFuture(new Hover(result));
     }
 
     private List<ParameterInformation> signatureParamsFromDocs(MethodTree method, DocCommentTree doc) {

@@ -54,7 +54,7 @@ public class CompileFocus {
             throw new RuntimeException(e);
         }
         profiler.print();
-        this.path = findPath();
+        this.path = findPath(task, root, line, character);
     }
 
     /** Create a task that compiles a single file */
@@ -200,17 +200,21 @@ public class CompileFocus {
 
     /** Find all case options in the switch expression surrounding line:character */
     public List<Completion> completeCases() {
-        // Find path to case
-        var types = task.getTypes();
+        LOG.info(String.format("Complete enum constants following `%s`...", path.getLeaf()));
+
         // Find surrounding switch
         var path = this.path;
         while (!(path.getLeaf() instanceof SwitchTree)) path = path.getParentPath();
         var leaf = (SwitchTree) path.getLeaf();
         path = new TreePath(path, leaf.getExpression());
+        LOG.info(String.format("...found switch expression `%s`", leaf.getExpression()));
+
         // Get members of switched type
-        var element = trees.getElement(path);
-        var type = element.asType();
+        var type = trees.getTypeMirror(path);
+        LOG.info(String.format("...switched expression has type `%s`", type));
+        var types = task.getTypes();
         var definition = types.asElement(type);
+        LOG.info(String.format("...switched expression has definition `%s`", definition));
         var result = new ArrayList<Completion>();
         for (var member : definition.getEnclosedElements()) {
             if (member.getKind() == ElementKind.ENUM_CONSTANT) result.add(Completion.ofElement(member));
@@ -833,7 +837,8 @@ public class CompileFocus {
     }
 
     /** Find the smallest tree that includes the cursor */
-    private TreePath findPath() {
+    static TreePath findPath(JavacTask task, CompilationUnitTree root, int line, int character) {
+        var trees = Trees.instance(task);
         var pos = trees.getSourcePositions();
         var cursor = root.getLineMap().getPosition(line, character);
 
@@ -868,7 +873,8 @@ public class CompileFocus {
         var find = new FindSmallest();
         find.scan(root, null);
         if (find.found == null) {
-            var message = String.format("No TreePath to %s %d:%d", file, line, character);
+            var uri = root.getSourceFile().toUri();
+            var message = String.format("No TreePath to %s %d:%d", uri, line, character);
             throw new RuntimeException(message);
         }
         return find.found;
