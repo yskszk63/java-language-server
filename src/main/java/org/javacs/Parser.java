@@ -1,15 +1,8 @@
 package org.javacs;
 
 import com.google.common.base.Joiner;
-import com.sun.source.tree.ClassTree;
-import com.sun.source.tree.CompilationUnitTree;
-import com.sun.source.tree.MethodTree;
-import com.sun.source.tree.Tree;
-import com.sun.source.tree.VariableTree;
-import com.sun.source.util.JavacTask;
-import com.sun.source.util.TreePath;
-import com.sun.source.util.TreePathScanner;
-import com.sun.source.util.Trees;
+import com.sun.source.tree.*;
+import com.sun.source.util.*;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -23,9 +16,7 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import javax.tools.JavaCompiler;
-import javax.tools.JavaFileObject;
-import javax.tools.StandardJavaFileManager;
+import javax.tools.*;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
@@ -47,7 +38,7 @@ class Parser {
                 compiler.getTask(
                         null,
                         fileManager,
-                        err -> LOG.warning(err.getMessage(Locale.getDefault())),
+                        Parser::onError,
                         Collections.emptyList(),
                         null,
                         Collections.singletonList(file));
@@ -102,6 +93,11 @@ class Parser {
             }
         }
         return true;
+    }
+
+    private static void onError(Diagnostic<? extends JavaFileObject> err) {
+        // Too noisy, this only comes up in parse tasks which tend to be less important
+        // LOG.warning(err.getMessage(Locale.getDefault()));
     }
 
     private static final Pattern WORD = Pattern.compile("\\b\\w+\\b");
