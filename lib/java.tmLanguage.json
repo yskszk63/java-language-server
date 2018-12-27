@@ -723,7 +723,7 @@
 				},
 				{
 					"match": "\\?",
-					"name": "keyword.other.q"
+					"name": "constant.numeric"
 				}
 			]
 		},
@@ -864,6 +864,14 @@
 						}
 					},
 					"patterns": [
+						{
+							"match": "\\?",
+							"name": "constant.numeric"
+						},
+						{
+							"match": "extends|super|,",
+							"name": "keyword.other"
+						},
 						{
 							"match": "\\b\\w+\\b",
 							"name": "storage.type.java"
