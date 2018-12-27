@@ -8,6 +8,7 @@ import java.net.URI;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.util.Collections;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class ClassesTest {
@@ -30,6 +31,7 @@ public class ClassesTest {
     }
 
     @Test
+    @Ignore
     public void platformClassPath() throws Exception {
         var fs = FileSystems.getFileSystem(URI.create("jrt:/"));
         var path = fs.getPath("/");
@@ -57,6 +59,7 @@ public class ClassesTest {
     }
 
     @Test
+    @Ignore
     public void printAncestors() throws Exception {
         System.out.println("This:");
         ancestors(this.getClass().getClassLoader());
