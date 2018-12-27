@@ -15,8 +15,10 @@ import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 
-// TODO Ptr is really dangerous because it doesn't uniquely identify overloaded methods or constructors
-/** Ptr is a serialized TreePath, suitable for storing in Index and remember across compiler invocations */
+/**
+ * Ptr is a reference to a named element, that can be serialized into a String. Ptr considers all overloads to be the
+ * same element.
+ */
 public class Ptr {
     private final String path;
 

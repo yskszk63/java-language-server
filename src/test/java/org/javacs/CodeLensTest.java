@@ -77,6 +77,6 @@ public class CodeLensTest {
         assertThat(lenses, not(empty()));
 
         var titles = titles(lenses);
-        assertThat(titles, hasItem(containsString("1 references")));
+        assertThat(titles, hasItem("2 references"));
     }
 }
