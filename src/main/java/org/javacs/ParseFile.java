@@ -257,9 +257,6 @@ public class ParseFile {
     }
 
     static Optional<Range> range(JavacTask task, String contents, TreePath path) {
-        var file = path.getCompilationUnit().getSourceFile().toUri();
-        LOG.info(String.format("Locate %s in %s...", new Ptr(path), file));
-        
         // Find start position
         var trees = Trees.instance(task);
         var pos = trees.getSourcePositions();
@@ -284,7 +281,6 @@ public class ParseFile {
             else searchFor = memberName.get();
             
             // Search text for searchFor
-            LOG.info(String.format("...refining position by looking for name `%s`", searchFor));
             start = contents.indexOf(searchFor, start);
             end = start + searchFor.length();
             if (start == -1)
@@ -296,7 +292,6 @@ public class ParseFile {
         var endCol = (int) lines.getColumnNumber(end);
         var range = new Range(new Position(startLine-1, startCol-1), new Position(endLine-1, endCol-1));
 
-        LOG.info(String.format("...final position %s(%d,%d)", file, startLine, startCol));
         return Optional.of(range);
     }
 
