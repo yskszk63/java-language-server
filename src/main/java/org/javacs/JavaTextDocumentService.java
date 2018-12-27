@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonPrimitive;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.doctree.DocTree;
@@ -510,8 +511,8 @@ class JavaTextDocumentService implements TextDocumentService {
                 var start = range.get().getStart();
                 var line = start.getLine();
                 var character = start.getCharacter();
-                var command = new Command("_ references", "java.command.findReferences", List.of(uri, line, character));
-                var lens = new CodeLens(range.get(), command, null);
+                List<Object> data = List.of("java.command.findReferences", uri, line, character, new Ptr(d).toString());
+                var lens = new CodeLens(range.get(), null, data);
                 result.add(lens);
             }
             // If test class or method, add "Run Test" code lens
@@ -532,10 +533,41 @@ class JavaTextDocumentService implements TextDocumentService {
         return CompletableFuture.completedFuture(result);
     }
 
+    private Map<Ptr, Integer> cacheCountReferences = Collections.emptyMap();
+    private URI cacheCountReferencesFile = URI.create("file:///NONE");
+
+    private void updateCacheCountReferences(URI current) {
+        if (cacheCountReferencesFile.equals(current)) return;
+        LOG.info(String.format("Update cached reference count to %s...", current));
+        var content = contents(current).content;
+        cacheCountReferences = server.compiler.countReferences(current, content);
+        cacheCountReferencesFile = current;
+    }
+
     @Override
     public CompletableFuture<CodeLens> resolveCodeLens(CodeLens unresolved) {
-        // TODO resolve java.command.findReferences
-        return null;
+        // Unpack data
+        var data = (JsonArray) unresolved.getData();
+        var command = data.get(0).getAsString();
+        assert command.equals("java.command.findReferences");
+        var uriString = data.get(1).getAsString();
+        var line = data.get(2).getAsInt();
+        var character = data.get(3).getAsInt();
+        var ptrString = data.get(4).getAsString();
+        // Parse data
+        var uri = URI.create(uriString);
+        var ptr = new Ptr(ptrString);
+        // Update cache if necessary
+        updateCacheCountReferences(uri);
+        // Read reference count from cache
+        var count = cacheCountReferences.getOrDefault(ptr, 0);
+        // Update command
+        String title;
+        if (count == 1) title = "1 reference";
+        else title = String.format("%d references", count);
+        unresolved.setCommand(new Command(title, command, List.of(uri, line, character)));
+
+        return CompletableFuture.completedFuture(unresolved);
     }
 
     private List<TextEdit> fixImports(URI java) {

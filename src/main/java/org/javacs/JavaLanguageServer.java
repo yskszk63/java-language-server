@@ -150,7 +150,7 @@ class JavaLanguageServer implements LanguageServer {
         c.setDocumentSymbolProvider(true);
         c.setSignatureHelpProvider(new SignatureHelpOptions(List.of("(", ",")));
         c.setDocumentFormattingProvider(true);
-        c.setCodeLensProvider(new CodeLensOptions(false));
+        c.setCodeLensProvider(new CodeLensOptions(true));
 
         result.setCapabilities(c);
 

@@ -19,6 +19,10 @@ import javax.lang.model.element.VariableElement;
 public class Ptr {
     private final String path;
 
+    public Ptr(String path) {
+        this.path = path;
+    }
+
     public Ptr(TreePath path) {
         var packageName = path.getCompilationUnit().getPackageName();
         var rev = new ArrayList<CharSequence>();

@@ -238,7 +238,9 @@ public class JavaCompilerService {
 
     public static Optional<String> memberName(TreePath t) {
         while (t != null) {
-            if (t.getLeaf() instanceof MethodTree) {
+            if (t.getLeaf() instanceof ClassTree) {
+                return Optional.empty();
+            } else if (t.getLeaf() instanceof MethodTree) {
                 var method = (MethodTree) t.getLeaf();
                 var name = method.getName().toString();
                 return Optional.of(name);
