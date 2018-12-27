@@ -69,14 +69,38 @@ public class ParseFile {
     public List<TreePath> declarations() {
         var found = new ArrayList<TreePath>();
         class FindDeclarations extends TreePathScanner<Void, Void> {
+            boolean isClass(Tree t) {
+                if (!(t instanceof ClassTree)) return false;
+                var cls = (ClassTree) t;
+                return cls.getKind() == Tree.Kind.CLASS;
+            }
+
             @Override 
-            public Void visitClass​(ClassTree node, Void __) {
+            public Void visitClass​(ClassTree t, Void __) {
+                found.add(getCurrentPath());
+                return super.visitClass(t, null);
+            }
+
+            @Override
+            public Void visitMethod(MethodTree t, Void __) {
                 var path = getCurrentPath();
-                found.add(path);
-                for (var m : node.getMembers()) {
-                    found.add(new TreePath(path, m));
+                var parent = path.getParentPath().getLeaf();
+                if (isClass(parent)) {
+                    found.add(path);
                 }
-                return super.visitClass(node, null);
+                // Skip code lenses for local classes
+                return null;
+            }
+
+            @Override
+            public Void visitVariable(VariableTree t, Void __) {
+                var path = getCurrentPath();
+                var parent = path.getParentPath().getLeaf();
+                if (isClass(parent)) {
+                    found.add(path);
+                }
+                // Skip code lenses for local classes
+                return null;
             }
         }
         new FindDeclarations().scan(root, null);
@@ -88,7 +112,6 @@ public class ParseFile {
         return range(task, contents, path);
     }
 
-    // TODO maybe this should return TreePath?
     public Optional<CompletionContext> completionContext(int line, int character) {
         LOG.info(String.format("Finding completion position near %s(%d,%d)...", file, line, character));
         

@@ -55,7 +55,9 @@ public class CodeLensTest {
     private List<String> titles(List<? extends CodeLens> lenses) {
         var titles = new ArrayList<String>();
         for (var lens : lenses) {
-            titles.add(lens.getCommand().getTitle());
+            var line = lens.getRange().getStart().getLine() + 1;
+            var title = lens.getCommand().getTitle();
+            titles.add(line + ":" + title);
         }
         return titles;
     }
@@ -77,6 +79,14 @@ public class CodeLensTest {
         assertThat(lenses, not(empty()));
 
         var titles = titles(lenses);
-        assertThat(titles, hasItem("2 references"));
+        assertThat(titles, hasItem("4:2 references"));
+        assertThat(titles, hasItem("6:2 references"));
+    }
+
+    @Test
+    public void enumConstants() {
+        var lenses = lenses("/org/javacs/example/DontShowEnumConstRefs.java");
+        var titles = titles(lenses);
+        assertThat(titles, not(hasItem("4:0 references")));
     }
 }
