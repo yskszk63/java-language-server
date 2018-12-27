@@ -29,14 +29,14 @@ class Profiler implements TaskListener {
     }
 
     void print() {
-        var lines = new StringJoiner("\n\t");
+        var lines = new StringJoiner("; ");
         for (var k : TaskEvent.Kind.values()) {
             if (!profile.containsKey(k)) continue;
             var elapsed = profile.get(k);
-            var ms = elapsed.getSeconds() * 1000 + elapsed.getNano() / 1000 / 1000;
-            lines.add(String.format("%s: %dms", k, ms));
+            var s = elapsed.getSeconds() + elapsed.getNano() / 1000.0 / 1000.0 / 1000.0;
+            lines.add(String.format("%s: %.3fs", k, s));
         }
-        LOG.info(String.format("Compiled %d files:\n\t%s", files.size(), lines));
+        LOG.info(String.format("Compiled %d files: %s", files.size(), lines));
     }
 
     private static final Logger LOG = Logger.getLogger("main");
