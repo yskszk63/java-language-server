@@ -506,15 +506,6 @@ class JavaTextDocumentService implements TextDocumentService {
             if (!range.isPresent()) continue;
             var className = JavaCompilerService.className(d);
             var memberName = JavaCompilerService.memberName(d);
-            // If method or field, add an unresolved "_ references" code lens
-            if (memberName.isPresent()) {
-                var start = range.get().getStart();
-                var line = start.getLine();
-                var character = start.getCharacter();
-                List<Object> data = List.of("java.command.findReferences", uri, line, character, new Ptr(d).toString());
-                var lens = new CodeLens(range.get(), null, data);
-                result.add(lens);
-            }
             // If test class or method, add "Run Test" code lens
             if (parse.isTestClass(d)) {
                 var command =
@@ -530,6 +521,15 @@ class JavaTextDocumentService implements TextDocumentService {
                                 "java.command.test.run",
                                 Arrays.asList(uri, className, memberName.orElse(null)));
                 var lens = new CodeLens(range.get(), command, null);
+                result.add(lens);
+            }
+            // If method or field, add an unresolved "_ references" code lens
+            if (memberName.isPresent()) {
+                var start = range.get().getStart();
+                var line = start.getLine();
+                var character = start.getCharacter();
+                List<Object> data = List.of("java.command.findReferences", uri, line, character, new Ptr(d).toString());
+                var lens = new CodeLens(range.get(), null, data);
                 result.add(lens);
             }
         }
