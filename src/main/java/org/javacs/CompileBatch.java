@@ -118,8 +118,6 @@ public class CompileBatch {
     }
 
     private Optional<TreePath> ref(TreePath from) {
-        var trees = Trees.instance(task);
-        var pos = trees.getSourcePositions();
         var root = from.getCompilationUnit();
         var lines = root.getLineMap();
         var to = trees.getElement(from);
