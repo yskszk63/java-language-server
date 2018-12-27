@@ -3,10 +3,10 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
+import com.google.gson.Gson;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.concurrent.ExecutionException;
 import org.eclipse.lsp4j.CodeLens;
@@ -22,7 +22,19 @@ public class CodeLensTest {
         var uri = FindResource.uri(file);
         var params = new CodeLensParams(new TextDocumentIdentifier(uri.toString()));
         try {
-            return server.getTextDocumentService().codeLens(params).get();
+            var lenses = server.getTextDocumentService().codeLens(params).get();
+            var resolved = new ArrayList<CodeLens>();
+            for (var lens : lenses) {
+                if (lens.getCommand() == null) {
+                    var gson = new Gson();
+                    var data = lens.getData();
+                    var dataJson = gson.toJsonTree(data);
+                    lens.setData(dataJson);
+                    lens = server.getTextDocumentService().resolveCodeLens(lens).get();
+                }
+                resolved.add(lens);
+            }
+            return resolved;
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
@@ -33,7 +45,6 @@ public class CodeLensTest {
         for (var lens : lenses) {
             var command = new StringJoiner(", ");
             for (var arg : lens.getCommand().getArguments()) {
-                if (arg instanceof Optional) arg = ((Optional) arg).orElse(null);
                 command.add(Objects.toString(arg));
             }
             commands.add(command.toString());
