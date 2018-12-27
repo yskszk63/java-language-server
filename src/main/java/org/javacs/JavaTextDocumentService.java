@@ -391,18 +391,18 @@ class JavaTextDocumentService implements TextDocumentService {
         var fromLine = position.getPosition().getLine() + 1;
         var fromColumn = position.getPosition().getCharacter() + 1;
         var fromContent = contents(fromUri).content;
-        var toPath = server.compiler.compileFocus(fromUri, fromContent, fromLine, fromColumn).definition();
+        var fromFocus = server.compiler.compileFocus(fromUri, fromContent, fromLine, fromColumn);
+        var toEl = fromFocus.element();
+        var toUri = fromFocus.declaringFile(toEl);
+        if (!toUri.isPresent()) return CompletableFuture.completedFuture(List.of());
+        var toContent = contents(toUri.get()).content;
+        var toFile = server.compiler.compileFile(toUri.get(), toContent);
+        var toPath = toFile.find(new Ptr(toEl));
         if (!toPath.isPresent()) return CompletableFuture.completedFuture(List.of());
-        // Figure out what file definition is in
-        var toUri = toPath.get().getCompilationUnit().getSourceFile().toUri();
-        // Parse that file
-        var toContent = contents(toUri).content;
-        var parse = server.compiler.parseFile(toUri, toContent);
         // Figure out where in the file the definition is
-        // NOTE: toPath is from a different compilation than parse, but this seems to work
-        var toRange = parse.range(toPath.get());
+        var toRange = toFile.range(toPath.get());
         if (!toRange.isPresent()) return CompletableFuture.completedFuture(List.of());
-        var to = new Location(toUri.toString(), toRange.get());
+        var to = new Location(toUri.get().toString(), toRange.get());
         return CompletableFuture.completedFuture(List.of(to));
     }
 
@@ -525,7 +525,10 @@ class JavaTextDocumentService implements TextDocumentService {
                 // TODO run all tests in package
             } else if (parse.isTestMethod(d)) {
                 var command =
-                        new Command("Run Test", "java.command.test.run", Arrays.asList(uri, className, memberName));
+                        new Command(
+                                "Run Test",
+                                "java.command.test.run",
+                                Arrays.asList(uri, className, memberName.orElse(null)));
                 var lens = new CodeLens(range.get(), command, null);
                 result.add(lens);
             }

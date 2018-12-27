@@ -70,14 +70,10 @@ public class CompileFocus {
                         Collections.singletonList(new StringFileObject(contents, file)));
     }
 
-    public Optional<TreePath> definition() {
-        LOG.info(String.format("Go-to-definition at %s(%d,%d)...", file, line, character));
-        var e = trees.getElement(path);
-        LOG.info(String.format("...found element `%s`", e));
-        var p = trees.getPath(e);
-        if (p != null) LOG.info(String.format("...element is located at path %s", new Ptr(p)));
-        else LOG.info(String.format("...element could not be located"));
-        return Optional.ofNullable(p);
+    public Optional<URI> declaringFile(Element e) {
+        var top = topLevelDeclaration(e);
+        if (!top.isPresent()) return Optional.empty();
+        return findDeclaringFile(top.get());
     }
 
     /** Find the smallest element that includes the cursor */
@@ -776,7 +772,7 @@ public class CompileFocus {
     }
 
     /** Find the file `e` was declared in */
-    private Optional<Path> findDeclaringFile(TypeElement e) {
+    private Optional<URI> findDeclaringFile(TypeElement e) {
         var name = e.getQualifiedName().toString();
         var lastDot = name.lastIndexOf('.');
         var packageName = lastDot == -1 ? "" : name.substring(0, lastDot);
@@ -787,7 +783,7 @@ public class CompileFocus {
         for (var root : parent.sourcePath) {
             var absPath = root.resolve(publicClassPath);
             if (Files.exists(absPath) && containsTopLevelDeclaration(absPath, className)) {
-                return Optional.of(absPath);
+                return Optional.of(absPath.toUri());
             }
         }
         // Then, look for a secondary declaration in all java files in the package
@@ -798,7 +794,7 @@ public class CompileFocus {
                 try {
                     var foundFile =
                             Files.list(absDir).filter(f -> containsTopLevelDeclaration(f, className)).findFirst();
-                    if (foundFile.isPresent()) return foundFile;
+                    if (foundFile.isPresent()) return foundFile.map(Path::toUri);
                 } catch (IOException err) {
                     throw new RuntimeException(err);
                 }

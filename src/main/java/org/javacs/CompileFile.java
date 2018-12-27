@@ -6,8 +6,10 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.logging.Logger;
 import javax.lang.model.element.*;
+import org.eclipse.lsp4j.Range;
 
 public class CompileFile {
     private final JavaCompilerService parent;
@@ -35,6 +37,52 @@ public class CompileFile {
             throw new RuntimeException(e);
         }
         profiler.print();
+    }
+
+    public Optional<TreePath> find(Ptr target) {
+        class FindPtr extends TreePathScanner<Void, Void> {
+            TreePath found = null;
+
+            boolean toStringEquals(Object left, Object right) {
+                return Objects.equals(Objects.toString(left, ""), Objects.toString(right, ""));
+            }
+
+            /** Check if the declaration at the current path is the same symbol as `e` */
+            boolean sameSymbol() {
+                return new Ptr(getCurrentPath()).equals(target);
+            }
+
+            void check() {
+                if (sameSymbol()) {
+                    found = getCurrentPath();
+                }
+            }
+
+            @Override
+            public Void visitClass(ClassTree node, Void aVoid) {
+                check();
+                return super.visitClass(node, aVoid);
+            }
+
+            @Override
+            public Void visitMethod(MethodTree node, Void aVoid) {
+                check();
+                return super.visitMethod(node, aVoid);
+            }
+
+            @Override
+            public Void visitVariable(VariableTree node, Void aVoid) {
+                check();
+                return super.visitVariable(node, aVoid);
+            }
+        }
+        var find = new FindPtr();
+        find.scan(root, null);
+        return Optional.ofNullable(find.found);
+    }
+
+    public Optional<Range> range(TreePath path) {
+        return ParseFile.range(task, contents, path);
     }
 
     /**
