@@ -126,6 +126,7 @@ public class JavaCompilerService {
     }
 
     private boolean containsWord(String toPackage, String toClass, String name, Path file) {
+        if (!name.matches("\\w*")) throw new RuntimeException(String.format("`%s` is not a word", name));
         var samePackage = Pattern.compile("^package +" + toPackage + ";");
         var importClass = Pattern.compile("^import +" + toPackage + "\\." + toClass + ";");
         var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
@@ -187,19 +188,29 @@ public class JavaCompilerService {
         return allFiles;
     }
 
+    // TODO should probably cache this
     public List<URI> potentialReferences(Element to) {
+        LOG.info(String.format("Find potential references to `%s`...", to));
+
+        // Find files that import toPackage.toClass and contain the word el
         var toPackage = packageName(to);
         var toClass = className(to);
-        // Enumerate all files on source path
-        var allFiles = allJavaSources();
-        // Filter for files that import toPackage.toClass and contain the word el
-        // TODO should probably cache this
         var name = to.getSimpleName().toString();
+        if (name.equals("<init>")) name = to.getEnclosingElement().getSimpleName().toString();
+        LOG.info(String.format("...look for the word `%s` in files that import %s.%s", name, toPackage, toClass));
+
+        // Check all files on source path
+        var allFiles = allJavaSources();
+        LOG.info(String.format("...check %d files on the source path", allFiles.size()));
+
+        // Check files, one at a time
         var result = new ArrayList<URI>();
         int nScanned = 0;
         for (var file : allFiles) {
-            if (toPackage.isEmpty() || containsWord(toPackage, toClass, name, file)) result.add(file.toUri());
+            if (containsWord(toPackage, toClass, name, file)) result.add(file.toUri());
         }
+        LOG.info(String.format("...%d files might have references to `%s`", result.size(), to));
+
         return result;
     }
 

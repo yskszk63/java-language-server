@@ -10,6 +10,8 @@
 - Crashes when you create the first file in a new maven project
 - Deleted files remain in compiler, even when you restart (via classpath?)
 - Always shows last javadoc
+- @Test is not autocompleting
+- new Test is not autocompleting
 
 ## Autocomplete
 - Annotation fields
@@ -20,6 +22,7 @@
 
 ## Navigation
 - Go-to-subclasses
+- Test coverage codelens
 
 ## Polish
 - Convert {@tag ...} to `<tag>...</tag>` (see vscode-java)
@@ -27,6 +30,7 @@
 - Hover constructor should show constructor, not class
 - String.format(...) coloring
 - `new` should be a control keyword, not a regular keyword
+- Show warning for unused local var, unused private method
 
 ## Simplicity
 - Use module-info.java instead of build files to figure out classpath

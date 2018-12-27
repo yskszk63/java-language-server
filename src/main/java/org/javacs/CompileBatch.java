@@ -117,23 +117,29 @@ public class CompileBatch {
                 && toStringEquals(to, from);
     }
 
+    private boolean isField(Element to) {
+        if (!(to instanceof VariableElement)) return false;
+        var field = (VariableElement) to;
+        return field.getEnclosingElement() instanceof TypeElement;
+    }
+
     private Optional<TreePath> ref(TreePath from) {
         var root = from.getCompilationUnit();
         var lines = root.getLineMap();
         var to = trees.getElement(from);
         // Skip elements we can't find
         if (to == null) {
-            LOG.warning(String.format("No element for `%s`", from.getLeaf()));
+            // LOG.warning(String.format("No element for `%s`", from.getLeaf()));
             return Optional.empty();
         }
         // Skip non-methods
-        if (!(to instanceof ExecutableElement || to instanceof TypeElement || to instanceof VariableElement)) {
+        if (!(to instanceof ExecutableElement || to instanceof TypeElement || isField(to))) {
             return Optional.empty();
         }
         // TODO skip anything not on source path
         var result = trees.getPath(to);
         if (result == null) {
-            LOG.warning(String.format("Element `%s` has no TreePath", to));
+            // LOG.warning(String.format("Element `%s` has no TreePath", to));
             return Optional.empty();
         }
         return Optional.of(result);
@@ -167,6 +173,12 @@ public class CompileBatch {
                 check(getCurrentPath());
                 return super.visitIdentifier(t, null);
             }
+
+            @Override
+            public Void visitNewClass(NewClassTree t, Void __) {
+                check(getCurrentPath());
+                return super.visitNewClass(t, null);
+            }
         }
         new FindReferencesElement().scan(root, null);
         LOG.info(
@@ -199,11 +211,18 @@ public class CompileBatch {
                 check(getCurrentPath());
                 return super.visitIdentifier(t, null);
             }
+
+            @Override
+            public Void visitNewClass(NewClassTree t, Void __) {
+                check(getCurrentPath());
+                return super.visitNewClass(t, null);
+            }
         }
         new IndexFile().scan(root, null);
-        LOG.info(
-                String.format(
-                        "Found %d refs in %s", refs.size(), Paths.get(root.getSourceFile().toUri()).getFileName()));
+        if (refs.size() > 0)
+            LOG.info(
+                    String.format(
+                            "Found %d refs in %s", refs.size(), Paths.get(root.getSourceFile().toUri()).getFileName()));
         return refs;
     }
 

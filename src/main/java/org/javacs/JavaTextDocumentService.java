@@ -456,13 +456,17 @@ class JavaTextDocumentService implements TextDocumentService {
         var toColumn = position.getPosition().getCharacter() + 1;
         var toEl = server.compiler.compileFocus(toUri, toContent, toLine, toColumn).element();
         var fromFiles = server.compiler.potentialReferences(toEl);
+        if (fromFiles.isEmpty()) return CompletableFuture.completedFuture(List.of());
         var batch = server.compiler.compileBatch(fromFiles);
         var fromTreePaths = batch.references(toEl);
         var result = new ArrayList<Location>();
         for (var path : fromTreePaths) {
             var fromUri = path.getCompilationUnit().getSourceFile().toUri();
             var fromRange = batch.range(path);
-            if (!fromRange.isPresent()) continue;
+            if (!fromRange.isPresent()) {
+                LOG.warning(String.format("Couldn't locate `%s`", path.getLeaf()));
+                continue;
+            }
             var from = new Location(fromUri.toString(), fromRange.get());
             result.add(from);
         }

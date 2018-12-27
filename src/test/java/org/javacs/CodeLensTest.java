@@ -52,15 +52,31 @@ public class CodeLensTest {
         return commands;
     }
 
+    private List<String> titles(List<? extends CodeLens> lenses) {
+        var titles = new ArrayList<String>();
+        for (var lens : lenses) {
+            titles.add(lens.getCommand().getTitle());
+        }
+        return titles;
+    }
+
     @Test
-    public void codeLens() {
-        var file = "/org/javacs/example/HasTest.java";
-        var lenses = lenses(file);
+    public void testMethods() {
+        var lenses = lenses("/org/javacs/example/HasTest.java");
         assertThat(lenses, not(empty()));
 
         var commands = commands(lenses);
         assertThat(commands, hasItem(containsString("HasTest, null")));
         assertThat(commands, hasItem(containsString("HasTest, testMethod")));
         assertThat(commands, hasItem(containsString("HasTest, otherTestMethod")));
+    }
+
+    @Test
+    public void constructorReferences() {
+        var lenses = lenses("/org/javacs/example/ConstructorRefs.java");
+        assertThat(lenses, not(empty()));
+
+        var titles = titles(lenses);
+        assertThat(titles, hasItem(containsString("1 references")));
     }
 }
