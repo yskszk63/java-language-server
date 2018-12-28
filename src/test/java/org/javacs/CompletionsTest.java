@@ -5,7 +5,7 @@ import static org.junit.Assert.*;
 
 import com.google.common.collect.Lists;
 import java.util.stream.Collectors;
-import org.eclipse.lsp4j.CompletionItem;
+import org.javacs.lsp.*;
 import org.junit.Ignore;
 import org.junit.Test;
 

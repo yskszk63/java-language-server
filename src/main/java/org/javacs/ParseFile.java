@@ -9,8 +9,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Logger;
-import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.Range;
+import org.javacs.lsp.*;
+
+
 
 public class ParseFile {
     private final JavaCompilerService parent;

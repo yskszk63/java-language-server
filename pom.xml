@@ -15,17 +15,11 @@
         </repository>
     </distributionManagement>
     <dependencies>
-        <!-- Java implementation of VS Code language server protocol -->
+        <!-- JSON support -->
         <dependency>
-            <groupId>org.eclipse.lsp4j</groupId>
-            <artifactId>org.eclipse.lsp4j</artifactId>
-            <version>0.5.0</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.google.guava</groupId>
-                    <artifactId>guava</artifactId>
-                </exclusion>
-            </exclusions>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.8.5</version>
         </dependency>
         <!-- Guava collections-->
         <dependency>

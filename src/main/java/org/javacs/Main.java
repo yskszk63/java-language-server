@@ -3,7 +3,7 @@ package org.javacs;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.eclipse.lsp4j.jsonrpc.*;
+import org.javacs.lsp.*;
 
 public class Main {
     private static final Logger LOG = Logger.getLogger("main");

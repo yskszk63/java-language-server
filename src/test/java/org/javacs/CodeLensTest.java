@@ -9,9 +9,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.concurrent.ExecutionException;
-import org.eclipse.lsp4j.CodeLens;
-import org.eclipse.lsp4j.CodeLensParams;
-import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.javacs.lsp.*;
 import org.junit.Test;
 
 public class CodeLensTest {

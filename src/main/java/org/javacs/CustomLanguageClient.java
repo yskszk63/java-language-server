@@ -1,7 +1,6 @@
 package org.javacs;
 
-import org.eclipse.lsp4j.jsonrpc.services.JsonNotification;
-import org.eclipse.lsp4j.services.LanguageClient;
+import org.javacs.lsp.*;
 
 public interface CustomLanguageClient extends LanguageClient {
 

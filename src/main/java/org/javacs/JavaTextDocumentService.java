@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonPrimitive;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.doctree.DocTree;
@@ -10,6 +9,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -19,9 +19,7 @@ import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.element.*;
-import org.eclipse.lsp4j.*;
-import org.eclipse.lsp4j.jsonrpc.messages.Either;
-import org.eclipse.lsp4j.services.TextDocumentService;
+import org.javacs.lsp.*;
 
 class JavaTextDocumentService implements TextDocumentService {
     private final JavaLanguageServer server;

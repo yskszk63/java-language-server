@@ -5,9 +5,7 @@ import static org.junit.Assert.*;
 
 import java.util.StringJoiner;
 import java.util.concurrent.ExecutionException;
-import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.TextDocumentIdentifier;
-import org.eclipse.lsp4j.TextDocumentPositionParams;
+import org.javacs.lsp.*;
 import org.junit.Ignore;
 import org.junit.Test;
 

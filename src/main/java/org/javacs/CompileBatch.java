@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 import javax.lang.model.element.*;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
-import org.eclipse.lsp4j.Range;
+import org.javacs.lsp.*;
 
 public class CompileBatch {
     private final JavaCompilerService parent;

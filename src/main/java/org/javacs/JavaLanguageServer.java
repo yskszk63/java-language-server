@@ -14,8 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
-import org.eclipse.lsp4j.*;
-import org.eclipse.lsp4j.services.*;
+import org.javacs.lsp.*;
 
 class JavaLanguageServer implements LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");

@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import org.eclipse.lsp4j.*;
+import org.javacs.lsp.*;
 import org.junit.BeforeClass;
 import org.junit.Test;
 

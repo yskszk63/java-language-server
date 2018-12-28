@@ -8,12 +8,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import org.eclipse.lsp4j.DidChangeConfigurationParams;
-import org.eclipse.lsp4j.DidChangeWatchedFilesParams;
-import org.eclipse.lsp4j.ExecuteCommandParams;
-import org.eclipse.lsp4j.SymbolInformation;
-import org.eclipse.lsp4j.WorkspaceSymbolParams;
-import org.eclipse.lsp4j.services.WorkspaceService;
+import org.javacs.lsp.*;
 
 class JavaWorkspaceService implements WorkspaceService {
     private static final Logger LOG = Logger.getLogger("main");

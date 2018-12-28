@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Logger;
 import javax.lang.model.element.*;
-import org.eclipse.lsp4j.Range;
+import org.javacs.lsp.*;
 
 public class CompileFile {
     private final JavaCompilerService parent;
