@@ -768,6 +768,19 @@ class JavaTextDocumentService implements TextDocumentService {
         // TODO update config when pom.xml changes
     }
 
+    @Override
+    public CompletableFuture<List<FoldingRange>> foldingRange(FoldingRangeRequestParams params) {
+        var document = params.getTextDocument();
+        var uri = URI.create(document.getUri());
+        if (!isJava(uri)) return CompletableFuture.completedFuture(null);
+        var content = contents(uri).content;
+        var folding = Parser.folding(content);
+        if (folding.firstImport == -1) return CompletableFuture.completedFuture(List.of());
+        var foldImports = new FoldingRange(folding.firstImport - 1, folding.lastImport - 1);
+        var list = List.of(foldImports);
+        return CompletableFuture.completedFuture(list);
+    }
+
     Set<URI> activeDocuments() {
         return activeDocuments.keySet();
     }

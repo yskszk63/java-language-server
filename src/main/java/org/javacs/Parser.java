@@ -3,8 +3,10 @@ package org.javacs;
 import com.google.common.base.Joiner;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.StringReader;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.FileSystems;
@@ -256,6 +258,33 @@ class Parser {
         i.setContainerName(containerName(path));
         i.setLocation(Parser.location(path));
         return i;
+    }
+
+    public static Folding folding(String contents) {
+        var importPattern = Pattern.compile("^import +(\\w+\\.)+(\\w+|\\*);");
+        var reader = new BufferedReader(new StringReader(contents));
+        var firstImport = -1;
+        var lastImport = -1;
+        var i = 0;
+        // TODO true is not coloring correctly
+        while (true) {
+            // Read one line
+            String line;
+            try {
+                line = reader.readLine();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            if (line == null) break;
+            i++;
+            // Check if line looks like an import
+            var match = importPattern.matcher(line);
+            if (match.matches()) {
+                if (firstImport == -1) firstImport = i;
+                lastImport = i;
+            }
+        }
+        return new Folding(firstImport, lastImport);
     }
 
     /** Find all already-imported symbols in all .java files in sourcePath */
