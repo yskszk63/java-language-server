@@ -64,6 +64,9 @@
 		},
 		{
 			"include": "#class-declaration"
+		},
+		{
+			"include": "#enum-declaration"
 		}
 	],
 	"repository": {
@@ -109,8 +112,64 @@
 				}
 			]
 		},
+		"enum-declaration": {
+			"begin": "\\b(enum) +(\\w+)\\b",
+			"end": "$",
+			"name": "meta.enum.java",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.enum"
+				},
+				"2": {
+					"name": "entity.name.class.java"
+				}
+			},
+			"patterns": [
+				{
+					"begin": "{",
+					"end": "}",
+					"name": "meta.enum.body",
+					"beginCaptures": {
+						"0": {
+							"name": "keyword.other.begin-enum-body"
+						}
+					},
+					"endCaptures": {
+						"0": {
+							"name": "keyword.other.end-enum-body"
+						}
+					},
+					"patterns": [
+						{
+							"match": "\\w+",
+							"name": "variable.other.enum.constant"
+						},
+						{
+							"match": ",",
+							"name": "keyword.other"
+						},
+						{
+							"begin": ";",
+							"end": "(?=})",
+							"name": "meta.enum.body.java",
+							"beginCaptures": {
+								"0": {
+									"name": "keyword.other.begin-enum-methods"
+								}
+							},
+							"patterns": [
+								{
+									"include": "#class-body"
+								}
+							]
+						}
+					]
+				}
+			]
+		},
 		"class-declaration": {
-			"begin": "(?<!\\.)\\b(class|interface|@interface)\\b +(\\w+)\\b",
+			"begin": "(?<!\\.)\\b(class|interface|@interface) +(\\w+)\\b",
+			"name": "meta.class.java",
 			"beginCaptures": {
 				"1": {
 					"name": "keyword.class"
@@ -120,7 +179,6 @@
 				}
 			},
 			"end": "$",
-			"name": "meta.class.java",
 			"patterns": [
 				{
 					"include": "#keywords"
@@ -170,6 +228,9 @@
 				},
 				{
 					"include": "#class-declaration"
+				},
+				{
+					"include": "#enum-declaration"
 				},
 				{
 					"match": "\\b(\\w+)(?=\\()",
