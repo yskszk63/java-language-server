@@ -326,7 +326,7 @@ class JavaTextDocumentService implements TextDocumentService {
         var line = position.getPosition().getLine() + 1;
         var column = position.getPosition().getCharacter() + 1;
         var el = hoverCache.element(line, column);
-        if (el.isEmpty()) return CompletableFuture.completedFuture(new Hover(Collections.emptyList()));
+        if (!el.isPresent()) return CompletableFuture.completedFuture(new Hover(Collections.emptyList()));
 
         // Add code hover message
         var result = new ArrayList<Either<String, MarkedString>>();
