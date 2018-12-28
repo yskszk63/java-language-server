@@ -141,8 +141,31 @@
 					},
 					"patterns": [
 						{
+							"include": "#comments"
+						},
+						{
 							"match": "\\w+",
 							"name": "variable.other.enum.constant"
+						},
+						{
+							"begin": "\\(",
+							"end": "\\)",
+							"name": "meta.enum-args",
+							"beginCaptures": {
+								"0": {
+									"name": "keyword.other.begin-enum-args"
+								}
+							},
+							"endCaptures": {
+								"0": {
+									"name": "keyword.other.end-enum-args"
+								}
+							},
+							"patterns": [
+								{
+									"include": "#code"
+								}
+							]
 						},
 						{
 							"match": ",",
