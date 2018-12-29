@@ -884,15 +884,15 @@ class JavaLanguageServer extends LanguageServer {
         return null; // TODO
     }
 
-    private boolean isJava(URI uri) {
-        return uri.getPath().endsWith(".java");
+    private boolean isJavaFile(URI uri) {
+        return uri.getScheme().equals("file") && uri.getPath().endsWith(".java");
     }
 
     @Override
     public void didOpenTextDocument(DidOpenTextDocumentParams params) {
         var document = params.textDocument;
         var uri = document.uri;
-        if (isJava(uri)) {
+        if (isJavaFile(uri)) {
             activeDocuments.put(uri, new VersionedContent(document.text, document.version));
             lint(Collections.singleton(uri));
         }
@@ -902,7 +902,7 @@ class JavaLanguageServer extends LanguageServer {
     public void didChangeTextDocument(DidChangeTextDocumentParams params) {
         var document = params.textDocument;
         var uri = document.uri;
-        if (isJava(uri)) {
+        if (isJavaFile(uri)) {
             var existing = activeDocuments.get(uri);
             var newText = existing.content;
 
@@ -956,7 +956,7 @@ class JavaLanguageServer extends LanguageServer {
     public void didCloseTextDocument(DidCloseTextDocumentParams params) {
         var document = params.textDocument;
         var uri = document.uri;
-        if (isJava(uri)) {
+        if (isJavaFile(uri)) {
             // Remove from source cache
             activeDocuments.remove(uri);
 
@@ -968,7 +968,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public void didSaveTextDocument(DidSaveTextDocumentParams params) {
         var uri = params.textDocument.uri;
-        if (isJava(uri)) {
+        if (isJavaFile(uri)) {
             // Re-lint all active documents
             lint(activeDocuments.keySet());
             // TODO update config when java file implies a new source root
