@@ -1,6 +1,5 @@
 package org.javacs;
 
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 // Translated from https://golang.org/src/strings/search.go
@@ -89,7 +88,11 @@ class StringSearch {
     }
 
     int next(String text) {
-        return next(ByteBuffer.wrap(text.getBytes()));
+        return next(text.getBytes());
+    }
+
+    int next(byte[] text) {
+        return next(ByteBuffer.wrap(text));
     }
 
     int next(ByteBuffer text) {
@@ -124,18 +127,6 @@ class StringSearch {
             }
         }
         return i;
-    }
-
-    private static class TextStream {
-        int offset;
-        private byte[] head;
-        private InputStream tail;
-
-        TextStream(InputStream bytes) {}
-
-        void move(int from, int to) {}
-
-        void get(int i) {}
     }
 
     private static class Slice {

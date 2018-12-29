@@ -5,7 +5,6 @@ import com.sun.source.util.*;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -113,12 +112,29 @@ class Parser {
         }
     }
 
-    // TODO try working on inputstream rather than lines
+    /*
+    FileChannel.open(...).map(...)
+
+    Benchmark                               Mode  Cnt      Score       Error  Units
+    StringSearchBenchmark.boyerMooreLarge  thrpt    3  15517.606 ±  4807.393  ops/s
+    StringSearchBenchmark.boyerMooreSmall  thrpt    3  34293.827 ± 58590.197  ops/s
+    StringSearchBenchmark.regexLarge       thrpt    3   1028.404 ±    61.053  ops/s
+    StringSearchBenchmark.regexSmall       thrpt    3  23062.039 ±  4342.233  ops/s
+
+    Files.readAllBytes()
+
+    Benchmark                               Mode  Cnt      Score       Error  Units
+    StringSearchBenchmark.boyerMooreLarge  thrpt    3  18229.198 ± 11873.019  ops/s
+    StringSearchBenchmark.boyerMooreSmall  thrpt    3  45522.137 ± 31464.129  ops/s
+    StringSearchBenchmark.regexLarge       thrpt    3    947.172 ±   228.766  ops/s
+    StringSearchBenchmark.regexSmall       thrpt    3  22039.420 ±  8259.623  ops/s
+        */
+
     static boolean containsText(Path java, String query) {
         var search = new StringSearch(query);
-        try (var chan = FileChannel.open(java)) {
-            var buffer = chan.map(FileChannel.MapMode.READ_ONLY, 0, chan.size());
-            return search.next(buffer) != -1;
+        try {
+            var bytes = Files.readAllBytes(java);
+            return search.next(bytes) != -1;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
