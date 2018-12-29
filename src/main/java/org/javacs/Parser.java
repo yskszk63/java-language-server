@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.google.common.base.Joiner;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.io.File;
@@ -317,9 +316,7 @@ class Parser {
         var candidates = imports.classes.stream().filter(c -> c.endsWith("." + unresolved)).collect(Collectors.toSet());
         if (candidates.size() > 1) {
             LOG.warning(
-                    String.format(
-                            "%s is ambiguous between previously imported candidates %s",
-                            unresolved, Joiner.on(", ").join(candidates)));
+                    String.format("%s is ambiguous between previously imported candidates %s", unresolved, candidates));
             return Optional.empty();
         } else if (candidates.size() == 1) {
             return Optional.of(candidates.iterator().next());
@@ -335,10 +332,7 @@ class Parser {
                         .filter(c -> imports.packages.contains(mostName(c)))
                         .collect(Collectors.toSet());
         if (candidates.size() > 1) {
-            LOG.warning(
-                    String.format(
-                            "%s is ambiguous between package-based candidates %s",
-                            unresolved, Joiner.on(", ").join(candidates)));
+            LOG.warning(String.format("%s is ambiguous between package-based candidates %s", unresolved, candidates));
             return Optional.empty();
         } else if (candidates.size() == 1) {
             return Optional.of(candidates.iterator().next());
@@ -348,10 +342,7 @@ class Parser {
         candidates = classPath.stream().filter(c -> lastName(c).equals(unresolved)).collect(Collectors.toSet());
 
         if (candidates.size() > 1) {
-            LOG.warning(
-                    String.format(
-                            "%s is ambiguous between classpath candidates %s",
-                            unresolved, Joiner.on(", ").join(candidates)));
+            LOG.warning(String.format("%s is ambiguous between classpath candidates %s", unresolved, candidates));
         } else if (candidates.size() == 1) {
             return Optional.of(candidates.iterator().next());
         } else {

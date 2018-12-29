@@ -3,7 +3,6 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-import com.google.common.collect.Lists;
 import java.util.stream.Collectors;
 import org.javacs.lsp.*;
 import org.junit.Ignore;
@@ -501,7 +500,7 @@ public class CompletionsTest extends CompletionsBase {
 
         // Static methods
         var items = items(file, 6, 19);
-        var suggestions = Lists.transform(items, i -> i.insertText);
+        var suggestions = items.stream().map(i -> i.insertText).collect(Collectors.toList());
 
         assertThat(suggestions, hasItems("ArrayList<>($0)"));
 
@@ -556,7 +555,7 @@ public class CompletionsTest extends CompletionsBase {
 
         // Static methods
         var items = items(file, 4, 25);
-        var suggestions = Lists.transform(items, i -> i.label);
+        var suggestions = items.stream().map(i -> i.label).collect(Collectors.toList());
 
         assertThat(suggestions, hasItems("OtherPackagePublic"));
         assertThat(suggestions, not(hasItems("OtherPackagePrivate")));
@@ -577,7 +576,7 @@ public class CompletionsTest extends CompletionsBase {
 
         // Static methods
         var items = items(file, 5, 14);
-        var suggestions = Lists.transform(items, i -> i.label);
+        var suggestions = items.stream().map(i -> i.label).collect(Collectors.toList());
 
         assertThat(suggestions, hasItems("OtherPackagePublic"));
         assertThat(suggestions, not(hasItems("OtherPackagePrivate")));

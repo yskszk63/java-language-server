@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.google.common.collect.Sets;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.MethodTree;
@@ -50,7 +49,10 @@ public class JavaCompilerService {
         this.sourcePath = Collections.unmodifiableSet(sourcePath);
         this.classPath = Collections.unmodifiableSet(classPath);
         this.docPath = Collections.unmodifiableSet(docPath);
-        this.docs = new Docs(Sets.union(sourcePath, docPath));
+        var docSourcePath = new HashSet<Path>();
+        docSourcePath.addAll(sourcePath);
+        docSourcePath.addAll(docPath);
+        this.docs = new Docs(docSourcePath);
         this.classPathClasses = Classes.classPathTopLevelClasses(classPath);
     }
 

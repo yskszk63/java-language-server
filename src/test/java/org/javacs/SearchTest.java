@@ -3,12 +3,12 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
-import com.google.common.base.Joiner;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.javacs.lsp.*;
@@ -23,11 +23,14 @@ public class SearchTest {
     @BeforeClass
     public static void openSource() throws IOException {
         var uri = FindResource.uri("/org/javacs/example/AutocompleteBetweenLines.java");
-        var textContent = Joiner.on("\n").join(Files.readAllLines(Paths.get(uri)));
+        var textContent = new StringJoiner("\n");
+        for (var line : Files.readAllLines(Paths.get(uri))) {
+            textContent.add(line);
+        }
         var document = new TextDocumentItem();
 
         document.uri = uri;
-        document.text = textContent;
+        document.text = textContent.toString();
 
         server.didOpenTextDocument(new DidOpenTextDocumentParams(document));
     }

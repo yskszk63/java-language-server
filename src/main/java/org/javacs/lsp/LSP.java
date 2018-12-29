@@ -1,9 +1,9 @@
 package org.javacs.lsp;
 
-import com.google.common.base.Charsets;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import java.io.*;
+import java.nio.charset.Charset;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -88,10 +88,12 @@ public class LSP {
         return gson.fromJson(token, Message.class);
     }
 
+    private static final Charset UTF_8 = Charset.forName("UTF-8");
+
     private static void writeClient(OutputStream client, String messageText) {
-        var messageBytes = messageText.getBytes(Charsets.UTF_8);
+        var messageBytes = messageText.getBytes(UTF_8);
         var headerText = String.format("Content-Length: %d\r\n\r\n", messageBytes.length);
-        var headerBytes = headerText.getBytes(Charsets.UTF_8);
+        var headerBytes = headerText.getBytes(UTF_8);
         try {
             client.write(headerBytes);
             client.write(messageBytes);

@@ -1,6 +1,5 @@
 package org.javacs;
 
-import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -14,6 +13,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.StreamSupport;
 import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
@@ -50,20 +51,24 @@ class FileManagerWrapper implements StandardJavaFileManager {
         else return file;
     }
 
+    private <T> Iterable<T> filter(Iterable<T> in, Predicate<T> f) {
+        return StreamSupport.stream(in.spliterator(), false).filter(f)::iterator;
+    }
+
     private Iterable<? extends JavaFileObject> removeModuleInfo(Iterable<? extends JavaFileObject> in) {
-        return Iterables.filter(in, this::notModuleInfo);
+        return filter(in, this::notModuleInfo);
     }
 
     private Iterable<JavaFileObject> removeModuleInfoInvariant(Iterable<JavaFileObject> in) {
-        return Iterables.filter(in, this::notModuleInfo);
+        return filter(in, this::notModuleInfo);
     }
 
     private Iterable<? extends File> removeModuleInfoFile(Iterable<? extends File> in) {
-        return Iterables.filter(in, this::notModuleInfo);
+        return filter(in, this::notModuleInfo);
     }
 
     private Iterable<? extends Path> removeModuleInfoPath(Iterable<? extends Path> in) {
-        return Iterables.filter(in, this::notModuleInfo);
+        return filter(in, this::notModuleInfo);
     }
 
     @Override
