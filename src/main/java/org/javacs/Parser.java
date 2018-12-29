@@ -61,6 +61,19 @@ class Parser {
         }
     }
 
+    private static boolean isWordChar(char c) {
+        return Character.isAlphabetic(c) || Character.isDigit(c) || c == '_' || c == '$';
+    }
+
+    private static int startOfToken(CharSequence candidate, int offset) {
+        while (offset < candidate.length()) {
+            char c = candidate.charAt(offset);
+            if (isWordChar(c)) break;
+            offset++;
+        }
+        return offset;
+    }
+
     /**
      * Check if `candidate` contains all the characters of `find`, in-order, case-insensitive Matches can be
      * discontinuous if the letters of `find` match the first letters of words in `candidate` For example, fb matches
@@ -68,26 +81,37 @@ class Parser {
      */
     static boolean matchesTitleCase(CharSequence candidate, String find) {
         int i = 0;
-        for (char f : find.toCharArray()) {
-            // If we have reached the end of candidate without matching all of find, fail
-            if (i >= candidate.length()) return false;
-            // If the next character in candidate matches, advance i
-            else if (Character.toLowerCase(f) == Character.toLowerCase(candidate.charAt(i))) i++;
-            else {
-                // Find the start of the next word
-                while (i < candidate.length()) {
-                    char c = candidate.charAt(i);
-                    boolean isStartOfWord = Character.isUpperCase(c);
-                    boolean isMatch = Character.toLowerCase(f) == Character.toLowerCase(c);
-                    if (isStartOfWord && isMatch) {
-                        i++;
-                        break;
-                    } else i++;
+
+        tokenLoop:
+        while (i < candidate.length()) {
+            i = startOfToken(candidate, i);
+
+            for (char f : find.toCharArray()) {
+                // If we have reached the end of candidate without matching all of find, fail
+                if (i >= candidate.length()) return false;
+                // If the next character in candidate matches, advance i
+                else if (Character.toLowerCase(f) == Character.toLowerCase(candidate.charAt(i))) i++;
+                else {
+                    // Find the start of the next word
+                    while (i < candidate.length()) {
+                        char c = candidate.charAt(i);
+                        // If the next character is not a word, try again with the next token
+                        if (!isWordChar(c)) continue tokenLoop;
+                        // TODO match things like fb ~ foo_bar
+                        boolean isStartOfWord = Character.isUpperCase(c);
+                        boolean isMatch = Character.toLowerCase(f) == Character.toLowerCase(c);
+                        if (isStartOfWord && isMatch) {
+                            i++;
+                            break;
+                        } else i++;
+                    }
+                    if (i >= candidate.length()) return false;
                 }
-                if (i == candidate.length()) return false;
             }
+            // All of find was matched!
+            return true;
         }
-        return true;
+        return false;
     }
 
     private static void onError(javax.tools.Diagnostic<? extends JavaFileObject> err) {
@@ -95,70 +119,33 @@ class Parser {
         // LOG.warning(err.getMessage(Locale.getDefault()));
     }
 
-    private static final Pattern WORD = Pattern.compile("\\b\\w+\\b");
+    private static final ByteBuffer SEARCH_BUFFER = ByteBuffer.allocateDirect(1 * 1024 * 1024);
 
     // TODO cache the progress made by searching shorter queries
     static boolean containsWordMatching(Path java, String query) {
-        try {
-            var reader = Files.newBufferedReader(java);
-            for (var line = reader.readLine(); line != null; line = reader.readLine()) {
-                var pattern = WORD.matcher(line);
-                while (pattern.find()) {
-                    var word = pattern.group(0);
-                    if (matchesTitleCase(word, query)) return true;
-                }
-            }
-            return false;
+        try (var channel = FileChannel.open(java)) {
+            // Read up to 1 MB of data from file
+            var limit = Math.min((int) channel.size(), SEARCH_BUFFER.capacity());
+            SEARCH_BUFFER.position(0);
+            SEARCH_BUFFER.limit(limit);
+            channel.read(SEARCH_BUFFER);
+            SEARCH_BUFFER.position(0);
+            var chars = Charset.forName("UTF-8").decode(SEARCH_BUFFER);
+            return matchesTitleCase(chars, query);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    /*
-        FileChannel.open(...).map(...)
-
-        Benchmark                               Mode  Cnt      Score       Error  Units
-        StringSearchBenchmark.boyerMooreLarge  thrpt    3  15517.606 ±  4807.393  ops/s
-        StringSearchBenchmark.boyerMooreSmall  thrpt    3  34293.827 ± 58590.197  ops/s
-        StringSearchBenchmark.regexLarge       thrpt    3   1028.404 ±    61.053  ops/s
-        StringSearchBenchmark.regexSmall       thrpt    3  23062.039 ±  4342.233  ops/s
-
-        Files.readAllBytes()
-
-        Benchmark                               Mode  Cnt      Score       Error  Units
-        StringSearchBenchmark.boyerMooreLarge  thrpt    3  18229.198 ± 11873.019  ops/s
-        StringSearchBenchmark.boyerMooreSmall  thrpt    3  45522.137 ± 31464.129  ops/s
-        StringSearchBenchmark.regexLarge       thrpt    3    947.172 ±   228.766  ops/s
-        StringSearchBenchmark.regexSmall       thrpt    3  22039.420 ±  8259.623  ops/s
-
-    FileChannel.open(...).read(ByteBuffer.allocate(...))
-
-    Benchmark                               Mode  Cnt      Score       Error  Units
-    StringSearchBenchmark.boyerMooreLarge  thrpt    3  17357.488 ± 19125.132  ops/s
-    StringSearchBenchmark.boyerMooreSmall  thrpt    3  51831.704 ± 15061.881  ops/s
-    StringSearchBenchmark.regexLarge       thrpt    3    897.675 ±   214.149  ops/s
-    StringSearchBenchmark.regexSmall       thrpt    3  21741.408 ±  8805.291  ops/s
-
-    Re-use ByteBuffer.allocateDirect
-
-    Benchmark                               Mode  Cnt      Score       Error  Units
-    StringSearchBenchmark.boyerMooreLarge  thrpt    3  21528.563 ±  6757.970  ops/s
-    StringSearchBenchmark.boyerMooreSmall  thrpt    3  55988.183 ±  5928.551  ops/s
-    StringSearchBenchmark.regexLarge       thrpt    3    987.733 ±   361.451  ops/s
-    StringSearchBenchmark.regexSmall       thrpt    3  23560.799 ± 29001.715  ops/s
-            */
-
-    private static final ByteBuffer searchBuffer = ByteBuffer.allocateDirect(1 * 1024 * 1024);
-
     static boolean containsText(Path java, String query) {
         var search = new StringSearch(query);
         try (var channel = FileChannel.open(java)) {
             // Read up to 1 MB of data from file
-            var limit = Math.min((int) channel.size(), searchBuffer.capacity());
-            searchBuffer.position(0);
-            searchBuffer.limit(limit);
-            channel.read(searchBuffer);
-            return search.next(searchBuffer) != -1;
+            var limit = Math.min((int) channel.size(), SEARCH_BUFFER.capacity());
+            SEARCH_BUFFER.position(0);
+            SEARCH_BUFFER.limit(limit);
+            channel.read(SEARCH_BUFFER);
+            return search.next(SEARCH_BUFFER) != -1;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

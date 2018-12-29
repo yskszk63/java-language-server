@@ -16,6 +16,27 @@ public class ParserTest {
         assertTrue(Parser.matchesTitleCase("AutocompleteBetweenLines", "ABetweenLines"));
         assertTrue(Parser.matchesTitleCase("UPPERFooBar", "fb"));
         assertFalse(Parser.matchesTitleCase("Foobar", "fb"));
+
+        assertTrue(Parser.matchesTitleCase("Prefix FooBar", "fb"));
+        assertTrue(Parser.matchesTitleCase("Prefix FooBar", "fob"));
+        assertTrue(Parser.matchesTitleCase("Prefix AnyPrefixFooBar", "fb"));
+        assertTrue(Parser.matchesTitleCase("Prefix AutocompleteBetweenLines", "ABetweenLines"));
+        assertTrue(Parser.matchesTitleCase("Prefix UPPERFooBar", "fb"));
+        assertFalse(Parser.matchesTitleCase("Foo Bar", "fb"));
+    }
+
+    @Test
+    public void searchLargeFile() {
+        var largeFile = Paths.get(FindResource.uri("/org/javacs/example/LargeFile.java"));
+        assertTrue(Parser.containsWordMatching(largeFile, "removeMethodBodies"));
+        assertFalse(Parser.containsWordMatching(largeFile, "removeMethodBodiez"));
+    }
+
+    @Test
+    public void searchSmallFile() {
+        var smallFile = Paths.get(FindResource.uri("/org/javacs/example/Goto.java"));
+        assertTrue(Parser.containsWordMatching(smallFile, "nonDefaultConstructor"));
+        assertFalse(Parser.containsWordMatching(smallFile, "removeMethodBodies"));
     }
 
     @Test

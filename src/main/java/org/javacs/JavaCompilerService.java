@@ -126,12 +126,13 @@ public class JavaCompilerService {
         return new CompileBatch(this, files);
     }
 
+    // TODO use Parser.containsWordMatching for speed?
     private boolean containsWord(String toPackage, String toClass, String name, Path file) {
         if (!name.matches("\\w*")) throw new RuntimeException(String.format("`%s` is not a word", name));
         var samePackage = Pattern.compile("^package +" + toPackage + ";");
         var importClass = Pattern.compile("^import +" + toPackage + "\\." + toClass + ";");
         var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
-        var importStatic = Pattern.compile("^import +static +" + toPackage + "\\.");
+        var importStatic = Pattern.compile("^import +static +" + toPackage + "\\." + toClass);
         var startOfClass = Pattern.compile("class +\\w+");
         var word = Pattern.compile("\\b" + name + "\\b");
         var foundImport = toPackage.isEmpty(); // If package is empty, everyone imports it
@@ -344,15 +345,25 @@ public class JavaCompilerService {
 
         var result = new ArrayList<TreePath>();
         var files = allJavaSources();
+        var checked = 0;
+        var parsed = 0;
         for (var file : files) {
-            if (!Parser.containsText(file, query)) continue;
+            checked++;
+            // First do a fast check if the query matches anything in a file
+            if (!Parser.containsWordMatching(file, query)) continue;
+            // Parse the file and check class members for matches
             LOG.info(String.format("...%s contains text matches", file.getFileName()));
             var parse = Parser.parse(file);
             var symbols = Parser.findSymbolsMatching(parse, query);
+            parsed++;
+            // If we confirm matches, add them to the results
             if (symbols.size() > 0) LOG.info(String.format("...found %d occurrences", symbols.size()));
             result.addAll(symbols);
+            // If results are full, stop
             if (result.size() >= limit) break;
         }
+        LOG.info(String.format("Found %d matches in %d/%d/%d files", result.size(), checked, parsed, files.size()));
+
         return result;
     }
 

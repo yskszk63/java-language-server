@@ -264,8 +264,10 @@ public class ParseFile {
             // Search text for searchFor
             start = contents.indexOf(searchFor, start);
             end = start + searchFor.length();
-            if (start == -1)
-                throw new RuntimeException(String.format("Couldn't find identifier `%s` in `%s`", searchFor, path.getLeaf()));
+            if (start == -1) {
+                LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", searchFor, path.getLeaf()));
+                return Optional.empty();
+            }
         }
         var startLine = (int) lines.getLineNumber(start);
         var startCol = (int) lines.getColumnNumber(start);
