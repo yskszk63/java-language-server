@@ -674,7 +674,7 @@ public class CompletionsTest extends CompletionsBase {
 
     @Test
     public void enumConstantFromClassPath() {
-        var file = "/org/javacs/example/AutocompleteCaseFromClassPath.java";
+        var file = "/org/javacs/example/AutocompleteCaseFromClasspath.java";
         var suggestions = insertText(file, 8, 18);
 
         assertThat("suggests enum options", suggestions, containsInAnyOrder("FULL", "LONG", "MEDIUM", "SHORT"));
