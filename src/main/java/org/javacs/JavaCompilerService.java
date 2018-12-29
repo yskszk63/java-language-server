@@ -339,14 +339,16 @@ public class JavaCompilerService {
     }
 
     public List<TreePath> findSymbols(String query, int limit) {
-        LOG.info(String.format("Searching for `%s`", query));
+        LOG.info(String.format("Searching for `%s`...", query));
 
         var result = new ArrayList<TreePath>();
         var files = allJavaSources();
         for (var file : files) {
             if (!Parser.containsWordMatching(file, query)) continue;
+            LOG.info(String.format("...%s contains text matches", file.getFileName()));
             var parse = Parser.parse(file);
             var symbols = Parser.findSymbolsMatching(parse, query);
+            if (symbols.size() > 0) LOG.info(String.format("...found %d occurrences", symbols.size()));
             result.addAll(symbols);
             if (result.size() >= limit) break;
         }

@@ -111,6 +111,19 @@ class Parser {
         }
     }
 
+    static boolean containsText(Path java, String query) {
+        try {
+            var search = new StringSearch(query);
+            var reader = Files.newBufferedReader(java);
+            for (var line = reader.readLine(); line != null; line = reader.readLine()) {
+                if (search.next(line) != -1) return true;
+            }
+            return false;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     static List<TreePath> findSymbolsMatching(CompilationUnitTree parse, String query) {
         class Find extends TreePathScanner<Void, Void> {
             List<TreePath> found = new ArrayList<>();
