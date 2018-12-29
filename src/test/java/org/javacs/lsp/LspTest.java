@@ -8,6 +8,7 @@ import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.util.Optional;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -43,6 +44,20 @@ public class LspTest {
     public void writeMultibyteCharacters() {
         LSP.respond(writer, 1, "🔥");
         var expected = "Content-Length: 40\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"🔥\"}";
+        assertThat(bufferToString(), equalTo(expected));
+    }
+
+    @Test
+    public void writeOptional() {
+        LSP.respond(writer, 1, Optional.of(1));
+        var expected = "Content-Length: 35\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":1}";
+        assertThat(bufferToString(), equalTo(expected));
+    }
+
+    @Test
+    public void writeEmpty() {
+        LSP.respond(writer, 1, Optional.empty());
+        var expected = "Content-Length: 38\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":null}";
         assertThat(bufferToString(), equalTo(expected));
     }
 

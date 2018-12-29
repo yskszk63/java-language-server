@@ -4,7 +4,6 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutionException;
 import org.javacs.lsp.*;
 import org.junit.Test;
 
@@ -13,34 +12,34 @@ public class SignatureHelpTest {
     public void signatureHelp() throws IOException {
         var help = doHelp("/org/javacs/example/SignatureHelp.java", 7, 36);
 
-        assertThat(help.getSignatures(), hasSize(2));
+        assertThat(help.signatures, hasSize(2));
     }
 
     @Test
     public void partlyFilledIn() throws IOException {
         var help = doHelp("/org/javacs/example/SignatureHelp.java", 8, 39);
 
-        assertThat(help.getSignatures(), hasSize(2));
-        assertThat(help.getActiveSignature(), equalTo(1));
-        assertThat(help.getActiveParameter(), equalTo(1));
+        assertThat(help.signatures, hasSize(2));
+        assertThat(help.activeSignature, equalTo(1));
+        assertThat(help.activeParameter, equalTo(1));
     }
 
     @Test
     public void constructor() throws IOException {
         var help = doHelp("/org/javacs/example/SignatureHelp.java", 9, 27);
 
-        assertThat(help.getSignatures(), hasSize(1));
-        assertThat(help.getSignatures().get(0).getLabel(), startsWith("SignatureHelp"));
+        assertThat(help.signatures, hasSize(1));
+        assertThat(help.signatures.get(0).label, startsWith("SignatureHelp"));
     }
 
     @Test
     public void platformConstructor() throws IOException {
         var help = doHelp("/org/javacs/example/SignatureHelp.java", 10, 26);
 
-        assertThat(help.getSignatures(), not(empty()));
-        assertThat(help.getSignatures().get(0).getLabel(), startsWith("ArrayList"));
+        assertThat(help.signatures, not(empty()));
+        assertThat(help.signatures.get(0).label, startsWith("ArrayList"));
         // TODO
-        // assertThat(help.getSignatures().get(0).getDocumentation(), not(nullValue()));
+        // assertThat(help.signatures.get(0).documentation, not(nullValue()));
     }
 
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
@@ -48,22 +47,18 @@ public class SignatureHelpTest {
     private SignatureHelp doHelp(String file, int row, int column) throws IOException {
         var document = new TextDocumentIdentifier();
 
-        document.setUri(FindResource.uri(file).toString());
+        document.uri = FindResource.uri(file);
 
         var position = new Position();
 
-        position.setLine(row - 1);
-        position.setCharacter(column - 1);
+        position.line = row - 1;
+        position.character = column - 1;
 
         var p = new TextDocumentPositionParams();
 
-        p.setTextDocument(document);
-        p.setPosition(position);
+        p.textDocument = document;
+        p.position = position;
 
-        try {
-            return server.getTextDocumentService().signatureHelp(p).get();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
+        return server.signatureHelp(p).get();
     }
 }

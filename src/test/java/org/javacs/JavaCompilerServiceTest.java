@@ -244,7 +244,7 @@ public class JavaCompilerServiceTest {
             var uri = r.getCompilationUnit().getSourceFile().toUri();
             var fileName = Paths.get(uri).getFileName();
             var range = batch.range(r).get();
-            stringify.add(String.format("%s:%d", fileName, range.getStart().getLine() + 1));
+            stringify.add(String.format("%s:%d", fileName, range.start.line + 1));
         }
         assertThat(stringify, hasItem("GotoDefinition.java:3"));
         assertThat(stringify, not(hasItem("GotoDefinition.java:6")));

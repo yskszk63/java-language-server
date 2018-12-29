@@ -2,6 +2,6 @@ package org.javacs.lsp;
 
 public class Diagnostic {
     public Range range;
-    public int severity;
+    public Integer severity;
     public String code, source, message;
 }

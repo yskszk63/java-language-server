@@ -9,7 +9,6 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.javacs.lsp.*;
@@ -27,37 +26,25 @@ public class SearchTest {
         var textContent = Joiner.on("\n").join(Files.readAllLines(Paths.get(uri)));
         var document = new TextDocumentItem();
 
-        document.setUri(uri.toString());
-        document.setText(textContent);
+        document.uri = uri;
+        document.text = textContent;
 
-        server.getTextDocumentService().didOpen(new DidOpenTextDocumentParams(document, null));
+        server.didOpenTextDocument(new DidOpenTextDocumentParams(document));
     }
 
     private static Set<String> searchWorkspace(String query, int limit) {
-        try {
-            return server.getWorkspaceService()
-                    .symbol(new WorkspaceSymbolParams(query))
-                    .get()
-                    .stream()
-                    .map(result -> result.getName())
-                    .limit(limit)
-                    .collect(Collectors.toSet());
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
+        return server.workspaceSymbols(new WorkspaceSymbolParams(query))
+                .stream()
+                .map(result -> result.name)
+                .limit(limit)
+                .collect(Collectors.toSet());
     }
 
     private static Set<String> searchFile(URI uri) {
-        try {
-            return server.getTextDocumentService()
-                    .documentSymbol(new DocumentSymbolParams(new TextDocumentIdentifier(uri.toString())))
-                    .get()
-                    .stream()
-                    .map(result -> result.getLeft().getName())
-                    .collect(Collectors.toSet());
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
+        return server.documentSymbol(new DocumentSymbolParams(new TextDocumentIdentifier(uri)))
+                .stream()
+                .map(result -> result.name)
+                .collect(Collectors.toSet());
     }
 
     @Test

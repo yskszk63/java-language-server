@@ -45,7 +45,9 @@ class InferSourcePath {
                 var packageName = Objects.toString(Parser.parse(java).getPackageName(), "");
                 var packagePath = packageName.replace('.', File.separatorChar);
                 var dir = java.getParent();
-                if (!dir.endsWith(packagePath)) {
+                if (packagePath.isEmpty()) {
+                    return Optional.of(dir);
+                } else if (!dir.endsWith(packagePath)) {
                     LOG.warning("Java source file " + java + " is not in " + packagePath);
                     return Optional.empty();
                 } else {

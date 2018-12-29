@@ -6,9 +6,6 @@ import static org.junit.Assert.*;
 import com.google.gson.Gson;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.StringJoiner;
-import java.util.concurrent.ExecutionException;
 import org.javacs.lsp.*;
 import org.junit.Test;
 
@@ -18,34 +15,24 @@ public class CodeLensTest {
 
     private List<? extends CodeLens> lenses(String file) {
         var uri = FindResource.uri(file);
-        var params = new CodeLensParams(new TextDocumentIdentifier(uri.toString()));
-        try {
-            var lenses = server.getTextDocumentService().codeLens(params).get();
-            var resolved = new ArrayList<CodeLens>();
-            for (var lens : lenses) {
-                if (lens.getCommand() == null) {
-                    var gson = new Gson();
-                    var data = lens.getData();
-                    var dataJson = gson.toJsonTree(data);
-                    lens.setData(dataJson);
-                    lens = server.getTextDocumentService().resolveCodeLens(lens).get();
-                }
-                resolved.add(lens);
+        var params = new CodeLensParams(new TextDocumentIdentifier(uri));
+        var lenses = server.codeLens(params);
+        var resolved = new ArrayList<CodeLens>();
+        for (var lens : lenses) {
+            if (lens.command == null) {
+                var gson = new Gson();
+                var data = lens.data;
+                lens = server.resolveCodeLens(lens);
             }
-            return resolved;
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
+            resolved.add(lens);
         }
+        return resolved;
     }
 
     private List<String> commands(List<? extends CodeLens> lenses) {
         var commands = new ArrayList<String>();
         for (var lens : lenses) {
-            var command = new StringJoiner(", ");
-            for (var arg : lens.getCommand().getArguments()) {
-                command.add(Objects.toString(arg));
-            }
-            commands.add(command.toString());
+            commands.add(String.format("%s(%s)", lens.command.command, lens.command.arguments));
         }
         return commands;
     }
@@ -53,8 +40,8 @@ public class CodeLensTest {
     private List<String> titles(List<? extends CodeLens> lenses) {
         var titles = new ArrayList<String>();
         for (var lens : lenses) {
-            var line = lens.getRange().getStart().getLine() + 1;
-            var title = lens.getCommand().getTitle();
+            var line = lens.range.start.line + 1;
+            var title = lens.command.title;
             titles.add(line + ":" + title);
         }
         return titles;
@@ -66,9 +53,9 @@ public class CodeLensTest {
         assertThat(lenses, not(empty()));
 
         var commands = commands(lenses);
-        assertThat(commands, hasItem(containsString("HasTest, null")));
-        assertThat(commands, hasItem(containsString("HasTest, testMethod")));
-        assertThat(commands, hasItem(containsString("HasTest, otherTestMethod")));
+        assertThat(commands, hasItem(containsString("\"HasTest\",null")));
+        assertThat(commands, hasItem(containsString("\"HasTest\",\"testMethod\"")));
+        assertThat(commands, hasItem(containsString("\"HasTest\",\"otherTestMethod\"")));
     }
 
     @Test

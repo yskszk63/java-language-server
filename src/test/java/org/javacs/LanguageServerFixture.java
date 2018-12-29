@@ -1,8 +1,8 @@
 package org.javacs;
 
+import com.google.gson.JsonElement;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 import org.javacs.lsp.*;
@@ -16,53 +16,32 @@ class LanguageServerFixture {
     }
 
     static JavaLanguageServer getJavaLanguageServer() {
-        return getJavaLanguageServer(DEFAULT_WORKSPACE_ROOT, diagnostic -> LOG.info(diagnostic.getMessage()));
+        return getJavaLanguageServer(DEFAULT_WORKSPACE_ROOT, diagnostic -> LOG.info(diagnostic.message));
     }
 
     static JavaLanguageServer getJavaLanguageServer(Path workspaceRoot, Consumer<Diagnostic> onError) {
         return getJavaLanguageServer(
                 workspaceRoot,
-                new CustomLanguageClient() {
-                    @Override
-                    public void telemetryEvent(Object o) {}
-
-                    @Override
-                    public void publishDiagnostics(PublishDiagnosticsParams publishDiagnosticsParams) {
-                        publishDiagnosticsParams.getDiagnostics().forEach(onError);
+                new LanguageClient() {
+                    public void publishDiagnostics(PublishDiagnosticsParams params) {
+                        params.diagnostics.forEach(onError);
                     }
 
-                    @Override
-                    public void showMessage(MessageParams messageParams) {}
+                    public void showMessage(ShowMessageParams params) {}
 
-                    @Override
-                    public CompletableFuture<MessageActionItem> showMessageRequest(
-                            ShowMessageRequestParams showMessageRequestParams) {
-                        return null;
-                    }
+                    public void registerCapability(String method, JsonElement options) {}
 
-                    @Override
-                    public void logMessage(MessageParams messageParams) {}
-
-                    @Override
-                    public void javaStartProgress(JavaStartProgressParams params) {}
-
-                    @Override
-                    public void javaReportProgress(JavaReportProgressParams params) {}
-
-                    @Override
-                    public void javaEndProgress() {}
+                    public void customNotification(String method, JsonElement params) {}
                 });
     }
 
-    private static JavaLanguageServer getJavaLanguageServer(Path workspaceRoot, CustomLanguageClient client) {
-        var server = new JavaLanguageServer();
+    private static JavaLanguageServer getJavaLanguageServer(Path workspaceRoot, LanguageClient client) {
+        var server = new JavaLanguageServer(client);
         var init = new InitializeParams();
 
-        init.setRootUri(workspaceRoot.toUri().toString());
-
-        server.installClient(client);
+        init.rootUri = workspaceRoot.toUri();
         server.initialize(init);
-        server.initialized(null);
+        server.initialized();
 
         return server;
     }

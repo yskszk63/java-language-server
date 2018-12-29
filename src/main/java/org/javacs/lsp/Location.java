@@ -3,6 +3,13 @@ package org.javacs.lsp;
 import java.net.URI;
 
 public class Location {
-    URI uri;
-    Range range;
+    public URI uri;
+    public Range range;
+
+    public Location() {}
+
+    public Location(URI uri, Range range) {
+        this.uri = uri;
+        this.range = range;
+    }
 }

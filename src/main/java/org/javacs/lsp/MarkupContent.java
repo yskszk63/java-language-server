@@ -1,6 +1,12 @@
 package org.javacs.lsp;
 
 public class MarkupContent {
-    public MarkupKind kind;
-    public String value;
+    public String kind, value;
+
+    public MarkupContent() {}
+
+    public MarkupContent(String kind, String value) {
+        this.kind = kind;
+        this.value = value;
+    }
 }

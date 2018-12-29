@@ -65,10 +65,24 @@ public class LanguageServerTest {
             throws IOException, InterruptedException, ExecutionException, TimeoutException {
         // Send initialize message and wait for ack
         sendToServer(initializeMessage);
-        receivedInitialize.get(1, TimeUnit.SECONDS);
+        receivedInitialize.get(10, TimeUnit.SECONDS);
         // Send exit message and wait for exit
         sendToServer(exitMessage);
-        main.join(1000);
+        main.join(10_000);
+        assertThat("Main thread has quit", main.isAlive(), equalTo(false));
+    }
+
+    @Test
+    public void endOfStreamKillsServer()
+            throws IOException, InterruptedException, ExecutionException, TimeoutException {
+        // Send initialize message and wait for ack
+        sendToServer(initializeMessage);
+        receivedInitialize.get(10, TimeUnit.SECONDS);
+        // Close stream
+        writeClientToServer.close();
+        clientToServer.close();
+        // Wait for exit
+        main.join(10_000);
         assertThat("Main thread has quit", main.isAlive(), equalTo(false));
     }
 }

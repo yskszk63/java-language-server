@@ -22,6 +22,8 @@
 ## Navigation
 - Go-to-subclasses
 - Test coverage codelens
+- Go-to-definition for overriding methods
+- Go-to-implementation for overridden methods
 
 ## Polish
 - Convert {@tag ...} to `<tag>...</tag>` (see vscode-java)
@@ -30,6 +32,8 @@
 - String.format(...) coloring
 - `new` should be a control keyword, not a regular keyword
 - Show warning for unused local var, unused private method
+- Use cached codelens during parse errors to prevent things from jumping around, or codelens-on-save
+- Suppress references codelens for inherited methods
 
 ## Simplicity
 - Use module-info.java instead of build files to figure out classpath

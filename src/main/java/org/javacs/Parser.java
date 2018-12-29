@@ -91,7 +91,7 @@ class Parser {
         return true;
     }
 
-    private static void onError(Diagnostic<? extends JavaFileObject> err) {
+    private static void onError(javax.tools.Diagnostic<? extends JavaFileObject> err) {
         // Too noisy, this only comes up in parse tasks which tend to be less important
         // LOG.warning(err.getMessage(Locale.getDefault()));
     }
@@ -185,11 +185,10 @@ class Parser {
         int startLine = (int) lines.getLineNumber(start) - 1, startCol = (int) lines.getColumnNumber(start) - 1;
         int endLine = (int) lines.getLineNumber(end) - 1, endCol = (int) lines.getColumnNumber(end) - 1;
         var dUri = cu.getSourceFile().toUri();
-        return new Location(
-                dUri.toString(), new Range(new Position(startLine, startCol), new Position(endLine, endCol)));
+        return new Location(dUri, new Range(new Position(startLine, startCol), new Position(endLine, endCol)));
     }
 
-    private static SymbolKind asSymbolKind(Tree.Kind k) {
+    private static Integer asSymbolKind(Tree.Kind k) {
         switch (k) {
             case ANNOTATION_TYPE:
             case CLASS:
@@ -247,10 +246,10 @@ class Parser {
     static SymbolInformation asSymbolInformation(TreePath path) {
         var i = new SymbolInformation();
         var t = path.getLeaf();
-        i.setKind(asSymbolKind(t.getKind()));
-        i.setName(symbolName(t));
-        i.setContainerName(containerName(path));
-        i.setLocation(Parser.location(path));
+        i.kind = asSymbolKind(t.getKind());
+        i.name = symbolName(t);
+        i.containerName = containerName(path);
+        i.location = Parser.location(path);
         return i;
     }
 

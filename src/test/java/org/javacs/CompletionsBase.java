@@ -2,7 +2,6 @@ package org.javacs;
 
 import com.google.gson.Gson;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -18,9 +17,9 @@ public class CompletionsBase {
     }
 
     static String itemInsertTemplate(CompletionItem i) {
-        var text = i.getInsertText();
+        var text = i.insertText;
 
-        if (text == null) text = i.getLabel();
+        if (text == null) text = i.label;
 
         assert text != null : "Either insertText or label must be defined";
 
@@ -37,9 +36,9 @@ public class CompletionsBase {
         var items = items(file, row, column);
         var result = new HashSet<String>();
         for (var i : items) {
-            i.setData(new Gson().toJsonTree(i.getData()));
+            i.data = new Gson().toJsonTree(i.data);
             var resolved = resolve(i);
-            result.add(resolved.getDetail());
+            result.add(resolved.detail);
         }
         return result;
     }
@@ -59,9 +58,9 @@ public class CompletionsBase {
     }
 
     static String itemInsertText(CompletionItem i) {
-        var text = i.getInsertText();
+        var text = i.insertText;
 
-        if (text == null) text = i.getLabel();
+        if (text == null) text = i.label;
 
         assert text != null : "Either insertText or label must be defined";
 
@@ -76,8 +75,7 @@ public class CompletionsBase {
         return items.stream()
                 .flatMap(
                         i -> {
-                            if (i.getDocumentation() != null)
-                                return Stream.of(i.getDocumentation().getRight().getValue().trim());
+                            if (i.documentation != null) return Stream.of(i.documentation.value.trim());
                             else return Stream.empty();
                         })
                 .collect(Collectors.toSet());
@@ -88,20 +86,12 @@ public class CompletionsBase {
     protected List<? extends CompletionItem> items(String file, int row, int column) {
         var uri = FindResource.uri(file);
         var position =
-                new CompletionParams(new TextDocumentIdentifier(uri.toString()), new Position(row - 1, column - 1));
+                new TextDocumentPositionParams(new TextDocumentIdentifier(uri), new Position(row - 1, column - 1));
 
-        try {
-            return server.getTextDocumentService().completion(position).get().getRight().getItems();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
+        return server.completion(position).get().items;
     }
 
     protected CompletionItem resolve(CompletionItem item) {
-        try {
-            return server.getTextDocumentService().resolveCompletionItem(item).get();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
+        return server.resolveCompletionItem(item);
     }
 }

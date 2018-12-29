@@ -99,4 +99,8 @@ public class LanguageServer {
     public void didChangeWorkspaceFolders(DidChangeWorkspaceFoldersParams params) {
         throw new RuntimeException("Unimplemented");
     }
+
+    public List<TextEdit> formatting(DocumentFormattingParams params) {
+        throw new RuntimeException("Unimplemented");
+    }
 }

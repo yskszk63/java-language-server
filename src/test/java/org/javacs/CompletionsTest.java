@@ -215,8 +215,8 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     private static String sortText(CompletionItem i) {
-        if (i.getSortText() != null) return i.getSortText();
-        else return i.getLabel();
+        if (i.sortText != null) return i.sortText;
+        else return i.label;
     }
 
     @Test
@@ -288,9 +288,9 @@ public class CompletionsTest extends CompletionsBase {
         var items = items(file, 9, 17);
 
         for (var item : items) {
-            if ("ArrayList".equals(item.getLabel())) {
-                assertThat(item.getAdditionalTextEdits(), not(nullValue()));
-                assertThat(item.getAdditionalTextEdits(), not(empty()));
+            if ("ArrayList".equals(item.label)) {
+                assertThat(item.additionalTextEdits, not(nullValue()));
+                assertThat(item.additionalTextEdits, not(empty()));
 
                 return;
             }
@@ -308,8 +308,8 @@ public class CompletionsTest extends CompletionsBase {
         var items = items(file, 6, 10);
 
         for (var item : items) {
-            if ("AutocompleteMember".equals(item.getLabel())) {
-                assertThat(item.getAdditionalTextEdits(), either(empty()).or(nullValue()));
+            if ("AutocompleteMember".equals(item.label)) {
+                assertThat(item.additionalTextEdits, either(empty()).or(nullValue()));
 
                 return;
             }
@@ -327,8 +327,8 @@ public class CompletionsTest extends CompletionsBase {
         var items = items(file, 11, 38);
 
         for (var item : items) {
-            if ("ArrayIndexOutOfBoundsException".equals(item.getLabel())) {
-                assertThat(item.getAdditionalTextEdits(), either(empty()).or(nullValue()));
+            if ("ArrayIndexOutOfBoundsException".equals(item.label)) {
+                assertThat(item.additionalTextEdits, either(empty()).or(nullValue()));
 
                 return;
             }
@@ -346,8 +346,8 @@ public class CompletionsTest extends CompletionsBase {
         var items = items(file, 6, 10);
 
         for (var item : items) {
-            if ("AutocompleteOther".equals(item.getLabel())) {
-                assertThat(item.getAdditionalTextEdits(), either(empty()).or(nullValue()));
+            if ("AutocompleteOther".equals(item.label)) {
+                assertThat(item.additionalTextEdits, either(empty()).or(nullValue()));
 
                 return;
             }
@@ -365,8 +365,8 @@ public class CompletionsTest extends CompletionsBase {
         var items = items(file, 12, 14);
 
         for (var item : items) {
-            if ("Arrays".equals(item.getLabel())) {
-                assertThat(item.getAdditionalTextEdits(), either(empty()).or(nullValue()));
+            if ("Arrays".equals(item.label)) {
+                assertThat(item.additionalTextEdits, either(empty()).or(nullValue()));
 
                 return;
             }
@@ -384,8 +384,8 @@ public class CompletionsTest extends CompletionsBase {
         var items = items(file, 10, 26);
 
         for (var item : items) {
-            if ("ArrayBlockingQueue".equals(item.getLabel())) {
-                assertThat(item.getAdditionalTextEdits(), either(empty()).or(nullValue()));
+            if ("ArrayBlockingQueue".equals(item.label)) {
+                assertThat(item.additionalTextEdits, either(empty()).or(nullValue()));
 
                 return;
             }
@@ -400,7 +400,7 @@ public class CompletionsTest extends CompletionsBase {
 
         // Static methods
         var items = items(file, 8, 17);
-        var suggestions = items.stream().map(i -> i.getLabel()).collect(Collectors.toSet());
+        var suggestions = items.stream().map(i -> i.label).collect(Collectors.toSet());
 
         assertThat(suggestions, hasItems("add", "addAll"));
     }
@@ -476,8 +476,8 @@ public class CompletionsTest extends CompletionsBase {
 
         // Static methods
         var items = items(file, 5, 18);
-        var suggestions = items.stream().map(i -> i.getLabel()).collect(Collectors.toSet());
-        var details = items.stream().map(i -> i.getDetail()).collect(Collectors.toSet());
+        var suggestions = items.stream().map(i -> i.label).collect(Collectors.toSet());
+        var details = items.stream().map(i -> i.detail).collect(Collectors.toSet());
 
         assertThat(suggestions, hasItems("restMethod"));
         assertThat(details, hasItems("void (String... params)"));
@@ -501,14 +501,13 @@ public class CompletionsTest extends CompletionsBase {
 
         // Static methods
         var items = items(file, 6, 19);
-        var suggestions = Lists.transform(items, i -> i.getInsertText());
+        var suggestions = Lists.transform(items, i -> i.insertText);
 
         assertThat(suggestions, hasItems("ArrayList<>($0)"));
 
         for (var each : items) {
-            if (each.getInsertText().equals("ArrayList<>"))
-                assertThat(
-                        "new ? auto-imports", each.getAdditionalTextEdits(), both(not(empty())).and(not(nullValue())));
+            if (each.insertText.equals("ArrayList<>"))
+                assertThat("new ? auto-imports", each.additionalTextEdits, both(not(empty())).and(not(nullValue())));
         }
     }
 
@@ -557,17 +556,17 @@ public class CompletionsTest extends CompletionsBase {
 
         // Static methods
         var items = items(file, 4, 25);
-        var suggestions = Lists.transform(items, i -> i.getLabel());
+        var suggestions = Lists.transform(items, i -> i.label);
 
         assertThat(suggestions, hasItems("OtherPackagePublic"));
         assertThat(suggestions, not(hasItems("OtherPackagePrivate")));
 
         // Imports are now being managed by FixImports
         // for (var item : items) {
-        //     if (item.getLabel().equals("OtherPackagePublic"))
+        //     if (item.label.equals("OtherPackagePublic"))
         //         assertThat(
         //                 "Don't import when completing imports",
-        //                 item.getAdditionalTextEdits(),
+        //                 item.additionalTextEdits,
         //                 either(empty()).or(nullValue()));
         // }
     }
@@ -578,14 +577,14 @@ public class CompletionsTest extends CompletionsBase {
 
         // Static methods
         var items = items(file, 5, 14);
-        var suggestions = Lists.transform(items, i -> i.getLabel());
+        var suggestions = Lists.transform(items, i -> i.label);
 
         assertThat(suggestions, hasItems("OtherPackagePublic"));
         assertThat(suggestions, not(hasItems("OtherPackagePrivate")));
 
         // for (var item : items) {
-        //     if (item.getLabel().equals("OtherPackagePublic"))
-        //         assertThat("Auto-import OtherPackagePublic", item.getAdditionalTextEdits(), not(empty()));
+        //     if (item.label.equals("OtherPackagePublic"))
+        //         assertThat("Auto-import OtherPackagePublic", item.additionalTextEdits, not(empty()));
         // }
     }
 

@@ -3,11 +3,9 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
-import java.net.URI;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import org.javacs.lsp.*;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -128,30 +126,24 @@ public class GotoTest {
     private List<String> doGoto(String file, int row, int column) {
         TextDocumentIdentifier document = new TextDocumentIdentifier();
 
-        document.setUri(FindResource.uri(file).toString());
+        document.uri = FindResource.uri(file);
 
         Position position = new Position();
 
-        position.setLine(row);
-        position.setCharacter(column);
+        position.line = row;
+        position.character = column;
 
         TextDocumentPositionParams p = new TextDocumentPositionParams();
 
-        p.setTextDocument(document);
-        p.setPosition(position);
+        p.textDocument = document;
+        p.position = position;
 
-        // TODO extends is not coloring correctly
-        List<? extends Location> locations;
-        try {
-            locations = server.getTextDocumentService().definition(p).get();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
+        var locations = server.gotoDefinition(p);
         var strings = new ArrayList<String>();
         for (var l : locations) {
-            var fileName = Paths.get(URI.create(l.getUri())).getFileName();
-            var start = l.getRange().getStart();
-            strings.add(String.format("%s:%d", fileName, start.getLine() + 1));
+            var fileName = Paths.get(l.uri).getFileName();
+            var start = l.range.start;
+            strings.add(String.format("%s:%d", fileName, start.line + 1));
         }
         return strings;
     }

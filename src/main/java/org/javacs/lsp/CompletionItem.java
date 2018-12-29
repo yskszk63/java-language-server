@@ -1,6 +1,6 @@
 package org.javacs.lsp;
 
-import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import java.util.List;
 
 public class CompletionItem {
@@ -9,10 +9,11 @@ public class CompletionItem {
     public String detail;
     public MarkupContent documentation;
     public boolean deprecated, preselect;
-    public String sortText, filterText, insertText, insertTextFormat;
+    public String sortText, filterText, insertText;
+    public int insertTextFormat;
     public TextEdit textEdit;
     public List<TextEdit> additionalTextEdits;
     public List<Character> commitCharacters;
     public Command command;
-    public JsonArray data;
+    public JsonElement data;
 }

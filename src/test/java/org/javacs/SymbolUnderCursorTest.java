@@ -4,7 +4,6 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
 import java.util.StringJoiner;
-import java.util.concurrent.ExecutionException;
 import org.javacs.lsp.*;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -108,18 +107,10 @@ public class SymbolUnderCursorTest {
     private String symbolAt(String file, int line, int character) {
         var pos =
                 new TextDocumentPositionParams(
-                        new TextDocumentIdentifier(FindResource.uri(file).toString()),
-                        new Position(line - 1, character - 1));
+                        new TextDocumentIdentifier(FindResource.uri(file)), new Position(line - 1, character - 1));
         var result = new StringJoiner("\n");
-        try {
-            server.getTextDocumentService()
-                    .hover(pos)
-                    .get()
-                    .getContents()
-                    .getLeft()
-                    .forEach(hover -> result.add(hover.isLeft() ? hover.getLeft() : hover.getRight().getValue()));
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
+        for (var h : server.hover(pos).get().contents) {
+            result.add(h.value);
         }
         return result.toString();
     }

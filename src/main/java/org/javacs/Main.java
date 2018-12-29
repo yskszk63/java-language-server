@@ -1,6 +1,5 @@
 package org.javacs;
 
-import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.javacs.lsp.*;
@@ -14,25 +13,16 @@ public class Main {
         for (var h : root.getHandlers()) h.setFormatter(new LogFormat());
     }
 
+    private JavaLanguageServer createServer(LanguageClient client) {
+        return new JavaLanguageServer(client);
+    }
+
     public static void main(String[] args) {
         try {
             // Logger.getLogger("").addHandler(new FileHandler("javacs.%u.log", false));
             setRootFormat();
 
-            var server = new JavaLanguageServer();
-            var threads = Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "client"));
-            var launcher =
-                    new Launcher.Builder<CustomLanguageClient>()
-                            .setLocalService(server)
-                            .setRemoteInterface(CustomLanguageClient.class)
-                            .setInput(System.in)
-                            .setOutput(System.out)
-                            .setExecutorService(threads)
-                            .create();
-
-            server.installClient(launcher.getRemoteProxy());
-            launcher.startListening();
-            LOG.info(String.format("java.version is %s", System.getProperty("java.version")));
+            LSP.connect(JavaLanguageServer::new, System.in, System.out);
         } catch (Throwable t) {
             LOG.log(Level.SEVERE, t.getMessage(), t);
 
