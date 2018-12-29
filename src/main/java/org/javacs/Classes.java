@@ -152,7 +152,7 @@ class Classes {
 
                 try {
                     return Optional.of(ClassLoader.getPlatformClassLoader().loadClass(className));
-                } catch (ClassNotFoundException | NoClassDefFoundError e) {
+                } catch (ClassNotFoundException | NoClassDefFoundError | ClassFormatError e) {
                     LOG.log(Level.WARNING, "Could not load " + className + ": " + e.getMessage());
                     loadError.add(className);
                     return Optional.empty();
@@ -195,7 +195,7 @@ class Classes {
 
                 try {
                     return Optional.of(classLoader.loadClass(className));
-                } catch (ClassNotFoundException | NoClassDefFoundError e) {
+                } catch (ClassNotFoundException | NoClassDefFoundError | ClassFormatError e) {
                     LOG.log(Level.WARNING, "Could not load " + className + ": " + e.getMessage());
                     loadError.add(className);
                     return Optional.empty();
