@@ -8,8 +8,6 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.*;
 import java.util.function.*;
 import java.util.logging.Level;
@@ -602,23 +600,6 @@ public class CompileFocus {
                 }
             }
 
-            // TODO profile info probably isn't necessary anymore now that we skip the slow stages
-            StringBuilder profile = new StringBuilder();
-            Instant started = Instant.now();
-
-            void profileEnd(Scope s) {
-                var ended = Instant.now();
-                var elapsed = Duration.between(started, ended);
-                var ms = elapsed.getSeconds() * 1000 + elapsed.getNano() / 1000 / 1000;
-                profile.append("\n\t").append(s);
-                profile.append(String.format("\n\t\t%dms", ms));
-                started = ended;
-            }
-
-            void printProfile() {
-                LOG.info(profile.toString());
-            }
-
             // Walk each enclosing scope, placing its members into `results`
             List<Element> walkScopes() {
                 var scopes = new ArrayList<Scope>();
@@ -633,15 +614,12 @@ public class CompileFocus {
                 for (var i = 0; i < scopes.size() - 2; i++) {
                     var s = scopes.get(i);
                     walkLocals(s);
-                    profileEnd(s);
                     // Return early?
                     if (tooManyItems(result.size())) {
-                        printProfile();
                         return result;
                     }
                 }
 
-                printProfile();
                 return result;
             }
         }
