@@ -271,6 +271,7 @@ public class JavaCompilerService {
         // Filter for files that import toPackage.toClass
         var result = new LinkedHashSet<URI>();
         for (var dir : sourcePath) {
+            // TODO folders can get deleted, need to re-create compiler at that point
             for (var file : javaSourcesInDir(dir)) {
                 if (importsAnyClass(toPackage, toClasses, file)) {
                     result.add(file.toUri());
@@ -344,7 +345,7 @@ public class JavaCompilerService {
         var result = new ArrayList<TreePath>();
         var files = allJavaSources();
         for (var file : files) {
-            if (!Parser.containsWordMatching(file, query)) continue;
+            if (!Parser.containsText(file, query)) continue;
             LOG.info(String.format("...%s contains text matches", file.getFileName()));
             var parse = Parser.parse(file);
             var symbols = Parser.findSymbolsMatching(parse, query);

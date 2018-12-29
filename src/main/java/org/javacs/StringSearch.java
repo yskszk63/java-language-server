@@ -1,5 +1,8 @@
 package org.javacs;
 
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+
 // Translated from https://golang.org/src/strings/search.go
 
 // Search efficiently finds strings in a source text. It's implemented
@@ -86,22 +89,22 @@ class StringSearch {
     }
 
     int next(String text) {
-        return next(text.getBytes());
+        return next(ByteBuffer.wrap(text.getBytes()));
     }
 
-    int next(byte[] text) {
+    int next(ByteBuffer text) {
         var i = pattern.length - 1;
-        while (i < text.length) {
+        while (i < text.capacity()) {
             // Compare backwards from the end until the first unmatching character.
             var j = pattern.length - 1;
-            while (j >= 0 && text[i] == pattern[j]) {
+            while (j >= 0 && text.get(i) == pattern[j]) {
                 i--;
                 j--;
             }
             if (j < 0) {
                 return i + 1; // match
             }
-            i += Math.max(badCharSkip[text[i] + 128], goodSuffixSkip[j]);
+            i += Math.max(badCharSkip[text.get(i) + 128], goodSuffixSkip[j]);
         }
         return -1;
     }
@@ -121,6 +124,18 @@ class StringSearch {
             }
         }
         return i;
+    }
+
+    private static class TextStream {
+        int offset;
+        private byte[] head;
+        private InputStream tail;
+
+        TextStream(InputStream bytes) {}
+
+        void move(int from, int to) {}
+
+        void get(int i) {}
     }
 
     private static class Slice {

@@ -5,6 +5,7 @@ import com.sun.source.util.*;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -114,13 +115,10 @@ class Parser {
 
     // TODO try working on inputstream rather than lines
     static boolean containsText(Path java, String query) {
-        try {
-            var search = new StringSearch(query);
-            var reader = Files.newBufferedReader(java);
-            for (var line = reader.readLine(); line != null; line = reader.readLine()) {
-                if (search.next(line) != -1) return true;
-            }
-            return false;
+        var search = new StringSearch(query);
+        try (var chan = FileChannel.open(java)) {
+            var buffer = chan.map(FileChannel.MapMode.READ_ONLY, 0, chan.size());
+            return search.next(buffer) != -1;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
