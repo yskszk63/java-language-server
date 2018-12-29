@@ -46,7 +46,8 @@ class InferSourcePath {
                 var packagePath = packageName.replace('.', File.separatorChar);
                 var dir = java.getParent();
                 if (packagePath.isEmpty()) {
-                    return Optional.of(dir);
+                    LOG.warning("Ignoring file with missing package declaration " + java);
+                    return Optional.empty();
                 } else if (!dir.endsWith(packagePath)) {
                     LOG.warning("Java source file " + java + " is not in " + packagePath);
                     return Optional.empty();

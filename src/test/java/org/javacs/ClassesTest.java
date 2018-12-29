@@ -3,11 +3,11 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-import com.google.common.reflect.ClassPath;
 import java.net.URI;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.util.Collections;
+import org.javacs.guava.ClassPath;
 import org.junit.Ignore;
 import org.junit.Test;
 

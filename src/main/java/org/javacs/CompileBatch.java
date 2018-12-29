@@ -191,7 +191,11 @@ public class CompileBatch {
         var refs = new ArrayList<Ptr>();
         class IndexFile extends TreePathScanner<Void, Void> {
             void check(TreePath from) {
-                ref(from).map(Ptr::new).ifPresent(refs::add);
+                var r = ref(from);
+                if (r.isPresent()) {
+                    var ptr = new Ptr(r.get());
+                    refs.add(ptr);
+                }
             }
 
             @Override
@@ -219,10 +223,11 @@ public class CompileBatch {
             }
         }
         new IndexFile().scan(root, null);
-        if (refs.size() > 0)
-            LOG.info(
-                    String.format(
-                            "Found %d refs in %s", refs.size(), Paths.get(root.getSourceFile().toUri()).getFileName()));
+        if (refs.size() > 0) {
+            var n = refs.size();
+            var file = Parser.fileName(root.getSourceFile().toUri());
+            LOG.info(String.format("Found %d refs in %s", n, file));
+        }
         return refs;
     }
 

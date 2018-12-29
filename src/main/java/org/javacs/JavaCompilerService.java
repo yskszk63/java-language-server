@@ -265,16 +265,15 @@ public class JavaCompilerService {
         return Optional.empty();
     }
 
-    private List<URI> potentialReferencesToClasses(String toPackage, List<String> toClasses) {
-        // Enumerate all files on source path
-        var allFiles = allJavaSources();
+    // TODO should probably cache this
+    private Collection<URI> potentialReferencesToClasses(String toPackage, List<String> toClasses) {
         // Filter for files that import toPackage.toClass
-        // TODO should probably cache this
-        var result = new ArrayList<URI>();
-        int nScanned = 0;
+        var result = new LinkedHashSet<URI>();
         for (var dir : sourcePath) {
             for (var file : javaSourcesInDir(dir)) {
-                if (importsAnyClass(toPackage, toClasses, file)) result.add(file.toUri());
+                if (importsAnyClass(toPackage, toClasses, file)) {
+                    result.add(file.toUri());
+                }
             }
         }
         return result;
@@ -296,7 +295,7 @@ public class JavaCompilerService {
 
     private Map<URI, Index> index = new HashMap<>();
 
-    private void updateIndex(List<URI> possible) {
+    private void updateIndex(Collection<URI> possible) {
         LOG.info(String.format("Check %d files for modifications compared to index...", possible.size()));
         var outOfDate = new ArrayList<URI>();
         for (var p : possible) {

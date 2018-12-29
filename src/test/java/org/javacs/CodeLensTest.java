@@ -3,7 +3,6 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-import com.google.gson.Gson;
 import java.util.ArrayList;
 import java.util.List;
 import org.javacs.lsp.*;
@@ -20,8 +19,6 @@ public class CodeLensTest {
         var resolved = new ArrayList<CodeLens>();
         for (var lens : lenses) {
             if (lens.command == null) {
-                var gson = new Gson();
-                var data = lens.data;
                 lens = server.resolveCodeLens(lens);
             }
             resolved.add(lens);
