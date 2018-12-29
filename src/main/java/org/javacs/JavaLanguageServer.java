@@ -17,6 +17,8 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -285,6 +287,7 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public Optional<CompletionList> completion(TextDocumentPositionParams position) {
+        var started = Instant.now();
         var uri = position.textDocument.uri;
         var content = contents(uri).content;
         var line = position.position.line + 1;
@@ -372,6 +375,11 @@ class JavaLanguageServer extends LanguageServer {
 
             result.add(i);
         }
+        // Log timing
+        var elapsedMs = Duration.between(started, Instant.now()).toMillis();
+        if (isIncomplete) LOG.info(String.format("Found %d items (incomplete) in %,d ms", result.size(), elapsedMs));
+        else LOG.info(String.format("...found %d items in %,d ms", result.size(), elapsedMs));
+
         return Optional.of(new CompletionList(isIncomplete, result));
     }
 
