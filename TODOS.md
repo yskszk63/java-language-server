@@ -34,6 +34,7 @@
 - Use cached codelens during parse errors to prevent things from jumping around, or codelens-on-save
 - Suppress references codelens for inherited methods
 - '1 reference' should just jump to definition instead of showing peek
+- Don't remove imports when there's an unresolved reference to that name
 
 ## Simplicity
 - Use module-info.java instead of build files to figure out classpath

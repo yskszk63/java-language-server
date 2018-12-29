@@ -95,6 +95,7 @@ class Parser {
 
     private static final Pattern WORD = Pattern.compile("\\b\\w+\\b");
 
+    // TODO cache the progress made by searching shorter queries
     static boolean containsWordMatching(Path java, String query) {
         try {
             var reader = Files.newBufferedReader(java);
@@ -111,6 +112,7 @@ class Parser {
         }
     }
 
+    // TODO try working on inputstream rather than lines
     static boolean containsText(Path java, String query) {
         try {
             var search = new StringSearch(query);
