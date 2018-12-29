@@ -27,7 +27,6 @@
 
 ## Polish
 - Convert {@tag ...} to `<tag>...</tag>` (see vscode-java)
-- Auto-collapse imports
 - Hover constructor should show constructor, not class
 - String.format(...) coloring
 - `new` should be a control keyword, not a regular keyword

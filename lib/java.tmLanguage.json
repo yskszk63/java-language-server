@@ -523,7 +523,7 @@
 					"end": "(?=[,;}\\)])|$",
 					"beginCaptures": {
 						"1": {
-							"name": "keyword.other.new"
+							"name": "keyword.control"
 						}
 					},
 					"name": "meta.new.java",

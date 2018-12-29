@@ -339,7 +339,16 @@ public class CompileFocus {
     }
 
     public static String[] TOP_LEVEL_KEYWORDS = {
-        "package", "import", "public", "private", "protected", "abstract", "class", "interface", "implements",
+        "package",
+        "import",
+        "public",
+        "private",
+        "protected",
+        "abstract",
+        "class",
+        "interface",
+        "extends",
+        "implements",
     };
 
     private static String[] CLASS_BODY_KEYWORDS = {
