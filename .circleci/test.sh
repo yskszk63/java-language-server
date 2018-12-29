@@ -17,4 +17,5 @@ java -cp $(cat cp.txt):$(pwd)/target/classes:$(pwd)/target/test-classes org.juni
     org.javacs.SignatureHelpTest \
     org.javacs.SymbolUnderCursorTest \
     org.javacs.TipFormatterTest \
-    org.javacs.UrlsTest 
+    org.javacs.lsp.LanguageServerTest \
+    org.javacs.lsp.LspTest 

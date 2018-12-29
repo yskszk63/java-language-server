@@ -38,8 +38,6 @@
 
 ## Simplicity
 - Use module-info.java instead of build files to figure out classpath
-- Link a standalone executable with jlink (scripts/link.sh)
-- Reduce use of TreePath, use ids instead
 
 ## JShell
 - Support .jshell extension as "scratch pad"

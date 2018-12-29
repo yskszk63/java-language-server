@@ -1,6 +1,8 @@
 /out
 /node_modules
 /target
+/dist
+/modules/gson.jar
 
 /dependency-reduced-pom.xml
 /classpath.txt

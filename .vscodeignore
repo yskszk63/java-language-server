@@ -19,6 +19,7 @@ repo/**
 scripts/**
 lib/**
 images/**
+modules/**
 !lib/src.zip
 !lib/error_prone.jar
 !lib/java.tmLanguage.json

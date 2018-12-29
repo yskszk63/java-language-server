@@ -24,9 +24,6 @@
         "onLanguage:java"
     ],
     "main": "./out/lib/extension",
-    "files": [
-        "./out/fat-jar.jar"
-    ],
     "contributes": {
         "languages": [
             {
