@@ -14,37 +14,23 @@
 
 package org.javacs.guava;
 
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.StandardSystemProperty.JAVA_CLASS_PATH;
-import static com.google.common.base.StandardSystemProperty.PATH_SEPARATOR;
 import static java.util.logging.Level.WARNING;
 
-import com.google.common.base.CharMatcher;
-import com.google.common.base.Predicate;
-import com.google.common.base.Splitter;
-import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
-import com.google.common.collect.MultimapBuilder;
-import com.google.common.collect.SetMultimap;
-import com.google.common.collect.Sets;
-import com.google.common.io.ByteSource;
-import com.google.common.io.CharSource;
-import com.google.common.io.Resources;
-import com.google.common.reflect.Reflection;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -53,6 +39,8 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Scans the source of a {@link ClassLoader} and finds all loadable classes and resources.
@@ -75,22 +63,11 @@ import java.util.logging.Logger;
 public final class ClassPath {
     private static final Logger logger = Logger.getLogger(ClassPath.class.getName());
 
-    private static final Predicate<ClassInfo> IS_TOP_LEVEL =
-            new Predicate<ClassInfo>() {
-                @Override
-                public boolean apply(ClassInfo info) {
-                    return info.className.indexOf('$') == -1;
-                }
-            };
-
-    /** Separator for the Class-Path manifest attribute value in jar files. */
-    private static final Splitter CLASS_PATH_ATTRIBUTE_SEPARATOR = Splitter.on(" ").omitEmptyStrings();
-
     private static final String CLASS_FILE_NAME_EXTENSION = ".class";
 
-    private final ImmutableSet<ResourceInfo> resources;
+    private final Set<ResourceInfo> resources;
 
-    private ClassPath(ImmutableSet<ResourceInfo> resources) {
+    private ClassPath(Set<ResourceInfo> resources) {
         this.resources = resources;
     }
 
@@ -119,8 +96,13 @@ public final class ClassPath {
      * Returns all resources loadable from the current class path, including the class files of all loadable classes but
      * excluding the "META-INF/MANIFEST.MF" file.
      */
-    public ImmutableSet<ResourceInfo> getResources() {
+    public Set<ResourceInfo> getResources() {
         return resources;
+    }
+
+    private Stream<ClassInfo> filterClassInfo(Object any) {
+        if (any instanceof ClassInfo) return Stream.of((ClassInfo) any);
+        else return Stream.empty();
     }
 
     /**
@@ -128,41 +110,45 @@ public final class ClassPath {
      *
      * @since 16.0
      */
-    public ImmutableSet<ClassInfo> getAllClasses() {
-        return FluentIterable.from(resources).filter(ClassInfo.class).toSet();
+    public Set<ClassInfo> getAllClasses() {
+        return resources.stream().flatMap(this::filterClassInfo).collect(Collectors.toSet());
+    }
+
+    private boolean isTopLevel(ClassInfo info) {
+        return info.className.indexOf('$') == -1;
     }
 
     /** Returns all top level classes loadable from the current class path. */
-    public ImmutableSet<ClassInfo> getTopLevelClasses() {
-        return FluentIterable.from(resources).filter(ClassInfo.class).filter(IS_TOP_LEVEL).toSet();
+    public Set<ClassInfo> getTopLevelClasses() {
+        return resources.stream().flatMap(this::filterClassInfo).filter(this::isTopLevel).collect(Collectors.toSet());
     }
 
     /** Returns all top level classes whose package name is {@code packageName}. */
-    public ImmutableSet<ClassInfo> getTopLevelClasses(String packageName) {
-        checkNotNull(packageName);
-        ImmutableSet.Builder<ClassInfo> builder = ImmutableSet.builder();
+    public Set<ClassInfo> getTopLevelClasses(String packageName) {
+        assert packageName != null;
+        var builder = new HashSet<ClassInfo>();
         for (ClassInfo classInfo : getTopLevelClasses()) {
             if (classInfo.getPackageName().equals(packageName)) {
                 builder.add(classInfo);
             }
         }
-        return builder.build();
+        return builder;
     }
 
     /**
      * Returns all top level classes whose package name is {@code packageName} or starts with {@code packageName}
      * followed by a '.'.
      */
-    public ImmutableSet<ClassInfo> getTopLevelClassesRecursive(String packageName) {
-        checkNotNull(packageName);
+    public Set<ClassInfo> getTopLevelClassesRecursive(String packageName) {
+        assert packageName != null;
         String packagePrefix = packageName + '.';
-        ImmutableSet.Builder<ClassInfo> builder = ImmutableSet.builder();
+        var builder = new HashSet<ClassInfo>();
         for (ClassInfo classInfo : getTopLevelClasses()) {
             if (classInfo.getName().startsWith(packagePrefix)) {
                 builder.add(classInfo);
             }
         }
-        return builder.build();
+        return builder;
     }
 
     /**
@@ -185,8 +171,10 @@ public final class ClassPath {
         }
 
         ResourceInfo(String resourceName, ClassLoader loader) {
-            this.resourceName = checkNotNull(resourceName);
-            this.loader = checkNotNull(loader);
+            assert resourceName != null;
+            assert loader != null;
+            this.resourceName = resourceName;
+            this.loader = loader;
         }
 
         /**
@@ -203,29 +191,6 @@ public final class ClassPath {
                 throw new NoSuchElementException(resourceName);
             }
             return url;
-        }
-
-        /**
-         * Returns a {@link ByteSource} view of the resource from which its bytes can be read.
-         *
-         * @throws NoSuchElementException if the resource cannot be loaded through the class loader, despite physically
-         *     existing in the class path.
-         * @since 20.0
-         */
-        public final ByteSource asByteSource() {
-            return Resources.asByteSource(url());
-        }
-
-        /**
-         * Returns a {@link CharSource} view of the resource from which its bytes can be read as characters decoded with
-         * the given {@code charset}.
-         *
-         * @throws NoSuchElementException if the resource cannot be loaded through the class loader, despite physically
-         *     existing in the class path.
-         * @since 20.0
-         */
-        public final CharSource asCharSource(Charset charset) {
-            return Resources.asCharSource(url(), charset);
         }
 
         /** Returns the fully qualified name of the resource. Such as "com/mycomp/foo/bar.txt". */
@@ -273,7 +238,8 @@ public final class ClassPath {
          * <p>Behaves identically to {@link Package#getName()} but does not require the class (or package) to be loaded.
          */
         public String getPackageName() {
-            return Reflection.getPackageName(className);
+            int lastDot = className.lastIndexOf('.');
+            return (lastDot < 0) ? "" : className.substring(0, lastDot);
         }
 
         /**
@@ -287,7 +253,11 @@ public final class ClassPath {
                 String innerClassName = className.substring(lastDollarSign + 1);
                 // local and anonymous classes are prefixed with number (1,2,3...), anonymous classes are
                 // entirely numeric whereas local classes have the user supplied name as a suffix
-                return CharMatcher.digit().trimLeadingFrom(innerClassName);
+                var prefix = 0;
+                while (prefix < innerClassName.length() && Character.isDigit(innerClassName.charAt(prefix))) {
+                    prefix++;
+                }
+                return innerClassName.substring(prefix);
             }
             String packageName = getPackageName();
             if (packageName.isEmpty()) {
@@ -336,7 +306,7 @@ public final class ClassPath {
 
         // We only scan each file once independent of the classloader that resource might be associated
         // with.
-        private final Set<File> scannedUris = Sets.newHashSet();
+        private final Set<File> scannedUris = new HashSet<>();
 
         public final void scan(ClassLoader classloader) throws IOException {
             for (Entry<File, ClassLoader> entry : getClassPathEntries(classloader).entrySet()) {
@@ -400,14 +370,15 @@ public final class ClassPath {
          * Specification</a>. If {@code manifest} is null, it means the jar file has no manifest, and an empty set will
          * be returned.
          */
-        static ImmutableSet<File> getClassPathFromManifest(File jarFile, Manifest manifest) {
+        static Set<File> getClassPathFromManifest(File jarFile, Manifest manifest) {
             if (manifest == null) {
-                return ImmutableSet.of();
+                return Set.of();
             }
-            ImmutableSet.Builder<File> builder = ImmutableSet.builder();
+            var builder = new HashSet<File>();
             String classpathAttribute = manifest.getMainAttributes().getValue(Attributes.Name.CLASS_PATH.toString());
             if (classpathAttribute != null) {
-                for (String path : CLASS_PATH_ATTRIBUTE_SEPARATOR.split(classpathAttribute)) {
+                for (String path : classpathAttribute.split(" ")) {
+                    if (path.isEmpty()) continue;
                     URL url;
                     try {
                         url = getClassPathEntry(jarFile, path);
@@ -421,11 +392,11 @@ public final class ClassPath {
                     }
                 }
             }
-            return builder.build();
+            return Collections.unmodifiableSet(builder);
         }
 
-        static ImmutableMap<File, ClassLoader> getClassPathEntries(ClassLoader classloader) {
-            LinkedHashMap<File, ClassLoader> entries = Maps.newLinkedHashMap();
+        static Map<File, ClassLoader> getClassPathEntries(ClassLoader classloader) {
+            LinkedHashMap<File, ClassLoader> entries = new LinkedHashMap<>();
             // Search parent first, since it's the order ClassLoader#loadClass() uses.
             ClassLoader parent = classloader.getParent();
             if (parent != null) {
@@ -439,17 +410,17 @@ public final class ClassPath {
                     }
                 }
             }
-            return ImmutableMap.copyOf(entries);
+            return Collections.unmodifiableMap(entries);
         }
 
-        private static ImmutableList<URL> getClassLoaderUrls(ClassLoader classloader) {
+        private static List<URL> getClassLoaderUrls(ClassLoader classloader) {
             if (classloader instanceof URLClassLoader) {
-                return ImmutableList.copyOf(((URLClassLoader) classloader).getURLs());
+                return List.of(((URLClassLoader) classloader).getURLs());
             }
             if (classloader.equals(ClassLoader.getSystemClassLoader())) {
                 return parseJavaClassPath();
             }
-            return ImmutableList.of();
+            return List.of();
         }
 
         /**
@@ -457,9 +428,11 @@ public final class ClassPath {
          * system property}.
          */
         // TODO(b/65488446): Make this a public API.
-        static ImmutableList<URL> parseJavaClassPath() {
-            ImmutableList.Builder<URL> urls = ImmutableList.builder();
-            for (String entry : Splitter.on(PATH_SEPARATOR.value()).split(JAVA_CLASS_PATH.value())) {
+        static List<URL> parseJavaClassPath() {
+            var urls = new ArrayList<URL>();
+            var classPath = System.getProperty("java.class.path");
+            var sep = System.getProperty("path.separator");
+            for (String entry : classPath.split(sep)) {
                 try {
                     try {
                         urls.add(new File(entry).toURI().toURL());
@@ -470,7 +443,7 @@ public final class ClassPath {
                     logger.log(WARNING, "malformed classpath entry: " + entry, e);
                 }
             }
-            return urls.build();
+            return Collections.unmodifiableList(urls);
         }
 
         /**
@@ -485,15 +458,16 @@ public final class ClassPath {
     }
 
     static final class DefaultScanner extends Scanner {
-        private final SetMultimap<ClassLoader, String> resources =
-                MultimapBuilder.hashKeys().linkedHashSetValues().build();
+        private final Map<ClassLoader, Set<String>> resources = new HashMap<>();
 
-        ImmutableSet<ResourceInfo> getResources() {
-            ImmutableSet.Builder<ResourceInfo> builder = ImmutableSet.builder();
-            for (Entry<ClassLoader, String> entry : resources.entries()) {
-                builder.add(ResourceInfo.of(entry.getValue(), entry.getKey()));
+        Set<ResourceInfo> getResources() {
+            var builder = new HashSet<ResourceInfo>();
+            for (var entry : resources.entrySet()) {
+                for (var value : entry.getValue()) {
+                    builder.add(ResourceInfo.of(value, entry.getKey()));
+                }
             }
-            return builder.build();
+            return Collections.unmodifiableSet(builder);
         }
 
         @Override
@@ -504,7 +478,7 @@ public final class ClassPath {
                 if (entry.isDirectory() || entry.getName().equals(JarFile.MANIFEST_NAME)) {
                     continue;
                 }
-                resources.get(classloader).add(entry.getName());
+                resources.computeIfAbsent(classloader, __ -> new LinkedHashSet<>()).add(entry.getName());
             }
         }
 
@@ -545,7 +519,7 @@ public final class ClassPath {
                 } else {
                     String resourceName = packagePrefix + name;
                     if (!resourceName.equals(JarFile.MANIFEST_NAME)) {
-                        resources.get(classloader).add(resourceName);
+                        resources.computeIfAbsent(classloader, __ -> new LinkedHashSet<>()).add(resourceName);
                     }
                 }
             }
@@ -560,7 +534,7 @@ public final class ClassPath {
     // TODO(benyu): Try java.nio.file.Paths#get() when Guava drops JDK 6 support.
 
     static File toFile(URL url) {
-        checkArgument(url.getProtocol().equals("file"));
+        assert url.getProtocol().equals("file");
         try {
             return new File(url.toURI()); // Accepts escaped characters like %20.
         } catch (URISyntaxException e) { // URL.toURI() doesn't escape chars.
