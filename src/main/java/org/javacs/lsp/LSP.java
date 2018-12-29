@@ -261,7 +261,7 @@ public class LSP {
                             server.didChangeWatchedFiles(params);
                             break;
                         }
-                    case "workspace/symbols":
+                    case "workspace/symbol":
                         {
                             var params = gson.fromJson(r.params, WorkspaceSymbolParams.class);
                             var response = server.workspaceSymbols(params);

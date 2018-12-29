@@ -216,11 +216,11 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public List<SymbolInformation> workspaceSymbols(WorkspaceSymbolParams params) {
-        List<SymbolInformation> list =
-                compiler.findSymbols(params.query)
-                        .map(Parser::asSymbolInformation)
-                        .limit(50)
-                        .collect(Collectors.toList());
+        var list = new ArrayList<SymbolInformation>();
+        for (var s : compiler.findSymbols(params.query, 50)) {
+            var i = Parser.asSymbolInformation(s);
+            list.add(i);
+        }
         return list;
     }
 

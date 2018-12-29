@@ -15,7 +15,6 @@ import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.lang.model.element.*;
 import javax.tools.*;
 
@@ -339,8 +338,19 @@ public class JavaCompilerService {
         return result;
     }
 
-    public Stream<TreePath> findSymbols(String query) {
-        return sourcePath.stream().flatMap(dir -> Parser.findSymbols(dir, query));
+    public List<TreePath> findSymbols(String query, int limit) {
+        LOG.info(String.format("Searching for `%s`", query));
+
+        var result = new ArrayList<TreePath>();
+        var files = allJavaSources();
+        for (var file : files) {
+            if (!Parser.containsWordMatching(file, query)) continue;
+            var parse = Parser.parse(file);
+            var symbols = Parser.findSymbolsMatching(parse, query);
+            result.addAll(symbols);
+            if (result.size() >= limit) break;
+        }
+        return result;
     }
 
     private static final Logger LOG = Logger.getLogger("main");

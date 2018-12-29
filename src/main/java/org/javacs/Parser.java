@@ -6,7 +6,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.Charset;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -14,7 +13,6 @@ import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.tools.*;
 import org.javacs.lsp.*;
 
@@ -99,7 +97,8 @@ class Parser {
 
     static boolean containsWordMatching(Path java, String query) {
         try {
-            for (var line : Files.readAllLines(java)) {
+            var reader = Files.newBufferedReader(java);
+            for (var line = reader.readLine(); line != null; line = reader.readLine()) {
                 var pattern = WORD.matcher(line);
                 while (pattern.find()) {
                     var word = pattern.group(0);
@@ -112,7 +111,7 @@ class Parser {
         }
     }
 
-    private static Stream<TreePath> findSymbolsMatching(CompilationUnitTree parse, String query) {
+    static List<TreePath> findSymbolsMatching(CompilationUnitTree parse, String query) {
         class Find extends TreePathScanner<Void, Void> {
             List<TreePath> found = new ArrayList<>();
 
@@ -146,31 +145,12 @@ class Parser {
                 return found;
             }
         }
-        return new Find().run().stream();
-    }
-
-    /** Search `dir` for .java files containing important symbols matching `query` */
-    static Stream<TreePath> findSymbols(Path dir, String query) {
-        if (!Files.exists(dir)) {
-            LOG.warning(dir + " does not exist");
-            return Stream.empty();
-        }
-
-        var match = FileSystems.getDefault().getPathMatcher("glob:*.java");
-
-        try {
-            return Files.walk(dir)
-                    .filter(java -> match.matches(java.getFileName()))
-                    .filter(java -> containsWordMatching(java, query))
-                    .flatMap(java -> findSymbolsMatching(parse(java), query));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        return new Find().run();
     }
 
     static List<TreePath> documentSymbols(Path java, String content) {
         var parse = parse(new StringFileObject(content, java.toUri()));
-        return findSymbolsMatching(parse, "").collect(Collectors.toList());
+        return findSymbolsMatching(parse, "");
     }
 
     static Location location(TreePath p) {
