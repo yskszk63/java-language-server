@@ -15,13 +15,10 @@ if [ ! -e modules/gson.jar ]; then
 fi
 
 # Build using jlink
-rm -rf dist
+rm -rf dist/mac
 $JAVA_HOME/bin/jlink \
   --module-path modules/gson.jar:target/classes \
   --add-modules gson,javacs \
-  --launcher javacs=javacs/org.javacs.Main \
-  --output dist \
+  --launcher launcher=javacs/org.javacs.Main \
+  --output dist/mac \
   --compress 2 
-
-# TODO: need to run this again with windows jdk!
-# https://stackoverflow.com/questions/47593409/create-java-runtime-image-on-one-platform-for-another-using-jlink

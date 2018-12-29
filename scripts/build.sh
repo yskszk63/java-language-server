@@ -9,7 +9,8 @@ JAVA_HOME=$(/usr/libexec/java_home -v 11)
 npm install
 
 # Build fat jar
-./scripts/link.sh
+./scripts/link_mac.sh
+./scripts/link_windows.sh
 
 # Build vsix
 vsce package -o build.vsix

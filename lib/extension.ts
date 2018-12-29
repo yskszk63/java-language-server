@@ -31,7 +31,9 @@ export function activate(context: ExtensionContext) {
         revealOutputChannelOn: 4 // never
     }
 
-    let launcher = Path.resolve(context.extensionPath, "dist", "bin", "javacs");
+    let launcherRelativePath = platformSpecificLauncher();
+    let launcherPath = [context.extensionPath].concat(launcherRelativePath);
+    let launcher = Path.resolve(...launcherPath);
     
     console.log(launcher);
     
@@ -199,4 +201,16 @@ function createProgressListeners(client: LanguageClient) {
 	client.onNotification(new NotificationType('java/endProgress'), () => {
 		progressListener.endProgress();
 	});
+}
+
+function platformSpecificLauncher(): string[] {
+	switch (process.platform) {
+		case 'win32':
+            return ['dist', 'windows', 'bin', 'launcher'];
+
+		case 'darwin':
+            return ['dist', 'mac', 'bin', 'launcher'];
+	}
+
+	throw `unsupported platform: ${process.platform}`;
 }
