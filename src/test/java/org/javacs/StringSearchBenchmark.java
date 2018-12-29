@@ -14,28 +14,64 @@ public class StringSearchBenchmark {
             smallFile = Paths.get(FindResource.uri("/org/javacs/example/Goto.java"));
     // "removeMethodBodies" appears late in the file, so stopping early will not be very effective
     private static final String query = "removeMethodBodies";
+    /*
+        @Benchmark
+        public void containsWordMatchingSmall() {
+            var found = Parser.containsWordMatching(smallFile, query);
+            assert found;
+        }
 
+        @Benchmark
+        public void containsWordMatchingLarge() {
+            var found = Parser.containsWordMatching(largeFile, query);
+            assert found;
+        }
+
+        @Benchmark
+        public void containsTextSmall() {
+            var found = Parser.containsText(smallFile, query);
+            assert found;
+        }
+
+        @Benchmark
+        public void containsTextLarge() {
+            var found = Parser.containsText(largeFile, query);
+            assert found;
+        }
+    */
     @Benchmark
-    public void regexSmall() {
-        var found = Parser.containsWordMatching(smallFile, query);
+    public void containsImportLarge() {
+        var found = JavaCompilerService.containsImport("java.util.nopkg", "Logger", largeFile);
         assert found;
     }
 
     @Benchmark
-    public void boyerMooreSmall() {
-        var found = Parser.containsText(smallFile, query);
+    public void containsImportSmall() {
+        var found = JavaCompilerService.containsImport("java.util.nopkg", "Logger", smallFile);
         assert found;
     }
 
     @Benchmark
-    public void regexLarge() {
-        var found = Parser.containsWordMatching(largeFile, query);
+    public void containsWordLarge() {
+        var found = JavaCompilerService.containsWord("removeMethodBodies", largeFile);
         assert found;
     }
 
     @Benchmark
-    public void boyerMooreLarge() {
-        var found = Parser.containsText(largeFile, query);
+    public void containsWordSmall() {
+        var found = JavaCompilerService.containsWord("removeMethodBodies", smallFile);
         assert found;
+    }
+
+    @Benchmark
+    public void parseLarge() {
+        var found = Parser.parse(largeFile);
+        assert found != null;
+    }
+
+    @Benchmark
+    public void parseSmall() {
+        var found = Parser.parse(smallFile);
+        assert found != null;
     }
 }

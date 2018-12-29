@@ -126,43 +126,44 @@ public class JavaCompilerService {
         return new CompileBatch(this, files);
     }
 
-    // TODO use Parser.containsWordMatching for speed?
-    private boolean containsWord(String toPackage, String toClass, String name, Path file) {
-        if (!name.matches("\\w*")) throw new RuntimeException(String.format("`%s` is not a word", name));
+    static boolean containsImport(String toPackage, String toClass, Path file) {
+        if (toPackage.isEmpty()) return true;
         var samePackage = Pattern.compile("^package +" + toPackage + ";");
         var importClass = Pattern.compile("^import +" + toPackage + "\\." + toClass + ";");
         var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
         var importStatic = Pattern.compile("^import +static +" + toPackage + "\\." + toClass);
-        var startOfClass = Pattern.compile("class +\\w+");
-        var word = Pattern.compile("\\b" + name + "\\b");
-        var foundImport = toPackage.isEmpty(); // If package is empty, everyone imports it
-        var foundWord = false;
+        var startOfClass = Pattern.compile("^[\\w ]*class +\\w+");
         try (var read = Files.newBufferedReader(file)) {
             while (true) {
                 var line = read.readLine();
-                if (line == null) break;
-                if (!foundImport && startOfClass.matcher(line).find()) break;
-                if (samePackage.matcher(line).find()) foundImport = true;
-                if (importClass.matcher(line).find()) foundImport = true;
-                if (importStar.matcher(line).find()) foundImport = true;
-                if (importStatic.matcher(line).find()) foundImport = true;
-                if (importClass.matcher(line).find()) foundImport = true;
-                if (word.matcher(line).find()) foundWord = true;
+                if (line == null) return false;
+                if (startOfClass.matcher(line).find()) return false;
+                if (samePackage.matcher(line).find()) return true;
+                if (importClass.matcher(line).find()) return true;
+                if (importStar.matcher(line).find()) return true;
+                if (importStatic.matcher(line).find()) return true;
+                if (importClass.matcher(line).find()) return true;
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return foundImport && foundWord;
     }
 
-    private boolean importsAnyClass(String toPackage, List<String> toClasses, Path file) {
+    static boolean containsWord(String name, Path file) {
+        if (!name.matches("\\w*")) throw new RuntimeException(String.format("`%s` is not a word", name));
+        // TODO consider using Parser.containsText, checking for \\b after finding matches
+        var word = Pattern.compile("\\b" + name + "\\b");
+        return Parser.containsPattern(file, word);
+    }
+
+    static boolean importsAnyClass(String toPackage, List<String> toClasses, Path file) {
         if (toPackage.isEmpty()) return true; // If package is empty, everyone imports it
         var toClass = toClasses.stream().collect(Collectors.joining("|"));
         var samePackage = Pattern.compile("^package +" + toPackage + ";");
         var importClass = Pattern.compile("^import +" + toPackage + "\\.(" + toClass + ");");
         var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
         var importStatic = Pattern.compile("^import +static +" + toPackage + "\\.");
-        var startOfClass = Pattern.compile("class +\\w+");
+        var startOfClass = Pattern.compile("^[\\w ]*class +\\w+");
         try (var read = Files.newBufferedReader(file)) {
             while (true) {
                 var line = read.readLine();
@@ -209,7 +210,9 @@ public class JavaCompilerService {
         var result = new ArrayList<URI>();
         int nScanned = 0;
         for (var file : allFiles) {
-            if (containsWord(toPackage, toClass, name, file)) result.add(file.toUri());
+            if (containsImport(toPackage, toClass, file) && containsWord(name, file)) {
+                result.add(file.toUri());
+            }
         }
         LOG.info(String.format("...%d files might have references to `%s`", result.size(), to));
 

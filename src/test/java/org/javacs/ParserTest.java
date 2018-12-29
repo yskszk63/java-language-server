@@ -40,6 +40,14 @@ public class ParserTest {
     }
 
     @Test
+    public void largeFilePossibleReference() {
+        var largeFile = Paths.get(FindResource.uri("/org/javacs/example/LargeFile.java"));
+        assertTrue(JavaCompilerService.containsImport("java.util.logging", "Logger", largeFile));
+        assertTrue(JavaCompilerService.containsWord("removeMethodBodies", largeFile));
+        assertFalse(JavaCompilerService.containsWord("removeMethodBodiez", largeFile));
+    }
+
+    @Test
     public void findAutocompleteBetweenLines() {
         var rel = Paths.get("src", "org", "javacs", "example", "AutocompleteBetweenLines.java");
         var file = LanguageServerFixture.DEFAULT_WORKSPACE_ROOT.resolve(rel);
