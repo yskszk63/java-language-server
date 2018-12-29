@@ -97,7 +97,7 @@ class StringSearch {
 
     int next(ByteBuffer text) {
         var i = pattern.length - 1;
-        while (i < text.capacity()) {
+        while (i < text.limit()) {
             // Compare backwards from the end until the first unmatching character.
             var j = pattern.length - 1;
             while (j >= 0 && text.get(i) == pattern[j]) {

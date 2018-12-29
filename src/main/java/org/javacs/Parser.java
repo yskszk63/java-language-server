@@ -5,6 +5,8 @@ import com.sun.source.util.*;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -113,28 +115,50 @@ class Parser {
     }
 
     /*
-    FileChannel.open(...).map(...)
+        FileChannel.open(...).map(...)
+
+        Benchmark                               Mode  Cnt      Score       Error  Units
+        StringSearchBenchmark.boyerMooreLarge  thrpt    3  15517.606 ±  4807.393  ops/s
+        StringSearchBenchmark.boyerMooreSmall  thrpt    3  34293.827 ± 58590.197  ops/s
+        StringSearchBenchmark.regexLarge       thrpt    3   1028.404 ±    61.053  ops/s
+        StringSearchBenchmark.regexSmall       thrpt    3  23062.039 ±  4342.233  ops/s
+
+        Files.readAllBytes()
+
+        Benchmark                               Mode  Cnt      Score       Error  Units
+        StringSearchBenchmark.boyerMooreLarge  thrpt    3  18229.198 ± 11873.019  ops/s
+        StringSearchBenchmark.boyerMooreSmall  thrpt    3  45522.137 ± 31464.129  ops/s
+        StringSearchBenchmark.regexLarge       thrpt    3    947.172 ±   228.766  ops/s
+        StringSearchBenchmark.regexSmall       thrpt    3  22039.420 ±  8259.623  ops/s
+
+    FileChannel.open(...).read(ByteBuffer.allocate(...))
 
     Benchmark                               Mode  Cnt      Score       Error  Units
-    StringSearchBenchmark.boyerMooreLarge  thrpt    3  15517.606 ±  4807.393  ops/s
-    StringSearchBenchmark.boyerMooreSmall  thrpt    3  34293.827 ± 58590.197  ops/s
-    StringSearchBenchmark.regexLarge       thrpt    3   1028.404 ±    61.053  ops/s
-    StringSearchBenchmark.regexSmall       thrpt    3  23062.039 ±  4342.233  ops/s
+    StringSearchBenchmark.boyerMooreLarge  thrpt    3  17357.488 ± 19125.132  ops/s
+    StringSearchBenchmark.boyerMooreSmall  thrpt    3  51831.704 ± 15061.881  ops/s
+    StringSearchBenchmark.regexLarge       thrpt    3    897.675 ±   214.149  ops/s
+    StringSearchBenchmark.regexSmall       thrpt    3  21741.408 ±  8805.291  ops/s
 
-    Files.readAllBytes()
+    Re-use ByteBuffer.allocateDirect
 
     Benchmark                               Mode  Cnt      Score       Error  Units
-    StringSearchBenchmark.boyerMooreLarge  thrpt    3  18229.198 ± 11873.019  ops/s
-    StringSearchBenchmark.boyerMooreSmall  thrpt    3  45522.137 ± 31464.129  ops/s
-    StringSearchBenchmark.regexLarge       thrpt    3    947.172 ±   228.766  ops/s
-    StringSearchBenchmark.regexSmall       thrpt    3  22039.420 ±  8259.623  ops/s
-        */
+    StringSearchBenchmark.boyerMooreLarge  thrpt    3  21528.563 ±  6757.970  ops/s
+    StringSearchBenchmark.boyerMooreSmall  thrpt    3  55988.183 ±  5928.551  ops/s
+    StringSearchBenchmark.regexLarge       thrpt    3    987.733 ±   361.451  ops/s
+    StringSearchBenchmark.regexSmall       thrpt    3  23560.799 ± 29001.715  ops/s
+            */
+
+    private static final ByteBuffer searchBuffer = ByteBuffer.allocateDirect(1 * 1024 * 1024);
 
     static boolean containsText(Path java, String query) {
         var search = new StringSearch(query);
-        try {
-            var bytes = Files.readAllBytes(java);
-            return search.next(bytes) != -1;
+        try (var channel = FileChannel.open(java)) {
+            // Read up to 1 MB of data from file
+            var limit = Math.min((int) channel.size(), searchBuffer.capacity());
+            searchBuffer.position(0);
+            searchBuffer.limit(limit);
+            channel.read(searchBuffer);
+            return search.next(searchBuffer) != -1;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
