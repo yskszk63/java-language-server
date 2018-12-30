@@ -209,14 +209,12 @@ class JavaLanguageServer extends LanguageServer {
         this.compiler = createCompiler();
 
         // Register for didChangeWatchedFiles notifications
-        var options =
-                new Object() {
-                    public List watchers =
-                            List.of(
-                                    new Object() {
-                                        public String globPattern = "**/*.java";
-                                    });
-                };
+        var options = new JsonObject();
+        var watchers = new JsonArray();
+        var watchJava = new JsonObject();
+        watchJava.addProperty("globPattern", "**/*.java");
+        watchers.add(watchJava);
+        options.add("watchers", watchers);
         client.registerCapability("workspace/didChangeWatchedFiles", gson.toJsonTree(options));
     }
 
