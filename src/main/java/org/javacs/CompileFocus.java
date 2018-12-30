@@ -772,6 +772,7 @@ public class CompileFocus {
     }
 
     private Optional<TypeElement> topLevelDeclaration(Element e) {
+        if (e == null) return Optional.empty();
         var parent = e;
         TypeElement result = null;
         while (parent.getEnclosingElement() != null) {

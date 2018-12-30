@@ -31,7 +31,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
@@ -322,6 +321,7 @@ class JavaLanguageServer extends LanguageServer {
     public Optional<CompletionList> completion(TextDocumentPositionParams position) {
         var started = Instant.now();
         var uri = position.textDocument.uri;
+        if (!isJavaFile(uri)) return Optional.empty();
         var content = contents(uri).content;
         var line = position.position.line + 1;
         var column = position.position.character + 1;
@@ -569,6 +569,7 @@ class JavaLanguageServer extends LanguageServer {
     public Optional<Hover> hover(TextDocumentPositionParams position) {
         // Compile entire file if it's changed since last hover
         var uri = position.textDocument.uri;
+        if (!isJavaFile(uri)) return Optional.empty();
         var content = contents(uri).content;
         updateHoverCache(uri, content);
 
@@ -655,6 +656,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public Optional<SignatureHelp> signatureHelp(TextDocumentPositionParams position) {
         var uri = position.textDocument.uri;
+        if (!isJavaFile(uri)) return Optional.empty();
         var content = contents(uri).content;
         var line = position.position.line + 1;
         var column = position.position.character + 1;
@@ -666,6 +668,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public List<Location> gotoDefinition(TextDocumentPositionParams position) {
         var fromUri = position.textDocument.uri;
+        if (!isJavaFile(fromUri)) return List.of();
         var fromLine = position.position.line + 1;
         var fromColumn = position.position.character + 1;
         var fromContent = contents(fromUri).content;
@@ -673,6 +676,7 @@ class JavaLanguageServer extends LanguageServer {
         var toEl = fromFocus.element();
         var toUri = fromFocus.declaringFile(toEl);
         if (!toUri.isPresent()) return List.of();
+        if (!isJavaFile(toUri.get())) return List.of();
         var toContent = contents(toUri.get()).content;
         var toFile = compiler.compileFile(toUri.get(), toContent);
         var toPath = toFile.find(new Ptr(toEl));
@@ -684,40 +688,26 @@ class JavaLanguageServer extends LanguageServer {
         return List.of(to);
     }
 
-    class ReportProgress implements ReportReferencesProgress, AutoCloseable {
-        private final Function<Integer, String> scanMessage, checkMessage;
+    class Progress implements ReportProgress, AutoCloseable {
+        @Override
+        public void start(String message) {
+            javaStartProgress(new JavaStartProgressParams(message));
+        }
 
-        ReportProgress(
-                String startMessage, Function<Integer, String> scanMessage, Function<Integer, String> checkMessage) {
-            this.scanMessage = scanMessage;
-            this.checkMessage = checkMessage;
-            javaStartProgress(new JavaStartProgressParams(startMessage));
+        @Override
+        public void progress(String message, int n, int total) {
+            if (n == 0) {
+                javaReportProgress(new JavaReportProgressParams(message));
+            } else {
+                var increment = percent(n, total) > percent(n - 1, total) ? 1 : 0;
+                javaReportProgress(new JavaReportProgressParams(message, increment));
+            }
         }
 
         private int percent(int n, int d) {
             double nD = n, dD = d;
             double ratio = nD / dD;
             return (int) (ratio * 100);
-        }
-
-        public void scanForPotentialReferences(int nScanned, int nFiles) {
-            var message = scanMessage.apply(nFiles);
-            if (nScanned == 0) {
-                javaReportProgress(new JavaReportProgressParams(message));
-            } else {
-                var increment = percent(nScanned, nFiles) > percent(nScanned - 1, nFiles) ? 1 : 0;
-                javaReportProgress(new JavaReportProgressParams(message, increment));
-            }
-        }
-
-        public void checkPotentialReferences(int nCompiled, int nPotential) {
-            var message = checkMessage.apply(nCompiled);
-            if (nCompiled == 0) {
-                javaReportProgress(new JavaReportProgressParams(message));
-            } else {
-                var increment = percent(nCompiled, nPotential) > percent(nCompiled - 1, nPotential) ? 1 : 0;
-                javaReportProgress(new JavaReportProgressParams(message, increment));
-            }
         }
 
         @Override
@@ -729,6 +719,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public List<Location> findReferences(ReferenceParams position) {
         var toUri = position.textDocument.uri;
+        if (!isJavaFile(toUri)) return List.of();
         var toContent = contents(toUri).content;
         var toLine = position.position.line + 1;
         var toColumn = position.position.character + 1;
@@ -754,6 +745,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public List<SymbolInformation> documentSymbol(DocumentSymbolParams params) {
         var uri = params.textDocument.uri;
+        if (!isJavaFile(uri)) return List.of();
         var content = contents(uri).content;
         var result =
                 Parser.documentSymbols(Paths.get(uri), content)
@@ -767,6 +759,7 @@ class JavaLanguageServer extends LanguageServer {
     public List<CodeLens> codeLens(CodeLensParams params) {
         // TODO just create a blank code lens on every method, then resolve it async
         var uri = params.textDocument.uri;
+        if (!isJavaFile(uri)) return List.of();
         var content = contents(uri).content;
         var parse = compiler.parseFile(uri, content);
         var declarations = parse.declarations();
@@ -822,7 +815,9 @@ class JavaLanguageServer extends LanguageServer {
         if (cacheCountReferencesFile.equals(current)) return;
         LOG.info(String.format("Update cached reference count to %s...", current));
         var content = contents(current).content;
-        cacheCountReferences = compiler.countReferences(current, content);
+        try (var progress = new Progress()) {
+            cacheCountReferences = compiler.countReferences(current, content, progress);
+        }
         cacheCountReferencesFile = current;
     }
 
@@ -1014,15 +1009,18 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     VersionedContent contents(URI openFile) {
+        if (!isJavaFile(openFile)) {
+            LOG.warning("Ignoring non-java file " + openFile);
+            return VersionedContent.EMPTY;
+        }
         if (activeDocuments.containsKey(openFile)) {
             return activeDocuments.get(openFile);
-        } else {
-            try {
-                var content = Files.readAllLines(Paths.get(openFile)).stream().collect(Collectors.joining("\n"));
-                return new VersionedContent(content, -1);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+        }
+        try {
+            var content = Files.readAllLines(Paths.get(openFile)).stream().collect(Collectors.joining("\n"));
+            return new VersionedContent(content, -1);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 }

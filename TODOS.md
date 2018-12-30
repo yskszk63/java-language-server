@@ -13,6 +13,7 @@
 - Goto field goes to method of same name
 - Goto definition goes to wrong method in overloads
 - T x, y; 'n references' shows references for y even when you click for x
+- Test that newly created file shows up in autocomplete
 
 ## Autocomplete
 - Annotation fields
@@ -48,3 +49,6 @@
 - new Foo< shouldn't make everything green
 - void f() shouldn't mess up next line as you type it
 - { on next line breaks coloring
+
+# Formatter
+- Automatically add @Override annotations

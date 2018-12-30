@@ -12,10 +12,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.element.*;
@@ -25,17 +27,49 @@ import org.javacs.lsp.*;
 
 public class CompileBatch {
     private final JavaCompilerService parent;
+    private final ReportProgress progress;
     private final JavacTask task;
     private final Trees trees;
     private final List<CompilationUnitTree> roots;
 
-    CompileBatch(JavaCompilerService parent, Collection<URI> files) {
+    CompileBatch(JavaCompilerService parent, Collection<URI> files, ReportProgress progress) {
         this.parent = parent;
+        this.progress = progress;
         this.task = batchTask(parent, files);
         this.trees = Trees.instance(task);
         this.roots = new ArrayList<CompilationUnitTree>();
+        // Print timing information for optimization
         var profiler = new Profiler();
         task.addTaskListener(profiler);
+        // Show progress message through the UI
+        class CountFiles implements TaskListener {
+            Set<URI> parse = new HashSet<>(), enter = new HashSet<>(), analyze = new HashSet<>();
+
+            void inc(String message) {
+                var n = parse.size() + enter.size() + analyze.size();
+                var total = files.size() * 3;
+                progress.progress(message, n, total);
+            }
+
+            @Override
+            public void started(TaskEvent e) {
+                var uri = e.getSourceFile().toUri();
+                switch (e.getKind()) {
+                    case PARSE:
+                        if (parse.add(uri)) inc("Parse sources");
+                        break;
+                    case ENTER:
+                        if (enter.add(uri)) inc("Enter symbols");
+                        break;
+                    case ANALYZE:
+                        var name = Parser.fileName(uri);
+                        if (analyze.add(uri)) inc("Analyze " + name);
+                        break;
+                }
+            }
+        }
+        task.addTaskListener(new CountFiles());
+        // Compile all roots
         try {
             for (var t : task.parse()) roots.add(t);
             task.analyze();

@@ -127,7 +127,11 @@ public class JavaCompilerService {
     }
 
     public CompileBatch compileBatch(Collection<URI> files) {
-        return new CompileBatch(this, files);
+        return compileBatch(files, ReportProgress.EMPTY);
+    }
+
+    public CompileBatch compileBatch(Collection<URI> files, ReportProgress progress) {
+        return new CompileBatch(this, files, progress);
     }
 
     static boolean containsImport(String toPackage, String toClass, Path file) {
@@ -298,7 +302,7 @@ public class JavaCompilerService {
 
     private Map<URI, Index> index = new HashMap<>();
 
-    private void updateIndex(Collection<URI> possible) {
+    private void updateIndex(Collection<URI> possible, ReportProgress progress) {
         LOG.info(String.format("Check %d files for modifications compared to index...", possible.size()));
         var outOfDate = new ArrayList<URI>();
         for (var p : possible) {
@@ -311,12 +315,18 @@ public class JavaCompilerService {
         LOG.info(String.format("... %d files are out-of-date", outOfDate.size()));
         // If there's nothing to update, return
         if (outOfDate.isEmpty()) return;
+        // If there's more than 1 file, report progress
+        if (outOfDate.size() > 1) { // TODO this could probably be tuned to be higher
+            progress.start(String.format("Index %d files", outOfDate.size()));
+        } else {
+            progress = ReportProgress.EMPTY;
+        }
         // Reindex
-        var counts = compileBatch(outOfDate).countReferences();
+        var counts = compileBatch(outOfDate, progress).countReferences();
         index.putAll(counts);
     }
 
-    public Map<Ptr, Integer> countReferences(URI file, String contents) {
+    public Map<Ptr, Integer> countReferences(URI file, String contents, ReportProgress progress) {
         var root = Parser.parse(new StringFileObject(contents, file));
         // List all files that import file
         var toPackage = Objects.toString(root.getPackageName(), "");
@@ -327,7 +337,7 @@ public class JavaCompilerService {
             return Map.of();
         }
         // Reindex only files that are out-of-date
-        updateIndex(possible);
+        updateIndex(possible, progress);
         // Assemble results
         var result = new HashMap<Ptr, Integer>();
         for (var p : possible) {

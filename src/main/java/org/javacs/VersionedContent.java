@@ -8,4 +8,6 @@ class VersionedContent {
         this.content = content;
         this.version = version;
     }
+
+    static final VersionedContent EMPTY = new VersionedContent("", -1);
 }

@@ -268,7 +268,7 @@ public class JavaCompilerServiceTest {
     @Test
     public void countReferences() {
         var file = "/GotoDefinition.java";
-        var refs = compiler.countReferences(resourceUri(file), contents(file));
+        var refs = compiler.countReferences(resourceUri(file), contents(file), ReportProgress.EMPTY);
         var stringify = new HashMap<String, Integer>();
         for (var kv : refs.entrySet()) {
             var key = kv.getKey().toString();
