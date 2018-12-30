@@ -12,6 +12,7 @@ import java.nio.charset.Charset;
 import java.nio.file.*;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -22,6 +23,7 @@ import javax.tools.*;
 public class JavaCompilerService {
     // Not modifiable! If you want to edit these, you need to create a new instance
     final Set<Path> sourcePath, classPath, docPath;
+    final Supplier<Set<Path>> allJavaFiles;
     final JavaCompiler compiler = ServiceLoader.load(JavaCompiler.class).iterator().next();
     final Docs docs;
     final ClassSource jdkClasses = Classes.jdkTopLevelClasses(), classPathClasses;
@@ -31,7 +33,8 @@ public class JavaCompilerService {
     final StandardJavaFileManager fileManager =
             new FileManagerWrapper(compiler.getStandardFileManager(diags::add, null, Charset.defaultCharset()));
 
-    public JavaCompilerService(Set<Path> sourcePath, Set<Path> classPath, Set<Path> docPath) {
+    public JavaCompilerService(
+            Set<Path> sourcePath, Supplier<Set<Path>> allJavaFiles, Set<Path> classPath, Set<Path> docPath) {
         System.err.println("Source path:");
         for (var p : sourcePath) {
             System.err.println("  " + p);
@@ -46,6 +49,7 @@ public class JavaCompilerService {
         }
         // sourcePath and classPath can't actually be modified, because JavaCompiler remembers them from task to task
         this.sourcePath = Collections.unmodifiableSet(sourcePath);
+        this.allJavaFiles = allJavaFiles;
         this.classPath = Collections.unmodifiableSet(classPath);
         this.docPath = Collections.unmodifiableSet(docPath);
         var docSourcePath = new HashSet<Path>();
@@ -179,22 +183,12 @@ public class JavaCompilerService {
         return false;
     }
 
-    private List<Path> allJavaSources() {
-        var allFiles = new ArrayList<Path>();
-        for (var dir : sourcePath) {
-            for (var file : javaSourcesInDir(dir)) {
-                allFiles.add(file);
-            }
-        }
-        return allFiles;
-    }
-
     // TODO should probably cache this
     public List<URI> potentialReferences(Element to) {
         LOG.info(String.format("Find potential references to `%s`...", to));
 
         // Check all files on source path
-        var allFiles = allJavaSources();
+        var allFiles = allJavaFiles.get();
         LOG.info(String.format("...check %d files on the source path", allFiles.size()));
 
         // Figure out which files import `to`, explicitly or implicitly
@@ -350,7 +344,7 @@ public class JavaCompilerService {
         LOG.info(String.format("Searching for `%s`...", query));
 
         var result = new ArrayList<TreePath>();
-        var files = allJavaSources();
+        var files = allJavaFiles.get();
         var checked = 0;
         var parsed = 0;
         for (var file : files) {

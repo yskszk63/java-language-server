@@ -8,12 +8,14 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
@@ -28,12 +30,25 @@ public class JavaCompilerServiceTest {
 
     private JavaCompilerService compiler =
             new JavaCompilerService(
-                    Collections.singleton(resourcesDir()), Collections.emptySet(), Collections.emptySet());
+                    Collections.singleton(resourcesDir()),
+                    JavaCompilerServiceTest::allJavaFiles,
+                    Collections.emptySet(),
+                    Collections.emptySet());
 
     static Path resourcesDir() {
         try {
             return Paths.get(JavaCompilerServiceTest.class.getResource("/HelloWorld.java").toURI()).getParent();
         } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static Set<Path> allJavaFiles() {
+        try {
+            return Files.walk(resourcesDir())
+                    .filter(f -> f.getFileName().toString().endsWith(".java"))
+                    .collect(Collectors.toSet());
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
@@ -233,7 +248,7 @@ public class JavaCompilerServiceTest {
         var to = compiler.compileFocus(resourceUri(file), contents(file), 6, 13).element();
         var possible = compiler.potentialReferences(to);
         assertThat(
-                "GotoDefinition.java can have refernces to itself",
+                "GotoDefinition.java can have references to itself",
                 possible,
                 hasItem(hasToString(endsWith("/GotoDefinition.java"))));
 

@@ -212,6 +212,10 @@ public class CompileFocus {
         LOG.info(String.format("...switched expression has type `%s`", type));
         var types = task.getTypes();
         var definition = types.asElement(type);
+        if (definition == null) {
+            LOG.info("...type has no definition, completing identifiers instead");
+            return completeIdentifiers(true, true, ""); // TODO pass partial name
+        }
         LOG.info(String.format("...switched expression has definition `%s`", definition));
         var result = new ArrayList<Completion>();
         for (var member : definition.getEnclosedElements()) {

@@ -140,10 +140,10 @@ public class LSP {
         }
 
         @Override
-        public void registerCapability(String id, JsonElement options) {
+        public void registerCapability(String method, JsonElement options) {
             var params = new RegistrationParams();
             params.id = UUID.randomUUID().toString();
-            params.id = id;
+            params.method = method;
             params.registerOptions = options;
 
             notifyClient(send, "client/registerCapability", params);

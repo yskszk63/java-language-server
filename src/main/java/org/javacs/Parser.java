@@ -11,7 +11,6 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -303,48 +302,46 @@ class Parser {
         return i;
     }
 
-    /** Find all already-imported symbols in all .java files in sourcePath */
-    static ExistingImports existingImports(Collection<Path> sourcePath) {
+    /** Find all already-imported symbols in all .java files in workspace */
+    static ExistingImports existingImports(Collection<Path> allJavaFiles) {
         var classes = new HashSet<String>();
         var packages = new HashSet<String>();
         var importClass = Pattern.compile("^import +(([\\w\\.]+)\\.\\w+);");
         var importStar = Pattern.compile("^import +([\\w\\.]+)\\.\\*;");
         var importSimple = Pattern.compile("^import +(\\w+);");
-        Consumer<Path> findImports =
-                path -> {
-                    try (var lines = Files.newBufferedReader(path)) {
-                        while (true) {
-                            var line = lines.readLine();
-                            // If we reach the end of the file, stop looking for imports
-                            if (line == null) return;
-                            // If we reach a class declaration, stop looking for imports
-                            // TODO This could be a little more specific
-                            if (line.contains("class")) return;
-                            // import foo.bar.Doh;
-                            var matchesClass = importClass.matcher(line);
-                            if (matchesClass.matches()) {
-                                String className = matchesClass.group(1), packageName = matchesClass.group(2);
-                                packages.add(packageName);
-                                classes.add(className);
-                            }
-                            // import foo.bar.*
-                            var matchesStar = importStar.matcher(line);
-                            if (matchesStar.matches()) {
-                                var packageName = matchesStar.group(1);
-                                packages.add(packageName);
-                            }
-                            // import Doh
-                            var matchesSimple = importSimple.matcher(line);
-                            if (matchesSimple.matches()) {
-                                var className = matchesSimple.group(1);
-                                classes.add(className);
-                            }
-                        }
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
+        for (var path : allJavaFiles) {
+            try (var lines = Files.newBufferedReader(path)) {
+                while (true) {
+                    var line = lines.readLine();
+                    // If we reach the end of the file, stop looking for imports
+                    if (line == null) break;
+                    // If we reach a class declaration, stop looking for imports
+                    // TODO This could be a little more specific
+                    if (line.contains("class")) break;
+                    // import foo.bar.Doh;
+                    var matchesClass = importClass.matcher(line);
+                    if (matchesClass.matches()) {
+                        String className = matchesClass.group(1), packageName = matchesClass.group(2);
+                        packages.add(packageName);
+                        classes.add(className);
                     }
-                };
-        sourcePath.stream().flatMap(InferSourcePath::allJavaFiles).forEach(findImports);
+                    // import foo.bar.*
+                    var matchesStar = importStar.matcher(line);
+                    if (matchesStar.matches()) {
+                        var packageName = matchesStar.group(1);
+                        packages.add(packageName);
+                    }
+                    // import Doh
+                    var matchesSimple = importSimple.matcher(line);
+                    if (matchesSimple.matches()) {
+                        var className = matchesSimple.group(1);
+                        classes.add(className);
+                    }
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
         return new ExistingImports(classes, packages);
     }
 

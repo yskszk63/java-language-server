@@ -45,7 +45,9 @@ import org.javacs.lsp.*;
 class JavaLanguageServer extends LanguageServer {
     private static final Logger LOG = Logger.getLogger("main");
 
+    // TODO allow multiple workspace roots
     private Path workspaceRoot;
+    private SourcePath sourcePath;
     private final LanguageClient client;
     private Set<String> externalDependencies = Set.of();
     private Set<Path> classPath = Set.of();
@@ -135,12 +137,11 @@ class JavaLanguageServer extends LanguageServer {
         javaStartProgress(new JavaStartProgressParams("Configure javac"));
         javaReportProgress(new JavaReportProgressParams("Finding source roots"));
 
-        var sourcePath = InferSourcePath.sourcePath(workspaceRoot); // TODO show each folder as we find it
-
         // If classpath is specified by the user, don't infer anything
         if (!classPath.isEmpty()) {
             javaEndProgress();
-            return new JavaCompilerService(sourcePath, classPath, Collections.emptySet());
+            return new JavaCompilerService(
+                    sourcePath.sourceRoots(), sourcePath::allJavaFiles, classPath, Collections.emptySet());
         }
         // Otherwise, combine inference with user-specified external dependencies
         else {
@@ -153,7 +154,7 @@ class JavaLanguageServer extends LanguageServer {
             var docPath = infer.buildDocPath();
 
             javaEndProgress();
-            return new JavaCompilerService(sourcePath, classPath, docPath);
+            return new JavaCompilerService(sourcePath.sourceRoots(), sourcePath::allJavaFiles, classPath, docPath);
         }
     }
 
@@ -174,6 +175,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public InitializeResult initialize(InitializeParams params) {
         this.workspaceRoot = Paths.get(params.rootUri);
+        this.sourcePath = new SourcePath(Set.of(workspaceRoot));
 
         var c = new JsonObject();
         c.addProperty("textDocumentSync", 2); // Incremental
@@ -205,6 +207,17 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public void initialized() {
         this.compiler = createCompiler();
+
+        // Register for didChangeWatchedFiles notifications
+        var options =
+                new Object() {
+                    public List watchers =
+                            List.of(
+                                    new Object() {
+                                        public String globPattern = "**/*.java";
+                                    });
+                };
+        client.registerCapability("workspace/didChangeWatchedFiles", gson.toJsonTree(options));
     }
 
     @Override
@@ -241,7 +254,29 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     @Override
-    public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {}
+    public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
+        var changed = false;
+        var created = new HashSet<Path>();
+        var deleted = new HashSet<Path>();
+        for (var c : params.changes) {
+            if (!isJavaFile(c.uri)) continue;
+            var file = Paths.get(c.uri);
+            switch (c.type) {
+                case FileChangeType.Created:
+                    created.add(file);
+                    break;
+                case FileChangeType.Changed:
+                    if (sourcePath.update(file)) changed = true;
+                    break;
+                case FileChangeType.Deleted:
+                    deleted.add(file);
+                    break;
+            }
+        }
+        if (sourcePath.create(created)) changed = true;
+        if (sourcePath.delete(deleted)) changed = true;
+        if (changed) this.compiler = createCompiler();
+    }
 
     private Integer completionItemKind(Element e) {
         switch (e.getKind()) {

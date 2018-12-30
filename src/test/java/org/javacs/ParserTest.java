@@ -4,7 +4,7 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
 import java.nio.file.Paths;
-import java.util.Set;
+import java.util.Collections;
 import org.junit.Test;
 
 public class ParserTest {
@@ -58,7 +58,8 @@ public class ParserTest {
     public void findExistingImports() {
         var rel = Paths.get("src", "org", "javacs", "doimport");
         var dir = LanguageServerFixture.DEFAULT_WORKSPACE_ROOT.resolve(rel);
-        var existing = Parser.existingImports(Set.of(dir));
+        var sourcePath = new SourcePath(Collections.singleton(dir));
+        var existing = Parser.existingImports(sourcePath.allJavaFiles());
         assertThat(existing.classes, hasItems("java.util.List"));
         assertThat(existing.packages, hasItems("java.util", "java.io"));
     }
