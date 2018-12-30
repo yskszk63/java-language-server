@@ -218,11 +218,6 @@ class Parser {
         return new Find().run();
     }
 
-    static List<TreePath> documentSymbols(Path java, String content) {
-        var parse = parse(new StringFileObject(content, java.toUri()));
-        return findSymbolsMatching(parse, "");
-    }
-
     static Location location(TreePath p) {
         // This is very questionable, will this Trees object actually work?
         var task = parseTask(p.getCompilationUnit().getSourceFile());
@@ -235,71 +230,6 @@ class Parser {
         int endLine = (int) lines.getLineNumber(end) - 1, endCol = (int) lines.getColumnNumber(end) - 1;
         var dUri = cu.getSourceFile().toUri();
         return new Location(dUri, new Range(new Position(startLine, startCol), new Position(endLine, endCol)));
-    }
-
-    private static Integer asSymbolKind(Tree.Kind k) {
-        switch (k) {
-            case ANNOTATION_TYPE:
-            case CLASS:
-                return SymbolKind.Class;
-            case ENUM:
-                return SymbolKind.Enum;
-            case INTERFACE:
-                return SymbolKind.Interface;
-            case METHOD:
-                return SymbolKind.Method;
-            case TYPE_PARAMETER:
-                return SymbolKind.TypeParameter;
-            case VARIABLE:
-                // This method is used for symbol-search functionality,
-                // where we only return fields, not local variables
-                return SymbolKind.Field;
-            default:
-                return null;
-        }
-    }
-
-    private static String containerName(TreePath path) {
-        var parent = path.getParentPath();
-        while (parent != null) {
-            var t = parent.getLeaf();
-            if (t instanceof ClassTree) {
-                var c = (ClassTree) t;
-                return c.getSimpleName().toString();
-            } else if (t instanceof CompilationUnitTree) {
-                var c = (CompilationUnitTree) t;
-                return Objects.toString(c.getPackageName(), "");
-            } else {
-                parent = parent.getParentPath();
-            }
-        }
-        return null;
-    }
-
-    private static String symbolName(Tree t) {
-        if (t instanceof ClassTree) {
-            var c = (ClassTree) t;
-            return c.getSimpleName().toString();
-        } else if (t instanceof MethodTree) {
-            var m = (MethodTree) t;
-            return m.getName().toString();
-        } else if (t instanceof VariableTree) {
-            var v = (VariableTree) t;
-            return v.getName().toString();
-        } else {
-            LOG.warning("Don't know how to create SymbolInformation from " + t);
-            return "???";
-        }
-    }
-
-    static SymbolInformation asSymbolInformation(TreePath path) {
-        var i = new SymbolInformation();
-        var t = path.getLeaf();
-        i.kind = asSymbolKind(t.getKind());
-        i.name = symbolName(t);
-        i.containerName = containerName(path);
-        i.location = Parser.location(path);
-        return i;
     }
 
     /** Find all already-imported symbols in all .java files in workspace */

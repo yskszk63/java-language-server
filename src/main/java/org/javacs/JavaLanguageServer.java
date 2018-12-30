@@ -8,7 +8,12 @@ import com.google.gson.JsonPrimitive;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.doctree.DocTree;
 import com.sun.source.doctree.ParamTree;
+import com.sun.source.tree.ClassTree;
+import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.MethodTree;
+import com.sun.source.tree.Tree;
+import com.sun.source.tree.VariableTree;
+import com.sun.source.util.TreePath;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
@@ -228,7 +233,7 @@ class JavaLanguageServer extends LanguageServer {
     public List<SymbolInformation> workspaceSymbols(WorkspaceSymbolParams params) {
         var list = new ArrayList<SymbolInformation>();
         for (var s : compiler.findSymbols(params.query, 50)) {
-            var i = Parser.asSymbolInformation(s);
+            var i = asSymbolInformation(s);
             list.add(i);
         }
         return list;
@@ -742,17 +747,95 @@ class JavaLanguageServer extends LanguageServer {
         return result;
     }
 
+    private ParseFile cacheParse;
+    private URI cacheParseFile = URI.create("file:///NONE");;
+    private int cacheParseVersion = -1;
+
+    private void updateCachedParse(URI file) {
+        if (file.equals(cacheParseFile) && contents(file).version == cacheParseVersion) return;
+        LOG.info(String.format("Updating cached parse file to %s", file));
+        var contents = contents(file);
+        cacheParse = compiler.parseFile(file, contents.content);
+        cacheParseFile = file;
+        cacheParseVersion = contents.version;
+    }
+
     @Override
     public List<SymbolInformation> documentSymbol(DocumentSymbolParams params) {
         var uri = params.textDocument.uri;
         if (!isJavaFile(uri)) return List.of();
-        var content = contents(uri).content;
-        var result =
-                Parser.documentSymbols(Paths.get(uri), content)
-                        .stream()
-                        .map(Parser::asSymbolInformation)
-                        .collect(Collectors.toList());
-        return result;
+        updateCachedParse(uri);
+        var paths = cacheParse.documentSymbols();
+        var infos = new ArrayList<SymbolInformation>();
+        for (var p : paths) {
+            infos.add(asSymbolInformation(p));
+        }
+        return infos;
+    }
+
+    static SymbolInformation asSymbolInformation(TreePath path) {
+        var i = new SymbolInformation();
+        var t = path.getLeaf();
+        i.kind = asSymbolKind(t.getKind());
+        i.name = symbolName(t);
+        i.containerName = containerName(path);
+        i.location = Parser.location(path);
+        return i;
+    }
+
+    private static Integer asSymbolKind(Tree.Kind k) {
+        switch (k) {
+            case ANNOTATION_TYPE:
+            case CLASS:
+                return SymbolKind.Class;
+            case ENUM:
+                return SymbolKind.Enum;
+            case INTERFACE:
+                return SymbolKind.Interface;
+            case METHOD:
+                return SymbolKind.Method;
+            case TYPE_PARAMETER:
+                return SymbolKind.TypeParameter;
+            case VARIABLE:
+                // This method is used for symbol-search functionality,
+                // where we only return fields, not local variables
+                return SymbolKind.Field;
+            default:
+                return null;
+        }
+    }
+
+    private static String containerName(TreePath path) {
+        var parent = path.getParentPath();
+        while (parent != null) {
+            var t = parent.getLeaf();
+            if (t instanceof ClassTree) {
+                var c = (ClassTree) t;
+                return c.getSimpleName().toString();
+            } else if (t instanceof CompilationUnitTree) {
+                var c = (CompilationUnitTree) t;
+                return Objects.toString(c.getPackageName(), "");
+            } else {
+                parent = parent.getParentPath();
+            }
+        }
+        return null;
+    }
+
+    private static String symbolName(Tree t) {
+        if (t instanceof ClassTree) {
+            var c = (ClassTree) t;
+            return c.getSimpleName().toString();
+        } else if (t instanceof MethodTree) {
+            var m = (MethodTree) t;
+            return m.getName().toString();
+        } else if (t instanceof VariableTree) {
+            var v = (VariableTree) t;
+            return v.getName().toString();
+        } else {
+            LOG.warning("Don't know how to create SymbolInformation from " + t);
+            return "???";
+        }
     }
 
     @Override
@@ -760,17 +843,16 @@ class JavaLanguageServer extends LanguageServer {
         // TODO just create a blank code lens on every method, then resolve it async
         var uri = params.textDocument.uri;
         if (!isJavaFile(uri)) return List.of();
-        var content = contents(uri).content;
-        var parse = compiler.parseFile(uri, content);
-        var declarations = parse.declarations();
+        updateCachedParse(uri);
+        var declarations = cacheParse.declarations();
         var result = new ArrayList<CodeLens>();
         for (var d : declarations) {
-            var range = parse.range(d);
+            var range = cacheParse.range(d);
             if (!range.isPresent()) continue;
             var className = JavaCompilerService.className(d);
             var memberName = JavaCompilerService.memberName(d);
             // If test class or method, add "Run Test" code lens
-            if (parse.isTestClass(d)) {
+            if (cacheParse.isTestClass(d)) {
                 var arguments = new JsonArray();
                 arguments.add(uri.toString());
                 arguments.add(className);
@@ -780,7 +862,7 @@ class JavaLanguageServer extends LanguageServer {
                 result.add(lens);
                 // TODO run all tests in file
                 // TODO run all tests in package
-            } else if (parse.isTestMethod(d)) {
+            } else if (cacheParse.isTestMethod(d)) {
                 var arguments = new JsonArray();
                 arguments.add(uri.toString());
                 arguments.add(className);
@@ -823,6 +905,11 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public CodeLens resolveCodeLens(CodeLens unresolved) {
+        // TODO This is pretty klugey, should happen asynchronously after CodeLenses are shown
+        if (!recentlyOpened.isEmpty()) {
+            lint(recentlyOpened);
+            recentlyOpened.clear();
+        }
         // Unpack data
         var data = unresolved.data;
         var command = data.get(0).getAsString();
@@ -916,14 +1003,17 @@ class JavaLanguageServer extends LanguageServer {
         return uri.getScheme().equals("file") && uri.getPath().endsWith(".java");
     }
 
+    private List<URI> recentlyOpened = new ArrayList<>();
+
     @Override
     public void didOpenTextDocument(DidOpenTextDocumentParams params) {
         var document = params.textDocument;
         var uri = document.uri;
-        if (isJavaFile(uri)) {
-            activeDocuments.put(uri, new VersionedContent(document.text, document.version));
-            lint(Collections.singleton(uri));
-        }
+        if (!isJavaFile(uri)) return;
+        LOG.info(String.format("Opened %s", Parser.fileName(uri)));
+        activeDocuments.put(uri, new VersionedContent(document.text, document.version));
+        recentlyOpened.add(uri);
+        updateCachedParse(uri); // So that subsequent documentSymbol and codeLens requests will be faster
     }
 
     @Override

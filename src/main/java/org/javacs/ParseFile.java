@@ -278,5 +278,9 @@ public class ParseFile {
         return Optional.of(range);
     }
 
+    public List<TreePath> documentSymbols() {
+        return Parser.findSymbolsMatching(root, "");
+    }
+
     private static final Logger LOG = Logger.getLogger("main");
 }
