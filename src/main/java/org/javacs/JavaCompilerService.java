@@ -151,9 +151,7 @@ public class JavaCompilerService {
 
     static boolean containsWord(String name, Path file) {
         if (!name.matches("\\w*")) throw new RuntimeException(String.format("`%s` is not a word", name));
-        // TODO consider using Parser.containsText, checking for \\b after finding matches
-        var word = Pattern.compile("\\b" + name + "\\b");
-        return Parser.containsPattern(file, word);
+        return Parser.containsWord(file, name);
     }
 
     static boolean importsAnyClass(String toPackage, List<String> toClasses, Path file) {
@@ -195,28 +193,33 @@ public class JavaCompilerService {
     public List<URI> potentialReferences(Element to) {
         LOG.info(String.format("Find potential references to `%s`...", to));
 
-        // Find files that import toPackage.toClass and contain the word el
-        var toPackage = packageName(to);
-        var toClass = className(to);
-        var name = to.getSimpleName().toString();
-        if (name.equals("<init>")) name = to.getEnclosingElement().getSimpleName().toString();
-        LOG.info(String.format("...look for the word `%s` in files that import %s.%s", name, toPackage, toClass));
-
         // Check all files on source path
         var allFiles = allJavaSources();
         LOG.info(String.format("...check %d files on the source path", allFiles.size()));
 
-        // Check files, one at a time
-        var result = new ArrayList<URI>();
-        int nScanned = 0;
+        // Figure out which files import `to`, explicitly or implicitly
+        var toPackage = packageName(to);
+        var toClass = className(to);
+        var hasImport = new ArrayList<Path>();
         for (var file : allFiles) {
-            if (containsImport(toPackage, toClass, file) && containsWord(name, file)) {
-                result.add(file.toUri());
+            if (containsImport(toPackage, toClass, file)) {
+                hasImport.add(file);
             }
         }
-        LOG.info(String.format("...%d files might have references to `%s`", result.size(), to));
+        LOG.info(String.format("...%d files import %s.%s", hasImport.size(), toPackage, toClass));
 
-        return result;
+        // Figure out which of those files have the word `to`
+        var name = to.getSimpleName().toString();
+        if (name.equals("<init>")) name = to.getEnclosingElement().getSimpleName().toString();
+        var hasWord = new ArrayList<URI>();
+        for (var file : hasImport) {
+            if (containsWord(name, file)) {
+                hasWord.add(file.toUri());
+            }
+        }
+        LOG.info(String.format("...%d files contain the word `%s`", hasWord.size(), name));
+
+        return hasWord;
     }
 
     public static String packageName(Element e) {

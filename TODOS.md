@@ -11,6 +11,7 @@
 - Deleted files remain in compiler, even when you restart (via classpath?)
 - Always shows last javadoc
 - Goto field goes to method of same name
+- Goto definition goes to wrong method in overloads
 
 ## Autocomplete
 - Annotation fields

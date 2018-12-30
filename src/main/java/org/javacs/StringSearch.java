@@ -96,7 +96,11 @@ class StringSearch {
     }
 
     int next(ByteBuffer text) {
-        var i = pattern.length - 1;
+        return next(text, 0);
+    }
+
+    int next(ByteBuffer text, int startingAfter) {
+        var i = startingAfter + pattern.length - 1;
         while (i < text.limit()) {
             // Compare backwards from the end until the first unmatching character.
             var j = pattern.length - 1;
@@ -110,6 +114,43 @@ class StringSearch {
             i += Math.max(badCharSkip[text.get(i) + 128], goodSuffixSkip[j]);
         }
         return -1;
+    }
+
+    boolean isWordChar(byte b) {
+        char c = (char) (b + 128);
+        return Character.isAlphabetic(c) || Character.isDigit(c) || c == '$' || c == '_';
+    }
+
+    boolean startsWord(ByteBuffer text, int offset) {
+        if (offset == 0) return true;
+        return !isWordChar(text.get(offset - 1));
+    }
+
+    boolean endsWord(ByteBuffer text, int offset) {
+        if (offset + 1 >= text.limit()) return true;
+        return !isWordChar(text.get(offset + 1));
+    }
+
+    boolean isWord(ByteBuffer text, int offset) {
+        return startsWord(text, offset) && endsWord(text, offset + pattern.length - 1);
+    }
+
+    int nextWord(String text) {
+        return nextWord(text.getBytes());
+    }
+
+    int nextWord(byte[] text) {
+        return nextWord(ByteBuffer.wrap(text));
+    }
+
+    int nextWord(ByteBuffer text) {
+        var i = 0;
+        while (true) {
+            i = next(text, i);
+            if (i == -1) return -1;
+            if (isWord(text, i)) return i;
+            i++;
+        }
     }
 
     private boolean hasPrefix(byte[] s, Slice prefix) {

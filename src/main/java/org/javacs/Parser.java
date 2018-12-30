@@ -152,6 +152,21 @@ class Parser {
         }
     }
 
+    static boolean containsWord(Path java, String query) {
+        var search = new StringSearch(query);
+        try (var channel = FileChannel.open(java)) {
+            // Read up to 1 MB of data from file
+            var limit = Math.min((int) channel.size(), SEARCH_BUFFER.capacity());
+            SEARCH_BUFFER.position(0);
+            SEARCH_BUFFER.limit(limit);
+            channel.read(SEARCH_BUFFER);
+            SEARCH_BUFFER.position(0);
+            return search.nextWord(SEARCH_BUFFER) != -1;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     static boolean containsPattern(Path java, Pattern pattern) {
         try (var channel = FileChannel.open(java)) {
             // Read up to 1 MB of data from file
