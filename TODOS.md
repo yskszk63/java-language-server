@@ -28,7 +28,6 @@
 - Go-to-implementation for overridden methods
 
 ## Polish
-- Convert {@tag ...} to `<tag>...</tag>` (see vscode-java)
 - Hover constructor should show constructor, not class
 - String.format(...) coloring
 - `new` should be a control keyword, not a regular keyword

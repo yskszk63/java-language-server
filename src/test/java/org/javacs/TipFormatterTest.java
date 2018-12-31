@@ -13,5 +13,6 @@ public class TipFormatterTest {
         assertThat(asMarkdown("<b>foo</b>"), equalTo("**foo**"));
         assertThat(asMarkdown("<pre>foo</pre>"), equalTo("`foo`"));
         assertThat(asMarkdown("<code>foo</code>"), equalTo("`foo`"));
+        assertThat(asMarkdown("{@code foo}"), equalTo("`foo`"));
     }
 }
