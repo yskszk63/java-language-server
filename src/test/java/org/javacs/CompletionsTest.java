@@ -62,6 +62,28 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
+    public void enumMapMembers() {
+        var suggestions = insertTemplate("/org/javacs/example/CompleteEnumMap.java", 9, 13);
+        assertThat(
+                suggestions,
+                hasItems(
+                        "clear",
+                        "clone",
+                        "containsKey",
+                        "containsValue",
+                        "entrySet",
+                        "equals",
+                        "get",
+                        "hashCode",
+                        "keySet",
+                        "put",
+                        "putAll",
+                        "remove",
+                        "size",
+                        "values"));
+    }
+
+    @Test
     public void fieldFromInitBlock() {
         var file = "/org/javacs/example/AutocompleteMembers.java";
 

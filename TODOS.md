@@ -1,17 +1,12 @@
 # Todo
 
 ## Bugs
-- Workspace root as source path crashes compiler
-- Nested source roots don't make sense
-- testMethod/testClass doesn't work for bazel
-- Find-all-references doesn't work on constructors
-- Files created in session don't autocomplete
-- EnumMap default methods don't autocomplete
 - Crashes when you create the first file in a new maven project
 - Deleted files remain in compiler, even when you restart (via classpath?)
 - Always shows last javadoc
 - T x, y; 'n references' shows references for y even when you click for x
 - Reference counts include self-references
+- Rename file crashes compiler
 
 ## Autocomplete
 - Annotation fields
