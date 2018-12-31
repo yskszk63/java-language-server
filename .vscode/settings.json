@@ -19,5 +19,4 @@
     },
     "java.testMethod": ["mvn", "test", "-Dtest=${class}#${method}"],
     "java.testClass": ["mvn", "test", "-Dtest=${class}"],
-    "java.trace.server": "off"
 }

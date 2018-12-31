@@ -872,20 +872,18 @@ class JavaLanguageServer extends LanguageServer {
                 var lens = new CodeLens(range.get(), command, null);
                 result.add(lens);
             }
-            // If method or field, add an unresolved "_ references" code lens
-            if (memberName.isPresent()) {
-                var start = range.get().start;
-                var line = start.line;
-                var character = start.character;
-                var data = new JsonArray();
-                data.add("java.command.findReferences");
-                data.add(uri.toString());
-                data.add(line);
-                data.add(character);
-                data.add(new Ptr(d).toString());
-                var lens = new CodeLens(range.get(), null, data);
-                result.add(lens);
-            }
+            // Unresolved "_ references" code lens
+            var start = range.get().start;
+            var line = start.line;
+            var character = start.character;
+            var data = new JsonArray();
+            data.add("java.command.findReferences");
+            data.add(uri.toString());
+            data.add(line);
+            data.add(character);
+            data.add(new Ptr(d).toString());
+            var lens = new CodeLens(range.get(), null, data);
+            result.add(lens);
         }
         return result;
     }
