@@ -20,7 +20,6 @@
 - Annotation fields
 - cc should match CamelCase
 - Autocomplete POJO constructor This(T f, U g) { this.f = f; ... }
-- Deprioritize Object fields
 
 ## Navigation
 - Go-to-subclasses

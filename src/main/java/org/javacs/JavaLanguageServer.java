@@ -319,6 +319,15 @@ class JavaLanguageServer extends LanguageServer {
         }
     }
 
+    private boolean isMemberOfObject(Element e) {
+        var parent = e.getEnclosingElement();
+        if (parent instanceof TypeElement) {
+            var type = (TypeElement) parent;
+            return type.getQualifiedName().contentEquals("java.lang.Object");
+        }
+        return false;
+    }
+
     /** Cache of completions from the last call to `completion` */
     private final Map<String, Completion> lastCompletions = new HashMap<>();
 
@@ -385,8 +394,15 @@ class JavaLanguageServer extends LanguageServer {
                 i.label = c.element.getSimpleName().toString();
                 i.kind = completionItemKind(c.element);
                 // Detailed name will be resolved later, using docs to fill in method names
-                if (!(c.element instanceof ExecutableElement)) i.detail = ShortTypePrinter.print(c.element.asType());
-                i.sortText = 2 + i.label;
+                if (!(c.element instanceof ExecutableElement)) {
+                    i.detail = ShortTypePrinter.print(c.element.asType());
+                }
+                // TODO prioritize based on usage?
+                if (isMemberOfObject(c.element)) {
+                    i.sortText = 9 + i.label;
+                } else {
+                    i.sortText = 2 + i.label;
+                }
             } else if (c.packagePart != null) {
                 i.label = c.packagePart.name;
                 i.kind = CompletionItemKind.Module;
@@ -401,15 +417,20 @@ class JavaLanguageServer extends LanguageServer {
                 i.label = Parser.lastName(c.className.name);
                 i.kind = CompletionItemKind.Class;
                 i.detail = c.className.name;
-                if (c.className.isImported) i.sortText = 2 + i.label;
-                else i.sortText = 4 + i.label;
+                if (c.className.isImported) {
+                    i.sortText = 2 + i.label;
+                } else {
+                    i.sortText = 4 + i.label;
+                }
             } else if (c.snippet != null) {
                 i.label = c.snippet.label;
                 i.kind = CompletionItemKind.Snippet;
                 i.insertText = c.snippet.snippet;
                 i.insertTextFormat = InsertTextFormat.Snippet;
                 i.sortText = 1 + i.label;
-            } else throw new RuntimeException(c + " is not valid");
+            } else {
+                throw new RuntimeException(c + " is not valid");
+            }
 
             result.add(i);
         }
