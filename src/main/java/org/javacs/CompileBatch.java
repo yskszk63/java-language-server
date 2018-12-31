@@ -157,28 +157,6 @@ public class CompileBatch {
         return field.getEnclosingElement() instanceof TypeElement;
     }
 
-    private Optional<TreePath> ref(TreePath from) {
-        var root = from.getCompilationUnit();
-        var lines = root.getLineMap();
-        var to = trees.getElement(from);
-        // Skip elements we can't find
-        if (to == null) {
-            // LOG.warning(String.format("No element for `%s`", from.getLeaf()));
-            return Optional.empty();
-        }
-        // Skip non-methods
-        if (!(to instanceof ExecutableElement || to instanceof TypeElement || isField(to))) {
-            return Optional.empty();
-        }
-        // TODO skip anything not on source path
-        var result = trees.getPath(to);
-        if (result == null) {
-            // LOG.warning(String.format("Element `%s` has no TreePath", to));
-            return Optional.empty();
-        }
-        return Optional.of(result);
-    }
-
     private List<TreePath> referencesToElement(CompilationUnitTree root, Element to) {
         var trees = Trees.instance(task);
         var results = new ArrayList<TreePath>();
@@ -222,8 +200,31 @@ public class CompileBatch {
     }
 
     private List<Ptr> index(CompilationUnitTree root) {
+        // TODO remember if the file contains errors, and keep re-indexing it
         var refs = new ArrayList<Ptr>();
         class IndexFile extends TreePathScanner<Void, Void> {
+            Optional<TreePath> ref(TreePath from) {
+                var root = from.getCompilationUnit();
+                var lines = root.getLineMap();
+                var to = trees.getElement(from);
+                // Skip elements we can't find
+                if (to == null) {
+                    // LOG.warning(String.format("No element for `%s`", from.getLeaf()));
+                    return Optional.empty();
+                }
+                // Skip non-methods
+                if (!(to instanceof ExecutableElement || to instanceof TypeElement || isField(to))) {
+                    return Optional.empty();
+                }
+                // TODO skip anything not on source path
+                var result = trees.getPath(to);
+                if (result == null) {
+                    // LOG.warning(String.format("Element `%s` has no TreePath", to));
+                    return Optional.empty();
+                }
+                return Optional.of(result);
+            }
+
             void check(TreePath from) {
                 var r = ref(from);
                 if (r.isPresent()) {
