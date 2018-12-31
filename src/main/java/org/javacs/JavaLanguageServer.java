@@ -698,19 +698,29 @@ class JavaLanguageServer extends LanguageServer {
         var fromLine = position.position.line + 1;
         var fromColumn = position.position.character + 1;
         var fromContent = contents(fromUri).content;
+        LOG.info(String.format("Go-to-def at %s:%d...", fromUri, fromLine));
         var fromFocus = compiler.compileFocus(fromUri, fromContent, fromLine, fromColumn);
         var toEl = fromFocus.element();
-        var toUri = fromFocus.declaringFile(toEl);
-        if (!toUri.isPresent()) return List.of();
-        if (!isJavaFile(toUri.get())) return List.of();
-        var toContent = contents(toUri.get()).content;
-        var toFile = compiler.compileFile(toUri.get(), toContent);
-        var toPath = toFile.find(new Ptr(toEl));
-        if (!toPath.isPresent()) return List.of();
+        LOG.info(String.format("...looking for definition of `%s`", toEl));
+        var toPath = fromFocus.path(toEl);
+        if (!toPath.isPresent()) {
+            LOG.info(String.format("...couldn't find declaring file, giving up"));
+            return List.of();
+        }
+        var toUri = toPath.get().getCompilationUnit().getSourceFile().toUri();
+        if (!isJavaFile(toUri)) {
+            LOG.info(String.format("...declaring file %s isn't a .java file", toUri));
+            return List.of();
+        }
+        var toContent = contents(toUri).content;
+        var toFile = compiler.compileFile(toUri, toContent);
         // Figure out where in the file the definition is
         var toRange = toFile.range(toPath.get());
-        if (!toRange.isPresent()) return List.of();
-        var to = new Location(toUri.get(), toRange.get());
+        if (!toRange.isPresent()) {
+            LOG.info(String.format("Couldn't find `%s` in %s", toPath.get(), toUri));
+            return List.of();
+        }
+        var to = new Location(toUri, toRange.get());
         return List.of(to);
     }
 

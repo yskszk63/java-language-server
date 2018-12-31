@@ -16,91 +16,91 @@ public class GotoTest {
 
     @Test
     public void localVariable() {
-        var suggestions = doGoto(file, 9, 8);
+        var suggestions = doGoto(file, 10, 9);
 
         assertThat(suggestions, contains("Goto.java:5"));
     }
 
     @Test
     public void defaultConstructor() {
-        var suggestions = doGoto(defaultConstructorFile, 4, 45);
+        var suggestions = doGoto(defaultConstructorFile, 5, 46);
 
         assertThat(suggestions, contains("GotoDefaultConstructor.java:3"));
     }
 
     @Test
     public void constructor() {
-        var suggestions = doGoto(file, 10, 20);
+        var suggestions = doGoto(file, 11, 21);
 
         assertThat(suggestions, contains("Goto.java:3"));
     }
 
     @Test
     public void className() {
-        var suggestions = doGoto(file, 15, 8);
+        var suggestions = doGoto(file, 16, 9);
 
         assertThat(suggestions, contains("Goto.java:3"));
     }
 
     @Test
     public void staticField() {
-        var suggestions = doGoto(file, 12, 21);
+        var suggestions = doGoto(file, 13, 22);
 
         assertThat(suggestions, contains("Goto.java:36"));
     }
 
     @Test
     public void field() {
-        var suggestions = doGoto(file, 13, 21);
+        var suggestions = doGoto(file, 14, 22);
 
         assertThat(suggestions, contains("Goto.java:37"));
     }
 
     @Test
     public void staticMethod() {
-        var suggestions = doGoto(file, 15, 13);
+        var suggestions = doGoto(file, 16, 14);
 
         assertThat(suggestions, contains("Goto.java:38"));
     }
 
     @Test
     public void method() {
-        var suggestions = doGoto(file, 16, 13);
+        var suggestions = doGoto(file, 17, 14);
 
         assertThat(suggestions, contains("Goto.java:41"));
     }
 
     @Test
     public void staticMethodReference() {
-        var suggestions = doGoto(file, 18, 26);
+        var suggestions = doGoto(file, 19, 27);
 
         assertThat(suggestions, contains("Goto.java:38"));
     }
 
     @Test
     public void methodReference() {
-        var suggestions = doGoto(file, 19, 26);
+        var suggestions = doGoto(file, 20, 27);
 
         assertThat(suggestions, contains("Goto.java:41"));
     }
 
     @Test
     public void otherStaticMethod() {
-        var suggestions = doGoto(file, 28, 24);
+        var suggestions = doGoto(file, 29, 25);
 
         assertThat(suggestions, contains(startsWith("GotoOther.java:")));
     }
 
     @Test
     public void otherMethod() {
-        var suggestions = doGoto(file, 29, 17);
+        var suggestions = doGoto(file, 30, 18);
 
         assertThat(suggestions, contains(startsWith("GotoOther.java:")));
     }
 
     @Test
     public void otherCompiledFile() {
-        var suggestions = doGoto(file, 28, 24);
+        var suggestions = doGoto(file, 29, 25);
 
         assertThat(suggestions, contains(startsWith("GotoOther.java:")));
     }
@@ -108,7 +108,7 @@ public class GotoTest {
     @Test
     @Ignore // TODO
     public void typeParam() {
-        var suggestions = doGoto(file, 45, 11);
+        var suggestions = doGoto(file, 46, 12);
 
         assertThat(suggestions, contains("Goto.java:3"));
     }
@@ -117,8 +117,26 @@ public class GotoTest {
     public void gotoEnum() {
         String file = "/org/javacs/example/GotoEnum.java";
 
-        assertThat(doGoto(file, 5, 30), not(empty()));
-        assertThat(doGoto(file, 5, 35), not(empty()));
+        assertThat(doGoto(file, 6, 31), not(empty()));
+        assertThat(doGoto(file, 6, 36), not(empty()));
+    }
+
+    @Test
+    public void gotoOverload() {
+        String file = "/org/javacs/example/GotoOverload.java";
+
+        assertThat(doGoto(file, 7, 12), contains("GotoOverload.java:4"));
+        assertThat(doGoto(file, 8, 12), contains("GotoOverload.java:12"));
+        assertThat(doGoto(file, 9, 12), contains("GotoOverload.java:16"));
+    }
+
+    @Test
+    public void gotoOverloadInOtherFile() {
+        String file = "/org/javacs/example/GotoOverloadInOtherFile.java";
+
+        assertThat(doGoto(file, 5, 25), contains("GotoOverload.java:4"));
+        assertThat(doGoto(file, 6, 25), contains("GotoOverload.java:12"));
+        assertThat(doGoto(file, 7, 25), contains("GotoOverload.java:16"));
     }
 
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
@@ -130,8 +148,8 @@ public class GotoTest {
 
         Position position = new Position();
 
-        position.line = row;
-        position.character = column;
+        position.line = row - 1;
+        position.character = column - 1;
 
         TextDocumentPositionParams p = new TextDocumentPositionParams();
 

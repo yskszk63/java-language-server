@@ -3,11 +3,8 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,6 +13,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
@@ -53,26 +51,30 @@ public class JavaCompilerServiceTest {
         }
     }
 
-    private String contents(String resourceFile) {
-        try (var in = JavaCompilerServiceTest.class.getResourceAsStream(resourceFile)) {
-            return new BufferedReader(new InputStreamReader(in)).lines().collect(Collectors.joining("\n"));
+    static String contents(String resourceFile) {
+        var root = JavaCompilerServiceTest.simpleProjectSrc();
+        var file = root.resolve(resourceFile);
+        List<String> lines;
+        try {
+            lines = Files.readAllLines(file);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        var join = new StringJoiner("\n");
+        for (var l : lines) join.add(l);
+        return join.toString();
     }
 
     private URI resourceUri(String resourceFile) {
-        try {
-            return JavaCompilerServiceTest.class.getResource(resourceFile).toURI();
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
+        var root = JavaCompilerServiceTest.simpleProjectSrc();
+        var file = root.resolve(resourceFile);
+        return file.toUri();
     }
 
     @Test
     public void element() {
-        var uri = resourceUri("/HelloWorld.java");
-        var contents = contents("/HelloWorld.java");
+        var uri = resourceUri("HelloWorld.java");
+        var contents = contents("HelloWorld.java");
         var found = compiler.compileFocus(uri, contents, 3, 24).element();
 
         assertThat(found.getSimpleName(), hasToString(containsString("println")));
@@ -80,8 +82,8 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void elementWithError() {
-        var uri = resourceUri("/CompleteMembers.java");
-        var contents = contents("/CompleteMembers.java");
+        var uri = resourceUri("CompleteMembers.java");
+        var contents = contents("CompleteMembers.java");
         var found = compiler.compileFocus(uri, contents, 3, 12).element();
 
         assertThat(found, notNullValue());
@@ -105,8 +107,8 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void identifiers() {
-        var uri = resourceUri("/CompleteIdentifiers.java");
-        var contents = contents("/CompleteIdentifiers.java");
+        var uri = resourceUri("CompleteIdentifiers.java");
+        var contents = contents("CompleteIdentifiers.java");
         var focus = compiler.compileFocus(uri, contents, 13, 21);
         var found = focus.scopeMembers("complete");
         var names = elementNames(found);
@@ -123,8 +125,8 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void identifiersInMiddle() {
-        var uri = resourceUri("/CompleteInMiddle.java");
-        var contents = contents("/CompleteInMiddle.java");
+        var uri = resourceUri("CompleteInMiddle.java");
+        var contents = contents("CompleteInMiddle.java");
         var focus = compiler.compileFocus(uri, contents, 13, 21);
         var found = focus.scopeMembers("complete");
         var names = elementNames(found);
@@ -141,8 +143,8 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void completeIdentifiers() {
-        var uri = resourceUri("/CompleteIdentifiers.java");
-        var contents = contents("/CompleteIdentifiers.java");
+        var uri = resourceUri("CompleteIdentifiers.java");
+        var contents = contents("CompleteIdentifiers.java");
         var ctx = compiler.parseFile(uri, contents).completionContext(13, 21).get();
         var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
         var found = focus.completeIdentifiers(ctx.inClass, ctx.inMethod, ctx.partialName);
@@ -160,8 +162,8 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void members() {
-        var uri = resourceUri("/CompleteMembers.java");
-        var contents = contents("/CompleteMembers.java");
+        var uri = resourceUri("CompleteMembers.java");
+        var contents = contents("CompleteMembers.java");
         var focus = compiler.compileFocus(uri, contents, 3, 14);
         var found = focus.completeMembers(false);
         var names = completionNames(found);
@@ -172,8 +174,8 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void completeMembers() {
-        var uri = resourceUri("/CompleteMembers.java");
-        var contents = contents("/CompleteMembers.java");
+        var uri = resourceUri("CompleteMembers.java");
+        var contents = contents("CompleteMembers.java");
         var ctx = compiler.parseFile(uri, contents).completionContext(3, 15).get();
         var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
         var found = focus.completeMembers(false);
@@ -185,8 +187,8 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void completeExpression() {
-        var uri = resourceUri("/CompleteExpression.java");
-        var contents = contents("/CompleteExpression.java");
+        var uri = resourceUri("CompleteExpression.java");
+        var contents = contents("CompleteExpression.java");
         var ctx = compiler.parseFile(uri, contents).completionContext(3, 37).get();
         var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
         var found = focus.completeMembers(false);
@@ -198,8 +200,8 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void completeClass() {
-        var uri = resourceUri("/CompleteClass.java");
-        var contents = contents("/CompleteClass.java");
+        var uri = resourceUri("CompleteClass.java");
+        var contents = contents("CompleteClass.java");
         var ctx = compiler.parseFile(uri, contents).completionContext(3, 23).get();
         var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
         var found = focus.completeMembers(false);
@@ -212,8 +214,8 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void completeImports() {
-        var uri = resourceUri("/CompleteImports.java");
-        var contents = contents("/CompleteImports.java");
+        var uri = resourceUri("CompleteImports.java");
+        var contents = contents("CompleteImports.java");
         var ctx = compiler.parseFile(uri, contents).completionContext(1, 18).get();
         var focus = compiler.compileFocus(uri, contents, ctx.line, ctx.character);
         var found = focus.completeMembers(false);
@@ -244,7 +246,7 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void references() {
-        var file = "/GotoDefinition.java";
+        var file = "GotoDefinition.java";
         var to = compiler.compileFocus(resourceUri(file), contents(file), 6, 13).element();
         var possible = compiler.potentialReferences(to);
         assertThat(
@@ -267,7 +269,7 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void countReferences() {
-        var file = "/GotoDefinition.java";
+        var file = "GotoDefinition.java";
         var refs = compiler.countReferences(resourceUri(file), contents(file), ReportProgress.EMPTY);
         var stringify = new HashMap<String, Integer>();
         for (var kv : refs.entrySet()) {
@@ -279,8 +281,8 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void overloads() {
-        var uri = resourceUri("/Overloads.java");
-        var contents = contents("/Overloads.java");
+        var uri = resourceUri("Overloads.java");
+        var contents = contents("Overloads.java");
         var found = compiler.compileFocus(uri, contents, 3, 15).methodInvocation().get();
         var strings = found.overloads.stream().map(Object::toString).collect(Collectors.toList());
 
@@ -290,7 +292,7 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void lint() {
-        var uri = resourceUri("/HasError.java");
+        var uri = resourceUri("HasError.java");
         var files = Collections.singleton(uri);
         var diags = compiler.compileBatch(files).lint();
         assertThat(diags, not(empty()));
@@ -298,8 +300,8 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void localDoc() {
-        var uri = resourceUri("/LocalMethodDoc.java");
-        var contents = contents("/LocalMethodDoc.java");
+        var uri = resourceUri("LocalMethodDoc.java");
+        var contents = contents("LocalMethodDoc.java");
         var method = compiler.compileFocus(uri, contents, 3, 21).methodInvocation().get().activeMethod.get();
         var doc = compiler.docs().methodDoc(method);
         assertTrue(doc.isPresent());
@@ -308,8 +310,8 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void fixImports() {
-        var uri = resourceUri("/MissingImport.java");
-        var contents = contents("/MissingImport.java");
+        var uri = resourceUri("MissingImport.java");
+        var contents = contents("MissingImport.java");
         var qualifiedNames = compiler.compileFile(uri, contents).fixImports().fixedImports;
         assertThat(qualifiedNames, hasItem("java.util.List"));
     }

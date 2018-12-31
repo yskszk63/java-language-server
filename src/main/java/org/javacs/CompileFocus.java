@@ -78,6 +78,10 @@ public class CompileFocus {
         return trees.getElement(path);
     }
 
+    public Optional<TreePath> path(Element e) {
+        return Optional.ofNullable(trees.getPath(e));
+    }
+
     /** Find all overloads for the smallest method call that includes the cursor */
     public Optional<MethodInvocation> methodInvocation() {
         LOG.info(String.format("Find method invocation around %s(%d,%d)...", file, line, character));
@@ -296,6 +300,10 @@ public class CompileFocus {
             return result;
         } else {
             var type = trees.getTypeMirror(path);
+            if (type == null) {
+                LOG.warning(String.format("`...%s` has not type", path.getLeaf()));
+                return List.of();
+            }
             if (hasMembers(type)) {
                 LOG.info(String.format("...completing virtual members of %s", type));
 

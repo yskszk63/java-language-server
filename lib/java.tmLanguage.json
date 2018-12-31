@@ -637,7 +637,7 @@
 					]
 				},
 				{
-					"begin": "assert",
+					"begin": "\\bassert\\b",
 					"end": "$",
 					"name": "meta.assert.java",
 					"beginCaptures": {

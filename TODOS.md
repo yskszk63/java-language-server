@@ -10,8 +10,6 @@
 - Crashes when you create the first file in a new maven project
 - Deleted files remain in compiler, even when you restart (via classpath?)
 - Always shows last javadoc
-- Goto field goes to method of same name
-- Goto definition goes to wrong method in overloads
 - T x, y; 'n references' shows references for y even when you click for x
 - Reference counts include self-references
 
