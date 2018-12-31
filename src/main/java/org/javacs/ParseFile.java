@@ -246,6 +246,11 @@ public class ParseFile {
         var start = (int) pos.getStartPosition(root, path.getLeaf());
         var end = (int) pos.getEndPosition(root, path.getLeaf());
         
+        // If start is -1, give up
+        if (start == -1) {
+            LOG.warning(String.format("Couldn't locate `%s`", path.getLeaf()));
+            return Optional.empty();
+        }
         // If end is bad, guess based on start
         if (end == -1) {
             end = start + path.getLeaf().toString().length();
