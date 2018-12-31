@@ -29,8 +29,6 @@
 
 ## Polish
 - Hover constructor should show constructor, not class
-- String.format(...) coloring
-- `new` should be a control keyword, not a regular keyword
 - Show warning for unused local var, unused private method
 - Use cached codelens during parse errors to prevent things from jumping around, or codelens-on-save
 - Suppress references codelens for inherited methods

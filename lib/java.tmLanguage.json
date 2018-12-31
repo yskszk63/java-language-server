@@ -664,6 +664,29 @@
 					]
 				},
 				{
+					"begin": "String\\.format\\(",
+					"end": "\\)",
+					"name": "meta.string.format",
+					"patterns": [
+						{
+							"begin": "\"",
+							"end": "\"",
+							"name": "string.quoted.double.format.java",
+							"patterns": [
+								{
+									"match": "\\\\.",
+									"name": "constant.character.escape"
+								},
+								{
+									"match": "%(\\d+\\$|<)?[-#+ 0,(]*(\\d+)?(\\.\\d+)?([tT][HIklMSLNpzZsQBbhAaCYyjmde]?|[bBhHsScCdoxXeEfgGaA%n])",
+									"name": "constant.character.escape",
+									"TODO": "more complicated format strings"
+								}
+							]
+						}
+					]
+				},
+				{
 					"include": "#keywords"
 				},
 				{
@@ -873,17 +896,7 @@
 				},
 				{
 					"begin": "\"",
-					"beginCaptures": {
-						"0": {
-							"name": "punctuation.definition.string.begin"
-						}
-					},
 					"end": "\"",
-					"endCaptures": {
-						"0": {
-							"name": "punctuation.definition.string.end"
-						}
-					},
 					"name": "string.quoted.double.java",
 					"patterns": [
 						{
@@ -894,17 +907,7 @@
 				},
 				{
 					"begin": "'",
-					"beginCaptures": {
-						"0": {
-							"name": "punctuation.definition.string.begin"
-						}
-					},
 					"end": "'",
-					"endCaptures": {
-						"0": {
-							"name": "punctuation.definition.string.end"
-						}
-					},
 					"name": "string.quoted.single.java",
 					"patterns": [
 						{
