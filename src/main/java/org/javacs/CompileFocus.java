@@ -697,10 +697,12 @@ public class CompileFocus {
 
             // Check classpath
             LOG.info("...checking classpath");
+            var classPathNames = new HashSet<String>();
             for (var c : parent.classPathClasses.classes()) {
                 if (tooManyItems(result.size())) return;
                 if (matchesPartialName.test(c) && parent.classPathClasses.isAccessibleFromPackage(c, packageName)) {
                     result.add(Completion.ofClassName(c, isImported(c)));
+                    classPathNames.add(c);
                 }
             }
 
@@ -714,13 +716,13 @@ public class CompileFocus {
                 // If file is in a different package, only a public class with the same name as the file is accessible
                 var maybePublic = matchesPartialName(file.getFileName().toString(), partialName);
                 if (samePackage || maybePublic) {
-                    result.addAll(accessibleClasses(file, partialName, packageName));
+                    result.addAll(accessibleClasses(file, partialName, packageName, classPathNames));
                 }
             }
         }
     }
 
-    private List<Completion> accessibleClasses(Path file, String partialName, String fromPackage) {
+    private List<Completion> accessibleClasses(Path file, String partialName, String fromPackage, Set<String> skip) {
         var parse = Parser.parse(file);
         var toPackage = Objects.toString(parse.getPackageName(), "");
         var samePackage = fromPackage.equals(toPackage) || toPackage.isEmpty();
@@ -728,16 +730,19 @@ public class CompileFocus {
         for (var t : parse.getTypeDecls()) {
             if (!(t instanceof ClassTree)) continue;
             var cls = (ClassTree) t;
+            // If class is not accessible, skip it
             var isPublic = cls.getModifiers().getFlags().contains(Modifier.PUBLIC);
-            if (isPublic || samePackage) {
-                var name = cls.getSimpleName().toString();
-                if (matchesPartialName(name, partialName)) {
-                    if (parse.getPackageName() != null) {
-                        name = parse.getPackageName() + "." + name;
-                    }
-                    result.add(Completion.ofClassName(name, isImported(name)));
-                }
+            if (!samePackage && !isPublic) continue;
+            // If class doesn't match partialName, skip it
+            var name = cls.getSimpleName().toString();
+            if (!matchesPartialName(name, partialName)) continue;
+            if (parse.getPackageName() != null) {
+                name = parse.getPackageName() + "." + name;
             }
+            // If class was already autocompleted using the classpath, skip it
+            if (skip.contains(name)) continue;
+            // Otherwise, add this name!
+            result.add(Completion.ofClassName(name, isImported(name)));
         }
         return result;
     }
