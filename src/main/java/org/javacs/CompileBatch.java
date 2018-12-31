@@ -116,13 +116,22 @@ public class CompileBatch {
             var uri = f.getSourceFile().toUri();
             var path = Paths.get(uri);
             var refs = index(f);
+            // Remember when file was modified
             FileTime modified;
             try {
                 modified = Files.getLastModifiedTime(path);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            var i = new Index(refs, modified.toInstant());
+            // Remember if file contains any errors
+            var containsError = false;
+            for (var d : parent.diags) {
+                var isError = d.getKind() == Diagnostic.Kind.ERROR;
+                var sameUri = d.getSource().toUri().equals(uri);
+                if (isError && sameUri) containsError = true;
+            }
+            // Add file to index
+            var i = new Index(refs, modified.toInstant(), containsError);
             index.put(uri, i);
         }
         return index;

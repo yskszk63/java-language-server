@@ -14,6 +14,7 @@
 - Goto definition goes to wrong method in overloads
 - T x, y; 'n references' shows references for y even when you click for x
 - Test that newly created file shows up in autocomplete
+- Reference counts include self-references
 
 ## Autocomplete
 - Annotation fields

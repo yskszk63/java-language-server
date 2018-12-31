@@ -304,25 +304,34 @@ public class JavaCompilerService {
 
     private void updateIndex(Collection<URI> possible, ReportProgress progress) {
         LOG.info(String.format("Check %d files for modifications compared to index...", possible.size()));
+
+        // Figure out all files that have been changed, or contained errors at the time they were indexed
         var outOfDate = new ArrayList<URI>();
+        var hasError = new ArrayList<URI>();
         for (var p : possible) {
             var i = index.getOrDefault(p, Index.EMPTY);
             var modified = Instant.ofEpochMilli(new File(p).lastModified());
-            if (modified.isAfter(i.created)) {
-                outOfDate.add(p);
-            }
+            if (modified.isAfter(i.created)) outOfDate.add(p);
+            if (i.containsError) hasError.add(p);
         }
-        LOG.info(String.format("... %d files are out-of-date", outOfDate.size()));
+        if (outOfDate.size() > 0) LOG.info(String.format("... %d files are out-of-date", outOfDate.size()));
+        if (hasError.size() > 0) LOG.info(String.format("... %d files contain errors", hasError.size()));
+
         // If there's nothing to update, return
-        if (outOfDate.isEmpty()) return;
+        var needsUpdate = new ArrayList<URI>();
+        needsUpdate.addAll(outOfDate);
+        needsUpdate.addAll(hasError);
+        if (needsUpdate.isEmpty()) return;
+
         // If there's more than 1 file, report progress
-        if (outOfDate.size() > 1) { // TODO this could probably be tuned to be higher
-            progress.start(String.format("Index %d files", outOfDate.size()));
+        if (needsUpdate.size() > 1) { // TODO this could probably be tuned to be higher
+            progress.start(String.format("Index %d files", needsUpdate.size()));
         } else {
             progress = ReportProgress.EMPTY;
         }
-        // Reindex
-        var counts = compileBatch(outOfDate, progress).countReferences();
+
+        // Compile in a batch and update the index
+        var counts = compileBatch(needsUpdate, progress).countReferences();
         index.putAll(counts);
     }
 
