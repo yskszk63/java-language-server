@@ -4,9 +4,7 @@
 - Crashes when you create the first file in a new maven project
 - Deleted files remain in compiler, even when you restart (via classpath?)
 - Always shows last javadoc
-- T x, y; 'n references' shows references for y even when you click for x
-- Reference counts include self-references
-- Rename file crashes compiler
+- Make new file, rename, edit crashes compiler
 
 ## Autocomplete
 - Annotation fields

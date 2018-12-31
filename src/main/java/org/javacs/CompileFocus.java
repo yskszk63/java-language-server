@@ -784,6 +784,25 @@ public class CompileFocus {
                 long start = pos.getStartPosition(root, tree), end = pos.getEndPosition(root, tree);
                 // If element has no position, give up
                 if (start == -1 || end == -1) return false;
+                // int x = 1, y = 2, ... requires special handling
+                if (tree instanceof VariableTree) {
+                    var v = (VariableTree) tree;
+                    // Get contents of source
+                    String source;
+                    try {
+                        source = root.getSourceFile().getCharContent(true).toString();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                    // Find name in contents
+                    var name = v.getName().toString();
+                    start = source.indexOf(name, (int) start);
+                    if (start == -1) {
+                        LOG.warning(String.format("Can't find name `%s` in variable declaration `%s`", name, v));
+                        return false;
+                    }
+                    end = start + name.length();
+                }
                 // Check if `tree` contains line:column
                 return start <= cursor && cursor <= end;
             }
@@ -791,7 +810,9 @@ public class CompileFocus {
             @Override
             public Void scan(Tree tree, Void nothing) {
                 // This is pre-order traversal, so the deepest element will be the last one remaining in `found`
-                if (containsCursor(tree)) found = new TreePath(getCurrentPath(), tree);
+                if (containsCursor(tree)) {
+                    found = new TreePath(getCurrentPath(), tree);
+                }
                 super.scan(tree, nothing);
                 return null;
             }

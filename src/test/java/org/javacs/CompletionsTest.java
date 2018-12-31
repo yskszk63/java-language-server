@@ -14,6 +14,8 @@ import org.junit.Test;
 
 public class CompletionsTest extends CompletionsBase {
 
+    // TODO rename Autocomplete Complete because Autocomplete is long and ugly
+
     @Test
     public void staticMember() {
         var file = "/org/javacs/example/AutocompleteStaticMember.java";

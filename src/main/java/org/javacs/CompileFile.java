@@ -45,9 +45,24 @@ public class CompileFile {
     }
 
     public Optional<Element> element(int line, int character) {
+        LOG.info(String.format("Looking for element under cursor %s(%d,%d)...", file, line, character));
+
+        // First, look for a tree path
         var path = CompileFocus.findPath(task, root, line, character);
+        if (path == null) {
+            LOG.info("...no tree under cursor");
+            return Optional.empty();
+        }
+        LOG.info(String.format("...found tree `%s`", path.getLeaf()));
+
+        // Then, convert the path to an element
         var el = trees.getElement(path);
-        return Optional.ofNullable(el);
+        if (el == null) {
+            LOG.info(String.format("...tree does not correspond to an element"));
+            return Optional.empty();
+        }
+
+        return Optional.of(el);
     }
 
     public Optional<TreePath> path(Element e) {

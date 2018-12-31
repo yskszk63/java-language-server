@@ -40,4 +40,12 @@ public class FindReferencesTest {
     public void findConstructorReferences() {
         assertThat(items("/org/javacs/example/ConstructorRefs.java", 4, 10), contains("ConstructorRefs.java(9)"));
     }
+
+    @Test
+    public void findStackedFieldReferences() {
+        var file = "/org/javacs/example/StackedFieldReferences.java";
+        assertThat(items(file, 4, 9), contains("StackedFieldReferences.java(7)"));
+        assertThat(items(file, 4, 12), contains("StackedFieldReferences.java(8)"));
+        assertThat(items(file, 4, 15), contains("StackedFieldReferences.java(9)"));
+    }
 }

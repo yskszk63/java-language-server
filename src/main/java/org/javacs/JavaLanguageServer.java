@@ -793,13 +793,18 @@ class JavaLanguageServer extends LanguageServer {
         var toUri = position.textDocument.uri;
         if (!isJavaFile(toUri)) return List.of();
         var toContent = contents(toUri).content;
+        updateHoverCache(toUri, toContent);
         var toLine = position.position.line + 1;
         var toColumn = position.position.character + 1;
-        var toEl = compiler.compileFocus(toUri, toContent, toLine, toColumn).element();
-        var fromFiles = compiler.potentialReferences(toEl);
+        var toEl = hoverCache.element(toLine, toColumn);
+        if (!toEl.isPresent()) {
+            LOG.warning(String.format("No element under cursor %s(%d,%d)", toUri.getPath(), toLine, toColumn));
+            return List.of();
+        }
+        var fromFiles = compiler.potentialReferences(toEl.get());
         if (fromFiles.isEmpty()) return List.of();
         var batch = compiler.compileBatch(fromFiles);
-        var fromTreePaths = batch.references(toEl);
+        var fromTreePaths = batch.references(toEl.get()); // Why does this work? These are two different batches
         var result = new ArrayList<Location>();
         for (var path : fromTreePaths) {
             var fromUri = path.getCompilationUnit().getSourceFile().toUri();
