@@ -19,7 +19,6 @@
 ## Autocomplete
 - Annotation fields
 - cc should match CamelCase
-- Detail of fields, vars should be type
 - Autocomplete POJO constructor This(T f, U g) { this.f = f; ... }
 - Deprioritize Object fields
 

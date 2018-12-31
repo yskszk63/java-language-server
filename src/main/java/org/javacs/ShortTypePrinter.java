@@ -14,6 +14,7 @@ class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
     private ShortTypePrinter() {}
 
     static String print(TypeMirror type) {
+        // TODO allow packageContext which suppresses printing of those package prefixes
         return type.accept(new ShortTypePrinter(), null);
     }
 
@@ -53,8 +54,8 @@ class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
             result += "<" + params + ">";
         }
 
-        if (result.matches("java\\.lang\\.\\w+")) return result.substring("java.lang.".length());
-        else if (result.startsWith("java\\.util\\.\\w+")) return result.substring("java.util.".length());
+        if (result.startsWith("java.lang")) return result.substring("java.lang.".length());
+        else if (result.startsWith("java.util")) return result.substring("java.util.".length());
         else return result;
     }
 

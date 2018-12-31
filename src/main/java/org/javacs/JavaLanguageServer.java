@@ -385,7 +385,7 @@ class JavaLanguageServer extends LanguageServer {
                 i.label = c.element.getSimpleName().toString();
                 i.kind = completionItemKind(c.element);
                 // Detailed name will be resolved later, using docs to fill in method names
-                if (!(c.element instanceof ExecutableElement)) i.detail = c.element.toString();
+                if (!(c.element instanceof ExecutableElement)) i.detail = ShortTypePrinter.print(c.element.asType());
                 i.sortText = 2 + i.label;
             } else if (c.packagePart != null) {
                 i.label = c.packagePart.name;
