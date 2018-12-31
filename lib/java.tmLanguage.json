@@ -637,6 +637,21 @@
 					]
 				},
 				{
+					"begin": "assert",
+					"end": "$",
+					"name": "meta.assert.java",
+					"beginCaptures": {
+						"0": {
+							"name": "keyword.control.assert"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#expr"
+						}
+					]
+				},
+				{
 					"include": "#expr"
 				}
 			]
