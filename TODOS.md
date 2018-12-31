@@ -13,7 +13,6 @@
 - Goto field goes to method of same name
 - Goto definition goes to wrong method in overloads
 - T x, y; 'n references' shows references for y even when you click for x
-- Test that newly created file shows up in autocomplete
 - Reference counts include self-references
 
 ## Autocomplete
@@ -32,7 +31,6 @@
 - Show warning for unused local var, unused private method
 - Use cached codelens during parse errors to prevent things from jumping around, or codelens-on-save
 - Suppress references codelens for inherited methods
-- '1 reference' should just jump to definition instead of showing peek
 - Don't remove imports when there's an unresolved reference to that name
 
 ## Simplicity

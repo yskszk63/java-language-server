@@ -12,7 +12,7 @@ public class ParserFixImportsTest {
     @Test
     public void findExistingImports() throws IOException {
         var allJavaFiles =
-                Files.walk(JavaCompilerServiceTest.resourcesDir())
+                Files.walk(JavaCompilerServiceTest.simpleProjectSrc())
                         .filter(f -> f.getFileName().toString().endsWith(".java"))
                         .collect(Collectors.toSet());
         assertThat(allJavaFiles, not(empty()));

@@ -3,6 +3,10 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+import java.util.List;
 import java.util.stream.Collectors;
 import org.javacs.lsp.*;
 import org.junit.Ignore;
@@ -795,5 +799,28 @@ public class CompletionsTest extends CompletionsBase {
         var suggestions = insertText(file, 3, 20);
 
         assertThat(suggestions, hasItem(containsString("util")));
+    }
+
+    @Test
+    public void newlyCreatedClass() throws IOException {
+        var file = FindResource.path("/org/javacs/example/NewlyCreatedFile.java");
+        try {
+            // Create a file that didn't exist when we created the server
+            try (var writer = Files.newBufferedWriter(file, StandardOpenOption.CREATE_NEW)) {
+                writer.write("package org.javacs.example;\nclass NewlyCreatedFile { }");
+            }
+            // Send a 'file created' notification
+            var created = new FileEvent();
+            created.uri = file.toUri();
+            created.type = FileChangeType.Created;
+            var changes = new DidChangeWatchedFilesParams();
+            changes.changes = List.of(created);
+            server.didChangeWatchedFiles(changes);
+            // Autocomplete `New`
+            var suggestions = insertText("/org/javacs/example/AutocompleteNewFile.java", 5, 12);
+            assertThat(suggestions, hasItem(containsString("NewlyCreatedFile")));
+        } finally {
+            Files.delete(file);
+        }
     }
 }

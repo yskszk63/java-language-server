@@ -30,22 +30,22 @@ public class JavaCompilerServiceTest {
 
     private JavaCompilerService compiler =
             new JavaCompilerService(
-                    Collections.singleton(resourcesDir()),
+                    Collections.singleton(simpleProjectSrc()),
                     JavaCompilerServiceTest::allJavaFiles,
                     Collections.emptySet(),
                     Collections.emptySet());
 
-    static Path resourcesDir() {
-        try {
-            return Paths.get(JavaCompilerServiceTest.class.getResource("/HelloWorld.java").toURI()).getParent();
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
+    static Path mavenProjectSrc() {
+        return Paths.get("src/test/test-project/workspace/src").normalize();
+    }
+
+    static Path simpleProjectSrc() {
+        return Paths.get("src/test/test-project/simple").normalize();
     }
 
     static Set<Path> allJavaFiles() {
         try {
-            return Files.walk(resourcesDir())
+            return Files.walk(simpleProjectSrc())
                     .filter(f -> f.getFileName().toString().endsWith(".java"))
                     .collect(Collectors.toSet());
         } catch (IOException e) {
@@ -318,5 +318,18 @@ public class JavaCompilerServiceTest {
     public void matchesPartialName() {
         assertTrue(CompileFocus.matchesPartialName("foobar", "foo"));
         assertFalse(CompileFocus.matchesPartialName("foo", "foobar"));
+    }
+
+    @Test
+    public void packageName() {
+        var compiler =
+                new JavaCompilerService(
+                        Collections.singleton(mavenProjectSrc()),
+                        JavaCompilerServiceTest::allJavaFiles,
+                        Collections.emptySet(),
+                        Collections.emptySet());
+        assertThat(
+                compiler.pathBasedPackageName(FindResource.path("/org/javacs/example/Goto.java")),
+                equalTo("org.javacs.example"));
     }
 }

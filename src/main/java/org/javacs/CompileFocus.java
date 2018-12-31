@@ -13,7 +13,6 @@ import java.util.function.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
@@ -707,40 +706,40 @@ public class CompileFocus {
 
             // Check sourcepath
             LOG.info("...checking source path");
-            Predicate<Path> matchesFileName = file -> matchesPartialName(file.getFileName().toString(), partialName);
-            Predicate<Path> isPublic =
-                    file -> {
-                        var fileName = file.getFileName().toString();
-                        if (!fileName.endsWith(".java")) return true;
-                        var simpleName = fileName.substring(0, fileName.length() - ".java".length());
-                        Stream<String> lines;
-                        try {
-                            lines = Files.lines(file);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                        return lines.anyMatch(line -> line.matches(".*public\\s+class\\s+" + simpleName + ".*"));
-                    };
-            for (var dir : parent.sourcePath) {
-                Function<Path, String> qualifiedName =
-                        file -> {
-                            var relative = dir.relativize(file).toString().replace('/', '.');
-                            if (!relative.endsWith(".java")) return "??? " + relative + " does not end in .java";
-                            return relative.substring(0, relative.length() - ".java".length());
-                        };
-                for (var file : JavaCompilerService.javaSourcesInDir(dir)) {
-                    if (tooManyItems(result.size())) return;
-                    // Fast check, file name only
-                    if (matchesFileName.test(file)) {
-                        var c = qualifiedName.apply(file);
-                        // Slow check, open file
-                        if (matchesPartialName.test(c) && isPublic.test(file)) {
-                            result.add(Completion.ofClassName(c, isImported(c)));
-                        }
-                    }
+            for (var file : parent.allJavaFiles.get()) {
+                if (tooManyItems(result.size())) return;
+                // If file is in the same package, any class defined in the file is accessible
+                var pathBasedPackageName = parent.pathBasedPackageName(file);
+                var samePackage = pathBasedPackageName.equals(packageName) || pathBasedPackageName.isEmpty();
+                // If file is in a different package, only a public class with the same name as the file is accessible
+                var maybePublic = matchesPartialName(file.getFileName().toString(), partialName);
+                if (samePackage || maybePublic) {
+                    result.addAll(accessibleClasses(file, partialName, packageName));
                 }
             }
         }
+    }
+
+    private List<Completion> accessibleClasses(Path file, String partialName, String fromPackage) {
+        var parse = Parser.parse(file);
+        var toPackage = Objects.toString(parse.getPackageName(), "");
+        var samePackage = fromPackage.equals(toPackage) || toPackage.isEmpty();
+        var result = new ArrayList<Completion>();
+        for (var t : parse.getTypeDecls()) {
+            if (!(t instanceof ClassTree)) continue;
+            var cls = (ClassTree) t;
+            var isPublic = cls.getModifiers().getFlags().contains(Modifier.PUBLIC);
+            if (isPublic || samePackage) {
+                var name = cls.getSimpleName().toString();
+                if (matchesPartialName(name, partialName)) {
+                    if (parse.getPackageName() != null) {
+                        name = parse.getPackageName() + "." + name;
+                    }
+                    result.add(Completion.ofClassName(name, isImported(name)));
+                }
+            }
+        }
+        return result;
     }
 
     private List<Element> staticImports(URI file, String contents, String partialName) {

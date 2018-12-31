@@ -9,7 +9,7 @@ import org.javacs.lsp.*;
 
 class LanguageServerFixture {
 
-    public static Path DEFAULT_WORKSPACE_ROOT = Paths.get("src/test/test-project/workspace").toAbsolutePath();
+    public static Path DEFAULT_WORKSPACE_ROOT = Paths.get("src/test/test-project/workspace").normalize();
 
     static {
         Main.setRootFormat();

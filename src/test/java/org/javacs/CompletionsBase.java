@@ -10,6 +10,8 @@ import org.javacs.lsp.*;
 public class CompletionsBase {
     protected static final Logger LOG = Logger.getLogger("main");
 
+    protected static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
+
     protected Set<String> insertTemplate(String file, int row, int column) {
         var items = items(file, row, column);
 
@@ -80,8 +82,6 @@ public class CompletionsBase {
                         })
                 .collect(Collectors.toSet());
     }
-
-    protected static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     protected List<? extends CompletionItem> items(String file, int row, int column) {
         var uri = FindResource.uri(file);

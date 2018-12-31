@@ -89,6 +89,21 @@ public class JavaCompilerService {
         return list;
     }
 
+    String pathBasedPackageName(Path javaFile) {
+        if (!javaFile.getFileName().toString().endsWith(".java")) {
+            LOG.warning(javaFile + " does not end in .java");
+            return "???";
+        }
+        for (var dir : sourcePath) {
+            if (!javaFile.startsWith(dir)) continue;
+            var packageDir = javaFile.getParent();
+            var relative = dir.relativize(packageDir);
+            return relative.toString().replace('/', '.');
+        }
+        LOG.warning(javaFile + " is not in the source path " + sourcePath);
+        return "???";
+    }
+
     private Collection<Path> removeModuleInfo(Collection<Path> files) {
         var result = new ArrayList<Path>();
         for (var f : files) {

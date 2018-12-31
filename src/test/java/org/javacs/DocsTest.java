@@ -9,7 +9,7 @@ import org.junit.Test;
 public class DocsTest {
     @Test
     public void classDoc() {
-        var sourcePath = Set.of(JavaCompilerServiceTest.resourcesDir());
+        var sourcePath = Set.of(JavaCompilerServiceTest.simpleProjectSrc());
         var docs = new Docs(sourcePath);
         var tree = docs.classDoc("ClassDoc");
         assertTrue(tree.isPresent());
@@ -18,7 +18,7 @@ public class DocsTest {
 
     @Test
     public void memberDoc() {
-        var sourcePath = Set.of(JavaCompilerServiceTest.resourcesDir());
+        var sourcePath = Set.of(JavaCompilerServiceTest.simpleProjectSrc());
         var docs = new Docs(sourcePath);
         var tree = docs.memberDoc("LocalMethodDoc", "targetMethod");
         assertTrue(tree.isPresent());
