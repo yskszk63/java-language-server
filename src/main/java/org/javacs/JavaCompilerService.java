@@ -141,12 +141,29 @@ public class JavaCompilerService {
         return new CompileFile(this, file, contents);
     }
 
-    public CompileBatch compileBatch(Collection<URI> files) {
-        return compileBatch(files, ReportProgress.EMPTY);
+    public CompileBatch compileBatch(Collection<URI> uris) {
+        return compileBatch(uris, ReportProgress.EMPTY);
     }
 
-    public CompileBatch compileBatch(Collection<URI> files, ReportProgress progress) {
-        return new CompileBatch(this, files, progress);
+    public CompileBatch compileBatch(Collection<URI> uris, ReportProgress progress) {
+        var files = new ArrayList<File>();
+        for (var p : uris) files.add(new File(p));
+        var sources = fileManager.getJavaFileObjectsFromFiles(files);
+        var list = new ArrayList<JavaFileObject>();
+        for (var s : sources) list.add(s);
+        return new CompileBatch(this, list, progress);
+    }
+
+    public CompileBatch compileBatch(Map<URI, String> sources) {
+        return compileBatch(sources, ReportProgress.EMPTY);
+    }
+
+    public CompileBatch compileBatch(Map<URI, String> sources, ReportProgress progress) {
+        var list = new ArrayList<JavaFileObject>();
+        for (var kv : sources.entrySet()) {
+            list.add(new StringFileObject(kv.getValue(), kv.getKey()));
+        }
+        return new CompileBatch(this, list, progress);
     }
 
     static boolean containsImport(String toPackage, String toClass, Path file) {

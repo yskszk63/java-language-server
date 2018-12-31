@@ -2,7 +2,6 @@ package org.javacs;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -32,7 +31,7 @@ public class CompileBatch {
     private final Trees trees;
     private final List<CompilationUnitTree> roots;
 
-    CompileBatch(JavaCompilerService parent, Collection<URI> files, ReportProgress progress) {
+    CompileBatch(JavaCompilerService parent, Collection<JavaFileObject> files, ReportProgress progress) {
         this.parent = parent;
         this.progress = progress;
         this.task = batchTask(parent, files);
@@ -82,10 +81,8 @@ public class CompileBatch {
         profiler.print();
     }
 
-    static JavacTask batchTask(JavaCompilerService parent, Collection<URI> paths) {
+    static JavacTask batchTask(JavaCompilerService parent, Collection<JavaFileObject> sources) {
         parent.diags.clear();
-        var files = new ArrayList<File>();
-        for (var p : paths) files.add(new File(p));
         return (JavacTask)
                 parent.compiler.getTask(
                         null,
@@ -93,7 +90,22 @@ public class CompileBatch {
                         parent.diags::add,
                         JavaCompilerService.options(parent.sourcePath, parent.classPath),
                         Collections.emptyList(),
-                        parent.fileManager.getJavaFileObjectsFromFiles(files));
+                        sources);
+    }
+
+    public Optional<Element> element(URI uri, int line, int character) {
+        for (var root : roots) {
+            if (root.getSourceFile().toUri().equals(uri)) {
+                var path = CompileFocus.findPath(task, root, line, character);
+                var el = trees.getElement(path);
+                return Optional.ofNullable(el);
+            }
+        }
+        throw new RuntimeException("File " + uri + " isn't in batch " + roots);
+    }
+
+    public Optional<TreePath> path(Element e) {
+        return Optional.ofNullable(trees.getPath(e));
     }
 
     public List<Diagnostic<? extends JavaFileObject>> lint() {

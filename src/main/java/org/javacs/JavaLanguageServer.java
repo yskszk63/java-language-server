@@ -483,6 +483,7 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public CompletionItem resolveCompletionItem(CompletionItem unresolved) {
+        if (unresolved.data == null) return unresolved;
         var idJson = (JsonPrimitive) unresolved.data;
         var id = idJson.getAsString();
         var cached = lastCompletions.get(id);
@@ -698,29 +699,64 @@ class JavaLanguageServer extends LanguageServer {
         var fromLine = position.position.line + 1;
         var fromColumn = position.position.character + 1;
         var fromContent = contents(fromUri).content;
+
+        // Compile from-file and identify element under cursor
         LOG.info(String.format("Go-to-def at %s:%d...", fromUri, fromLine));
-        var fromFocus = compiler.compileFocus(fromUri, fromContent, fromLine, fromColumn);
-        var toEl = fromFocus.element();
+        updateHoverCache(fromUri, fromContent);
+        var toEl = hoverCache.element(fromLine, fromColumn);
+        if (!toEl.isPresent()) {
+            LOG.info(String.format("...no element at cursor"));
+            return List.of();
+        }
+
+        // Figure out what file toEl is declared in
         LOG.info(String.format("...looking for definition of `%s`", toEl));
-        var toPath = fromFocus.path(toEl);
-        if (!toPath.isPresent()) {
+        var toUri = hoverCache.declaringFile(toEl.get());
+        if (!toUri.isPresent()) {
             LOG.info(String.format("...couldn't find declaring file, giving up"));
             return List.of();
         }
-        var toUri = toPath.get().getCompilationUnit().getSourceFile().toUri();
-        if (!isJavaFile(toUri)) {
+        if (!isJavaFile(toUri.get())) {
             LOG.info(String.format("...declaring file %s isn't a .java file", toUri));
             return List.of();
         }
-        var toContent = contents(toUri).content;
-        var toFile = compiler.compileFile(toUri, toContent);
-        // Figure out where in the file the definition is
-        var toRange = toFile.range(toPath.get());
-        if (!toRange.isPresent()) {
-            LOG.info(String.format("Couldn't find `%s` in %s", toPath.get(), toUri));
-            return List.of();
+
+        // Compile fromUri and toUri together
+        Optional<Range> toRange;
+        if (toUri.get().equals(fromUri)) {
+            LOG.info("...definition is in the same file, using cached compilation");
+
+            var toPath = hoverCache.path(toEl.get());
+            if (!toPath.isPresent()) {
+                LOG.warning(String.format("...couldn't locate `%s` in %s", toEl, toUri.get()));
+                return List.of();
+            }
+            toRange = hoverCache.range(toPath.get());
+            if (!toRange.isPresent()) {
+                LOG.info(String.format("...couldn't find `%s` in %s", toPath.get(), toUri));
+                return List.of();
+            }
+        } else {
+            LOG.info(
+                    String.format(
+                            "...compiling %s and %s together", Parser.fileName(fromUri), Parser.fileName(toUri.get())));
+
+            var both = Map.of(fromUri, contents(fromUri).content, toUri.get(), contents(toUri.get()).content);
+            var batch = compiler.compileBatch(both);
+            var toElAgain = batch.element(fromUri, fromLine, fromColumn).get();
+            var toPath = batch.path(toElAgain);
+            if (!toPath.isPresent()) {
+                LOG.warning(String.format("...couldn't locate `%s` in %s", toEl, toUri.get()));
+                return List.of();
+            }
+            toRange = batch.range(toPath.get());
+            if (!toRange.isPresent()) {
+                LOG.info(String.format("...couldn't find `%s` in %s", toPath.get(), toUri));
+                return List.of();
+            }
         }
-        var to = new Location(toUri, toRange.get());
+
+        var to = new Location(toUri.get(), toRange.get());
         return List.of(to);
     }
 

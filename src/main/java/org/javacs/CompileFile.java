@@ -2,12 +2,17 @@ package org.javacs;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import javax.lang.model.element.*;
 import org.javacs.lsp.*;
 
@@ -43,6 +48,10 @@ public class CompileFile {
         var path = CompileFocus.findPath(task, root, line, character);
         var el = trees.getElement(path);
         return Optional.ofNullable(el);
+    }
+
+    public Optional<TreePath> path(Element e) {
+        return Optional.ofNullable(trees.getPath(e));
     }
 
     public Optional<TreePath> find(Ptr target) {
@@ -158,6 +167,69 @@ public class CompileFile {
         // Add qualified names from fixes
         qualifiedNames.addAll(fixes.values());
         return new FixImports(root, trees.getSourcePositions(), qualifiedNames);
+    }
+
+    public Optional<URI> declaringFile(Element e) {
+        var top = topLevelDeclaration(e);
+        if (!top.isPresent()) return Optional.empty();
+        return findDeclaringFile(top.get());
+    }
+
+    private Optional<TypeElement> topLevelDeclaration(Element e) {
+        if (e == null) return Optional.empty();
+        var parent = e;
+        TypeElement result = null;
+        while (parent.getEnclosingElement() != null) {
+            if (parent instanceof TypeElement) result = (TypeElement) parent;
+            parent = parent.getEnclosingElement();
+        }
+        return Optional.ofNullable(result);
+    }
+
+    private boolean containsTopLevelDeclaration(Path file, String simpleClassName) {
+        var find = Pattern.compile("\\b(class|interface|enum) +" + simpleClassName + "\\b");
+        try (var lines = Files.newBufferedReader(file)) {
+            var line = lines.readLine();
+            while (line != null) {
+                if (find.matcher(line).find()) return true;
+                line = lines.readLine();
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return false;
+    }
+
+    /** Find the file `e` was declared in */
+    private Optional<URI> findDeclaringFile(TypeElement e) {
+        var name = e.getQualifiedName().toString();
+        var lastDot = name.lastIndexOf('.');
+        var packageName = lastDot == -1 ? "" : name.substring(0, lastDot);
+        var className = name.substring(lastDot + 1);
+        // First, look for a file named [ClassName].java
+        var packagePath = Paths.get(packageName.replace('.', File.separatorChar));
+        var publicClassPath = packagePath.resolve(className + ".java");
+        for (var root : parent.sourcePath) {
+            var absPath = root.resolve(publicClassPath);
+            if (Files.exists(absPath) && containsTopLevelDeclaration(absPath, className)) {
+                return Optional.of(absPath.toUri());
+            }
+        }
+        // Then, look for a secondary declaration in all java files in the package
+        var isPublic = e.getModifiers().contains(Modifier.PUBLIC);
+        if (!isPublic) {
+            for (var root : parent.sourcePath) {
+                var absDir = root.resolve(packagePath);
+                try {
+                    var foundFile =
+                            Files.list(absDir).filter(f -> containsTopLevelDeclaration(f, className)).findFirst();
+                    if (foundFile.isPresent()) return foundFile.map(Path::toUri);
+                } catch (IOException err) {
+                    throw new RuntimeException(err);
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     private static final Logger LOG = Logger.getLogger("main");

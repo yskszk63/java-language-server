@@ -679,9 +679,9 @@
 					]
 				},
 				{
-					"begin": "String\\.format\\(",
+					"begin": "(String)\\.(format)\\(",
 					"end": "\\)",
-					"name": "meta.string.format",
+					"name": "meta.paren.java",
 					"patterns": [
 						{
 							"begin": "\"",
@@ -698,6 +698,9 @@
 									"TODO": "more complicated format strings"
 								}
 							]
+						},
+						{
+							"include": "#expr"
 						}
 					]
 				},
