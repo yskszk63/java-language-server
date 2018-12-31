@@ -8,7 +8,10 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Logger;
@@ -18,11 +21,11 @@ import org.javacs.lsp.*;
 
 public class CompileFile {
     private final JavaCompilerService parent;
-    final URI file;
-    final String contents;
+    public final URI file;
+    public final String contents;
     private final JavacTask task;
     private final Trees trees;
-    private final CompilationUnitTree root;
+    public final CompilationUnitTree root;
 
     CompileFile(JavaCompilerService parent, URI file, String contents) {
         this.parent = parent;
@@ -42,6 +45,10 @@ public class CompileFile {
             throw new RuntimeException(e);
         }
         profiler.print();
+    }
+
+    public SourcePositions sourcePositions() {
+        return trees.getSourcePositions();
     }
 
     public Optional<Element> element(int line, int character) {
@@ -119,7 +126,7 @@ public class CompileFile {
      * Figure out what imports this file should have. Star-imports like `import java.util.*` are converted to individual
      * class imports. Missing imports are inferred by looking at imports in other source files.
      */
-    public FixImports fixImports() {
+    public List<String> fixImports() {
         // Check diagnostics for missing imports
         var unresolved = new HashSet<String>();
         for (var d : parent.diags) {
@@ -181,7 +188,11 @@ public class CompileFile {
         }
         // Add qualified names from fixes
         qualifiedNames.addAll(fixes.values());
-        return new FixImports(root, trees.getSourcePositions(), qualifiedNames);
+        // Sort in alphabetical order
+        var sorted = new ArrayList<String>();
+        sorted.addAll(qualifiedNames);
+        Collections.sort(sorted);
+        return sorted;
     }
 
     public Optional<URI> declaringFile(Element e) {

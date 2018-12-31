@@ -18,14 +18,10 @@
 - Go-to-implementation for overridden methods
 
 ## Polish
-- Hover constructor should show constructor, not class
 - Show warning for unused local var, unused private method
 - Use cached codelens during parse errors to prevent things from jumping around, or codelens-on-save
 - Suppress references codelens for inherited methods
 - Don't remove imports when there's an unresolved reference to that name
-
-## Simplicity
-- Use module-info.java instead of build files to figure out classpath
 
 ## JShell
 - Support .jshell extension as "scratch pad"

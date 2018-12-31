@@ -312,7 +312,7 @@ public class JavaCompilerServiceTest {
     public void fixImports() {
         var uri = resourceUri("MissingImport.java");
         var contents = contents("MissingImport.java");
-        var qualifiedNames = compiler.compileFile(uri, contents).fixImports().fixedImports;
+        var qualifiedNames = compiler.compileFile(uri, contents).fixImports();
         assertThat(qualifiedNames, hasItem("java.util.List"));
     }
 

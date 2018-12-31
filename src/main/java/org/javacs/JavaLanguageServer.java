@@ -586,8 +586,10 @@ class JavaLanguageServer extends LanguageServer {
         } else return Optional.empty();
     }
 
+    // TODO change name
     private CompileFile hoverCache;
 
+    // TODO take only URI and invalidate based on version
     private void updateHoverCache(URI uri, String contents) {
         if (hoverCache == null || !hoverCache.file.equals(uri) || !hoverCache.contents.equals(contents)) {
             LOG.info("File has changed since last hover, recompiling");
@@ -1011,36 +1013,39 @@ class JavaLanguageServer extends LanguageServer {
         return unresolved;
     }
 
-    private List<TextEdit> fixImports(URI java) {
-        var contents = contents(java).content;
-        var fix = compiler.compileFile(java, contents).fixImports();
+    @Override
+    public List<TextEdit> formatting(DocumentFormattingParams params) {
+        updateHoverCache(params.textDocument.uri, contents(params.textDocument.uri).content);
         // TODO if imports already match fixed-imports, return empty list
         // TODO preserve comments and other details of existing imports
+        var imports = hoverCache.fixImports();
+        var pos = hoverCache.sourcePositions();
+        var lines = hoverCache.root.getLineMap();
         var edits = new ArrayList<TextEdit>();
         // Delete all existing imports
-        for (var i : fix.parsed.getImports()) {
+        for (var i : hoverCache.root.getImports()) {
             if (!i.isStatic()) {
-                var offset = fix.sourcePositions.getStartPosition(fix.parsed, i);
-                var line = (int) fix.parsed.getLineMap().getLineNumber(offset) - 1;
+                var offset = pos.getStartPosition(hoverCache.root, i);
+                var line = (int) lines.getLineNumber(offset) - 1;
                 var delete = new TextEdit(new Range(new Position(line, 0), new Position(line + 1, 0)), "");
                 edits.add(delete);
             }
         }
-        if (fix.fixedImports.isEmpty()) return edits;
+        if (imports.isEmpty()) return edits;
         // Find a place to insert the new imports
         long insertLine = -1;
         var insertText = new StringBuilder();
         // If there are imports, use the start of the first import as the insert position
-        for (var i : fix.parsed.getImports()) {
+        for (var i : hoverCache.root.getImports()) {
             if (!i.isStatic() && insertLine == -1) {
-                long offset = fix.sourcePositions.getStartPosition(fix.parsed, i);
-                insertLine = fix.parsed.getLineMap().getLineNumber(offset) - 1;
+                long offset = pos.getStartPosition(hoverCache.root, i);
+                insertLine = lines.getLineNumber(offset) - 1;
             }
         }
         // If there are no imports, insert after the package declaration
-        if (insertLine == -1 && fix.parsed.getPackageName() != null) {
-            long offset = fix.sourcePositions.getEndPosition(fix.parsed, fix.parsed.getPackageName());
-            insertLine = fix.parsed.getLineMap().getLineNumber(offset);
+        if (insertLine == -1 && hoverCache.root.getPackageName() != null) {
+            long offset = pos.getEndPosition(hoverCache.root, hoverCache.root.getPackageName());
+            insertLine = lines.getLineNumber(offset);
             insertText.append("\n");
         }
         // If there are no imports and no package, insert at the top of the file
@@ -1048,22 +1053,14 @@ class JavaLanguageServer extends LanguageServer {
             insertLine = 0;
         }
         // Insert each import
-        fix.fixedImports
-                .stream()
-                .sorted()
-                .forEach(
-                        i -> {
-                            insertText.append("import ").append(i).append(";\n");
-                        });
+        for (var i : imports) {
+            insertText.append("import ").append(i).append(";\n");
+        }
         var insertPosition = new Position((int) insertLine, 0);
         var insert = new TextEdit(new Range(insertPosition, insertPosition), insertText.toString());
         edits.add(insert);
-        return edits;
-    }
 
-    @Override
-    public List<TextEdit> formatting(DocumentFormattingParams params) {
-        return fixImports(params.textDocument.uri);
+        return edits;
     }
 
     @Override
