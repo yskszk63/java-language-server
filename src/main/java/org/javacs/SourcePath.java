@@ -50,22 +50,25 @@ class SourcePath {
      * A .java file has been edited and saved. If the package declaration has been changed, we may need to recalculate
      * sourceRoots.
      */
+    // TODO batch this
     boolean update(Path javaFile) {
+        // Check if file is in an existing source root
         for (var root : sourceRoots) {
             if (!javaFile.startsWith(root)) continue;
             var dir = javaFile.getParent();
-            var expectedPackageName = root.relativize(dir).toString().replace('/', '.');
+            var expected = root.relativize(dir).toString().replace('/', '.');
             var parse = Parser.parse(javaFile);
-            var foundPackageName = Objects.toString(parse.getPackageName(), "");
-            if (!expectedPackageName.equals(foundPackageName)) {
-                LOG.info(
-                        String.format(
-                                "%s is in %s, which implies package %s, but now has package %s",
-                                javaFile.getFileName(), root, expectedPackageName, foundPackageName));
+            var found = Objects.toString(parse.getPackageName(), "");
+            if (!expected.equals(found)) {
+                LOG.info(String.format("%s is in %s not %s", javaFile.getFileName(), found, expected));
                 return checkSourceRoots();
             }
+            return false;
         }
-        return false;
+
+        // Apparently, a new source root needs to be created
+        LOG.info(String.format("%s is not in the source path", javaFile));
+        return checkSourceRoots();
     }
 
     Set<Path> sourceRoots() {

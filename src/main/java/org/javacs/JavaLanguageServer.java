@@ -259,6 +259,7 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
+        // TODO update config when pom.xml changes
         var changed = false;
         var created = new HashSet<Path>();
         var deleted = new HashSet<Path>();
@@ -1234,9 +1235,7 @@ class JavaLanguageServer extends LanguageServer {
         if (isJavaFile(uri)) {
             // Re-lint all active documents
             lint(activeDocuments.keySet());
-            // TODO update config when java file implies a new source root
         }
-        // TODO update config when pom.xml changes
     }
 
     Set<URI> activeDocuments() {

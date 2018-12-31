@@ -1,7 +1,6 @@
 # Todo
 
 ## Bugs
-- Crashes when you create the first file in a new maven project
 - Deleted files remain in compiler, even when you restart (via classpath?)
 - Always shows last javadoc
 - Make new file, rename, edit crashes compiler
