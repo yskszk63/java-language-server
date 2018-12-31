@@ -389,6 +389,13 @@ public class LSP {
                             respond(send, r.id, response);
                             break;
                         }
+                    case "textDocument/foldingRange":
+                        {
+                            var params = gson.fromJson(r.params, FoldingRangeParams.class);
+                            var response = server.foldingRange(params);
+                            respond(send, r.id, response);
+                            break;
+                        }
                     default:
                         LOG.warning(String.format("Don't know what to do with method `%s`", r.method));
                 }

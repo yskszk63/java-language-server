@@ -5,6 +5,7 @@
 - Deleted files remain in compiler, even when you restart (via classpath?)
 - Always shows last javadoc
 - Make new file, rename, edit crashes compiler
+- StringBuilder.length isn't autocompleting
 
 ## Autocomplete
 - Annotation fields

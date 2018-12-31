@@ -237,6 +237,40 @@ public class ParseFile {
         return Optional.of(find.result);
     }
 
+    public FoldingRanges foldingRanges() {
+        var imports = new ArrayList<TreePath>();
+        var blocks = new ArrayList<TreePath>();
+        // TODO find comment trees
+        var comments = new ArrayList<TreePath>();
+        class FindFoldingRanges extends TreePathScanner<Void, Void> {
+            @Override
+            public Void visitClass(ClassTree t, Void __) {
+                blocks.add(getCurrentPath());
+                return super.visitClass(t, null);
+            }
+            
+            @Override
+            public Void visitBlock(BlockTree t, Void __) {
+                blocks.add(getCurrentPath());
+                return super.visitBlock(t, null);
+            }
+
+            @Override
+            public Void visitImport(ImportTree t, Void __) {
+                imports.add(getCurrentPath());
+                return null;
+            }
+        }
+        new FindFoldingRanges().scan(root, null);
+
+        return new FoldingRanges(imports, blocks, comments);
+    }
+
+    public SourcePositions sourcePositions() {
+        return trees.getSourcePositions();
+    }
+
+    // TODO get rid of this and expose SourcePositions
     static Optional<Range> range(JavacTask task, String contents, TreePath path) {
         // Find start position
         var trees = Trees.instance(task);

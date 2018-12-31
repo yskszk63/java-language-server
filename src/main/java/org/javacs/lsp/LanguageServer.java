@@ -103,4 +103,8 @@ public class LanguageServer {
     public List<TextEdit> formatting(DocumentFormattingParams params) {
         throw new RuntimeException("Unimplemented");
     }
+
+    public List<FoldingRange> foldingRange(FoldingRangeParams params) {
+        throw new RuntimeException("Unimplemented");
+    }
 }

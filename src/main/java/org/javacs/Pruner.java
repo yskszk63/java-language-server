@@ -73,6 +73,7 @@ class Pruner {
                     if (!erasedAfterCursor) {
                         var start = cursor;
                         var end = sourcePositions.getEndPosition(root, node);
+                        if (end >= contents.length()) end = contents.length() - 1;
                         // Find the next line
                         while (start < end && contents.charAt((int) start) != '\n') start++;
                         // Find the end of the block
@@ -86,6 +87,7 @@ class Pruner {
                     var last = node.getStatements().get(node.getStatements().size() - 1);
                     var start = sourcePositions.getStartPosition(root, first);
                     var end = sourcePositions.getEndPosition(root, last);
+                    if (end >= contents.length()) end = contents.length() - 1;
                     erase(start, end);
                 }
                 return null;
