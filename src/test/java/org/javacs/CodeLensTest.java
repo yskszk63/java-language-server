@@ -61,8 +61,8 @@ public class CodeLensTest {
         assertThat(lenses, not(empty()));
 
         var titles = titles(lenses);
-        assertThat(titles, hasItem("4:2 references"));
-        assertThat(titles, hasItem("6:2 references"));
+        assertThat(titles, hasItem("4:1 references"));
+        assertThat(titles, hasItem("6:1 references"));
     }
 
     @Test

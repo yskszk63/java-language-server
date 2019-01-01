@@ -343,7 +343,8 @@ public class JavaCompilerService {
         for (var p : possible) {
             var i = index.getOrDefault(p, Index.EMPTY);
             var modified = Instant.ofEpochMilli(new File(p).lastModified());
-            if (modified.isAfter(i.created)) outOfDate.add(p);
+            // TODO can modified rewind when you checkout a branch?
+            if (modified.isAfter(i.modified)) outOfDate.add(p);
             if (i.containsError) hasError.add(p);
         }
         if (outOfDate.size() > 0) LOG.info(String.format("... %d files are out-of-date", outOfDate.size()));

@@ -276,7 +276,7 @@ public class JavaCompilerServiceTest {
             var key = kv.getKey().toString();
             stringify.put(key, kv.getValue());
         }
-        assertThat(stringify, hasEntry("GotoDefinition.goToHere", 1));
+        assertThat(stringify, hasEntry("GotoDefinition.goToHere()", 1));
     }
 
     @Test

@@ -8,12 +8,12 @@ public class Index {
 
     public final List<Ptr> refs;
     // TODO modified time can rewind when you switch branches, need to track modified and look for exact match
-    public final Instant created;
+    public final Instant modified;
     public final boolean containsError;
 
-    public Index(List<Ptr> refs, Instant created, boolean containsError) {
+    public Index(List<Ptr> refs, Instant modified, boolean containsError) {
         this.refs = refs;
-        this.created = created;
+        this.modified = modified;
         this.containsError = containsError;
     }
 }
