@@ -19,6 +19,16 @@ public class Ptr {
         this.path = path;
     }
 
+    public static boolean canPoint(Element e) {
+        var inLeaf = true;
+        for (; e != null; e = e.getEnclosingElement()) {
+            var isLeaf = e instanceof ExecutableElement || e instanceof VariableElement;
+            if (inLeaf && !isLeaf) inLeaf = false;
+            if (!inLeaf && isLeaf) return false;
+        }
+        return true;
+    }
+
     public Ptr(Element e) {
         var rev = new ArrayList<CharSequence>();
         while (e != null) {
@@ -39,7 +49,8 @@ public class Ptr {
             e = e.getEnclosingElement();
         }
         var name = reverseAndJoin(rev, ".");
-        if (!name.matches("(\\w+\\.)*(\\w+|<init>)")) LOG.warning(String.format("`%s` doesn't look like a name", name));
+        if (!name.matches("(\\w+\\.)*(\\w+|<init>)(\\(.*\\))?"))
+            LOG.warning(String.format("`%s` doesn't look like a name", name));
         this.path = name;
     }
 

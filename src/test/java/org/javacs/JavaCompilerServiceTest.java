@@ -10,7 +10,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -265,18 +264,6 @@ public class JavaCompilerServiceTest {
         }
         assertThat(stringify, hasItem("GotoDefinition.java:3"));
         assertThat(stringify, not(hasItem("GotoDefinition.java:6")));
-    }
-
-    @Test
-    public void countReferences() {
-        var file = "GotoDefinition.java";
-        var refs = compiler.countReferences(resourceUri(file), contents(file), ReportProgress.EMPTY);
-        var stringify = new HashMap<String, Integer>();
-        for (var kv : refs.entrySet()) {
-            var key = kv.getKey().toString();
-            stringify.put(key, kv.getValue());
-        }
-        assertThat(stringify, hasEntry("GotoDefinition.goToHere()", 1));
     }
 
     @Test

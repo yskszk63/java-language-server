@@ -61,8 +61,8 @@ public class CodeLensTest {
         assertThat(lenses, not(empty()));
 
         var titles = titles(lenses);
-        assertThat(titles, hasItem("4:1 references"));
-        assertThat(titles, hasItem("6:1 references"));
+        assertThat(titles, hasItem("4:1 reference"));
+        assertThat(titles, hasItem("6:1 reference"));
     }
 
     @Test
@@ -70,5 +70,20 @@ public class CodeLensTest {
         var lenses = lenses("/org/javacs/example/DontShowEnumConstRefs.java");
         var titles = titles(lenses);
         assertThat(titles, not(hasItem("4:0 references")));
+    }
+
+    @Test
+    public void signatureMatches() {
+        var file = "/org/javacs/example/ConstructorRefs.java";
+        var uri = FindResource.uri(file);
+        var contents = FindResource.contents(file);
+        var compile = server.compiler.compileFile(uri, contents);
+        var signatureMatches = compile.signatureMatches();
+
+        var good = List.of(new Ptr("org.javacs.example.ConstructorRefs.ConstructorRefs(int)"));
+        assertTrue(signatureMatches.test(good));
+
+        var bad = List.of(new Ptr("org.javacs.example.ConstructorRefs.ConstructorRefs(int, int)"));
+        assertFalse(signatureMatches.test(bad));
     }
 }

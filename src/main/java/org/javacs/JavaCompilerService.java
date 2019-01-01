@@ -1,7 +1,6 @@
 package org.javacs;
 
 import com.sun.source.tree.ClassTree;
-import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.*;
@@ -10,7 +9,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.*;
-import java.time.Instant;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
@@ -113,18 +111,6 @@ public class JavaCompilerService {
         return result;
     }
 
-    static Iterable<Path> javaSourcesInDir(Path dir) {
-        var match = FileSystems.getDefault().getPathMatcher("glob:*.java");
-
-        try {
-            // TODO instead of looking at EVERY file, once you see a few files with the same source directory,
-            // ignore all subsequent files in the directory
-            return Files.walk(dir).filter(java -> match.matches(java.getFileName()))::iterator;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     public Docs docs() {
         return docs;
     }
@@ -192,31 +178,6 @@ public class JavaCompilerService {
     static boolean containsWord(String name, Path file) {
         if (!name.matches("\\w*")) throw new RuntimeException(String.format("`%s` is not a word", name));
         return Parser.containsWord(file, name);
-    }
-
-    static boolean importsAnyClass(String toPackage, List<String> toClasses, Path file) {
-        if (toPackage.isEmpty()) return true; // If package is empty, everyone imports it
-        var toClass = toClasses.stream().collect(Collectors.joining("|"));
-        var samePackage = Pattern.compile("^package +" + toPackage + ";");
-        var importClass = Pattern.compile("^import +" + toPackage + "\\.(" + toClass + ");");
-        var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
-        var importStatic = Pattern.compile("^import +static +" + toPackage + "\\.");
-        var startOfClass = Pattern.compile("^[\\w ]*class +\\w+");
-        try (var read = Files.newBufferedReader(file)) {
-            while (true) {
-                var line = read.readLine();
-                if (line == null) break;
-                if (startOfClass.matcher(line).find()) break;
-                if (samePackage.matcher(line).find()) return true;
-                if (importClass.matcher(line).find()) return true;
-                if (importStar.matcher(line).find()) return true;
-                if (importStatic.matcher(line).find()) return true;
-                if (importClass.matcher(line).find()) return true;
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return false;
     }
 
     // TODO should probably cache this
@@ -301,98 +262,6 @@ public class JavaCompilerService {
             t = t.getParentPath();
         }
         return Optional.empty();
-    }
-
-    // TODO should probably cache this
-    private Collection<URI> potentialReferencesToClasses(String toPackage, List<String> toClasses) {
-        // Filter for files that import toPackage.toClass
-        var result = new LinkedHashSet<URI>();
-        for (var dir : sourcePath) {
-            // TODO folders can get deleted, need to re-create compiler at that point
-            for (var file : javaSourcesInDir(dir)) {
-                if (importsAnyClass(toPackage, toClasses, file)) {
-                    result.add(file.toUri());
-                }
-            }
-        }
-        return result;
-    }
-
-    private List<String> allClassNames(CompilationUnitTree root) {
-        var result = new ArrayList<String>();
-        class FindClasses extends TreeScanner<Void, Void> {
-            @Override
-            public Void visitClass(ClassTree classTree, Void __) {
-                var className = Objects.toString(classTree.getSimpleName(), "");
-                result.add(className);
-                return null;
-            }
-        }
-        root.accept(new FindClasses(), null);
-        return result;
-    }
-
-    private Map<URI, Index> index = new HashMap<>();
-
-    private void updateIndex(Collection<URI> possible, ReportProgress progress) {
-        LOG.info(String.format("Check %d files for modifications compared to index...", possible.size()));
-
-        // Figure out all files that have been changed, or contained errors at the time they were indexed
-        var outOfDate = new ArrayList<URI>();
-        var hasError = new ArrayList<URI>();
-        for (var p : possible) {
-            var i = index.getOrDefault(p, Index.EMPTY);
-            var modified = Instant.ofEpochMilli(new File(p).lastModified());
-            // TODO can modified rewind when you checkout a branch?
-            if (modified.isAfter(i.modified)) outOfDate.add(p);
-            if (i.containsError) hasError.add(p);
-        }
-        if (outOfDate.size() > 0) LOG.info(String.format("... %d files are out-of-date", outOfDate.size()));
-        if (hasError.size() > 0) LOG.info(String.format("... %d files contain errors", hasError.size()));
-
-        // If there's nothing to update, return
-        var needsUpdate = new ArrayList<URI>();
-        needsUpdate.addAll(outOfDate);
-        needsUpdate.addAll(hasError);
-        if (needsUpdate.isEmpty()) return;
-
-        // If there's more than 1 file, report progress
-        if (needsUpdate.size() > 1) { // TODO this could probably be tuned to be higher
-            progress.start(String.format("Index %d files", needsUpdate.size()));
-        } else {
-            progress = ReportProgress.EMPTY;
-        }
-
-        // Compile in a batch and update the index
-        var counts = compileBatch(needsUpdate, progress).countReferences();
-        index.putAll(counts);
-    }
-
-    // TODO when computing the index, store the signature of the target.
-    // If the target has changed, reindex that file.
-    // This can take advantage of the fact that code lenses are resolved one-at-a-time!
-    public Map<Ptr, Integer> countReferences(URI file, String contents, ReportProgress progress) {
-        var root = Parser.parse(new StringFileObject(contents, file));
-        // List all files that import file
-        var toPackage = Objects.toString(root.getPackageName(), "");
-        var toClasses = allClassNames(root);
-        var possible = potentialReferencesToClasses(toPackage, toClasses);
-        if (possible.isEmpty()) {
-            LOG.info("No potential references to " + file);
-            return Map.of();
-        }
-        // Reindex only files that are out-of-date
-        updateIndex(possible, progress);
-        // Assemble results
-        var result = new HashMap<Ptr, Integer>();
-        for (var p : possible) {
-            var i = index.get(p);
-            for (var r : i.refs) {
-                var count = result.getOrDefault(r, 0);
-                result.put(r, count + 1);
-            }
-        }
-        return result;
     }
 
     public List<TreePath> findSymbols(String query, int limit) {

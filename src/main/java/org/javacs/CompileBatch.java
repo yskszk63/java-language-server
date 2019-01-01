@@ -127,7 +127,7 @@ public class CompileBatch {
         for (var f : roots) {
             var uri = f.getSourceFile().toUri();
             var path = Paths.get(uri);
-            var refs = index(f);
+            var refs = index(trees, f);
             // Remember when file was modified
             FileTime modified;
             try {
@@ -172,7 +172,7 @@ public class CompileBatch {
                 && toStringEquals(to, from);
     }
 
-    private boolean isField(Element to) {
+    private static boolean isField(Element to) {
         if (!(to instanceof VariableElement)) return false;
         var field = (VariableElement) to;
         return field.getEnclosingElement() instanceof TypeElement;
@@ -220,8 +220,7 @@ public class CompileBatch {
         return results;
     }
 
-    private List<Ptr> index(CompilationUnitTree root) {
-        // TODO remember if the file contains errors, and keep re-indexing it
+    static List<Ptr> index(Trees trees, CompilationUnitTree root) {
         var refs = new ArrayList<Ptr>();
         class IndexFile extends TreePathScanner<Void, Void> {
             Optional<Element> ref(TreePath from) {
@@ -235,6 +234,10 @@ public class CompileBatch {
                 }
                 // Skip non-methods
                 if (!(to instanceof ExecutableElement || to instanceof TypeElement || isField(to))) {
+                    return Optional.empty();
+                }
+                // Skip classes that are nested inside of methods
+                if (!Ptr.canPoint(to)) {
                     return Optional.empty();
                 }
                 // TODO skip anything not on source path

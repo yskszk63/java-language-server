@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import javax.lang.model.element.*;
@@ -52,12 +53,12 @@ public class CompileFile {
     }
 
     public Optional<Element> element(int line, int character) {
-        LOG.info(String.format("Looking for element under cursor %s(%d,%d)...", file, line, character));
+        LOG.info(String.format("Looking for element at %s(%d,%d)...", file.getPath(), line, character));
 
         // First, look for a tree path
         var path = CompileFocus.findPath(task, root, line, character);
         if (path == null) {
-            LOG.info("...no tree under cursor");
+            LOG.info("...found nothing");
             return Optional.empty();
         }
         LOG.info(String.format("...found tree `%s`", path.getLeaf()));
@@ -106,13 +107,15 @@ public class CompileFile {
             @Override
             public Void visitMethod(MethodTree node, Void aVoid) {
                 check();
-                return super.visitMethod(node, aVoid);
+                // Ptr can't point inside a method
+                return null;
             }
 
             @Override
             public Void visitVariable(VariableTree node, Void aVoid) {
                 check();
-                return super.visitVariable(node, aVoid);
+                // Ptr can't point inside a method
+                return null;
             }
         }
         var find = new FindPtr();
@@ -251,6 +254,52 @@ public class CompileFile {
         sorted.addAll(qualifiedNames);
         Collections.sort(sorted);
         return sorted;
+    }
+
+    public List<String> allClassNames() {
+        var result = new ArrayList<String>();
+        class FindClasses extends TreeScanner<Void, Void> {
+            @Override
+            public Void visitClass(ClassTree classTree, Void __) {
+                var className = Objects.toString(classTree.getSimpleName(), "");
+                result.add(className);
+                return null;
+            }
+        }
+        root.accept(new FindClasses(), null);
+        return result;
+    }
+
+    public Predicate<List<Ptr>> signatureMatches() {
+        // Precompute qualified names of all classes in this file
+        var thisClasses = new ArrayList<String>();
+        for (var c : root.getTypeDecls()) {
+            var path = trees.getPath(root, c);
+            var el = (TypeElement) trees.getElement(path);
+            var name = el.getQualifiedName().toString();
+            thisClasses.add(name);
+        }
+        // Does a pointer refer to something in this file?
+        Predicate<Ptr> pointsToThis =
+                ptr -> {
+                    for (var c : thisClasses) {
+                        if (ptr.toString().startsWith(c)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+        return i -> {
+            // For each pointer, check if it refers to something in this file that no longer exists
+            for (var ptr : i) {
+                if (pointsToThis.test(ptr) && find(ptr).isEmpty()) {
+                    LOG.info(
+                            String.format("`%s` refers to signature that no longer exists in %s", ptr, file.getPath()));
+                    return false;
+                }
+            }
+            return true;
+        };
     }
 
     public Optional<URI> declaringFile(Element e) {
