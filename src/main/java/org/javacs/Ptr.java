@@ -49,7 +49,7 @@ public class Ptr {
             e = e.getEnclosingElement();
         }
         var name = reverseAndJoin(rev, ".");
-        if (!name.matches("(\\w+\\.)*(\\w+|<init>)(\\(.*\\))?"))
+        if (!name.matches("(\\w+\\.)*(<.*>)?(\\w+|<init>)(\\(.*\\))?"))
             LOG.warning(String.format("`%s` doesn't look like a name", name));
         this.path = name;
     }

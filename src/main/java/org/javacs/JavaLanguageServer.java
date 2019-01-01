@@ -969,15 +969,18 @@ class JavaLanguageServer extends LanguageServer {
 
     private Map<Ptr, Integer> cacheCountReferences = Collections.emptyMap();
     private URI cacheCountReferencesFile = URI.create("file:///NONE");
+    private int cacheCountReferencesVersion = -1;
 
     private void updateCacheCountReferences(URI current) {
-        if (cacheCountReferencesFile.equals(current)) return;
+        if (cacheCountReferencesFile.equals(current) && cacheCountReferencesVersion == contents(current).version)
+            return;
         LOG.info(String.format("Update cached reference count to %s...", current));
-        var content = contents(current).content;
+        var contents = contents(current);
         try (var progress = new Progress()) {
-            cacheCountReferences = countReferences(current, content, progress);
+            cacheCountReferences = countReferences(current, contents.content, progress);
         }
         cacheCountReferencesFile = current;
+        cacheCountReferencesVersion = contents.version;
     }
 
     private Map<URI, Index> index = new HashMap<>();
@@ -1104,6 +1107,7 @@ class JavaLanguageServer extends LanguageServer {
         var el = hoverCache.element(line, character);
         if (el.isEmpty()) {
             LOG.warning(String.format("No element to resolve code lens at %s(%d,%d)", uri.getPath(), line, character));
+            // TODO this causes <<MISSING COMMAND>> to appear
             return unresolved;
         }
         var ptr = new Ptr(el.get());
