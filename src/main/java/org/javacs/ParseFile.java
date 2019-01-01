@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.io.IOException;
@@ -14,7 +15,6 @@ import org.javacs.lsp.*;
 
 
 public class ParseFile {
-    private final JavaCompilerService parent;
     private final URI file;
     private final String contents;
     private final JavacTask task;
@@ -22,7 +22,10 @@ public class ParseFile {
     private final CompilationUnitTree root;
 
     ParseFile(JavaCompilerService parent, URI file, String contents) {
-        this.parent = parent;
+        Objects.requireNonNull(parent);
+        Objects.requireNonNull(file);
+        Objects.requireNonNull(contents);
+        
         this.file = file;
         this.contents = contents;
         this.task = CompileFocus.singleFileTask(parent, file, contents);
@@ -36,7 +39,19 @@ public class ParseFile {
             throw new RuntimeException(e);
         }
         profiler.print();
+    }
+
+    ParseFile(URI file, String contents, JavacTask task, CompilationUnitTree root) {
+        Objects.requireNonNull(file);
+        Objects.requireNonNull(contents);
+        Objects.requireNonNull(task);
+        Objects.requireNonNull(root);
         
+        this.file = file;
+        this.contents = contents;
+        this.task = task;
+        this.trees = Trees.instance(task);
+        this.root = root;
     }
 
     public boolean isTestMethod(TreePath path) {
@@ -270,6 +285,60 @@ public class ParseFile {
         return trees.getSourcePositions();
     }
 
+    /** Find and source code associated with a ptr */
+    public Optional<TreePath> fuzzyFind(Ptr ptr) {
+        LOG.info(String.format("...find fuzzy match of %s in %s ...", ptr, Parser.fileName(file)));
+        
+        class FindPtr extends TreePathScanner<Void, Void> {
+            int bestMatch = Ptr.NOT_MATCHED;
+            TreePath found;
+            void check() {
+                var path = getCurrentPath();
+                var mismatch = ptr.fuzzyMatch(path);
+                if (mismatch < bestMatch) {
+                    found = path;
+                    bestMatch = mismatch;
+                }
+            }
+
+            @Override
+            public Void visitClass(ClassTree node, Void aVoid) {
+                check();
+                return super.visitClass(node, aVoid);
+            }
+
+            @Override
+            public Void visitMethod(MethodTree node, Void aVoid) {
+                check();
+                // Ptr can't point inside a method
+                return null;
+            }
+
+            @Override
+            public Void visitVariable(VariableTree node, Void aVoid) {
+                check();
+                // Ptr can't point inside a method
+                return null;
+            }
+        }
+        var find = new FindPtr();
+        find.scan(root, null);
+        if (find.found != null)
+            LOG.info(String.format("...`%s` with score %d is best match", Parser.describeTree(find.found.getLeaf()), find.bestMatch));
+        else 
+            LOG.info("...no match found");
+        return Optional.ofNullable(find.found);
+    }
+
+    public DocCommentTree doc(TreePath path) {
+        // Find ptr in the file
+        // Find the documentation attached to el
+        var docs = DocTrees.instance(task);
+        var doc = docs.getDocCommentTree(path);
+        if (doc == null) return EMPTY_DOC;
+        return doc;
+    }
+
     // TODO get rid of this and expose SourcePositions
     static Optional<Range> range(JavacTask task, String contents, TreePath path) {
         // Find start position
@@ -319,6 +388,31 @@ public class ParseFile {
 
     public List<TreePath> documentSymbols() {
         return Parser.findSymbolsMatching(root, "");
+    }
+
+    private static final DocCommentTree EMPTY_DOC = makeEmptyDoc();
+
+    private static DocCommentTree makeEmptyDoc() {
+        var file = new StringFileObject("/** */ class Foo { }", URI.create("file:///Foo.java"));
+        var task = Parser.parseTask(file);
+        var docs = DocTrees.instance(task);
+        CompilationUnitTree root;
+        try {
+            root = task.parse().iterator().next();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        class FindEmptyDoc extends TreePathScanner<Void, Void> {
+            DocCommentTree found;
+            @Override
+            public Void visitClass(ClassTree t, Void __) {
+                found = docs.getDocCommentTree(getCurrentPath());
+                return null;
+            }
+        }
+        var find = new FindEmptyDoc();
+        find.scan(root, null);
+        return Objects.requireNonNull(find.found);
     }
 
     private static final Logger LOG = Logger.getLogger("main");

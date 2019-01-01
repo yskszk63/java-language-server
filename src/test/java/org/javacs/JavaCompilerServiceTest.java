@@ -290,8 +290,11 @@ public class JavaCompilerServiceTest {
         var uri = resourceUri("LocalMethodDoc.java");
         var contents = contents("LocalMethodDoc.java");
         var method = compiler.compileFocus(uri, contents, 3, 21).methodInvocation().get().activeMethod.get();
-        var doc = compiler.docs().methodDoc(method);
-        assertTrue(doc.isPresent());
+        var ptr = new Ptr(method);
+        var file = compiler.docs().find(ptr).get();
+        var parse = compiler.docs().parse(file);
+        var path = parse.fuzzyFind(ptr).get();
+        var doc = parse.doc(path);
         assertThat(doc.toString(), containsString("A great method"));
     }
 

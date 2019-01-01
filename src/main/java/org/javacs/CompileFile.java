@@ -61,7 +61,7 @@ public class CompileFile {
             LOG.info("...found nothing");
             return Optional.empty();
         }
-        LOG.info(String.format("...found tree `%s`", showTree(path)));
+        LOG.info(String.format("...found tree `%s`", Parser.describeTree(path.getLeaf())));
 
         // Then, convert the path to an element
         var el = trees.getElement(path);
@@ -71,23 +71,6 @@ public class CompileFile {
         }
 
         return Optional.of(el);
-    }
-
-    private String showTree(TreePath path) {
-        var leaf = path.getLeaf();
-        if (leaf instanceof MethodTree) {
-            var method = (MethodTree) leaf;
-            return method.getName() + "(...)";
-        }
-        if (leaf instanceof ClassTree) {
-            var cls = (ClassTree) leaf;
-            return "class " + cls.getSimpleName();
-        }
-        if (leaf instanceof BlockTree) {
-            var block = (BlockTree) leaf;
-            return String.format("{ ...%d lines... }", block.getStatements().size());
-        }
-        return leaf.toString();
     }
 
     public Optional<TreePath> path(Element e) {
@@ -296,20 +279,10 @@ public class CompileFile {
             var name = el.getQualifiedName().toString();
             thisClasses.add(name);
         }
-        // Does a pointer refer to something in this file?
-        Predicate<Ptr> pointsToThis =
-                ptr -> {
-                    for (var c : thisClasses) {
-                        if (ptr.toString().startsWith(c)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                };
         return i -> {
             // For each pointer, check if it refers to something in this file that no longer exists
             for (var ptr : i) {
-                if (pointsToThis.test(ptr) && find(ptr).isEmpty()) {
+                if (thisClasses.contains(ptr.qualifiedClassName()) && find(ptr).isEmpty()) {
                     LOG.info(
                             String.format("`%s` refers to signature that no longer exists in %s", ptr, file.getPath()));
                     return false;

@@ -2,7 +2,6 @@ package org.javacs;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -275,15 +274,37 @@ class Parser {
         return new ExistingImports(classes, packages);
     }
 
+    // TODO this doesn't work for inner classes, eliminate
     static String mostName(String name) {
         var lastDot = name.lastIndexOf('.');
         return lastDot == -1 ? "" : name.substring(0, lastDot);
     }
 
+    // TODO this doesn't work for inner classes, eliminate
     static String lastName(String name) {
         int i = name.lastIndexOf('.');
         if (i == -1) return name;
         else return name.substring(i + 1);
+    }
+
+    static String describeTree(Tree leaf) {
+        if (leaf instanceof MethodTree) {
+            var method = (MethodTree) leaf;
+            var params = new StringJoiner(", ");
+            for (var p : method.getParameters()) {
+                params.add(p.getType() + " " + p.getName());
+            }
+            return method.getName() + "(" + params + ")";
+        }
+        if (leaf instanceof ClassTree) {
+            var cls = (ClassTree) leaf;
+            return "class " + cls.getSimpleName();
+        }
+        if (leaf instanceof BlockTree) {
+            var block = (BlockTree) leaf;
+            return String.format("{ ...%d lines... }", block.getStatements().size());
+        }
+        return leaf.toString();
     }
 
     // TODO does this really belong in Parser?
@@ -350,7 +371,7 @@ class Parser {
     }
 
     static String fileName(URI uri) {
-        var parts = uri.getPath().split(File.separator);
+        var parts = uri.toString().split("/");
         if (parts.length == 0) return "";
         return parts[parts.length - 1];
     }

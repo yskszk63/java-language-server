@@ -11,24 +11,34 @@ public class DocsTest {
     public void classDoc() {
         var sourcePath = Set.of(JavaCompilerServiceTest.simpleProjectSrc());
         var docs = new Docs(sourcePath);
-        var tree = docs.classDoc("ClassDoc");
-        assertTrue(tree.isPresent());
-        assertThat(tree.get().getFirstSentence(), hasToString("A great class"));
+        var ptr = new Ptr("ClassDoc");
+        var file = docs.find(ptr).get();
+        var parse = docs.parse(file);
+        var path = parse.fuzzyFind(ptr).get();
+        var tree = parse.doc(path);
+        assertThat(tree.getFirstSentence(), hasToString("A great class"));
     }
 
     @Test
     public void memberDoc() {
         var sourcePath = Set.of(JavaCompilerServiceTest.simpleProjectSrc());
         var docs = new Docs(sourcePath);
-        var tree = docs.memberDoc("LocalMethodDoc", "targetMethod");
-        assertTrue(tree.isPresent());
-        assertThat(tree.get().getFirstSentence(), hasToString("A great method"));
+        var ptr = new Ptr("LocalMethodDoc#targetMethod(int)");
+        var file = docs.find(ptr).get();
+        var parse = docs.parse(file);
+        var path = parse.fuzzyFind(ptr).get();
+        var tree = parse.doc(path);
+        assertThat(tree.getFirstSentence(), hasToString("A great method"));
     }
 
     @Test
     public void platformDoc() {
         var docs = new Docs(Set.of());
-        var tree = docs.classDoc("java.util.List");
-        assertTrue(tree.isPresent());
+        var ptr = new Ptr("java.util/List");
+        var file = docs.find(ptr).get();
+        var parse = docs.parse(file);
+        var path = parse.fuzzyFind(ptr).get();
+        var tree = parse.doc(path);
+        assertThat(tree.getFirstSentence(), not(empty()));
     }
 }

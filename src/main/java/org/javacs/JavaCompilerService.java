@@ -28,6 +28,7 @@ public class JavaCompilerService {
     // Diagnostics from the last compilation task
     final List<Diagnostic<? extends JavaFileObject>> diags = new ArrayList<>();
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files
+    // TODO intercept files that aren't in the batch and erase method bodies so compilation is faster
     final StandardJavaFileManager fileManager =
             new FileManagerWrapper(compiler.getStandardFileManager(diags::add, null, Charset.defaultCharset()));
 

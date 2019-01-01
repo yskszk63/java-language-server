@@ -42,6 +42,7 @@ public class Completion {
     }
 
     public static class ClassName {
+        // TODO keep package and class name separate to avoid inner-class problems
         public final String name;
         public final boolean isImported;
 
@@ -67,5 +68,9 @@ public class Completion {
             this.label = label;
             this.snippet = snippet;
         }
+    }
+
+    public Ptr ptr() {
+        return new Ptr(element);
     }
 }

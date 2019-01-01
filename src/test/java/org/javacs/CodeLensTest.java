@@ -80,10 +80,10 @@ public class CodeLensTest {
         var compile = server.compiler.compileFile(uri, contents);
         var signatureMatches = compile.signatureMatches();
 
-        var good = List.of(new Ptr("org.javacs.example.ConstructorRefs.ConstructorRefs(int)"));
+        var good = List.of(new Ptr("org.javacs.example/ConstructorRefs#<init>(int)"));
         assertTrue(signatureMatches.test(good));
 
-        var bad = List.of(new Ptr("org.javacs.example.ConstructorRefs.ConstructorRefs(int, int)"));
+        var bad = List.of(new Ptr("org.javacs.example/ConstructorRefs#<init>(int,int)"));
         assertFalse(signatureMatches.test(bad));
     }
 }

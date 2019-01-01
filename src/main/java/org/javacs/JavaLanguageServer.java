@@ -4,7 +4,6 @@ import com.google.gson.*;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.doctree.DocTree;
 import com.sun.source.doctree.ParamTree;
@@ -345,7 +344,6 @@ class JavaLanguageServer extends LanguageServer {
         var content = contents(uri).content;
         var line = position.position.line + 1;
         var column = position.position.character + 1;
-        lastCompletions.clear();
         // Figure out what kind of completion we want to do
         var maybeCtx = compiler.parseFile(uri, content).completionContext(line, column);
         if (!maybeCtx.isPresent()) {
@@ -404,6 +402,7 @@ class JavaLanguageServer extends LanguageServer {
                     i.detail = ShortTypePrinter.print(c.element.asType());
                 }
                 // TODO prioritize based on usage?
+                // TODO prioritize based on scope
                 if (isMemberOfObject(c.element)) {
                     i.sortText = 9 + i.label;
                 } else {
@@ -448,15 +447,52 @@ class JavaLanguageServer extends LanguageServer {
         return Optional.of(new CompletionList(isIncomplete, result));
     }
 
-    private String resolveDocDetail(MethodTree doc) {
-        var args = new StringJoiner(", ");
-        for (var p : doc.getParameters()) {
-            args.add(p.getName());
-        }
-        return String.format("%s %s(%s)", doc.getReturnType(), doc.getName(), args);
+    private Optional<MarkupContent> findDocs(Ptr ptr) {
+        LOG.info(String.format("Find docs for `%s`...", ptr));
+
+        // Find el in the doc path
+        var file = compiler.docs().find(ptr);
+        if (!file.isPresent()) return Optional.empty();
+        // Parse file and find el
+        var parse = compiler.docs().parse(file.get());
+        var path = parse.fuzzyFind(ptr);
+        if (!path.isPresent()) return Optional.empty();
+        // Parse the doctree associated with el
+        var docTree = parse.doc(path.get());
+        ;
+        var string = asMarkupContent(docTree);
+        return Optional.of(string);
     }
 
-    private String resolveDefaultDetail(ExecutableElement method) {
+    private Optional<String> findMethodDetails(ExecutableElement method) {
+        LOG.info(String.format("Find details for method `%s`...", method));
+
+        // TODO find and parse happens twice between findDocs and findMethodDetails
+        // Find method in the doc path
+        var ptr = new Ptr(method);
+        var file = compiler.docs().find(ptr);
+        if (!file.isPresent()) return Optional.empty();
+        // Parse file and find method
+        var parse = compiler.docs().parse(file.get());
+        var path = parse.fuzzyFind(ptr);
+        if (!path.isPresent()) return Optional.empty();
+        // Should be a MethodTree
+        var tree = path.get().getLeaf();
+        if (!(tree instanceof MethodTree)) {
+            LOG.warning(String.format("...method `%s` associated with non-method tree `%s`", method, tree));
+            return Optional.empty();
+        }
+        // Write description of method using info from source
+        var methodTree = (MethodTree) tree;
+        var args = new StringJoiner(", ");
+        for (var p : methodTree.getParameters()) {
+            args.add(p.getName());
+        }
+        var details = String.format("%s %s(%s)", methodTree.getReturnType(), methodTree.getName(), args);
+        return Optional.of(details);
+    }
+
+    private String defaultDetails(ExecutableElement method) {
         var args = new StringJoiner(", ");
         var missingParamNames =
                 method.getParameters().stream().allMatch(p -> p.getSimpleName().toString().matches("arg\\d+"));
@@ -500,25 +536,17 @@ class JavaLanguageServer extends LanguageServer {
         if (cached.element != null) {
             if (cached.element instanceof ExecutableElement) {
                 var method = (ExecutableElement) cached.element;
-                var tree = compiler.docs().methodTree(method);
-                var detail = tree.map(this::resolveDocDetail).orElse(resolveDefaultDetail(method));
-                unresolved.detail = detail;
-
-                var doc = compiler.docs().methodDoc(method);
-                var markdown = doc.map(this::asMarkupContent);
-                if (markdown.isPresent()) unresolved.documentation = markdown.get();
-            } else if (cached.element instanceof TypeElement) {
-                var type = (TypeElement) cached.element;
-                var doc = compiler.docs().classDoc(type);
-                var markdown = doc.map(this::asMarkupContent);
-                if (markdown.isPresent()) unresolved.documentation = markdown.get();
-            } else {
-                LOG.info("Don't know how to look up docs for element " + cached.element);
+                unresolved.detail = findMethodDetails(method).orElse(defaultDetails(method));
             }
-            // TODO constructors, fields
+            var markdown = findDocs(new Ptr(cached.element));
+            if (markdown.isPresent()) {
+                unresolved.documentation = markdown.get();
+            }
         } else if (cached.className != null) {
-            var doc = compiler.docs().classDoc(cached.className.name);
-            var markdown = doc.map(this::asMarkupContent);
+            var packageName = Parser.mostName(cached.className.name);
+            var className = Parser.lastName(cached.className.name);
+            var ptr = Ptr.toClass(packageName, className);
+            var markdown = findDocs(ptr);
             if (markdown.isPresent()) unresolved.documentation = markdown.get();
         }
         return unresolved;
@@ -576,17 +604,21 @@ class JavaLanguageServer extends LanguageServer {
             }
             lines.add("}");
             return lines.toString();
-        } else return e.toString();
+        } else {
+            return e.toString();
+        }
     }
 
     private Optional<String> hoverDocs(Element e) {
-        if (e instanceof ExecutableElement) {
-            var m = (ExecutableElement) e;
-            return compiler.docs().methodDoc(m).map(this::asMarkdown);
-        } else if (e instanceof TypeElement) {
-            var t = (TypeElement) e;
-            return compiler.docs().classDoc(t).map(this::asMarkdown);
-        } else return Optional.empty();
+        var ptr = new Ptr(e);
+        var file = compiler.docs().find(ptr);
+        if (!file.isPresent()) return Optional.empty();
+        var parse = compiler.docs().parse(file.get());
+        var path = parse.fuzzyFind(ptr);
+        if (!path.isPresent()) return Optional.empty();
+        var doc = parse.doc(path.get());
+        var md = asMarkdown(doc);
+        return Optional.of(md);
     }
 
     // TODO change name
@@ -627,29 +659,23 @@ class JavaLanguageServer extends LanguageServer {
         return Optional.of(new Hover(result));
     }
 
-    private List<ParameterInformation> signatureParamsFromDocs(MethodTree method, DocCommentTree doc) {
-        var ps = new ArrayList<ParameterInformation>();
-        var paramComments = new HashMap<String, String>();
-        for (var tag : doc.getBlockTags()) {
-            if (tag.getKind() == DocTree.Kind.PARAM) {
-                var param = (ParamTree) tag;
-                paramComments.put(param.getName().toString(), asMarkdown(param.getDescription()));
-            }
+    private SignatureInformation asSignatureInformation(ExecutableElement e) {
+        // Figure out parameter info from source or from ExecutableElement
+        var i = new SignatureInformation();
+        var ptr = new Ptr(e);
+        var ps = signatureParamsFromDocs(ptr).orElse(signatureParamsFromMethod(e));
+        i.parameters = ps;
+
+        // Compute label from params (which came from either source or ExecutableElement)
+        var name = e.getSimpleName();
+        if (name.contentEquals("<init>")) name = e.getEnclosingElement().getSimpleName();
+        var args = new StringJoiner(", ");
+        for (var p : ps) {
+            args.add(p.label);
         }
-        for (var param : method.getParameters()) {
-            var info = new ParameterInformation();
-            var name = param.getName().toString();
-            info.label = name;
-            if (paramComments.containsKey(name)) {
-                var markdown = paramComments.get(name);
-                info.documentation = new MarkupContent("markdown", markdown);
-            } else {
-                var markdown = Objects.toString(param.getType(), "");
-                info.documentation = new MarkupContent("markdown", markdown);
-            }
-            ps.add(info);
-        }
-        return ps;
+        i.label = name + "(" + args + ")";
+
+        return i;
     }
 
     private List<ParameterInformation> signatureParamsFromMethod(ExecutableElement e) {
@@ -664,18 +690,42 @@ class JavaLanguageServer extends LanguageServer {
         return ps;
     }
 
-    private SignatureInformation asSignatureInformation(ExecutableElement e) {
-        var i = new SignatureInformation();
-        var ps = signatureParamsFromMethod(e);
-        var doc = compiler.docs().methodDoc(e);
-        var tree = compiler.docs().methodTree(e);
-        if (doc.isPresent() && tree.isPresent()) ps = signatureParamsFromDocs(tree.get(), doc.get());
-        var args = ps.stream().map(p -> p.label).collect(Collectors.joining(", "));
-        var name = e.getSimpleName().toString();
-        if (name.equals("<init>")) name = e.getEnclosingElement().getSimpleName().toString();
-        i.label = name + "(" + args + ")";
-        i.parameters = ps;
-        return i;
+    private Optional<List<ParameterInformation>> signatureParamsFromDocs(Ptr ptr) {
+        // Find the file ptr point to, and parse it
+        var file = compiler.docs().find(ptr);
+        if (!file.isPresent()) return Optional.empty();
+        var parse = compiler.docs().parse(file.get());
+        // Find the tree
+        var path = parse.fuzzyFind(ptr);
+        if (!path.isPresent()) return Optional.empty();
+        if (!(path.get().getLeaf() instanceof MethodTree)) return Optional.empty();
+        var method = (MethodTree) path.get().getLeaf();
+        // Find the docstring on method, or empty doc if there is none
+        var doc = parse.doc(path.get());
+        // Get param docs from @param tags
+        var ps = new ArrayList<ParameterInformation>();
+        var paramComments = new HashMap<String, String>();
+        for (var tag : doc.getBlockTags()) {
+            if (tag.getKind() == DocTree.Kind.PARAM) {
+                var param = (ParamTree) tag;
+                paramComments.put(param.getName().toString(), asMarkdown(param.getDescription()));
+            }
+        }
+        // Get param names from source
+        for (var param : method.getParameters()) {
+            var info = new ParameterInformation();
+            var name = param.getName().toString();
+            info.label = name;
+            if (paramComments.containsKey(name)) {
+                var markdown = paramComments.get(name);
+                info.documentation = new MarkupContent("markdown", markdown);
+            } else {
+                var markdown = Objects.toString(param.getType(), "");
+                info.documentation = new MarkupContent("markdown", markdown);
+            }
+            ps.add(info);
+        }
+        return Optional.of(ps);
     }
 
     private SignatureHelp asSignatureHelp(MethodInvocation invoke) {
@@ -718,7 +768,7 @@ class JavaLanguageServer extends LanguageServer {
         }
 
         // Figure out what file toEl is declared in
-        LOG.info(String.format("...looking for definition of `%s`", toEl));
+        LOG.info(String.format("...looking for definition of `%s`", toEl.get()));
         var toUri = hoverCache.declaringFile(toEl.get());
         if (!toUri.isPresent()) {
             LOG.info(String.format("...couldn't find declaring file, giving up"));
@@ -1103,6 +1153,7 @@ class JavaLanguageServer extends LanguageServer {
         var line = data.get(2).getAsInt() + 1;
         var character = data.get(3).getAsInt() + 1;
         // Find the element being referenced
+        // TODO only update code lenses when file is saved, then return these lenses from cache
         updateHoverCache(uri, contents(uri).content);
         var el = hoverCache.element(line, character);
         if (el.isEmpty()) {
@@ -1135,6 +1186,7 @@ class JavaLanguageServer extends LanguageServer {
         var edits = new ArrayList<TextEdit>();
         edits.addAll(fixImports());
         edits.addAll(addOverrides());
+        // TODO replace var with type name when vars are copy-pasted into fields
         return edits;
     }
 
