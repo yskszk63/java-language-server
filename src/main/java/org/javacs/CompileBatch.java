@@ -224,7 +224,7 @@ public class CompileBatch {
         // TODO remember if the file contains errors, and keep re-indexing it
         var refs = new ArrayList<Ptr>();
         class IndexFile extends TreePathScanner<Void, Void> {
-            Optional<TreePath> ref(TreePath from) {
+            Optional<Element> ref(TreePath from) {
                 var root = from.getCompilationUnit();
                 var lines = root.getLineMap();
                 var to = trees.getElement(from);
@@ -238,12 +238,7 @@ public class CompileBatch {
                     return Optional.empty();
                 }
                 // TODO skip anything not on source path
-                var result = trees.getPath(to);
-                if (result == null) {
-                    // LOG.warning(String.format("Element `%s` has no TreePath", to));
-                    return Optional.empty();
-                }
-                return Optional.of(result);
+                return Optional.of(to);
             }
 
             void check(TreePath from) {

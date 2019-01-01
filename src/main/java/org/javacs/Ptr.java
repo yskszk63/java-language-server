@@ -1,9 +1,5 @@
 package org.javacs;
 
-import com.sun.source.tree.ClassTree;
-import com.sun.source.tree.MethodTree;
-import com.sun.source.tree.VariableTree;
-import com.sun.source.util.TreePath;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -15,39 +11,12 @@ import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 
-/**
- * Ptr is a reference to a named element, that can be serialized into a String. Ptr considers all overloads to be the
- * same element.
- */
+/** Ptr is a reference to a named element, that can be serialized into a String. */
 public class Ptr {
     private final String path;
 
     public Ptr(String path) {
         this.path = path;
-    }
-
-    public Ptr(TreePath path) {
-        var packageName = path.getCompilationUnit().getPackageName();
-        var rev = new ArrayList<CharSequence>();
-        while (path != null) {
-            var part = path.getLeaf();
-            if (part instanceof ClassTree) {
-                var cls = (ClassTree) part;
-                rev.add(cls.getSimpleName());
-            } else if (part instanceof MethodTree) {
-                var method = (MethodTree) part;
-                // TODO overloads
-                rev.add(method.getName());
-            } else if (part instanceof VariableTree) {
-                var variable = (VariableTree) part;
-                rev.add(variable.getName());
-            }
-            path = path.getParentPath();
-        }
-        if (packageName != null) rev.add(packageName.toString());
-        var name = reverseAndJoin(rev, ".");
-        if (!name.matches("(\\w+\\.)*(\\w+|<init>)")) LOG.warning(String.format("`%s` doesn't look like a name", name));
-        this.path = name;
     }
 
     public Ptr(Element e) {
@@ -62,7 +31,7 @@ public class Ptr {
             } else if (e instanceof ExecutableElement) {
                 var method = (ExecutableElement) e;
                 // TODO overloads
-                rev.add(method.getSimpleName());
+                rev.add(method.toString());
             } else if (e instanceof VariableElement) {
                 var field = (VariableElement) e;
                 rev.add(field.getSimpleName());
@@ -94,6 +63,7 @@ public class Ptr {
         return Objects.hash(path);
     }
 
+    @Override
     public String toString() {
         return path;
     }

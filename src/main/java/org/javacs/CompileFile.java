@@ -86,7 +86,9 @@ public class CompileFile {
 
             /** Check if the declaration at the current path is the same symbol as `e` */
             boolean sameSymbol() {
-                return new Ptr(getCurrentPath()).equals(target);
+                var path = getCurrentPath();
+                var el = trees.getElement(path);
+                return new Ptr(el).equals(target);
             }
 
             void check() {

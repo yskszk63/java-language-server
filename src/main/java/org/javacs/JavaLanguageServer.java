@@ -958,7 +958,6 @@ class JavaLanguageServer extends LanguageServer {
             data.add(uri.toString());
             data.add(line);
             data.add(character);
-            data.add(new Ptr(d).toString());
             var lens = new CodeLens(range.get(), null, data);
             result.add(lens);
         }
@@ -990,12 +989,17 @@ class JavaLanguageServer extends LanguageServer {
         var command = data.get(0).getAsString();
         assert command.equals("java.command.findReferences");
         var uriString = data.get(1).getAsString();
-        var line = data.get(2).getAsInt();
-        var character = data.get(3).getAsInt();
-        var ptrString = data.get(4).getAsString();
-        // Parse data
         var uri = URI.create(uriString);
-        var ptr = new Ptr(ptrString);
+        var line = data.get(2).getAsInt() + 1;
+        var character = data.get(3).getAsInt() + 1;
+        // Find the element being referenced
+        updateHoverCache(uri, contents(uri).content);
+        var el = hoverCache.element(line, character);
+        if (el.isEmpty()) {
+            LOG.warning(String.format("No element to resolve code lens at %s(%d,%d)", uri.getPath(), line, character));
+            return unresolved;
+        }
+        var ptr = new Ptr(el.get());
         // Update cache if necessary
         updateCacheCountReferences(uri);
         // Read reference count from cache
@@ -1006,8 +1010,8 @@ class JavaLanguageServer extends LanguageServer {
         else title = String.format("%d references", count);
         var arguments = new JsonArray();
         arguments.add(uri.toString());
-        arguments.add(line);
-        arguments.add(character);
+        arguments.add(line - 1);
+        arguments.add(character - 1);
         unresolved.command = new Command(title, command, arguments);
 
         return unresolved;
@@ -1084,7 +1088,7 @@ class JavaLanguageServer extends LanguageServer {
             for (var i = 0; i < indent; i++) insertText.append(' ');
             insertText.append("@Override");
             insertText.append('\n');
-            var insertPosition = new Position((int) insertLine, 0);
+            var insertPosition = new Position((int) insertLine - 1, 0);
             var insert = new TextEdit(new Range(insertPosition, insertPosition), insertText.toString());
             edits.add(insert);
         }
