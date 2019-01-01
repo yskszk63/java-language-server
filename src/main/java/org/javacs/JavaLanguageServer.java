@@ -1016,6 +1016,14 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public List<TextEdit> formatting(DocumentFormattingParams params) {
         updateHoverCache(params.textDocument.uri, contents(params.textDocument.uri).content);
+
+        var edits = new ArrayList<TextEdit>();
+        edits.addAll(fixImports());
+        edits.addAll(addOverrides());
+        return edits;
+    }
+
+    private List<TextEdit> fixImports() {
         // TODO if imports already match fixed-imports, return empty list
         // TODO preserve comments and other details of existing imports
         var imports = hoverCache.fixImports();
@@ -1060,6 +1068,26 @@ class JavaLanguageServer extends LanguageServer {
         var insert = new TextEdit(new Range(insertPosition, insertPosition), insertText.toString());
         edits.add(insert);
 
+        return edits;
+    }
+
+    private List<TextEdit> addOverrides() {
+        var edits = new ArrayList<TextEdit>();
+        var methods = hoverCache.needsOverrideAnnotation();
+        var pos = hoverCache.sourcePositions();
+        var lines = hoverCache.root.getLineMap();
+        for (var t : methods) {
+            var methodStart = pos.getStartPosition(t.getCompilationUnit(), t.getLeaf());
+            var insertLine = lines.getLineNumber(methodStart);
+            var indent = methodStart - lines.getPosition(insertLine, 0);
+            var insertText = new StringBuilder();
+            for (var i = 0; i < indent; i++) insertText.append(' ');
+            insertText.append("@Override");
+            insertText.append('\n');
+            var insertPosition = new Position((int) insertLine, 0);
+            var insert = new TextEdit(new Range(insertPosition, insertPosition), insertText.toString());
+            edits.add(insert);
+        }
         return edits;
     }
 

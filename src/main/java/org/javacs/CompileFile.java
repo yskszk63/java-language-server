@@ -122,6 +122,62 @@ public class CompileFile {
         return ParseFile.range(task, contents, path);
     }
 
+    private List<Element> overrides(ExecutableElement method) {
+        var elements = task.getElements();
+        var types = task.getTypes();
+        var results = new ArrayList<Element>();
+        var enclosingClass = (TypeElement) method.getEnclosingElement();
+        var enclosingType = enclosingClass.asType();
+        for (var superClass : types.directSupertypes(enclosingType)) {
+            var e = (TypeElement) types.asElement(superClass);
+            for (var other : e.getEnclosedElements()) {
+                if (!(other instanceof ExecutableElement)) continue;
+                if (elements.overrides(method, (ExecutableElement) other, enclosingClass)) {
+                    results.add(other);
+                }
+            }
+        }
+        return results;
+    }
+
+    private boolean hasOverrideAnnotation(ExecutableElement method) {
+        for (var ann : method.getAnnotationMirrors()) {
+            var type = ann.getAnnotationType();
+            var el = type.asElement();
+            var name = el.toString();
+            if (name.equals("java.lang.Override")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Find methods that override a method from a superclass but don't have an @Override annotation. */
+    public List<TreePath> needsOverrideAnnotation() {
+        LOG.info(String.format("Looking for methods that need an @Override annotation in %s ...", file.getPath()));
+
+        var results = new ArrayList<TreePath>();
+        class FindMissingOverride extends TreePathScanner<Void, Void> {
+            @Override
+            public Void visitMethod(MethodTree t, Void __) {
+                var method = (ExecutableElement) trees.getElement(getCurrentPath());
+                var supers = overrides(method);
+                if (!supers.isEmpty() && !hasOverrideAnnotation(method)) {
+                    var overridesMethod = supers.get(0);
+                    var overridesClass = overridesMethod.getEnclosingElement();
+                    LOG.info(
+                            String.format(
+                                    "...`%s` has no @Override annotation but overrides `%s.%s`",
+                                    method, overridesClass, overridesMethod));
+                    results.add(getCurrentPath());
+                }
+                return super.visitMethod(t, null);
+            }
+        }
+        new FindMissingOverride().scan(root, null);
+        return results;
+    }
+
     /**
      * Figure out what imports this file should have. Star-imports like `import java.util.*` are converted to individual
      * class imports. Missing imports are inferred by looking at imports in other source files.

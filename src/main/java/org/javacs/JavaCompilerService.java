@@ -367,6 +367,9 @@ public class JavaCompilerService {
         index.putAll(counts);
     }
 
+    // TODO when computing the index, store the signature of the target.
+    // If the target has changed, reindex that file.
+    // This can take advantage of the fact that code lenses are resolved one-at-a-time!
     public Map<Ptr, Integer> countReferences(URI file, String contents, ReportProgress progress) {
         var root = Parser.parse(new StringFileObject(contents, file));
         // List all files that import file

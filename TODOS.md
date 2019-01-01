@@ -30,6 +30,3 @@
 - new Foo< shouldn't make everything green
 - void f() shouldn't mess up next line as you type it
 - { on next line breaks coloring
-
-# Formatter
-- Automatically add @Override annotations
