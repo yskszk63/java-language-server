@@ -25,6 +25,3 @@
 
 ## JShell
 - Support .jshell extension as "scratch pad"
-
-# Coloring
-- { on next line breaks coloring

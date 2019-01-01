@@ -192,6 +192,7 @@
 		},
 		"class-declaration": {
 			"begin": "(?<!\\.)\\b(class|interface|@interface) +(\\w+)\\b",
+			"end": "}",
 			"name": "meta.class.java",
 			"beginCaptures": {
 				"1": {
@@ -201,7 +202,11 @@
 					"name": "entity.name.class.java"
 				}
 			},
-			"end": "$",
+			"endCaptures": {
+				"0": {
+					"name": "keyword.other.end-class-body"
+				}
+			},
 			"patterns": [
 				{
 					"include": "#keywords"
@@ -215,15 +220,10 @@
 				},
 				{
 					"begin": "{",
-					"end": "}",
+					"end": "(?=})",
 					"beginCaptures": {
 						"0": {
 							"name": "keyword.other.begin-class-body"
-						}
-					},
-					"endCaptures": {
-						"0": {
-							"name": "keyword.other.end-class-body"
 						}
 					},
 					"name": "meta.class.body.java",
