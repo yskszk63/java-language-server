@@ -956,7 +956,7 @@
 			"patterns": [
 				{
 					"begin": "<",
-					"end": ">",
+					"end": ">|$",
 					"name": "meta.type-parameters.java",
 					"beginCaptures": {
 						"0": {
