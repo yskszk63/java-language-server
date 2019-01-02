@@ -1,8 +1,5 @@
 # Todo
 
-## Bugs
-- Make new file, rename, edit crashes compiler
-
 ## Autocomplete
 - Autocomplete POJO constructor This(T f, U g) { this.f = f; ... }
 
