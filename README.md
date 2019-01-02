@@ -1,6 +1,6 @@
 # Language Server for Java using the [Java compiler API](https://docs.oracle.com/javase/10/docs/api/jdk.compiler-summary.html) 
 
-A Java [language server](https://github.com/Microsoft/vscode-languageserver-protocol) implemented using the Java compiler API. Requires that you have Java 10 installed on your system.
+A Java [language server](https://github.com/Microsoft/vscode-languageserver-protocol) implemented using the Java compiler API. 
 
 [![CircleCI](https://circleci.com/gh/georgewfraser/java-language-server.png)](https://circleci.com/gh/georgewfraser/java-language-server)
 
@@ -155,3 +155,5 @@ If you have npm and maven installed, you should be able to install locally using
     npm install -g vsce
     npm install
     ./scripts/build.sh
+
+At the time of this writing, the build only works on Mac, because of the way it uses JLink. However, it would be straightforward to fix this by changing `scripts/link_mac.sh` to be more like `scripts/link_windows.sh`.
