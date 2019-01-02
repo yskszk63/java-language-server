@@ -22,6 +22,7 @@ public class InferConfigTest {
                     Collections.emptySet(),
                     mavenHome,
                     Paths.get("nowhere"));
+    private InferConfig thisProject = new InferConfig(Paths.get("."), Set.of());
 
     @Test
     public void mavenClassPath() {
@@ -63,24 +64,32 @@ public class InferConfigTest {
 
     @Test
     public void dependencyList() {
-        assertThat(
-                InferConfig.dependencyList(Paths.get("pom.xml")),
-                hasItem(new Artifact("org.hamcrest", "hamcrest-all", "1.3")));
+        assertThat(InferConfig.mvnDependencies(Paths.get("pom.xml"), "dependency:list"), not(empty()));
     }
 
     @Test
-    public void onlyPomXmlClassPath() {
+    public void thisProjectClassPath() {
         assertThat(
-                onlyPomXml.buildClassPath(),
-                contains(mavenHome.resolve("repository/com/external/external-library/1.2/external-library-1.2.jar")));
+                thisProject.buildClassPath(),
+                hasItem(hasToString(endsWith(".m2/repository/junit/junit/4.12/junit-4.12.jar"))));
     }
 
     @Test
-    public void onlyPomXmlDocPath() {
+    public void thisProjectDocPath() {
         assertThat(
-                onlyPomXml.buildDocPath(),
-                contains(
-                        mavenHome.resolve(
-                                "repository/com/external/external-library/1.2/external-library-1.2-sources.jar")));
+                thisProject.buildDocPath(),
+                hasItem(hasToString(endsWith(".m2/repository/junit/junit/4.12/junit-4.12-sources.jar"))));
+    }
+
+    @Test
+    public void parseDependencyLine() {
+        var line =
+                "[INFO]    org.openjdk.jmh:jmh-generator-annprocess:jar:1.21:provided:/Users/georgefraser/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.21/jmh-generator-annprocess-1.21.jar";
+        var path = InferConfig.readDependency(line).get();
+        assertThat(
+                path,
+                equalTo(
+                        Paths.get(
+                                "/Users/georgefraser/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.21/jmh-generator-annprocess-1.21.jar")));
     }
 }

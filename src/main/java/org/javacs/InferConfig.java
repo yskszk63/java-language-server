@@ -3,6 +3,7 @@ package org.javacs;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -77,14 +78,9 @@ class InferConfig {
         }
 
         // Maven
-        if (Files.exists(workspaceRoot.resolve("pom.xml"))) {
-            var result = new HashSet<Path>();
-            for (var a : mvnDependencies()) {
-                var found = findMavenJar(a, false);
-                if (found.isPresent()) result.add(found.get());
-                else LOG.warning(String.format("Couldn't find jar for %s in %s", a, mavenHome));
-            }
-            return result;
+        var pomXml = workspaceRoot.resolve("pom.xml");
+        if (Files.exists(pomXml)) {
+            return mvnDependencies(pomXml, "dependency:list");
         }
 
         // Bazel
@@ -220,12 +216,9 @@ class InferConfig {
         }
 
         // Maven
-        if (Files.exists(workspaceRoot.resolve("pom.xml"))) {
-            var result = new HashSet<Path>();
-            for (var a : mvnDependencies()) {
-                findMavenJar(a, true).ifPresent(result::add);
-            }
-            return result;
+        var pomXml = workspaceRoot.resolve("pom.xml");
+        if (Files.exists(pomXml)) {
+            return mvnDependencies(pomXml, "dependency:sources");
         }
 
         // TODO Bazel
@@ -281,63 +274,75 @@ class InferConfig {
         return artifact.artifactId + '-' + artifact.version + (source ? "-sources" : "") + ".jar";
     }
 
-    static List<Artifact> dependencyList(Path pomXml) {
+    static Set<Path> mvnDependencies(Path pomXml, String goal) {
         Objects.requireNonNull(pomXml, "pom.xml path is null");
 
         try {
-            // Tell maven to output deps to a temporary file
-            var outputFile = Files.createTempFile("deps", ".txt");
-
-            // TODO consider using mvn dependency:copy-dependencies instead
+            // TODO consider using mvn valide dependency:copy-dependencies -DoutputDirectory=??? instead
+            // Run maven as a subprocess
             var command =
                     List.of(
                             getMvnCommand(),
                             "validate",
-                            "dependency:list",
+                            goal,
                             "-DincludeScope=test",
-                            "-DoutputFile=" + outputFile);
+                            "-DoutputAbsoluteArtifactFilename=true");
             LOG.info("Running " + String.join(" ", command) + " ...");
             var workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
-            var log = Files.createTempFile("maven", ".log");
-            LOG.info("...sending output to " + log);
-            var result =
+            var process =
                     new ProcessBuilder()
                             .command(command)
                             .directory(workingDirectory)
                             .redirectError(ProcessBuilder.Redirect.INHERIT)
-                            .redirectOutput(ProcessBuilder.Redirect.to(log.toFile()))
-                            .start()
-                            .waitFor();
+                            .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                            .start();
 
+            // Read output on a separate thread
+            var reader =
+                    new Runnable() {
+                        Set<Path> dependencies;
+
+                        @Override
+                        public void run() {
+                            dependencies = readDependencyList(process.getInputStream());
+                        }
+                    };
+            var thread = new Thread(reader, "ReadMavenOutput");
+            thread.start();
+
+            // Wait for process to exit
+            var result = process.waitFor();
             if (result != 0) throw new RuntimeException("`" + String.join(" ", command) + "` returned " + result);
 
-            return readDependencyList(outputFile);
+            // Wait for thread to finish
+            thread.join();
+            return reader.dependencies;
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private static List<Artifact> readDependencyList(Path outputFile) {
-        var artifact = Pattern.compile(".*:.*:.*:.*:.*");
-
-        try (var in = Files.newInputStream(outputFile)) {
-            return new BufferedReader(new InputStreamReader(in))
-                    .lines()
-                    .map(String::trim)
-                    .filter(line -> artifact.matcher(line).matches())
-                    .map(Artifact::parse)
-                    .collect(Collectors.toList());
+    private static Set<Path> readDependencyList(InputStream stdout) {
+        try (var in = new BufferedReader(new InputStreamReader(stdout))) {
+            var paths = new HashSet<Path>();
+            for (var line = in.readLine(); line != null; line = in.readLine()) {
+                readDependency(line).ifPresent(paths::add);
+            }
+            return paths;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private Collection<Artifact> mvnDependencies() {
-        var pomXml = workspaceRoot.resolve("pom.xml");
+    private static Pattern DEPENDENCY = Pattern.compile("^\\[INFO\\]\\s+(.*:.*:.*:.*:.*):(/.*)$");
 
-        if (Files.exists(pomXml)) return dependencyList(pomXml);
-
-        return Collections.emptyList();
+    static Optional<Path> readDependency(String line) {
+        var match = DEPENDENCY.matcher(line);
+        if (!match.matches()) return Optional.empty();
+        var artifact = match.group(1);
+        var path = match.group(2);
+        LOG.info(String.format("...artifact %s is at %s", artifact, path));
+        return Optional.of(Paths.get(path));
     }
 
     static String getMvnCommand() {
