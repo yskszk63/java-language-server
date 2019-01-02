@@ -6,6 +6,7 @@ java -cp $(cat cp.txt):$(pwd)/target/classes:$(pwd)/target/test-classes org.juni
     org.javacs.CompletionsTest \
     org.javacs.DocsTest \
     org.javacs.FindReferencesTest \
+    org.javacs.FormattingTest \
     org.javacs.GotoTest \
     org.javacs.InferBazelConfigTest \
     org.javacs.InferConfigTest \
@@ -13,8 +14,10 @@ java -cp $(cat cp.txt):$(pwd)/target/classes:$(pwd)/target/test-classes org.juni
     org.javacs.ParserFixImportsTest \
     org.javacs.ParserTest \
     org.javacs.PrunerTest \
+    org.javacs.PtrTest \
     org.javacs.SearchTest \
     org.javacs.SignatureHelpTest \
+    org.javacs.StringSearchTest \
     org.javacs.SymbolUnderCursorTest \
     org.javacs.TipFormatterTest \
     org.javacs.lsp.LanguageServerTest \
