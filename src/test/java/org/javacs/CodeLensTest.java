@@ -86,4 +86,12 @@ public class CodeLensTest {
         var bad = List.of(new Ptr("org.javacs.example/ConstructorRefs#<init>(int,int)"));
         assertFalse(signatureMatches.test(bad));
     }
+
+    @Test
+    public void placement() {
+        var lenses = lenses("/org/javacs/example/CodeLensPlacement.java");
+        var titles = titles(lenses);
+        assertThat(titles, hasItem("4:0 references"));
+        assertThat(titles, hasItem("6:0 references"));
+    }
 }

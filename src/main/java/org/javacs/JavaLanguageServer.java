@@ -1180,7 +1180,7 @@ class JavaLanguageServer extends LanguageServer {
     private String countReferencesTitle(URI uri, int line, int character) {
         updateHoverCache(uri, contents(uri).content);
         var el = hoverCache.element(line, character);
-        if (el.isEmpty()) {
+        if (!el.isPresent()) {
             LOG.warning(String.format("No element to resolve code lens at %s(%d,%d)", uri.getPath(), line, character));
             return "? references";
         }

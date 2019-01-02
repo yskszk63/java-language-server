@@ -282,7 +282,7 @@ public class CompileFile {
         return i -> {
             // For each pointer, check if it refers to something in this file that no longer exists
             for (var ptr : i) {
-                if (thisClasses.contains(ptr.qualifiedClassName()) && find(ptr).isEmpty()) {
+                if (thisClasses.contains(ptr.qualifiedClassName()) && !find(ptr).isPresent()) {
                     LOG.info(
                             String.format("`%s` refers to signature that no longer exists in %s", ptr, file.getPath()));
                     return false;

@@ -359,23 +359,56 @@ public class ParseFile {
             end = start + path.getLeaf().toString().length();
         }
         
-        // If this is a class or method declaration, we need to refine the range
-        if (path.getLeaf() instanceof ClassTree || path.getLeaf() instanceof MethodTree || path.getLeaf() instanceof VariableTree) {
-            // Figure out what name to search for
-            var className = JavaCompilerService.className(path);
-            var memberName = JavaCompilerService.memberName(path);
-            String searchFor;
-            if (!memberName.isPresent()) searchFor = className;
-            else if (memberName.get().equals("<init>")) searchFor = className;
-            else searchFor = memberName.get();
-            
-            // Search text for searchFor
-            start = contents.indexOf(searchFor, start);
-            end = start + searchFor.length();
+        if (path.getLeaf() instanceof ClassTree) {
+            var cls = (ClassTree) path.getLeaf();
+
+            // If class has annotations, skip over them
+            if (!cls.getModifiers().getAnnotations().isEmpty())
+                start = (int) pos.getEndPosition(root, cls.getModifiers());
+
+            // Find position of class name
+            var name = cls.getSimpleName().toString();
+            start = contents.indexOf(name, start);
             if (start == -1) {
-                LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", searchFor, path.getLeaf()));
+                LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", name, path.getLeaf()));
                 return Optional.empty();
             }
+            end = start + name.length();
+        }
+        if (path.getLeaf() instanceof MethodTree) {
+            var method = (MethodTree) path.getLeaf();
+
+            // If method has annotations, skip over them
+            if (!method.getModifiers().getAnnotations().isEmpty())
+                start = (int) pos.getEndPosition(root, method.getModifiers());
+
+            // Find position of method name
+            var name = method.getName().toString();
+            if (name.equals("<init>")) {
+                name = JavaCompilerService.className(path);
+            }
+            start = contents.indexOf(name, start);
+            if (start == -1) {
+                LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", name, path.getLeaf()));
+                return Optional.empty();
+            }
+            end = start + name.length();
+        }
+        if (path.getLeaf() instanceof VariableTree) {
+            var field = (VariableTree) path.getLeaf();
+
+            // If field has annotations, skip over them
+            if (!field.getModifiers().getAnnotations().isEmpty())
+                start = (int) pos.getEndPosition(root, field.getModifiers());
+
+            // Find position of method name
+            var name = field.getName().toString();
+            start = contents.indexOf(name, start);
+            if (start == -1) {
+                LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", name, path.getLeaf()));
+                return Optional.empty();
+            }
+            end = start + name.length();
         }
         var startLine = (int) lines.getLineNumber(start);
         var startCol = (int) lines.getColumnNumber(start);
