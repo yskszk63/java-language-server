@@ -124,14 +124,7 @@ class JavaLanguageServer extends LanguageServer {
         }
     }
 
-    void lint(Collection<URI> uris) {
-        var message = new StringJoiner(", ");
-        for (var uri : uris) {
-            var path = uri.getPath();
-            var name = Paths.get(path).getFileName();
-            message.add(name.toString());
-        }
-        LOG.info("Lint " + message);
+    void reportErrors(Collection<URI> uris) {
         var messages = compiler.reportErrors(uris);
         publishDiagnostics(uris, messages);
     }
@@ -1081,7 +1074,7 @@ class JavaLanguageServer extends LanguageServer {
         if (needsUpdate.isEmpty()) return;
 
         // If there's more than 1 file, report progress
-        if (needsUpdate.size() > 1) { // TODO this could probably be tuned to be higher
+        if (needsUpdate.size() > 1) { // TODO this could probably be tuned to be higher and based on bytes of code
             progress.start(String.format("Index %d files", needsUpdate.size()));
         } else {
             progress = ReportProgress.EMPTY;
@@ -1162,7 +1155,7 @@ class JavaLanguageServer extends LanguageServer {
     public CodeLens resolveCodeLens(CodeLens unresolved) {
         // TODO This is pretty klugey, should happen asynchronously after CodeLenses are shown
         if (!recentlyOpened.isEmpty()) {
-            lint(recentlyOpened);
+            reportErrors(recentlyOpened);
             recentlyOpened.clear();
         }
         // Unpack data
@@ -1448,7 +1441,7 @@ class JavaLanguageServer extends LanguageServer {
         var uri = params.textDocument.uri;
         if (isJavaFile(uri)) {
             // Re-lint all active documents
-            lint(activeDocuments.keySet());
+            reportErrors(activeDocuments.keySet());
         }
     }
 

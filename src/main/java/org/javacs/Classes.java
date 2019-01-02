@@ -124,17 +124,17 @@ class Classes {
         var fs = FileSystems.getFileSystem(URI.create("jrt:/"));
         for (var m : JDK_MODULES) {
             var moduleRoot = fs.getPath(String.format("/modules/%s/", m));
-            try {
-                Files.walk(moduleRoot)
-                        .forEach(
-                                classFile -> {
-                                    var relative = moduleRoot.relativize(classFile).toString();
-                                    if (relative.endsWith(".class") && !relative.contains("$")) {
-                                        var trim = relative.substring(0, relative.length() - ".class".length());
-                                        var qualifiedName = trim.replace(File.separatorChar, '.');
-                                        classes.add(qualifiedName);
-                                    }
-                                });
+            try (var stream = Files.walk(moduleRoot)) {
+                var it = stream.iterator();
+                while (it.hasNext()) {
+                    var classFile = it.next();
+                    var relative = moduleRoot.relativize(classFile).toString();
+                    if (relative.endsWith(".class") && !relative.contains("$")) {
+                        var trim = relative.substring(0, relative.length() - ".class".length());
+                        var qualifiedName = trim.replace(File.separatorChar, '.');
+                        classes.add(qualifiedName);
+                    }
+                }
             } catch (IOException e) {
                 LOG.log(Level.WARNING, "Failed indexing module " + m + "(" + e.getMessage() + ")");
             }
@@ -143,10 +143,12 @@ class Classes {
         LOG.info(String.format("Found %d classes in the java platform", classes.size()));
 
         class PlatformClassSource implements ClassSource {
+            @Override
             public Set<String> classes() {
                 return Collections.unmodifiableSet(classes);
             }
 
+            @Override
             public Optional<Class<?>> load(String className) {
                 if (loadError.contains(className)) return Optional.empty();
 
@@ -186,10 +188,12 @@ class Classes {
         LOG.info(String.format("Found %d classes in classpath", classes.size()));
 
         class ClassPathClassSource implements ClassSource {
+            @Override
             public Set<String> classes() {
                 return Collections.unmodifiableSet(classes);
             }
 
+            @Override
             public Optional<Class<?>> load(String className) {
                 if (loadError.contains(className)) return Optional.empty();
 

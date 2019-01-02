@@ -154,11 +154,11 @@ public class JavaCompilerService {
     }
 
     public List<Diagnostic<? extends JavaFileObject>> reportErrors(Collection<URI> uris) {
+        LOG.info(String.format("Report errors in %d files...", uris.size()));
+
         var options = options(sourcePath, classPath);
         // Add error-prone
-        Collections.addAll(options, "-XDcompilePolicy=byfile");
-        Collections.addAll(options, "-processorpath", Lib.ERROR_PRONE);
-        Collections.addAll(options, "-Xplugin:ErrorProne -XepAllErrorsAsWarnings --illegal-access=warn");
+        options.addAll(errorProneOptions());
         // Construct list of sources
         var files = new ArrayList<File>();
         for (var p : uris) files.add(new File(p));
@@ -170,6 +170,7 @@ public class JavaCompilerService {
         var profiler = new Profiler();
         task.addTaskListener(profiler);
         // Run compilation
+        diags.clear();
         try {
             task.analyze();
         } catch (IOException e) {
@@ -177,7 +178,47 @@ public class JavaCompilerService {
         }
         profiler.print();
 
+        LOG.info(String.format("...found %d errors", diags.size()));
+
         return Collections.unmodifiableList(new ArrayList<>(diags));
+    }
+
+    // TODO make bug patterns configurable
+    // TODO error prone has a "suggest fix" option, make that available as a code action
+    // TODO benchmark speed effect of error-prone
+    private static List<String> errorProneOptions() {
+        var options = new ArrayList<String>();
+
+        // https://errorprone.info/docs/installation "Command Line"
+        Collections.addAll(options, "-XDcompilePolicy=simple");
+        Collections.addAll(options, "-processorpath", Lib.ERROR_PRONE);
+
+        // https://errorprone.info/bugpatterns
+        var bugPatterns = new StringJoiner(" ");
+        // Experimental errors
+        bugPatterns.add("-Xep:EmptyIf");
+        bugPatterns.add("-Xep:NumericEquality");
+        // Experimintal warnings
+        bugPatterns.add("-Xep:ConstructorLeaksThis");
+        bugPatterns.add("-Xep:EqualsBrokenForNull");
+        bugPatterns.add("-Xep:InvalidThrows");
+        bugPatterns.add("-Xep:RedundantThrows");
+        bugPatterns.add("-Xep:StaticQualifiedUsingExpression");
+        bugPatterns.add("-Xep:StringEquality");
+        bugPatterns.add("-Xep:Unused");
+        bugPatterns.add("-Xep:UnusedException");
+        // Experimental suggestions
+        bugPatterns.add("-Xep:FieldCanBeFinal");
+        bugPatterns.add("-Xep:FieldMissingNullable");
+        bugPatterns.add("-Xep:MethodCanBeStatic");
+        bugPatterns.add("-Xep:PackageLocation");
+        bugPatterns.add("-Xep:PrivateConstructorForUtilityClass");
+        bugPatterns.add("-Xep:ReturnMissingNullable");
+
+        Collections.addAll(
+                options, "-Xplugin:ErrorProne -XepAllErrorsAsWarnings " + bugPatterns + " --illegal-access=warn");
+
+        return options;
     }
 
     static boolean containsImport(String toPackage, String toClass, Path file) {

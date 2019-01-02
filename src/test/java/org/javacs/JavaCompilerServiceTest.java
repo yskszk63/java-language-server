@@ -16,6 +16,8 @@ import java.util.StringJoiner;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
+import javax.tools.Diagnostic;
+import javax.tools.JavaFileObject;
 import org.junit.Test;
 
 public class JavaCompilerServiceTest {
@@ -285,19 +287,37 @@ public class JavaCompilerServiceTest {
         assertThat(diags, not(empty()));
     }
 
-    @Test
-    public void errorProne() {
-        var uri = resourceUri("ErrorProne.java");
-        var files = Collections.singleton(uri);
-        var diags = compiler.reportErrors(files);
+    private static List<String> errorStrings(List<Diagnostic<? extends JavaFileObject>> diags) {
+        var strings = new ArrayList<String>();
         for (var d : diags) {
-            var file = d.getSource().toUri().getPath();
+            var file = Parser.fileName(d.getSource().toUri());
             var line = d.getLineNumber();
             var kind = d.getKind();
             var msg = d.getMessage(null);
-            System.out.println(String.format("%s(%d)\t%s\t%s", file, line, kind, msg));
+            var string = String.format("%s(%d): %s", file, line, msg);
+            strings.add(string);
         }
-        assertThat(diags, not(empty()));
+        return strings;
+    }
+
+    @Test
+    public void errorProne() {
+        // TODO verify that error-prone *only* runs when you call reportErrors(),
+        // by calling compileFile() and checking no diagnostic is reported
+        var uri = resourceUri("ErrorProne.java");
+        var files = Collections.singleton(uri);
+        var diags = compiler.reportErrors(files);
+        var strings = errorStrings(diags);
+        assertThat(strings, hasItem(containsString("ErrorProne.java(7): [CollectionIncompatibleType]")));
+    }
+
+    @Test
+    public void unusedVar() {
+        var uri = resourceUri("UnusedVar.java");
+        var files = Collections.singleton(uri);
+        var diags = compiler.reportErrors(files);
+        var strings = errorStrings(diags);
+        assertThat(strings, hasItem(containsString("UnusedVar.java(3): [Unused]")));
     }
 
     @Test
