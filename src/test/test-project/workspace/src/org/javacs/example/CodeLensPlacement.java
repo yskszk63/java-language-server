@@ -4,6 +4,6 @@ package org.javacs.example;
 public class CodeLensPlacement {
     @Deprecated(since = "The presence of the word main screws up positioning")
     void main() {
-
+        
     }
 }

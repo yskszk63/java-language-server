@@ -314,8 +314,8 @@ public class CompileFocus {
                             if (alreadyAdded.contains(member.toString())) continue;
 
                             // If type is a DeclaredType, check accessibility of member
-                            if (t instanceof DeclaredType) {
-                                if (trees.isAccessible(scope, member, (DeclaredType) t)) {
+                            if (type instanceof DeclaredType) {
+                                if (trees.isAccessible(scope, member, (DeclaredType) type)) {
                                     result.add(Completion.ofElement(member));
                                 }
                             }

@@ -810,6 +810,14 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
+    public void stringBuilderLength() {
+        var file = "/org/javacs/example/CompleteStringBuilderLength.java";
+        var suggestions = insertText(file, 6, 12);
+
+        assertThat(suggestions, hasItem(containsString("length")));
+    }
+
+    @Test
     public void implementsKeyword() {
         var file = "/org/javacs/example/AutocompleteImplements.java";
         var suggestions = insertText(file, 3, 34);
