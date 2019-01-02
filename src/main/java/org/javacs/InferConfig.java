@@ -289,13 +289,27 @@ class InferConfig {
             var outputFile = Files.createTempFile("deps", ".txt");
 
             // TODO consider using mvn dependency:copy-dependencies instead
-            var cmd =
-                    String.format(
-                            "%s dependency:list -DincludeScope=test -DoutputFile=%s", getMvnCommand(), outputFile);
+            var command =
+                    List.of(
+                            getMvnCommand(),
+                            "validate",
+                            "dependency:list",
+                            "-DincludeScope=test",
+                            "-DoutputFile=" + outputFile);
+            LOG.info("Running " + String.join(" ", command) + " ...");
             var workingDirectory = pomXml.toAbsolutePath().getParent().toFile();
-            var result = Runtime.getRuntime().exec(cmd, null, workingDirectory).waitFor();
+            var log = Files.createTempFile("maven", ".log");
+            LOG.info("...sending output to " + log);
+            var result =
+                    new ProcessBuilder()
+                            .command(command)
+                            .directory(workingDirectory)
+                            .redirectError(ProcessBuilder.Redirect.INHERIT)
+                            .redirectOutput(ProcessBuilder.Redirect.to(log.toFile()))
+                            .start()
+                            .waitFor();
 
-            if (result != 0) throw new RuntimeException("`" + cmd + "` returned " + result);
+            if (result != 0) throw new RuntimeException("`" + String.join(" ", command) + "` returned " + result);
 
             return readDependencyList(outputFile);
         } catch (InterruptedException | IOException e) {
