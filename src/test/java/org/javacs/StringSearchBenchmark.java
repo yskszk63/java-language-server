@@ -14,31 +14,31 @@ public class StringSearchBenchmark {
             smallFile = Paths.get(FindResource.uri("/org/javacs/example/Goto.java"));
     // "removeMethodBodies" appears late in the file, so stopping early will not be very effective
     private static final String query = "removeMethodBodies";
-    /*
-        @Benchmark
-        public void containsWordMatchingSmall() {
-            var found = Parser.containsWordMatching(smallFile, query);
-            assert found;
-        }
 
-        @Benchmark
-        public void containsWordMatchingLarge() {
-            var found = Parser.containsWordMatching(largeFile, query);
-            assert found;
-        }
+    @Benchmark
+    public void containsWordMatchingSmall() {
+        var found = Parser.containsWordMatching(smallFile, query);
+        assert found;
+    }
 
-        @Benchmark
-        public void containsTextSmall() {
-            var found = Parser.containsText(smallFile, query);
-            assert found;
-        }
+    @Benchmark
+    public void containsWordMatchingLarge() {
+        var found = Parser.containsWordMatching(largeFile, query);
+        assert found;
+    }
 
-        @Benchmark
-        public void containsTextLarge() {
-            var found = Parser.containsText(largeFile, query);
-            assert found;
-        }
-    */
+    @Benchmark
+    public void containsTextSmall() {
+        var found = Parser.containsText(smallFile, query);
+        assert found;
+    }
+
+    @Benchmark
+    public void containsTextLarge() {
+        var found = Parser.containsText(largeFile, query);
+        assert found;
+    }
+
     @Benchmark
     public void containsImportLarge() {
         var found = JavaCompilerService.containsImport("java.util.nopkg", "Logger", largeFile);
