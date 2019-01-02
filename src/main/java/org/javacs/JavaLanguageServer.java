@@ -1074,7 +1074,7 @@ class JavaLanguageServer extends LanguageServer {
         if (needsUpdate.isEmpty()) return;
 
         // If there's more than 1 file, report progress
-        if (needsUpdate.size() > 1) { // TODO this could probably be tuned to be higher and based on bytes of code
+        if (needsUpdate.size() > 10) { // TODO this could probably be tuned to be based on bytes of code
             progress.start(String.format("Index %d files", needsUpdate.size()));
         } else {
             progress = ReportProgress.EMPTY;
