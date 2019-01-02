@@ -88,28 +88,39 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     void publishDiagnostics(Collection<URI> files, List<Diagnostic<? extends JavaFileObject>> javaDiagnostics) {
-        for (var f : files) {
-            List<org.javacs.lsp.Diagnostic> ds = new ArrayList<>();
-            for (var j : javaDiagnostics) {
-                if (j.getSource() == null) {
-                    LOG.warning("No source in warning " + j.getMessage(null));
-                    continue;
-                }
-
-                var uri = j.getSource().toUri();
-                if (uri.equals(f)) {
-                    var content = contents(uri).content;
-                    var start = position(content, j.getStartPosition());
-                    var end = position(content, j.getEndPosition());
-                    var d = new org.javacs.lsp.Diagnostic();
-                    d.severity = severity(j.getKind());
-                    d.range = new Range(start, end);
-                    d.code = j.getCode();
-                    d.message = j.getMessage(null);
-                    ds.add(d);
-                }
+        var byUri = new HashMap<URI, List<org.javacs.lsp.Diagnostic>>();
+        for (var j : javaDiagnostics) {
+            if (j.getSource() == null) {
+                LOG.warning("No source in warning " + j.getMessage(null));
+                continue;
             }
-            client.publishDiagnostics(new PublishDiagnosticsParams(f, ds));
+            // Check that error is in an open file
+            var uri = j.getSource().toUri();
+            if (!files.contains(uri)) {
+                LOG.warning(
+                        String.format(
+                                "Skipped error at %s(%d,%d) because that file isn't open",
+                                uri, j.getLineNumber(), j.getColumnNumber()));
+                continue;
+            }
+            // Find start and end position
+            var content = contents(uri).content;
+            var start = position(content, j.getStartPosition());
+            var end = position(content, j.getEndPosition());
+            var d = new org.javacs.lsp.Diagnostic();
+            d.severity = severity(j.getKind());
+            d.range = new Range(start, end);
+            d.code = j.getCode();
+            d.message = j.getMessage(null);
+            // Add to byUri
+            var ds = byUri.computeIfAbsent(uri, __ -> new ArrayList<>());
+            ds.add(d);
+        }
+
+        for (var f : files) {
+            var ds = byUri.getOrDefault(f, List.of());
+            var message = new PublishDiagnosticsParams(f, ds);
+            client.publishDiagnostics(message);
         }
     }
 
@@ -121,7 +132,8 @@ class JavaLanguageServer extends LanguageServer {
             message.add(name.toString());
         }
         LOG.info("Lint " + message);
-        publishDiagnostics(uris, compiler.compileBatch(uris).lint());
+        var messages = compiler.reportErrors(uris);
+        publishDiagnostics(uris, messages);
     }
 
     private static final Gson gson = new Gson();
@@ -1045,7 +1057,11 @@ class JavaLanguageServer extends LanguageServer {
         var hasError = new ArrayList<URI>();
         var wrongSig = new ArrayList<URI>();
         for (var p : possible) {
-            var i = index.getOrDefault(p, Index.EMPTY);
+            if (!index.containsKey(p)) {
+                outOfDate.add(p);
+                continue;
+            }
+            var i = index.get(p);
             var modified = Instant.ofEpochMilli(new File(p).lastModified());
             // TODO can modified rewind when you checkout a branch?
             if (modified.isAfter(i.modified)) outOfDate.add(p);
@@ -1054,13 +1070,14 @@ class JavaLanguageServer extends LanguageServer {
         }
         if (outOfDate.size() > 0) LOG.info(String.format("... %d files are out-of-date", outOfDate.size()));
         if (hasError.size() > 0) LOG.info(String.format("... %d files contain errors", hasError.size()));
-        if (hasError.size() > 0)
+        if (wrongSig.size() > 0)
             LOG.info(String.format("... %d files refer to methods that have changed", wrongSig.size()));
 
         // If there's nothing to update, return
         var needsUpdate = new ArrayList<URI>();
         needsUpdate.addAll(outOfDate);
         needsUpdate.addAll(hasError);
+        needsUpdate.addAll(wrongSig);
         if (needsUpdate.isEmpty()) return;
 
         // If there's more than 1 file, report progress
@@ -1091,6 +1108,10 @@ class JavaLanguageServer extends LanguageServer {
         // Assemble results
         var result = new HashMap<Ptr, Integer>();
         for (var p : possible) {
+            if (!index.containsKey(p)) {
+                LOG.warning("Did not index " + p);
+                continue;
+            }
             var i = index.get(p);
             for (var r : i.refs) {
                 var count = result.getOrDefault(r, 0);

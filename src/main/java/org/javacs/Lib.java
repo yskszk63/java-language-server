@@ -1,5 +1,6 @@
 package org.javacs;
 
+import java.io.File;
 import java.nio.file.*;
 
 class Lib {
@@ -13,5 +14,13 @@ class Lib {
 
     static final Path SRC_ZIP = installRoot().resolve("lib/src.zip");
 
-    static final Path ERROR_PRONE = installRoot().resolve("lib/error_prone.jar");
+    static final String ERROR_PRONE = findErrorProne();
+
+    private static String findErrorProne() {
+        var dataflow = installRoot().resolve("lib/error_prone/dataflow.jar").toString();
+        var errorProne = installRoot().resolve("lib/error_prone/error_prone.jar").toString();
+        var javacUtil = installRoot().resolve("lib/error_prone/javacutil.jar").toString();
+        var jFormatString = installRoot().resolve("lib/error_prone/jFormatString.jar").toString();
+        return String.join(File.pathSeparator, dataflow, errorProne, javacUtil, jFormatString);
+    }
 }

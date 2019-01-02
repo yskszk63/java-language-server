@@ -278,10 +278,25 @@ public class JavaCompilerServiceTest {
     }
 
     @Test
-    public void lint() {
+    public void reportErrors() {
         var uri = resourceUri("HasError.java");
         var files = Collections.singleton(uri);
-        var diags = compiler.compileBatch(files).lint();
+        var diags = compiler.reportErrors(files);
+        assertThat(diags, not(empty()));
+    }
+
+    @Test
+    public void errorProne() {
+        var uri = resourceUri("ErrorProne.java");
+        var files = Collections.singleton(uri);
+        var diags = compiler.reportErrors(files);
+        for (var d : diags) {
+            var file = d.getSource().toUri().getPath();
+            var line = d.getLineNumber();
+            var kind = d.getKind();
+            var msg = d.getMessage(null);
+            System.out.println(String.format("%s(%d)\t%s\t%s", file, line, kind, msg));
+        }
         assertThat(diags, not(empty()));
     }
 

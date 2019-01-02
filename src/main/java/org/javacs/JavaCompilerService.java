@@ -153,6 +153,33 @@ public class JavaCompilerService {
         return new CompileBatch(this, list, progress);
     }
 
+    public List<Diagnostic<? extends JavaFileObject>> reportErrors(Collection<URI> uris) {
+        var options = options(sourcePath, classPath);
+        // Add error-prone
+        Collections.addAll(options, "-XDcompilePolicy=byfile");
+        Collections.addAll(options, "-processorpath", Lib.ERROR_PRONE);
+        Collections.addAll(options, "-Xplugin:ErrorProne -XepAllErrorsAsWarnings --illegal-access=warn");
+        // Construct list of sources
+        var files = new ArrayList<File>();
+        for (var p : uris) files.add(new File(p));
+        var sources = fileManager.getJavaFileObjectsFromFiles(files);
+        // Create task
+        var task =
+                (JavacTask) compiler.getTask(null, fileManager, diags::add, options, Collections.emptyList(), sources);
+        // Print timing information for optimization
+        var profiler = new Profiler();
+        task.addTaskListener(profiler);
+        // Run compilation
+        try {
+            task.analyze();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        profiler.print();
+
+        return Collections.unmodifiableList(new ArrayList<>(diags));
+    }
+
     static boolean containsImport(String toPackage, String toClass, Path file) {
         if (toPackage.isEmpty()) return true;
         var samePackage = Pattern.compile("^package +" + toPackage + ";");

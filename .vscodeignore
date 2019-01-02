@@ -22,7 +22,10 @@ images/**
 modules/**
 jdks/**
 !lib/src.zip
-!lib/error_prone.jar
+!lib/error_prone/dataflow.jar
+!lib/error_prone/error_prone.jar
+!lib/error_prone/javacutil.jar
+!lib/error_prone/jFormatString.jar
 !lib/java.tmLanguage.json
 !lib/java.hover.tmLanguage.json
 

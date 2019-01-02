@@ -71,7 +71,6 @@ public class CompileBatch {
         // Compile all roots
         try {
             for (var t : task.parse()) roots.add(t);
-            task.analyze();
             // The results of task.analyze() are unreliable when errors are present
             // You can get at `Element` values using `Trees`
             task.analyze();
@@ -106,10 +105,6 @@ public class CompileBatch {
 
     public Optional<TreePath> path(Element e) {
         return Optional.ofNullable(trees.getPath(e));
-    }
-
-    public List<Diagnostic<? extends JavaFileObject>> lint() {
-        return Collections.unmodifiableList(new ArrayList<>(parent.diags));
     }
 
     public List<TreePath> references(Element to) {
