@@ -18,9 +18,3 @@
 
 ## Polish
 - Show warning for unused local var, unused private method
-- Use cached codelens during parse errors to prevent things from jumping around, or codelens-on-save
-- Suppress references codelens for inherited methods
-- Don't remove imports when there's an unresolved reference to that name
-
-## JShell
-- Support .jshell extension as "scratch pad"

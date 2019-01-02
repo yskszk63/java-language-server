@@ -1152,24 +1152,8 @@ class JavaLanguageServer extends LanguageServer {
         var uri = URI.create(uriString);
         var line = data.get(2).getAsInt() + 1;
         var character = data.get(3).getAsInt() + 1;
-        // Find the element being referenced
-        // TODO only update code lenses when file is saved, then return these lenses from cache
-        updateHoverCache(uri, contents(uri).content);
-        var el = hoverCache.element(line, character);
-        if (el.isEmpty()) {
-            LOG.warning(String.format("No element to resolve code lens at %s(%d,%d)", uri.getPath(), line, character));
-            // TODO this causes <<MISSING COMMAND>> to appear
-            return unresolved;
-        }
-        var ptr = new Ptr(el.get());
-        // Update cache if necessary
-        updateCacheCountReferences(uri);
-        // Read reference count from cache
-        var count = cacheCountReferences.getOrDefault(ptr, 0);
         // Update command
-        String title;
-        if (count == 1) title = "1 reference";
-        else title = String.format("%d references", count);
+        var title = countReferencesTitle(uri, line, character);
         var arguments = new JsonArray();
         arguments.add(uri.toString());
         arguments.add(line - 1);
@@ -1177,6 +1161,23 @@ class JavaLanguageServer extends LanguageServer {
         unresolved.command = new Command(title, command, arguments);
 
         return unresolved;
+    }
+
+    private String countReferencesTitle(URI uri, int line, int character) {
+        updateHoverCache(uri, contents(uri).content);
+        var el = hoverCache.element(line, character);
+        if (el.isEmpty()) {
+            LOG.warning(String.format("No element to resolve code lens at %s(%d,%d)", uri.getPath(), line, character));
+            return "? references";
+        }
+        var ptr = new Ptr(el.get());
+        // Update cache if necessary
+        updateCacheCountReferences(uri);
+        // Read reference count from cache
+        var count = cacheCountReferences.getOrDefault(ptr, 0);
+
+        if (count == 1) return "1 reference";
+        return String.format("%d references", count);
     }
 
     @Override
