@@ -92,6 +92,10 @@ public class LanguageServer {
         throw new RuntimeException("Unimplemented");
     }
 
+    public Optional<RenameResponse> prepareRename(TextDocumentPositionParams params) {
+        throw new RuntimeException("Unimplemented");
+    }
+
     public WorkspaceEdit rename(RenameParams params) {
         throw new RuntimeException("Unimplemented");
     }

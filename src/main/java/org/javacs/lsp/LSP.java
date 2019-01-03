@@ -382,6 +382,13 @@ public class LSP {
                             respond(send, r.id, response);
                             break;
                         }
+                    case "textDocument/prepareRename":
+                        {
+                            var params = gson.fromJson(r.params, TextDocumentPositionParams.class);
+                            var response = server.prepareRename(params);
+                            respond(send, r.id, response);
+                            break;
+                        }
                     case "textDocument/rename":
                         {
                             var params = gson.fromJson(r.params, RenameParams.class);
