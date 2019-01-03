@@ -107,4 +107,8 @@ public class LanguageServer {
     public List<FoldingRange> foldingRange(FoldingRangeParams params) {
         throw new RuntimeException("Unimplemented");
     }
+
+    public List<DocumentLink> documentLink(DocumentLinkParams params) {
+        throw new RuntimeException("Unimplemented");
+    }
 }

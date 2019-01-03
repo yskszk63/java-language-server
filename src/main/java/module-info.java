@@ -6,4 +6,6 @@ open module javacs {
     requires gson;
 
     uses javax.tools.JavaCompiler;
+
+    exports org.javacs.lsp;
 }

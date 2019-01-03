@@ -268,6 +268,13 @@ public class LSP {
                             respond(send, r.id, response);
                             break;
                         }
+                    case "textDocument/documentLink":
+                        {
+                            var params = gson.fromJson(r.params, DocumentLinkParams.class);
+                            var response = server.documentLink(params);
+                            respond(send, r.id, response);
+                            break;
+                        }
                     case "textDocument/didOpen":
                         {
                             var params = gson.fromJson(r.params, DidOpenTextDocumentParams.class);
