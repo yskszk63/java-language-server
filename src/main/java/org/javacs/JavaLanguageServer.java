@@ -756,9 +756,9 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     @Override
-    public List<Location> gotoDefinition(TextDocumentPositionParams position) {
+    public Optional<List<Location>> gotoDefinition(TextDocumentPositionParams position) {
         var fromUri = position.textDocument.uri;
-        if (!isJavaFile(fromUri)) return List.of();
+        if (!isJavaFile(fromUri)) return Optional.empty();
         var fromLine = position.position.line + 1;
         var fromColumn = position.position.character + 1;
         var fromContent = contents(fromUri).content;
@@ -769,12 +769,12 @@ class JavaLanguageServer extends LanguageServer {
         var toEl = hoverCache.element(fromLine, fromColumn);
         if (!toEl.isPresent()) {
             LOG.info(String.format("...no element at cursor"));
-            return List.of();
+            return Optional.empty();
         }
 
         // Compile all files that *might* contain definitions of fromEl
         var toFiles = compiler.potentialDefinitions(toEl.get());
-        if (toFiles.isEmpty()) return List.of();
+        if (toFiles.isEmpty()) return Optional.of(List.of());
         var batch = compiler.compileBatch(latestText(toFiles));
 
         // Find fromEl again, so that we have an Element from the current batch
@@ -782,8 +782,9 @@ class JavaLanguageServer extends LanguageServer {
 
         // Find all definitions of fromElAgain
         var toTreePaths = batch.definitions(fromElAgain);
+        if (toTreePaths.isEmpty()) return Optional.empty();
         var result = new ArrayList<Location>();
-        for (var path : toTreePaths) {
+        for (var path : toTreePaths.get()) {
             var toUri = path.getCompilationUnit().getSourceFile().toUri();
             var toRange = batch.range(path);
             if (!toRange.isPresent()) {
@@ -793,7 +794,7 @@ class JavaLanguageServer extends LanguageServer {
             var from = new Location(toUri, toRange.get());
             result.add(from);
         }
-        return result;
+        return Optional.of(result);
     }
 
     class Progress implements ReportProgress, AutoCloseable {
@@ -825,9 +826,9 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     @Override
-    public List<Location> findReferences(ReferenceParams position) {
+    public Optional<List<Location>> findReferences(ReferenceParams position) {
         var toUri = position.textDocument.uri;
-        if (!isJavaFile(toUri)) return List.of();
+        if (!isJavaFile(toUri)) return Optional.empty();
         var toLine = position.position.line + 1;
         var toColumn = position.position.character + 1;
         var toContent = contents(toUri).content;
@@ -838,12 +839,12 @@ class JavaLanguageServer extends LanguageServer {
         var toEl = hoverCache.element(toLine, toColumn);
         if (!toEl.isPresent()) {
             LOG.warning("...no element under cursor");
-            return List.of();
+            return Optional.empty();
         }
 
         // Compile all files that *might* contain references to toEl
         var fromFiles = compiler.potentialReferences(toEl.get());
-        if (fromFiles.isEmpty()) return List.of();
+        if (fromFiles.isEmpty()) return Optional.of(List.of());
         var batch = compiler.compileBatch(latestText(fromFiles));
 
         // Find toEl again, so that we have an Element from the current batch
@@ -852,8 +853,9 @@ class JavaLanguageServer extends LanguageServer {
         // Find all references to toElAgain
         // TODO this should references to supers of toEl
         var fromTreePaths = batch.references(toElAgain);
+        if (fromTreePaths.isEmpty()) return Optional.empty();
         var result = new ArrayList<Location>();
-        for (var path : fromTreePaths) {
+        for (var path : fromTreePaths.get()) {
             var fromUri = path.getCompilationUnit().getSourceFile().toUri();
             var fromRange = batch.range(path);
             if (!fromRange.isPresent()) {
@@ -863,7 +865,7 @@ class JavaLanguageServer extends LanguageServer {
             var from = new Location(fromUri, fromRange.get());
             result.add(from);
         }
-        return result;
+        return Optional.of(result);
     }
 
     private List<JavaFileObject> latestText(List<URI> files) {

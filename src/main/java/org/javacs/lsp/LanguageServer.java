@@ -64,11 +64,11 @@ public class LanguageServer {
         throw new RuntimeException("Unimplemented");
     }
 
-    public List<Location> gotoDefinition(TextDocumentPositionParams params) {
+    public Optional<List<Location>> gotoDefinition(TextDocumentPositionParams params) {
         throw new RuntimeException("Unimplemented");
     }
 
-    public List<Location> findReferences(ReferenceParams params) {
+    public Optional<List<Location>> findReferences(ReferenceParams params) {
         throw new RuntimeException("Unimplemented");
     }
 

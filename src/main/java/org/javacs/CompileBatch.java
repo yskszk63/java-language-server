@@ -99,12 +99,12 @@ public class CompileBatch {
         throw new RuntimeException("File " + uri + " isn't in batch " + roots);
     }
 
-    public List<TreePath> definitions(Element el) {
+    public Optional<List<TreePath>> definitions(Element el) {
         LOG.info(String.format("Search for definitions of `%s` in %d files...", el, roots.size()));
 
         if (el.asType().getKind() == TypeKind.ERROR) {
             LOG.info(String.format("...`%s` is an error type, giving up", el.asType()));
-            return List.of();
+            return Optional.empty();
         }
 
         var refs = new ArrayList<TreePath>();
@@ -172,15 +172,15 @@ public class CompileBatch {
         for (var r : roots) {
             finder.scan(r, null);
         }
-        return refs;
+        return Optional.of(refs);
     }
 
-    public List<TreePath> references(Element to) {
+    public Optional<List<TreePath>> references(Element to) {
         LOG.info(String.format("Search for references to `%s` in %d files...", to, roots.size()));
 
         if (to.asType().getKind() == TypeKind.ERROR) {
             LOG.info(String.format("...`%s` is an error type, giving up", to.asType()));
-            return List.of();
+            return Optional.empty();
         }
 
         var refs = new ArrayList<TreePath>();
@@ -254,7 +254,7 @@ public class CompileBatch {
         for (var r : roots) {
             finder.scan(r, null);
         }
-        return refs;
+        return Optional.of(refs);
     }
 
     public Map<URI, Index> countReferences() {

@@ -21,7 +21,7 @@ public class FindReferencesTest {
         params.textDocument = new TextDocumentIdentifier(uri);
         params.position = new Position(row - 1, column - 1);
 
-        var locations = server.findReferences(params);
+        var locations = server.findReferences(params).orElse(List.of());
         var strings = new ArrayList<String>();
         for (var l : locations) {
             var fileName = Parser.fileName(l.uri);

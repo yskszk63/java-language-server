@@ -171,7 +171,7 @@ public class GotoTest {
         p.textDocument = document;
         p.position = position;
 
-        var locations = server.gotoDefinition(p);
+        var locations = server.gotoDefinition(p).orElse(List.of());
         var strings = new ArrayList<String>();
         for (var l : locations) {
             var fileName = Paths.get(l.uri).getFileName();
