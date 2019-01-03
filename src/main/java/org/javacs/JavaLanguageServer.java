@@ -774,6 +774,7 @@ class JavaLanguageServer extends LanguageServer {
 
         // Figure out what file toEl is declared in
         LOG.info(String.format("...looking for definition of `%s`", toEl.get()));
+        // TODO this should include overrides of toEl
         var toUri = hoverCache.declaringFile(toEl.get());
         if (!toUri.isPresent()) {
             LOG.info(String.format("...couldn't find declaring file, giving up"));
@@ -855,19 +856,30 @@ class JavaLanguageServer extends LanguageServer {
     public List<Location> findReferences(ReferenceParams position) {
         var toUri = position.textDocument.uri;
         if (!isJavaFile(toUri)) return List.of();
-        var toContent = contents(toUri).content;
-        updateHoverCache(toUri, toContent);
         var toLine = position.position.line + 1;
         var toColumn = position.position.character + 1;
+        var toContent = contents(toUri).content;
+
+        // Compile from-file and identify element under cursor
+        LOG.warning(String.format("Looking for references to %s(%d,%d)...", toUri.getPath(), toLine, toColumn));
+        updateHoverCache(toUri, toContent);
         var toEl = hoverCache.element(toLine, toColumn);
         if (!toEl.isPresent()) {
-            LOG.warning(String.format("No element under cursor %s(%d,%d)", toUri.getPath(), toLine, toColumn));
+            LOG.warning("...no element under cursor");
             return List.of();
         }
+
+        // Compile all files that *might* contain references to toEl
         var fromFiles = compiler.potentialReferences(toEl.get());
         if (fromFiles.isEmpty()) return List.of();
         var batch = compiler.compileBatch(fromFiles);
-        var fromTreePaths = batch.references(toEl.get()); // Why does this work? These are two different batches
+
+        // Find toEl again, so that we have an Element from the current batch
+        var toElAgain = batch.element(toUri, toLine, toColumn).get();
+
+        // Find all references to toElAgain
+        // TODO this should references to supers of toEl
+        var fromTreePaths = batch.references(toElAgain);
         var result = new ArrayList<Location>();
         for (var path : fromTreePaths) {
             var fromUri = path.getCompilationUnit().getSourceFile().toUri();
@@ -1348,8 +1360,13 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     @Override
+    public Optional<RenameResponse> prepareRename(TextDocumentPositionParams params) {
+        throw new RuntimeException("TODO");
+    }
+
+    @Override
     public WorkspaceEdit rename(RenameParams params) {
-        return null; // TODO
+        throw new RuntimeException("TODO");
     }
 
     private boolean isJavaFile(URI uri) {
