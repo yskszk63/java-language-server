@@ -24,7 +24,7 @@ public class CompileBatch {
     private final Types types;
     private final List<CompilationUnitTree> roots;
 
-    CompileBatch(JavaCompilerService parent, Collection<JavaFileObject> files, ReportProgress progress) {
+    CompileBatch(JavaCompilerService parent, Collection<? extends JavaFileObject> files, ReportProgress progress) {
         this.parent = parent;
         this.progress = progress;
         this.task = batchTask(parent, files);
@@ -75,7 +75,7 @@ public class CompileBatch {
         profiler.print();
     }
 
-    static JavacTask batchTask(JavaCompilerService parent, Collection<JavaFileObject> sources) {
+    static JavacTask batchTask(JavaCompilerService parent, Collection<? extends JavaFileObject> sources) {
         parent.diags.clear();
         return (JavacTask)
                 parent.compiler.getTask(
@@ -98,6 +98,7 @@ public class CompileBatch {
         throw new RuntimeException("File " + uri + " isn't in batch " + roots);
     }
 
+    // TODO error is interpreted as object, which leads to "go-to-everywhere"
     public List<TreePath> definitions(Element el) {
         LOG.info(String.format("Search for definitions of `%s` in %d files...", el, roots.size()));
 
@@ -151,7 +152,6 @@ public class CompileBatch {
         var finder = new FindDefinitions();
         for (var r : roots) {
             finder.scan(r, null);
-            ;
         }
         return refs;
     }
@@ -215,7 +215,6 @@ public class CompileBatch {
         var finder = new FindReferences();
         for (var r : roots) {
             finder.scan(r, null);
-            ;
         }
         return refs;
     }

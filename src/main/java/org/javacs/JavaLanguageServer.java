@@ -775,7 +775,7 @@ class JavaLanguageServer extends LanguageServer {
         // Compile all files that *might* contain definitions of fromEl
         var toFiles = compiler.potentialDefinitions(toEl.get());
         if (toFiles.isEmpty()) return List.of();
-        var batch = compiler.compileBatch(toFiles);
+        var batch = compiler.compileBatch(latestText(toFiles));
 
         // Find fromEl again, so that we have an Element from the current batch
         var fromElAgain = batch.element(fromUri, fromLine, fromColumn).get();
@@ -844,7 +844,7 @@ class JavaLanguageServer extends LanguageServer {
         // Compile all files that *might* contain references to toEl
         var fromFiles = compiler.potentialReferences(toEl.get());
         if (fromFiles.isEmpty()) return List.of();
-        var batch = compiler.compileBatch(fromFiles);
+        var batch = compiler.compileBatch(latestText(fromFiles));
 
         // Find toEl again, so that we have an Element from the current batch
         var toElAgain = batch.element(toUri, toLine, toColumn).get();
@@ -864,6 +864,14 @@ class JavaLanguageServer extends LanguageServer {
             result.add(from);
         }
         return result;
+    }
+
+    private List<JavaFileObject> latestText(List<URI> files) {
+        var sources = new ArrayList<JavaFileObject>();
+        for (var f : files) {
+            sources.add(new StringFileObject(contents(f).content, f));
+        }
+        return sources;
     }
 
     private ParseFile cacheParse;

@@ -132,16 +132,8 @@ public class JavaCompilerService {
         return new CompileBatch(this, list, progress);
     }
 
-    public CompileBatch compileBatch(Map<URI, String> sources) {
-        return compileBatch(sources, ReportProgress.EMPTY);
-    }
-
-    public CompileBatch compileBatch(Map<URI, String> sources, ReportProgress progress) {
-        var list = new ArrayList<JavaFileObject>();
-        for (var kv : sources.entrySet()) {
-            list.add(new StringFileObject(kv.getValue(), kv.getKey()));
-        }
-        return new CompileBatch(this, list, progress);
+    public CompileBatch compileBatch(List<? extends JavaFileObject> sources) {
+        return new CompileBatch(this, sources, ReportProgress.EMPTY);
     }
 
     public List<Diagnostic<? extends JavaFileObject>> reportErrors(Collection<URI> uris) {
