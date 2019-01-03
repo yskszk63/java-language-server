@@ -13,7 +13,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class LSP {
-
     private static final Gson gson = new Gson();
 
     private static String readHeader(InputStream client) {
@@ -67,9 +66,7 @@ public class LSP {
         while (true) {
             result.append(next);
             i++;
-            if (i == byteLength) {
-                break;
-            }
+            if (i == byteLength) break;
             next = read(client);
         }
         return result.toString();
@@ -80,14 +77,10 @@ public class LSP {
         while (true) {
             var line = readHeader(client);
             // If header is empty, next line is the start of the message
-            if (line.isEmpty()) {
-                return readLength(client, contentLength);
-            }
+            if (line.isEmpty()) return readLength(client, contentLength);
             // If header contains length, save it
             var maybeLength = parseHeader(line);
-            if (maybeLength != -1) {
-                contentLength = maybeLength;
-            }
+            if (maybeLength != -1) contentLength = maybeLength;
         }
     }
 
@@ -130,7 +123,6 @@ public class LSP {
     }
 
     private static class RealClient implements LanguageClient {
-
         final OutputStream send;
 
         RealClient(OutputStream send) {
@@ -171,16 +163,12 @@ public class LSP {
 
         // Read messages and process cancellations on a separate thread
         class MessageReader implements Runnable {
-
             void peek(Message message) {
                 if (message.method.equals("$/cancelRequest")) {
                     var params = gson.fromJson(message.params, CancelParams.class);
                     var removed = pending.removeIf(r -> r.id != null && r.id.equals(params.id));
-                    if (removed) {
-                        LOG.info(String.format("Cancelled request %d, which had not yet started", params.id));
-                    } else {
-                        LOG.info(String.format("Cannot cancel request %d because it has already started", params.id));
-                    }
+                    if (removed) LOG.info(String.format("Cancelled request %d, which had not yet started", params.id));
+                    else LOG.info(String.format("Cannot cancel request %d because it has already started", params.id));
                 }
             }
 
@@ -206,9 +194,7 @@ public class LSP {
                         peek(message);
                         pending.put(message);
                     } catch (EndOfStream __) {
-                        if (kill()) {
-                            return;
-                        }
+                        if (kill()) return;
                     } catch (Exception e) {
                         LOG.log(Level.SEVERE, e.getMessage(), e);
                     }
@@ -232,9 +218,7 @@ public class LSP {
                     break processMessages;
                 }
                 // If poll(_) failed, loop again
-                if (r == null) {
-                    continue;
-                }
+                if (r == null) continue;
                 // Otherwise, process the new message
                 switch (r.method) {
                     case "initialize":
