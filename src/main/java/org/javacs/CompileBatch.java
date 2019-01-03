@@ -7,28 +7,21 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.element.*;
-import javax.tools.Diagnostic;
-import javax.tools.JavaFileObject;
-import org.javacs.lsp.*;
+import javax.lang.model.util.*;
+import javax.tools.*;
+import org.javacs.lsp.Range;
 
 public class CompileBatch {
     private final JavaCompilerService parent;
     private final ReportProgress progress;
     private final JavacTask task;
     private final Trees trees;
+    private final Elements elements;
+    private final Types types;
     private final List<CompilationUnitTree> roots;
 
     CompileBatch(JavaCompilerService parent, Collection<JavaFileObject> files, ReportProgress progress) {
@@ -36,6 +29,8 @@ public class CompileBatch {
         this.progress = progress;
         this.task = batchTask(parent, files);
         this.trees = Trees.instance(task);
+        this.elements = task.getElements();
+        this.types = task.getTypes();
         this.roots = new ArrayList<CompilationUnitTree>();
         // Print timing information for optimization
         var profiler = new Profiler();
@@ -103,18 +98,126 @@ public class CompileBatch {
         throw new RuntimeException("File " + uri + " isn't in batch " + roots);
     }
 
-    public Optional<TreePath> path(Element e) {
-        return Optional.ofNullable(trees.getPath(e));
+    public List<TreePath> definitions(Element el) {
+        LOG.info(String.format("Search for definitions of `%s` in %d files...", el, roots.size()));
+
+        var refs = new ArrayList<TreePath>();
+        class FindDefinitions extends TreePathScanner<Void, Void> {
+            boolean sameSymbol(Element found) {
+                return el.equals(found);
+            }
+
+            boolean isSubMethod(Element found) {
+                if (!(el instanceof ExecutableElement)) return false;
+                if (!(found instanceof ExecutableElement)) return false;
+                var superMethod = (ExecutableElement) el;
+                var subMethod = (ExecutableElement) found;
+                var subType = (TypeElement) subMethod.getEnclosingElement();
+                return elements.overrides(subMethod, superMethod, subType);
+            }
+
+            boolean isSubType(Element found) {
+                if (!(el instanceof TypeElement)) return false;
+                if (!(found instanceof TypeElement)) return false;
+                var superType = (TypeElement) el;
+                var subType = (TypeElement) found;
+                return types.isSubtype(subType.asType(), superType.asType());
+            }
+
+            void check(TreePath from) {
+                var found = trees.getElement(from);
+                var match = sameSymbol(found) || isSubMethod(found) || isSubType(found);
+                if (match) refs.add(from);
+            }
+
+            @Override
+            public Void visitClass(ClassTree t, Void __) {
+                check(getCurrentPath());
+                return super.visitClass(t, null);
+            }
+
+            @Override
+            public Void visitMethod(MethodTree t, Void __) {
+                check(getCurrentPath());
+                return super.visitMethod(t, null);
+            }
+
+            @Override
+            public Void visitVariable(VariableTree t, Void __) {
+                check(getCurrentPath());
+                return super.visitVariable(t, null);
+            }
+        }
+        var finder = new FindDefinitions();
+        for (var r : roots) {
+            finder.scan(r, null);
+            ;
+        }
+        return refs;
     }
 
     public List<TreePath> references(Element to) {
         LOG.info(String.format("Search for references to `%s` in %d files...", to, roots.size()));
 
-        var result = new ArrayList<TreePath>();
-        for (var f : roots) {
-            result.addAll(referencesToElement(f, to));
+        var refs = new ArrayList<TreePath>();
+        class FindReferences extends TreePathScanner<Void, Void> {
+            boolean sameSymbol(Element found) {
+                return to.equals(found);
+            }
+
+            boolean isSuperMethod(Element found) {
+                if (!(to instanceof ExecutableElement)) return false;
+                if (!(found instanceof ExecutableElement)) return false;
+                var subMethod = (ExecutableElement) to;
+                var subType = (TypeElement) subMethod.getEnclosingElement();
+                var superMethod = (ExecutableElement) found;
+                return elements.overrides(subMethod, superMethod, subType);
+            }
+
+            boolean isSuperType(Element found) {
+                if (!(to instanceof TypeElement)) return false;
+                if (!(found instanceof TypeElement)) return false;
+                var subType = (TypeElement) to;
+                var superType = (TypeElement) found;
+                return types.isSubtype(subType.asType(), superType.asType());
+            }
+
+            void check(TreePath from) {
+                var found = trees.getElement(from);
+                var match = sameSymbol(found) || isSuperMethod(found) || isSuperType(found);
+                if (match) refs.add(from);
+            }
+
+            @Override
+            public Void visitMemberReference(MemberReferenceTree t, Void __) {
+                check(getCurrentPath());
+                return super.visitMemberReference(t, null);
+            }
+
+            @Override
+            public Void visitMemberSelect(MemberSelectTree t, Void __) {
+                check(getCurrentPath());
+                return super.visitMemberSelect(t, null);
+            }
+
+            @Override
+            public Void visitIdentifier(IdentifierTree t, Void __) {
+                check(getCurrentPath());
+                return super.visitIdentifier(t, null);
+            }
+
+            @Override
+            public Void visitNewClass(NewClassTree t, Void __) {
+                check(getCurrentPath());
+                return super.visitNewClass(t, null);
+            }
         }
-        return result;
+        var finder = new FindReferences();
+        for (var r : roots) {
+            finder.scan(r, null);
+            ;
+        }
+        return refs;
     }
 
     public Map<URI, Index> countReferences() {
@@ -160,59 +263,10 @@ public class CompileBatch {
         return Objects.equals(Objects.toString(left, ""), Objects.toString(right, ""));
     }
 
-    private boolean sameSymbol(Element from, Element to) {
-        return to != null
-                && from != null
-                && toStringEquals(to.getEnclosingElement(), from.getEnclosingElement())
-                && toStringEquals(to, from);
-    }
-
     private static boolean isField(Element to) {
         if (!(to instanceof VariableElement)) return false;
         var field = (VariableElement) to;
         return field.getEnclosingElement() instanceof TypeElement;
-    }
-
-    private List<TreePath> referencesToElement(CompilationUnitTree root, Element to) {
-        var trees = Trees.instance(task);
-        var results = new ArrayList<TreePath>();
-        class FindReferencesElement extends TreePathScanner<Void, Void> {
-            void check(TreePath from) {
-                var found = trees.getElement(from);
-                if (sameSymbol(found, to)) {
-                    results.add(from);
-                }
-            }
-
-            @Override
-            public Void visitMemberReference(MemberReferenceTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitMemberReference(t, null);
-            }
-
-            @Override
-            public Void visitMemberSelect(MemberSelectTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitMemberSelect(t, null);
-            }
-
-            @Override
-            public Void visitIdentifier(IdentifierTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitIdentifier(t, null);
-            }
-
-            @Override
-            public Void visitNewClass(NewClassTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitNewClass(t, null);
-            }
-        }
-        new FindReferencesElement().scan(root, null);
-        LOG.info(
-                String.format(
-                        "...found %d references in %s", results.size(), Parser.fileName(root.getSourceFile().toUri())));
-        return results;
     }
 
     static List<Ptr> index(Trees trees, CompilationUnitTree root) {

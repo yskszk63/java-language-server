@@ -772,56 +772,28 @@ class JavaLanguageServer extends LanguageServer {
             return List.of();
         }
 
-        // Figure out what file toEl is declared in
-        LOG.info(String.format("...looking for definition of `%s`", toEl.get()));
-        // TODO this should include overrides of toEl
-        var toUri = hoverCache.declaringFile(toEl.get());
-        if (!toUri.isPresent()) {
-            LOG.info(String.format("...couldn't find declaring file, giving up"));
-            return List.of();
-        }
-        if (!isJavaFile(toUri.get())) {
-            LOG.info(String.format("...declaring file %s isn't a .java file", toUri));
-            return List.of();
-        }
+        // Compile all files that *might* contain definitions of fromEl
+        var toFiles = compiler.potentialDefinitions(toEl.get());
+        if (toFiles.isEmpty()) return List.of();
+        var batch = compiler.compileBatch(toFiles);
 
-        // Compile fromUri and toUri together
-        Optional<Range> toRange;
-        if (toUri.get().equals(fromUri)) {
-            LOG.info("...definition is in the same file, using cached compilation");
+        // Find fromEl again, so that we have an Element from the current batch
+        var fromElAgain = batch.element(fromUri, fromLine, fromColumn).get();
 
-            var toPath = hoverCache.path(toEl.get());
-            if (!toPath.isPresent()) {
-                LOG.warning(String.format("...couldn't locate `%s` in %s", toEl, toUri.get()));
-                return List.of();
-            }
-            toRange = hoverCache.range(toPath.get());
+        // Find all definitions of fromElAgain
+        var toTreePaths = batch.definitions(fromElAgain);
+        var result = new ArrayList<Location>();
+        for (var path : toTreePaths) {
+            var toUri = path.getCompilationUnit().getSourceFile().toUri();
+            var toRange = batch.range(path);
             if (!toRange.isPresent()) {
-                LOG.info(String.format("...couldn't find `%s` in %s", toPath.get(), toUri));
-                return List.of();
+                LOG.warning(String.format("Couldn't locate `%s`", path.getLeaf()));
+                continue;
             }
-        } else {
-            LOG.info(
-                    String.format(
-                            "...compiling %s and %s together", Parser.fileName(fromUri), Parser.fileName(toUri.get())));
-
-            var both = Map.of(fromUri, contents(fromUri).content, toUri.get(), contents(toUri.get()).content);
-            var batch = compiler.compileBatch(both);
-            var toElAgain = batch.element(fromUri, fromLine, fromColumn).get();
-            var toPath = batch.path(toElAgain);
-            if (!toPath.isPresent()) {
-                LOG.warning(String.format("...couldn't locate `%s` in %s", toEl, toUri.get()));
-                return List.of();
-            }
-            toRange = batch.range(toPath.get());
-            if (!toRange.isPresent()) {
-                LOG.info(String.format("...couldn't find `%s` in %s", toPath.get(), toUri));
-                return List.of();
-            }
+            var from = new Location(toUri, toRange.get());
+            result.add(from);
         }
-
-        var to = new Location(toUri.get(), toRange.get());
-        return List.of(to);
+        return result;
     }
 
     class Progress implements ReportProgress, AutoCloseable {

@@ -36,6 +36,7 @@ class Profiler implements TaskListener {
             var s = elapsed.getSeconds() + elapsed.getNano() / 1000.0 / 1000.0 / 1000.0;
             lines.add(String.format("%s: %.3fs", k, s));
         }
+        // TODO log names if n is small
         LOG.info(String.format("Compiled %d files: %s", files.size(), lines));
     }
 

@@ -200,8 +200,20 @@ public class JavaCompilerService {
         return Parser.containsWord(file, name);
     }
 
+    public List<URI> potentialDefinitions(Element to) {
+        // TODO only methods and types can have multiple definitions
+        // TODO reduce number of files we need to check by parsing and eliminating more cases
+        return matchesName(to);
+    }
+
     // TODO should probably cache this
     public List<URI> potentialReferences(Element to) {
+        // TODO only methods and types can have multiple definitions
+        // TODO reduce number of files we need to check by parsing and eliminating more cases
+        return matchesName(to);
+    }
+
+    private List<URI> matchesName(Element to) {
         LOG.info(String.format("Find potential references to `%s`...", to));
 
         // Check all files on source path

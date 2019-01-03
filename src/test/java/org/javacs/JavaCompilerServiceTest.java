@@ -226,49 +226,6 @@ public class JavaCompilerServiceTest {
         assertThat(names, hasItem("concurrent"));
     }
 
-    /*
-    @Test
-    public void gotoDefinition() {
-        var def =
-                compiler.definition("/GotoDefinition.java";
-        assertTrue(def.isPresent());
-
-        var t = def.get();
-        var unit = t.getCompilationUnit();
-        assertThat(unit.getSourceFile().getName(), endsWith("GotoDefinition.java"));
-
-        var trees = compiler.trees();
-        var pos = trees.getSourcePositions();
-        var lines = unit.getLineMap();
-        long start = pos.getStartPosition(unit, t.getLeaf());
-        long line = lines.getLineNumber(start);
-        assertThat(line, equalTo(6L));
-    }
-    */
-
-    @Test
-    public void references() {
-        var file = "GotoDefinition.java";
-        var to = compiler.compileFocus(resourceUri(file), contents(file), 6, 13).element();
-        var possible = compiler.potentialReferences(to);
-        assertThat(
-                "GotoDefinition.java can have references to itself",
-                possible,
-                hasItem(hasToString(endsWith("/GotoDefinition.java"))));
-
-        var batch = compiler.compileBatch(possible);
-        var refs = batch.references(to);
-        var stringify = new ArrayList<String>();
-        for (var r : refs) {
-            var uri = r.getCompilationUnit().getSourceFile().toUri();
-            var fileName = Paths.get(uri).getFileName();
-            var range = batch.range(r).get();
-            stringify.add(String.format("%s:%d", fileName, range.start.line + 1));
-        }
-        assertThat(stringify, hasItem("GotoDefinition.java:3"));
-        assertThat(stringify, not(hasItem("GotoDefinition.java:6")));
-    }
-
     @Test
     public void overloads() {
         var uri = resourceUri("Overloads.java");

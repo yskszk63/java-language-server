@@ -37,6 +37,12 @@ public class FindReferencesTest {
     }
 
     @Test
+    public void findInterfaceReference() {
+        assertThat(
+                items("/org/javacs/example/GotoImplementation.java", 14, 26), contains("GotoImplementation.java(5)"));
+    }
+
+    @Test
     public void findConstructorReferences() {
         assertThat(items("/org/javacs/example/ConstructorRefs.java", 4, 10), contains("ConstructorRefs.java(9)"));
     }
