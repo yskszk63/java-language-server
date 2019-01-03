@@ -147,6 +147,13 @@ public class GotoTest {
         assertThat(doGoto(file, 5, 18), hasItems("GotoImplementation.java:9", "GotoImplementation.java:14"));
     }
 
+    @Test
+    public void gotoError() {
+        String file = "/org/javacs/example/GotoError.java";
+
+        assertThat(doGoto(file, 5, 22), empty());
+    }
+
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     private List<String> doGoto(String file, int row, int column) {

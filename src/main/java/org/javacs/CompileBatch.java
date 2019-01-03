@@ -11,6 +11,7 @@ import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.element.*;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.util.*;
 import javax.tools.*;
 import org.javacs.lsp.Range;
@@ -98,14 +99,24 @@ public class CompileBatch {
         throw new RuntimeException("File " + uri + " isn't in batch " + roots);
     }
 
-    // TODO error is interpreted as object, which leads to "go-to-everywhere"
     public List<TreePath> definitions(Element el) {
         LOG.info(String.format("Search for definitions of `%s` in %d files...", el, roots.size()));
+
+        if (el.asType().getKind() == TypeKind.ERROR) {
+            LOG.info(String.format("...`%s` is an error type, giving up", el.asType()));
+            return List.of();
+        }
 
         var refs = new ArrayList<TreePath>();
         class FindDefinitions extends TreePathScanner<Void, Void> {
             boolean sameSymbol(Element found) {
-                return el.equals(found);
+                if (el.equals(found)) {
+                    var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
+                    var fileName = Parser.fileName(uri);
+                    LOG.info(String.format("...%s is in %s", found, fileName));
+                    return true;
+                }
+                return false;
             }
 
             boolean isSubMethod(Element found) {
@@ -114,7 +125,11 @@ public class CompileBatch {
                 var superMethod = (ExecutableElement) el;
                 var subMethod = (ExecutableElement) found;
                 var subType = (TypeElement) subMethod.getEnclosingElement();
-                return elements.overrides(subMethod, superMethod, subType);
+                if (elements.overrides(subMethod, superMethod, subType)) {
+                    LOG.info(String.format("...`%s.%s` overrides `%s`", subType, subMethod, superMethod));
+                    return true;
+                }
+                return false;
             }
 
             boolean isSubType(Element found) {
@@ -122,7 +137,11 @@ public class CompileBatch {
                 if (!(found instanceof TypeElement)) return false;
                 var superType = (TypeElement) el;
                 var subType = (TypeElement) found;
-                return types.isSubtype(subType.asType(), superType.asType());
+                if (types.isSubtype(subType.asType(), superType.asType())) {
+                    LOG.info(String.format("...`%s` overrides `%s`", subType, superType));
+                    return true;
+                }
+                return false;
             }
 
             void check(TreePath from) {
@@ -159,10 +178,21 @@ public class CompileBatch {
     public List<TreePath> references(Element to) {
         LOG.info(String.format("Search for references to `%s` in %d files...", to, roots.size()));
 
+        if (to.asType().getKind() == TypeKind.ERROR) {
+            LOG.info(String.format("...`%s` is an error type, giving up", to.asType()));
+            return List.of();
+        }
+
         var refs = new ArrayList<TreePath>();
         class FindReferences extends TreePathScanner<Void, Void> {
             boolean sameSymbol(Element found) {
-                return to.equals(found);
+                if (to.equals(found)) {
+                    var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
+                    var fileName = Parser.fileName(uri);
+                    LOG.info(String.format("...%s is in %s", found, fileName));
+                    return true;
+                }
+                return false;
             }
 
             boolean isSuperMethod(Element found) {
@@ -171,7 +201,11 @@ public class CompileBatch {
                 var subMethod = (ExecutableElement) to;
                 var subType = (TypeElement) subMethod.getEnclosingElement();
                 var superMethod = (ExecutableElement) found;
-                return elements.overrides(subMethod, superMethod, subType);
+                if (elements.overrides(subMethod, superMethod, subType)) {
+                    LOG.info(String.format("...`%s.%s` overrides `%s`", subType, subMethod, superMethod));
+                    return true;
+                }
+                return false;
             }
 
             boolean isSuperType(Element found) {
@@ -179,7 +213,11 @@ public class CompileBatch {
                 if (!(found instanceof TypeElement)) return false;
                 var subType = (TypeElement) to;
                 var superType = (TypeElement) found;
-                return types.isSubtype(subType.asType(), superType.asType());
+                if (types.isSubtype(subType.asType(), superType.asType())) {
+                    LOG.info(String.format("...`%s` overrides `%s`", subType, superType));
+                    return true;
+                }
+                return false;
             }
 
             void check(TreePath from) {
@@ -268,6 +306,7 @@ public class CompileBatch {
         return field.getEnclosingElement() instanceof TypeElement;
     }
 
+    // TODO what if instead we just make references really fast?
     static List<Ptr> index(Trees trees, CompilationUnitTree root) {
         var refs = new ArrayList<Ptr>();
         class IndexFile extends TreePathScanner<Void, Void> {
@@ -289,6 +328,7 @@ public class CompileBatch {
                     return Optional.empty();
                 }
                 // TODO skip anything not on source path
+                // TODO this is also a reference to a bunch of other things
                 return Optional.of(to);
             }
 
