@@ -775,14 +775,15 @@ class JavaLanguageServer extends LanguageServer {
         // Compile all files that *might* contain definitions of fromEl
         var toFiles = compiler.potentialDefinitions(toEl.get());
         if (toFiles.isEmpty()) return Optional.of(List.of());
-        var batch = compiler.compileBatch(latestText(toFiles));
+        var name = toEl.get().getSimpleName().toString();
+        var batch = compiler.compileBatch(pruneWord(toFiles, name));
 
         // Find fromEl again, so that we have an Element from the current batch
         var fromElAgain = batch.element(fromUri, fromLine, fromColumn).get();
 
         // Find all definitions of fromElAgain
         var toTreePaths = batch.definitions(fromElAgain);
-        if (toTreePaths.isEmpty()) return Optional.empty();
+        if (!toTreePaths.isPresent()) return Optional.empty();
         var result = new ArrayList<Location>();
         for (var path : toTreePaths.get()) {
             var toUri = path.getCompilationUnit().getSourceFile().toUri();
@@ -845,7 +846,8 @@ class JavaLanguageServer extends LanguageServer {
         // Compile all files that *might* contain references to toEl
         var fromFiles = compiler.potentialReferences(toEl.get());
         if (fromFiles.isEmpty()) return Optional.of(List.of());
-        var batch = compiler.compileBatch(latestText(fromFiles));
+        var name = toEl.get().getSimpleName().toString();
+        var batch = compiler.compileBatch(pruneWord(fromFiles, name));
 
         // Find toEl again, so that we have an Element from the current batch
         var toElAgain = batch.element(toUri, toLine, toColumn).get();
@@ -853,7 +855,7 @@ class JavaLanguageServer extends LanguageServer {
         // Find all references to toElAgain
         // TODO this should references to supers of toEl
         var fromTreePaths = batch.references(toElAgain);
-        if (fromTreePaths.isEmpty()) return Optional.empty();
+        if (!fromTreePaths.isPresent()) return Optional.empty();
         var result = new ArrayList<Location>();
         for (var path : fromTreePaths.get()) {
             var fromUri = path.getCompilationUnit().getSourceFile().toUri();
@@ -866,6 +868,16 @@ class JavaLanguageServer extends LanguageServer {
             result.add(from);
         }
         return Optional.of(result);
+    }
+
+    private List<JavaFileObject> pruneWord(List<URI> files, String word) {
+        var sources = new ArrayList<JavaFileObject>();
+        for (var f : files) {
+            var contents = contents(f).content;
+            var pruned = Pruner.prune(f, contents, word);
+            sources.add(new StringFileObject(pruned, f));
+        }
+        return sources;
     }
 
     private List<JavaFileObject> latestText(List<URI> files) {

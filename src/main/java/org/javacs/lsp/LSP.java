@@ -415,6 +415,7 @@ public class LSP {
                 }
             } catch (Exception e) {
                 LOG.log(Level.SEVERE, e.getMessage(), e);
+                // TODO send failure response if r was a request
             }
         }
     }

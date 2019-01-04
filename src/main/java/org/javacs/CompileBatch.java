@@ -96,7 +96,12 @@ public class CompileBatch {
                 return Optional.ofNullable(el);
             }
         }
-        throw new RuntimeException("File " + uri + " isn't in batch " + roots);
+        // Somehow, uri was not in batch
+        var names = new StringJoiner(", ");
+        for (var r : roots) {
+            names.add(Parser.fileName(r.getSourceFile().toUri()));
+        }
+        throw new RuntimeException("File " + uri + " isn't in batch " + names);
     }
 
     public Optional<List<TreePath>> definitions(Element el) {

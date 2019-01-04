@@ -16,6 +16,7 @@ class Profiler implements TaskListener {
     public void started(TaskEvent e) {
         started.put(e.getKind(), Instant.now());
         files.add(e.getSourceFile().toUri());
+        // TODO log file name when we compile something that wasn't in the batch
     }
 
     @Override

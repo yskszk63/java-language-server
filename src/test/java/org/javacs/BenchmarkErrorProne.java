@@ -20,7 +20,7 @@ import org.openjdk.jmh.annotations.*;
 @Warmup(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
-public class ErrorProneBenchmark {
+public class BenchmarkErrorProne {
     private static Path file = Paths.get(FindResource.uri("/org/javacs/example/BenchmarkStringSearch.java"));
 
     @State(Scope.Thread)

@@ -36,4 +36,11 @@ public class PrunerTest {
         var expected = contents("PruneDot_erased.java");
         assertThat(actual, equalToIgnoringWhiteSpace(expected));
     }
+
+    @Test
+    public void pruneWords() {
+        var actual = Pruner.prune(URI.create("/PruneWords.java"), contents("PruneWords.java"), "word");
+        var expected = contents("PruneWords_erased.java");
+        assertThat(actual, equalToIgnoringWhiteSpace(expected));
+    }
 }
