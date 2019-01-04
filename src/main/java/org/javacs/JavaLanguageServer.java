@@ -774,9 +774,8 @@ class JavaLanguageServer extends LanguageServer {
 
         // Compile all files that *might* contain definitions of fromEl
         var toFiles = compiler.potentialDefinitions(toEl.get());
-        if (toFiles.isEmpty()) return Optional.of(List.of());
-        var name = toEl.get().getSimpleName().toString();
-        var batch = compiler.compileBatch(pruneWord(toFiles, name));
+        toFiles.add(fromUri);
+        var batch = compiler.compileBatch(pruneWord(toFiles, toEl.get()));
 
         // Find fromEl again, so that we have an Element from the current batch
         var fromElAgain = batch.element(fromUri, fromLine, fromColumn).get();
@@ -845,9 +844,8 @@ class JavaLanguageServer extends LanguageServer {
 
         // Compile all files that *might* contain references to toEl
         var fromFiles = compiler.potentialReferences(toEl.get());
-        if (fromFiles.isEmpty()) return Optional.of(List.of());
-        var name = toEl.get().getSimpleName().toString();
-        var batch = compiler.compileBatch(pruneWord(fromFiles, name));
+        fromFiles.add(toUri);
+        var batch = compiler.compileBatch(pruneWord(fromFiles, toEl.get()));
 
         // Find toEl again, so that we have an Element from the current batch
         var toElAgain = batch.element(toUri, toLine, toColumn).get();
@@ -870,11 +868,13 @@ class JavaLanguageServer extends LanguageServer {
         return Optional.of(result);
     }
 
-    private List<JavaFileObject> pruneWord(List<URI> files, String word) {
+    private List<JavaFileObject> pruneWord(Collection<URI> files, Element el) {
+        var name = el.getSimpleName().toString();
+        if (name.equals("<init>")) name = el.getEnclosingElement().getSimpleName().toString();
         var sources = new ArrayList<JavaFileObject>();
         for (var f : files) {
             var contents = contents(f).content;
-            var pruned = Pruner.prune(f, contents, word);
+            var pruned = Pruner.prune(f, contents, name);
             sources.add(new StringFileObject(pruned, f));
         }
         return sources;

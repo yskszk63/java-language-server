@@ -2,6 +2,7 @@ package org.javacs;
 
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.MethodTree;
+import com.sun.source.tree.TypeParameterTree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.*;
 import java.io.File;
@@ -10,6 +11,7 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.*;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -171,6 +173,7 @@ public class JavaCompilerService {
         var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
         var importStatic = Pattern.compile("^import +static +" + toPackage + "\\." + toClass);
         var startOfClass = Pattern.compile("^[\\w ]*class +\\w+");
+        // TODO this needs to use open text if available
         try (var read = Files.newBufferedReader(file)) {
             while (true) {
                 var line = read.readLine();
@@ -189,20 +192,92 @@ public class JavaCompilerService {
 
     static boolean containsWord(String name, Path file) {
         if (!name.matches("\\w*")) throw new RuntimeException(String.format("`%s` is not a word", name));
+        // TODO this needs to use open text if available
         return Parser.containsWord(file, name);
     }
 
-    public List<URI> potentialDefinitions(Element to) {
+    public Set<URI> potentialDefinitions(Element to) {
+        var hasWord = matchesName(to);
+        // Parse each file and check if the syntax tree is consistent with a definition of `to`
+        // This produces some false positives, but parsing is much faster than compiling,
+        // so it's an effective optimization
+        var findName = to.getSimpleName();
+        var checkTree = new HashSet<URI>();
         // TODO only methods and types can have multiple definitions
-        // TODO reduce number of files we need to check by parsing and eliminating more cases
-        return matchesName(to);
+        // TODO this needs to use open text if available
+        Consumer<TreePathScanner<Void, Void>> scanAll =
+                visitor -> {
+                    for (var f : hasWord) {
+                        var root = Parser.parse(Paths.get(f));
+                        visitor.scan(root, null);
+                    }
+                };
+        if (to instanceof ExecutableElement) {
+            class FindMethod extends TreePathScanner<Void, Void> {
+                @Override
+                public Void visitMethod(MethodTree t, Void __) {
+                    if (t.getName().contentEquals(findName)) {
+                        var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
+                        checkTree.add(uri);
+                    }
+                    return super.visitMethod(t, null);
+                }
+            }
+            scanAll.accept(new FindMethod());
+            LOG.info(String.format("...%d files contain method `%s`", checkTree.size(), findName));
+        } else if (to instanceof TypeElement) {
+            class FindType extends TreePathScanner<Void, Void> {
+                @Override
+                public Void visitClass(ClassTree t, Void __) {
+                    if (t.getSimpleName().contentEquals(findName)) {
+                        var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
+                        checkTree.add(uri);
+                    }
+                    return super.visitClass(t, null);
+                }
+            }
+            scanAll.accept(new FindType());
+            LOG.info(String.format("...%d files contain type `%s`", checkTree.size(), findName));
+        } else if (to instanceof VariableElement) {
+            class FindVar extends TreePathScanner<Void, Void> {
+                @Override
+                public Void visitVariable(VariableTree t, Void __) {
+                    if (t.getName().contentEquals(findName)) {
+                        var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
+                        checkTree.add(uri);
+                    }
+                    return super.visitVariable(t, null);
+                }
+            }
+            scanAll.accept(new FindVar());
+            LOG.info(String.format("...%d files contain variable `%s`", checkTree.size(), findName));
+        } else if (to instanceof TypeParameterElement) {
+            class FindTypeParameter extends TreePathScanner<Void, Void> {
+                @Override
+                public Void visitTypeParameter(TypeParameterTree t, Void __) {
+                    if (t.getName().contentEquals(findName)) {
+                        var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
+                        checkTree.add(uri);
+                    }
+                    return super.visitTypeParameter(t, null);
+                }
+            }
+            scanAll.accept(new FindTypeParameter());
+            LOG.info(String.format("...%d files contain type parameter `%s`", checkTree.size(), findName));
+        } else {
+            LOG.info(String.format("...`%s` is not a method, type, variable, or type parameter", to));
+        }
+        return checkTree;
     }
 
     // TODO should probably cache this
-    public List<URI> potentialReferences(Element to) {
+    public Set<URI> potentialReferences(Element to) {
         // TODO only methods and types can have multiple definitions
         // TODO reduce number of files we need to check by parsing and eliminating more cases
-        return matchesName(to);
+        var hasWord = matchesName(to);
+        var set = new HashSet<URI>();
+        set.addAll(hasWord);
+        return set;
     }
 
     private List<URI> matchesName(Element to) {
