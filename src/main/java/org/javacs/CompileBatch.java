@@ -118,7 +118,6 @@ public class CompileBatch {
                 if (el.equals(found)) {
                     var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
                     var fileName = Parser.fileName(uri);
-                    LOG.info(String.format("...%s is in %s", found, fileName));
                     return true;
                 }
                 return false;
@@ -137,21 +136,9 @@ public class CompileBatch {
                 return false;
             }
 
-            boolean isSubType(Element found) {
-                if (!(el instanceof TypeElement)) return false;
-                if (!(found instanceof TypeElement)) return false;
-                var superType = (TypeElement) el;
-                var subType = (TypeElement) found;
-                if (types.isSubtype(subType.asType(), superType.asType())) {
-                    LOG.info(String.format("...`%s` overrides `%s`", subType, superType));
-                    return true;
-                }
-                return false;
-            }
-
             void check(TreePath from) {
                 var found = trees.getElement(from);
-                var match = sameSymbol(found) || isSubMethod(found) || isSubType(found);
+                var match = sameSymbol(found) || isSubMethod(found);
                 if (match) refs.add(from);
             }
 
@@ -194,7 +181,6 @@ public class CompileBatch {
                 if (to.equals(found)) {
                     var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
                     var fileName = Parser.fileName(uri);
-                    LOG.info(String.format("...%s is in %s", found, fileName));
                     return true;
                 }
                 return false;
@@ -213,21 +199,9 @@ public class CompileBatch {
                 return false;
             }
 
-            boolean isSuperType(Element found) {
-                if (!(to instanceof TypeElement)) return false;
-                if (!(found instanceof TypeElement)) return false;
-                var subType = (TypeElement) to;
-                var superType = (TypeElement) found;
-                if (types.isSubtype(subType.asType(), superType.asType())) {
-                    LOG.info(String.format("...`%s` overrides `%s`", subType, superType));
-                    return true;
-                }
-                return false;
-            }
-
             void check(TreePath from) {
                 var found = trees.getElement(from);
-                var match = sameSymbol(found) || isSuperMethod(found) || isSuperType(found);
+                var match = sameSymbol(found) || isSuperMethod(found);
                 if (match) refs.add(from);
             }
 

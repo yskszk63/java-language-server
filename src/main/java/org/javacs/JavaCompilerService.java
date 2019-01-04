@@ -1,9 +1,6 @@
 package org.javacs;
 
-import com.sun.source.tree.ClassTree;
-import com.sun.source.tree.MethodTree;
-import com.sun.source.tree.TypeParameterTree;
-import com.sun.source.tree.VariableTree;
+import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.io.File;
 import java.io.IOException;
@@ -11,7 +8,6 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.*;
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -197,22 +193,15 @@ public class JavaCompilerService {
     }
 
     public Set<URI> potentialDefinitions(Element to) {
-        var hasWord = matchesName(to);
-        // Parse each file and check if the syntax tree is consistent with a definition of `to`
-        // This produces some false positives, but parsing is much faster than compiling,
-        // so it's an effective optimization
-        var findName = to.getSimpleName();
-        var checkTree = new HashSet<URI>();
-        // TODO only methods and types can have multiple definitions
-        // TODO this needs to use open text if available
-        Consumer<TreePathScanner<Void, Void>> scanAll =
-                visitor -> {
-                    for (var f : hasWord) {
-                        var root = Parser.parse(Paths.get(f));
-                        visitor.scan(root, null);
-                    }
-                };
         if (to instanceof ExecutableElement) {
+            // TODO this needs to use open text if available
+            // Check if the file imports `to` and contains the name of `to`
+            var hasWord = matchesName(to);
+            // Parse each file and check if the syntax tree is consistent with a definition of `to`
+            // This produces some false positives, but parsing is much faster than compiling,
+            // so it's an effective optimization
+            var findName = simpleName(to);
+            var checkTree = new HashSet<URI>();
             class FindMethod extends TreePathScanner<Void, Void> {
                 @Override
                 public Void visitMethod(MethodTree t, Void __) {
@@ -223,61 +212,184 @@ public class JavaCompilerService {
                     return super.visitMethod(t, null);
                 }
             }
-            scanAll.accept(new FindMethod());
+            for (var f : hasWord) {
+                var root = Parser.parse(Paths.get(f));
+                new FindMethod().scan(root, null);
+            }
             LOG.info(String.format("...%d files contain method `%s`", checkTree.size(), findName));
-        } else if (to instanceof TypeElement) {
-            class FindType extends TreePathScanner<Void, Void> {
-                @Override
-                public Void visitClass(ClassTree t, Void __) {
-                    if (t.getSimpleName().contentEquals(findName)) {
-                        var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
-                        checkTree.add(uri);
-                    }
-                    return super.visitClass(t, null);
-                }
-            }
-            scanAll.accept(new FindType());
-            LOG.info(String.format("...%d files contain type `%s`", checkTree.size(), findName));
-        } else if (to instanceof VariableElement) {
-            class FindVar extends TreePathScanner<Void, Void> {
-                @Override
-                public Void visitVariable(VariableTree t, Void __) {
-                    if (t.getName().contentEquals(findName)) {
-                        var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
-                        checkTree.add(uri);
-                    }
-                    return super.visitVariable(t, null);
-                }
-            }
-            scanAll.accept(new FindVar());
-            LOG.info(String.format("...%d files contain variable `%s`", checkTree.size(), findName));
-        } else if (to instanceof TypeParameterElement) {
-            class FindTypeParameter extends TreePathScanner<Void, Void> {
-                @Override
-                public Void visitTypeParameter(TypeParameterTree t, Void __) {
-                    if (t.getName().contentEquals(findName)) {
-                        var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
-                        checkTree.add(uri);
-                    }
-                    return super.visitTypeParameter(t, null);
-                }
-            }
-            scanAll.accept(new FindTypeParameter());
-            LOG.info(String.format("...%d files contain type parameter `%s`", checkTree.size(), findName));
+            return checkTree;
         } else {
-            LOG.info(String.format("...`%s` is not a method, type, variable, or type parameter", to));
+            var files = new HashSet<URI>();
+            declaringFile(to).ifPresent(files::add);
+            return files;
         }
-        return checkTree;
     }
 
-    // TODO should probably cache this
     public Set<URI> potentialReferences(Element to) {
-        // TODO only methods and types can have multiple definitions
-        // TODO reduce number of files we need to check by parsing and eliminating more cases
+        var findName = simpleName(to);
+        var isField = to instanceof VariableElement && to.getEnclosingElement() instanceof TypeElement;
+        var isType = to instanceof TypeElement;
+        if (isField || isType) {
+            class FindVar extends TreePathScanner<Void, Set<URI>> {
+                void add(Set<URI> found) {
+                    var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
+                    found.add(uri);
+                }
+
+                boolean method() {
+                    return getCurrentPath().getParentPath().getLeaf() instanceof MethodInvocationTree;
+                }
+
+                @Override
+                public Void visitIdentifier(IdentifierTree t, Set<URI> found) {
+                    if (t.getName().contentEquals(findName) && !method()) add(found);
+                    return super.visitIdentifier(t, found);
+                }
+
+                @Override
+                public Void visitMemberSelect(MemberSelectTree t, Set<URI> found) {
+                    if (t.getIdentifier().contentEquals(findName) && !method()) add(found);
+                    return super.visitMemberSelect(t, found);
+                }
+            }
+            return scanForPotentialReferences(to, new FindVar());
+        } else if (to instanceof ExecutableElement) {
+            class FindMethod extends TreePathScanner<Void, Set<URI>> {
+                void add(Set<URI> found) {
+                    var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
+                    found.add(uri);
+                }
+
+                @Override
+                public Void visitMethodInvocation(MethodInvocationTree t, Set<URI> found) {
+                    var method = t.getMethodSelect();
+                    // outer.method()
+                    if (method instanceof MemberSelectTree) {
+                        var select = (MemberSelectTree) method;
+                        if (select.getIdentifier().contentEquals(findName)) add(found);
+                    }
+                    // method()
+                    if (method instanceof IdentifierTree) {
+                        var id = (IdentifierTree) method;
+                        if (id.getName().contentEquals(findName)) add(found);
+                    }
+                    // Check other parts
+                    return super.visitMethodInvocation(t, found);
+                }
+
+                @Override
+                public Void visitMemberReference(MemberReferenceTree t, Set<URI> found) {
+                    if (t.getName().contentEquals(findName)) add(found);
+                    return super.visitMemberReference(t, found);
+                }
+            }
+            return scanForPotentialReferences(to, new FindMethod());
+        } else {
+            var files = new HashSet<URI>();
+            declaringFile(to).ifPresent(files::add);
+            return files;
+        }
+    }
+
+    private static CharSequence simpleName(Element e) {
+        if (e.getSimpleName().contentEquals("<init>")) {
+            return e.getEnclosingElement().getSimpleName();
+        }
+        return e.getSimpleName();
+    }
+
+    private Set<URI> scanForPotentialReferences(Element to, TreePathScanner<Void, Set<URI>> scan) {
+        // TODO this needs to use open text if available
+        // Check if the file imports `to` and contains the name of `to`
         var hasWord = matchesName(to);
-        var set = new HashSet<URI>();
-        set.addAll(hasWord);
-        return set;
+        // Parse each file and check if the syntax tree is consistent with a definition of `to`
+        // This produces some false positives, but parsing is much faster than compiling,
+        // so it's an effective optimization
+        var found = new HashSet<URI>();
+        for (var f : hasWord) {
+            var root = Parser.parse(Paths.get(f));
+            scan.scan(root, found);
+        }
+        LOG.info(
+                String.format(
+                        "...%d files contain syntax that might be a reference to `%s`",
+                        found.size(), to.getSimpleName()));
+        return found;
+    }
+
+    private Optional<URI> declaringFile(Element e) {
+        // Find top-level type surrounding `to`
+        LOG.info(String.format("Lookup up declaring file of `%s`...", e));
+        var top = topLevelDeclaration(e);
+        if (!top.isPresent()) {
+            LOG.warning("...no top-level type!");
+            return Optional.empty();
+        }
+        // Find file by looking at package and class name
+        LOG.info(String.format("...top-level type is %s", top.get()));
+        var file = findDeclaringFile(top.get());
+        if (!file.isPresent()) {
+            LOG.info(String.format("...couldn't find declaring file for type"));
+            return Optional.empty();
+        }
+        return file;
+    }
+
+    private Optional<TypeElement> topLevelDeclaration(Element e) {
+        if (e == null) return Optional.empty();
+        var parent = e;
+        TypeElement result = null;
+        while (parent.getEnclosingElement() != null) {
+            if (parent instanceof TypeElement) result = (TypeElement) parent;
+            parent = parent.getEnclosingElement();
+        }
+        return Optional.ofNullable(result);
+    }
+
+    /** Find the file `e` was declared in */
+    private Optional<URI> findDeclaringFile(TypeElement e) {
+        var name = e.getQualifiedName().toString();
+        var lastDot = name.lastIndexOf('.');
+        var packageName = lastDot == -1 ? "" : name.substring(0, lastDot);
+        var className = name.substring(lastDot + 1);
+        // First, look for a file named [ClassName].java
+        var packagePath = Paths.get(packageName.replace('.', File.separatorChar));
+        var publicClassPath = packagePath.resolve(className + ".java");
+        for (var root : sourcePath) {
+            var absPath = root.resolve(publicClassPath);
+            if (Files.exists(absPath) && containsTopLevelDeclaration(absPath, className)) {
+                return Optional.of(absPath.toUri());
+            }
+        }
+        // Then, look for a secondary declaration in all java files in the package
+        var isPublic = e.getModifiers().contains(Modifier.PUBLIC);
+        if (!isPublic) {
+            for (var root : sourcePath) {
+                var absDir = root.resolve(packagePath);
+                try {
+                    var foundFile =
+                            Files.list(absDir).filter(f -> containsTopLevelDeclaration(f, className)).findFirst();
+                    if (foundFile.isPresent()) return foundFile.map(Path::toUri);
+                } catch (IOException err) {
+                    throw new RuntimeException(err);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private boolean containsTopLevelDeclaration(Path file, String simpleClassName) {
+        var find = Pattern.compile("\\b(class|interface|enum) +" + simpleClassName + "\\b");
+        try (var lines = Files.newBufferedReader(file)) {
+            var line = lines.readLine();
+            while (line != null) {
+                if (find.matcher(line).find()) return true;
+                line = lines.readLine();
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return false;
     }
 
     private List<URI> matchesName(Element to) {
