@@ -1,32 +1,21 @@
 package org.javacs;
 
 import com.sun.source.tree.*;
-import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
 import java.io.IOException;
 import java.net.URI;
-import java.util.logging.Logger;
 
 class Pruner {
-    private static final Logger LOG = Logger.getLogger("main");
-
-    private final JavacTask task;
-    private final CompilationUnitTree root;
-    private final StringBuilder contents;
-
-    // TODO this should really just be a static function
-    Pruner(URI file, String contents) {
-        this.task = Parser.parseTask(new StringFileObject(contents, file));
+    static String prune(URI file, String contents, int line, int character) {
+        var task = Parser.parseTask(new StringFileObject(contents, file));
+        CompilationUnitTree root;
         try {
-            this.root = task.parse().iterator().next();
+            root = task.parse().iterator().next();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        this.contents = new StringBuilder(contents);
-    }
-
-    String prune(int line, int character) {
+        var buffer = new StringBuilder(contents);
         var sourcePositions = Trees.instance(task).getSourcePositions();
         var lines = root.getLineMap();
         var cursor = lines.getPosition(line, character);
@@ -42,12 +31,12 @@ class Pruner {
 
             void erase(long start, long end) {
                 for (int i = (int) start; i < end; i++) {
-                    switch (contents.charAt(i)) {
+                    switch (buffer.charAt(i)) {
                         case '\r':
                         case '\n':
                             break;
                         default:
-                            contents.setCharAt(i, ' ');
+                            buffer.setCharAt(i, ' ');
                     }
                 }
             }
@@ -57,7 +46,7 @@ class Pruner {
                 // Erase 'static' keyword so autocomplete works better
                 if (containsCursor(node) && node.isStatic()) {
                     var start = (int) sourcePositions.getStartPosition(root, node);
-                    start = contents.indexOf("static", start);
+                    start = buffer.indexOf("static", start);
                     var end = start + "static".length();
                     erase(start, end);
                 }
@@ -73,11 +62,11 @@ class Pruner {
                     if (!erasedAfterCursor) {
                         var start = cursor;
                         var end = sourcePositions.getEndPosition(root, node);
-                        if (end >= contents.length()) end = contents.length() - 1;
+                        if (end >= buffer.length()) end = buffer.length() - 1;
                         // Find the next line
-                        while (start < end && contents.charAt((int) start) != '\n') start++;
+                        while (start < end && buffer.charAt((int) start) != '\n') start++;
                         // Find the end of the block
-                        while (end > start && contents.charAt((int) end) != '}') end--;
+                        while (end > start && buffer.charAt((int) end) != '}') end--;
                         // Erase from next line to end of block
                         erase(start, end - 1);
                         erasedAfterCursor = true;
@@ -87,7 +76,7 @@ class Pruner {
                     var last = node.getStatements().get(node.getStatements().size() - 1);
                     var start = sourcePositions.getStartPosition(root, first);
                     var end = sourcePositions.getEndPosition(root, last);
-                    if (end >= contents.length()) end = contents.length() - 1;
+                    if (end >= buffer.length()) end = buffer.length() - 1;
                     erase(start, end);
                 }
                 return null;
@@ -101,6 +90,6 @@ class Pruner {
 
         new Scan().scan(root, null);
 
-        return contents.toString();
+        return buffer.toString();
     }
 }

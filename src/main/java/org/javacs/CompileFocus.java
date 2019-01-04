@@ -31,7 +31,7 @@ public class CompileFocus {
     CompileFocus(JavaCompilerService parent, URI file, String contents, int line, int character) {
         this.parent = parent;
         this.file = file;
-        this.contents = new Pruner(file, contents).prune(line, character);
+        this.contents = Pruner.prune(file, contents, line, character);
         this.line = line;
         this.character = character;
         this.task = singleFileTask(parent, file, this.contents);

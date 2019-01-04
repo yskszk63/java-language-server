@@ -117,6 +117,7 @@ class Parser {
         // LOG.warning(err.getMessage(Locale.getDefault()));
     }
 
+    // TODO move all this to StringSearch
     private static final ByteBuffer SEARCH_BUFFER = ByteBuffer.allocateDirect(1 * 1024 * 1024);
 
     // TODO cache the progress made by searching shorter queries
