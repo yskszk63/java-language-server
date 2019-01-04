@@ -162,6 +162,35 @@ public class JavaCompilerService {
         return Collections.unmodifiableList(new ArrayList<>(diags));
     }
 
+    private static class ContainsImportKey {
+        final Path file;
+        final String toPackage, toClass;
+
+        ContainsImportKey(Path file, String toPackage, String toClass) {
+            this.file = file;
+            this.toPackage = toPackage;
+            this.toClass = toClass;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (!(other instanceof ContainsImportKey)) return false;
+            var that = (ContainsImportKey) other;
+            if (!Objects.equals(this.file, that.file)) return false;
+            if (!Objects.equals(this.toPackage, that.toPackage)) return false;
+            if (!Objects.equals(this.toClass, that.toClass)) return false;
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(file, toPackage, toClass);
+        }
+    }
+
+    private static Cache<ContainsImportKey, Boolean> cacheContainsImport =
+            new Cache<>(k -> containsImport(k.toPackage, k.toClass, k.file), k -> k.file);
+
     static boolean containsImport(String toPackage, String toClass, Path file) {
         if (toPackage.isEmpty()) return true;
         var samePackage = Pattern.compile("^package +" + toPackage + ";");
@@ -186,12 +215,40 @@ public class JavaCompilerService {
         }
     }
 
+    private static class ContainsWordKey {
+        final Path file;
+        final String word;
+
+        ContainsWordKey(Path file, String word) {
+            this.file = file;
+            this.word = word;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (!(other instanceof ContainsWordKey)) return false;
+            var that = (ContainsWordKey) other;
+            if (!Objects.equals(this.file, that.file)) return false;
+            if (!Objects.equals(this.word, that.word)) return false;
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(file, word);
+        }
+    }
+
+    private static Cache<ContainsWordKey, Boolean> cacheContainsWord =
+            new Cache<>(k -> containsWord(k.word, k.file), k -> k.file);
+
     static boolean containsWord(String name, Path file) {
         if (!name.matches("\\w*")) throw new RuntimeException(String.format("`%s` is not a word", name));
         // TODO this needs to use open text if available
         return Parser.containsWord(file, name);
     }
 
+    // TODO if we change this to Ptr, we could cache on a per-file basis
     public Set<URI> potentialDefinitions(Element to) {
         if (to instanceof ExecutableElement) {
             // TODO this needs to use open text if available
@@ -205,6 +262,8 @@ public class JavaCompilerService {
             class FindMethod extends TreePathScanner<Void, Void> {
                 @Override
                 public Void visitMethod(MethodTree t, Void __) {
+                    // TODO try to disprove that this is a reference by looking at obvious special cases, like is the
+                    // simple name of the type different?
                     if (t.getName().contentEquals(findName)) {
                         var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
                         checkTree.add(uri);
@@ -225,6 +284,7 @@ public class JavaCompilerService {
         }
     }
 
+    // TODO if we change this to Ptr, we could cache on a per-file basis
     public Set<URI> potentialReferences(Element to) {
         var findName = simpleName(to);
         var isField = to instanceof VariableElement && to.getEnclosingElement() instanceof TypeElement;
@@ -242,6 +302,8 @@ public class JavaCompilerService {
 
                 @Override
                 public Void visitIdentifier(IdentifierTree t, Set<URI> found) {
+                    // TODO try to disprove that this is a reference by looking at obvious special cases, like is the
+                    // simple name of the type different?
                     if (t.getName().contentEquals(findName) && !method()) add(found);
                     return super.visitIdentifier(t, found);
                 }
@@ -262,6 +324,8 @@ public class JavaCompilerService {
 
                 @Override
                 public Void visitMethodInvocation(MethodInvocationTree t, Set<URI> found) {
+                    // TODO try to disprove that this is a reference by looking at obvious special cases, like is the
+                    // simple name of the type different?
                     var method = t.getMethodSelect();
                     // outer.method()
                     if (method instanceof MemberSelectTree) {
@@ -404,7 +468,7 @@ public class JavaCompilerService {
         var toClass = className(to);
         var hasImport = new ArrayList<Path>();
         for (var file : allFiles) {
-            if (containsImport(toPackage, toClass, file)) {
+            if (cacheContainsImport.get(new ContainsImportKey(file, toPackage, toClass))) {
                 hasImport.add(file);
             }
         }
@@ -415,7 +479,7 @@ public class JavaCompilerService {
         if (name.equals("<init>")) name = to.getEnclosingElement().getSimpleName().toString();
         var hasWord = new ArrayList<URI>();
         for (var file : hasImport) {
-            if (containsWord(name, file)) {
+            if (cacheContainsWord.get(new ContainsWordKey(file, name))) {
                 hasWord.add(file.toUri());
             }
         }

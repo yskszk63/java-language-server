@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.nio.file.attribute.FileTime;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -129,6 +128,7 @@ public class CompileBatch {
                 var superMethod = (ExecutableElement) el;
                 var subMethod = (ExecutableElement) found;
                 var subType = (TypeElement) subMethod.getEnclosingElement();
+                // TODO need to check if class is compatible as well
                 if (elements.overrides(subMethod, superMethod, subType)) {
                     LOG.info(String.format("...`%s.%s` overrides `%s`", subType, subMethod, superMethod));
                     return true;
@@ -192,6 +192,7 @@ public class CompileBatch {
                 var subMethod = (ExecutableElement) to;
                 var subType = (TypeElement) subMethod.getEnclosingElement();
                 var superMethod = (ExecutableElement) found;
+                // TODO need to check if class is compatible as well
                 if (elements.overrides(subMethod, superMethod, subType)) {
                     LOG.info(String.format("...`%s.%s` overrides `%s`", subType, subMethod, superMethod));
                     return true;
@@ -236,33 +237,6 @@ public class CompileBatch {
         return Optional.of(refs);
     }
 
-    public Map<URI, Index> countReferences() {
-        var index = new HashMap<URI, Index>();
-        for (var f : roots) {
-            var uri = f.getSourceFile().toUri();
-            var path = Paths.get(uri);
-            var refs = index(trees, f);
-            // Remember when file was modified
-            FileTime modified;
-            try {
-                modified = Files.getLastModifiedTime(path);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            // Remember if file contains any errors
-            var containsError = false;
-            for (var d : parent.diags) {
-                var isError = d.getKind() == Diagnostic.Kind.ERROR;
-                var sameUri = d.getSource().toUri().equals(uri);
-                if (isError && sameUri) containsError = true;
-            }
-            // Add file to index
-            var i = new Index(refs, modified.toInstant(), containsError);
-            index.put(uri, i);
-        }
-        return index;
-    }
-
     public Optional<Range> range(TreePath path) {
         var uri = path.getCompilationUnit().getSourceFile().toUri();
         var file = Paths.get(uri);
@@ -275,81 +249,10 @@ public class CompileBatch {
         return ParseFile.range(task, contents, path);
     }
 
-    private boolean toStringEquals(Object left, Object right) {
-        return Objects.equals(Objects.toString(left, ""), Objects.toString(right, ""));
-    }
-
     private static boolean isField(Element to) {
         if (!(to instanceof VariableElement)) return false;
         var field = (VariableElement) to;
         return field.getEnclosingElement() instanceof TypeElement;
-    }
-
-    // TODO what if instead we just make references really fast?
-    static List<Ptr> index(Trees trees, CompilationUnitTree root) {
-        var refs = new ArrayList<Ptr>();
-        class IndexFile extends TreePathScanner<Void, Void> {
-            Optional<Element> ref(TreePath from) {
-                var root = from.getCompilationUnit();
-                var lines = root.getLineMap();
-                var to = trees.getElement(from);
-                // Skip elements we can't find
-                if (to == null) {
-                    // LOG.warning(String.format("No element for `%s`", from.getLeaf()));
-                    return Optional.empty();
-                }
-                // Skip non-methods
-                if (!(to instanceof ExecutableElement || to instanceof TypeElement || isField(to))) {
-                    return Optional.empty();
-                }
-                // Skip classes that are nested inside of methods
-                if (!Ptr.canPoint(to)) {
-                    return Optional.empty();
-                }
-                // TODO skip anything not on source path
-                // TODO this is also a reference to a bunch of other things
-                return Optional.of(to);
-            }
-
-            void check(TreePath from) {
-                var r = ref(from);
-                if (r.isPresent()) {
-                    var ptr = new Ptr(r.get());
-                    refs.add(ptr);
-                }
-            }
-
-            @Override
-            public Void visitMemberReference(MemberReferenceTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitMemberReference(t, null);
-            }
-
-            @Override
-            public Void visitMemberSelect(MemberSelectTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitMemberSelect(t, null);
-            }
-
-            @Override
-            public Void visitIdentifier(IdentifierTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitIdentifier(t, null);
-            }
-
-            @Override
-            public Void visitNewClass(NewClassTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitNewClass(t, null);
-            }
-        }
-        new IndexFile().scan(root, null);
-        if (refs.size() > 0) {
-            var n = refs.size();
-            var file = Parser.fileName(root.getSourceFile().toUri());
-            LOG.info(String.format("Found %d refs in %s", n, file));
-        }
-        return refs;
     }
 
     private static final Logger LOG = Logger.getLogger("main");

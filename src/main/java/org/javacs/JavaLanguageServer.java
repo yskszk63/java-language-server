@@ -15,7 +15,6 @@ import com.sun.source.tree.Tree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreePath;
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
@@ -30,7 +29,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -39,7 +37,6 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.UUID;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
@@ -797,34 +794,6 @@ class JavaLanguageServer extends LanguageServer {
         return Optional.of(result);
     }
 
-    class Progress implements ReportProgress, AutoCloseable {
-        @Override
-        public void start(String message) {
-            javaStartProgress(new JavaStartProgressParams(message));
-        }
-
-        @Override
-        public void progress(String message, int n, int total) {
-            if (n == 0) {
-                javaReportProgress(new JavaReportProgressParams(message));
-            } else {
-                var increment = percent(n, total) > percent(n - 1, total) ? 1 : 0;
-                javaReportProgress(new JavaReportProgressParams(message, increment));
-            }
-        }
-
-        private int percent(int n, int d) {
-            double nD = n, dD = d;
-            double ratio = nD / dD;
-            return (int) (ratio * 100);
-        }
-
-        @Override
-        public void close() {
-            javaEndProgress();
-        }
-    }
-
     @Override
     public Optional<List<Location>> findReferences(ReferenceParams position) {
         var toUri = position.textDocument.uri;
@@ -851,7 +820,6 @@ class JavaLanguageServer extends LanguageServer {
         var toElAgain = batch.element(toUri, toLine, toColumn).get();
 
         // Find all references to toElAgain
-        // TODO this should references to supers of toEl
         var fromTreePaths = batch.references(toElAgain);
         if (!fromTreePaths.isPresent()) return Optional.empty();
         var result = new ArrayList<Location>();
@@ -1018,6 +986,7 @@ class JavaLanguageServer extends LanguageServer {
             var line = start.line;
             var character = start.character;
             var data = new JsonArray();
+            // TODO would textDocument/references do the same thing?
             data.add("java.command.findReferences");
             data.add(uri.toString());
             data.add(line);
@@ -1026,135 +995,6 @@ class JavaLanguageServer extends LanguageServer {
             result.add(lens);
         }
         return result;
-    }
-
-    private Map<Ptr, Integer> cacheCountReferences = Collections.emptyMap();
-    private URI cacheCountReferencesFile = URI.create("file:///NONE");
-    private int cacheCountReferencesVersion = -1;
-
-    private void updateCacheCountReferences(URI current) {
-        if (cacheCountReferencesFile.equals(current) && cacheCountReferencesVersion == contents(current).version)
-            return;
-        LOG.info(String.format("Update cached reference count to %s...", current));
-        var contents = contents(current);
-        try (var progress = new Progress()) {
-            cacheCountReferences = countReferences(current, contents.content, progress);
-        }
-        cacheCountReferencesFile = current;
-        cacheCountReferencesVersion = contents.version;
-    }
-
-    private Map<URI, Index> index = new HashMap<>();
-
-    private void updateIndex(Collection<URI> possible, ReportProgress progress) {
-        LOG.info(String.format("Check %d files for modifications compared to index...", possible.size()));
-
-        // signatureMatches tests if edits to the current file invalidate an index
-        var signatureMatches = hoverCache.signatureMatches();
-        // Figure out all files that have been changed, or contained errors at the time they were indexed
-        var outOfDate = new ArrayList<URI>();
-        var hasError = new ArrayList<URI>();
-        var wrongSig = new ArrayList<URI>();
-        for (var p : possible) {
-            if (!index.containsKey(p)) {
-                outOfDate.add(p);
-                continue;
-            }
-            var i = index.get(p);
-            var modified = Instant.ofEpochMilli(new File(p).lastModified());
-            // TODO can modified rewind when you checkout a branch?
-            if (modified.isAfter(i.modified)) outOfDate.add(p);
-            else if (i.containsError) hasError.add(p);
-            else if (!signatureMatches.test(i.refs)) wrongSig.add(p);
-        }
-        if (outOfDate.size() > 0) LOG.info(String.format("... %d files are out-of-date", outOfDate.size()));
-        if (hasError.size() > 0) LOG.info(String.format("... %d files contain errors", hasError.size()));
-        if (wrongSig.size() > 0)
-            LOG.info(String.format("... %d files refer to methods that have changed", wrongSig.size()));
-
-        // If there's nothing to update, return
-        var needsUpdate = new ArrayList<URI>();
-        needsUpdate.addAll(outOfDate);
-        needsUpdate.addAll(hasError);
-        needsUpdate.addAll(wrongSig);
-        if (needsUpdate.isEmpty()) return;
-
-        // If there's more than 1 file, report progress
-        if (needsUpdate.size() > 10) { // TODO this could probably be tuned to be based on bytes of code
-            progress.start(String.format("Index %d files", needsUpdate.size()));
-        } else {
-            progress = ReportProgress.EMPTY;
-        }
-
-        // Compile in a batch and update the index
-        var counts = compiler.compileBatch(needsUpdate, progress).countReferences();
-        index.putAll(counts);
-    }
-
-    public Map<Ptr, Integer> countReferences(URI file, String contents, ReportProgress progress) {
-        updateHoverCache(file, contents(file).content);
-
-        // List all files that import file
-        var toPackage = Objects.toString(hoverCache.root.getPackageName(), "");
-        var toClasses = hoverCache.allClassNames();
-        var possible = potentialReferencesToClasses(toPackage, toClasses);
-        if (possible.isEmpty()) {
-            LOG.info("No potential references to " + file);
-            return Map.of();
-        }
-        // Reindex only files that are out-of-date
-        updateIndex(possible, progress);
-        // Assemble results
-        var result = new HashMap<Ptr, Integer>();
-        for (var p : possible) {
-            if (!index.containsKey(p)) {
-                LOG.warning("Did not index " + p);
-                continue;
-            }
-            var i = index.get(p);
-            for (var r : i.refs) {
-                var count = result.getOrDefault(r, 0);
-                result.put(r, count + 1);
-            }
-        }
-        return result;
-    }
-
-    // TODO should probably cache this
-    private Collection<URI> potentialReferencesToClasses(String toPackage, List<String> toClasses) {
-        // Filter for files that import toPackage.toClass
-        var result = new LinkedHashSet<URI>();
-        for (var file : sourcePath.allJavaFiles()) {
-            if (importsAnyClass(toPackage, toClasses, file)) {
-                result.add(file.toUri());
-            }
-        }
-        return result;
-    }
-
-    private static boolean importsAnyClass(String toPackage, List<String> toClasses, Path file) {
-        if (toPackage.isEmpty()) return true; // If package is empty, everyone imports it
-        var toClass = toClasses.stream().collect(Collectors.joining("|"));
-        var samePackage = Pattern.compile("^package +" + toPackage + ";");
-        var importClass = Pattern.compile("^import +" + toPackage + "\\.(" + toClass + ");");
-        var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
-        var importStatic = Pattern.compile("^import +static +" + toPackage + "\\.");
-        var startOfClass = Pattern.compile("^[\\w ]*class +\\w+");
-        try (var read = Files.newBufferedReader(file)) {
-            while (true) {
-                var line = read.readLine();
-                if (line == null) break;
-                if (startOfClass.matcher(line).find()) break;
-                if (samePackage.matcher(line).find()) return true;
-                if (importClass.matcher(line).find()) return true;
-                if (importStar.matcher(line).find()) return true;
-                if (importStatic.matcher(line).find()) return true;
-                if (importClass.matcher(line).find()) return true;
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return false;
     }
 
     @Override
@@ -1183,19 +1023,34 @@ class JavaLanguageServer extends LanguageServer {
         return unresolved;
     }
 
-    private String countReferencesTitle(URI uri, int line, int character) {
-        updateHoverCache(uri, contents(uri).content);
-        var el = hoverCache.element(line, character);
-        if (!el.isPresent()) {
-            LOG.warning(String.format("No element to resolve code lens at %s(%d,%d)", uri.getPath(), line, character));
+    private String countReferencesTitle(URI toUri, int toLine, int toColumn) {
+        var toContent = contents(toUri).content;
+
+        // Compile from-file and identify element under cursor
+        LOG.warning(String.format("Looking for references to %s(%d,%d)...", toUri.getPath(), toLine, toColumn));
+        updateHoverCache(toUri, toContent);
+        var toEl = hoverCache.element(toLine, toColumn);
+        if (!toEl.isPresent()) {
+            LOG.warning("...no element at code lens");
             return "? references";
         }
-        var ptr = new Ptr(el.get());
-        // Update cache if necessary
-        updateCacheCountReferences(uri);
-        // Read reference count from cache
-        var count = cacheCountReferences.getOrDefault(ptr, 0);
 
+        // Compile all files that *might* contain references to toEl
+        // TODO if this gets too big, just show "Many references"
+        var fromFiles = compiler.potentialReferences(toEl.get());
+        fromFiles.add(toUri);
+        // TODO instead of pruning words (2x speedup at best),
+        // compile the whole file and save all references to all declarations in all open files.
+        // As soon as any open file is edited, discard this cache.
+        // This will re-use work across code lenses.
+        var batch = compiler.compileBatch(pruneWord(fromFiles, toEl.get()));
+
+        // Find toEl again, so that we have an Element from the current batch
+        var toElAgain = batch.element(toUri, toLine, toColumn).get();
+
+        // Find all references to toElAgain
+        var fromTreePaths = batch.references(toElAgain);
+        var count = fromTreePaths.orElse(List.of()).size();
         if (count == 1) return "1 reference";
         return String.format("%d references", count);
     }
