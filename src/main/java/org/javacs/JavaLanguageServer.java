@@ -1037,9 +1037,11 @@ class JavaLanguageServer extends LanguageServer {
         }
 
         // Compile all files that *might* contain references to toEl
-        // TODO if this gets too big, just show "Many references"
         var fromFiles = compiler.potentialReferences(toEl.get());
         fromFiles.add(toUri);
+
+        // If it's too expensive to compute the code lens
+        if (fromFiles.size() > 10) return "Many references";
 
         // Make sure all fromFiles -> toUri references are in the cache
         updateCountReferencesCache(toUri, fromFiles);
@@ -1101,7 +1103,6 @@ class JavaLanguageServer extends LanguageServer {
                 String.format(
                         "...%d files need to be re-counted for references to %s",
                         outOfDate.size(), Parser.fileName(toFile)));
-        // TODO this extra file could be eliminated by remembering a List<Ptr> for the current file
         outOfDate.add(toFile);
         countReferencesCache.remove(toFile);
         var batch = compiler.compileBatch(latestText(outOfDate));
@@ -1293,7 +1294,7 @@ class JavaLanguageServer extends LanguageServer {
         throw new RuntimeException("TODO");
     }
 
-    private boolean isJavaFile(URI uri) {
+    static boolean isJavaFile(URI uri) {
         return uri.getScheme().equals("file") && uri.getPath().endsWith(".java");
     }
 

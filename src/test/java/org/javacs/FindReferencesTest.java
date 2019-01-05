@@ -48,6 +48,12 @@ public class FindReferencesTest {
     }
 
     @Test
+    public void referenceIndirectImport() {
+        assertThat(
+                items("/org/javacs/other/ImportIndirectly.java", 4, 25), contains("ReferenceIndirectImport.java(9)"));
+    }
+
+    @Test
     public void findStackedFieldReferences() {
         var file = "/org/javacs/example/StackedFieldReferences.java";
         assertThat(items(file, 4, 9), contains("StackedFieldReferences.java(7)"));

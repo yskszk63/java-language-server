@@ -248,12 +248,17 @@ public class JavaCompilerService {
         return Parser.containsWord(file, name);
     }
 
-    // TODO if we change this to Ptr, we could cache on a per-file basis
     public Set<URI> potentialDefinitions(Element to) {
+        LOG.info(String.format("Find potential definitions of `%s`...", to));
+
+        // Check all files on source path
+        var allFiles = allJavaFiles.get();
+        LOG.info(String.format("...check %d files on the source path", allFiles.size()));
+
         if (to instanceof ExecutableElement) {
             // TODO this needs to use open text if available
-            // Check if the file imports `to` and contains the name of `to`
-            var hasWord = matchesName(to);
+            // Check if the file contains the name of `to`
+            var hasWord = hasWord(allFiles, to);
             // Parse each file and check if the syntax tree is consistent with a definition of `to`
             // This produces some false positives, but parsing is much faster than compiling,
             // so it's an effective optimization
@@ -272,7 +277,7 @@ public class JavaCompilerService {
                 }
             }
             for (var f : hasWord) {
-                var root = Parser.parse(Paths.get(f));
+                var root = Parser.parse(f);
                 new FindMethod().scan(root, null);
             }
             LOG.info(String.format("...%d files contain method `%s`", checkTree.size(), findName));
@@ -284,12 +289,12 @@ public class JavaCompilerService {
         }
     }
 
-    // TODO if we change this to Ptr, we could cache on a per-file basis
     public Set<URI> potentialReferences(Element to) {
         var findName = simpleName(to);
         var isField = to instanceof VariableElement && to.getEnclosingElement() instanceof TypeElement;
         var isType = to instanceof TypeElement;
         if (isField || isType) {
+            LOG.info(String.format("Find identifiers named `%s`", findName));
             class FindVar extends TreePathScanner<Void, Set<URI>> {
                 void add(Set<URI> found) {
                     var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
@@ -316,6 +321,7 @@ public class JavaCompilerService {
             }
             return scanForPotentialReferences(to, new FindVar());
         } else if (to instanceof ExecutableElement) {
+            LOG.info(String.format("Find method calls named `%s`", findName));
             class FindMethod extends TreePathScanner<Void, Set<URI>> {
                 void add(Set<URI> found) {
                     var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
@@ -359,8 +365,23 @@ public class JavaCompilerService {
             }
             return scanForPotentialReferences(to, new FindMethod());
         } else {
+            // Fields, type parameters can only be referenced from within the same file
+            LOG.info(String.format("Find definition of `%s`", to));
             var files = new HashSet<URI>();
-            declaringFile(to).ifPresent(files::add);
+            var toFile = declaringFile(to);
+            // If there is no declaring file
+            if (!toFile.isPresent()) {
+                LOG.info("..has no declaring file");
+                return files;
+            }
+            // If the declaring file isn't a normal file, for example if it's in src.zip
+            if (!JavaLanguageServer.isJavaFile(toFile.get())) {
+                LOG.info(String.format("...%s is not on the source path", toFile.get()));
+                return files;
+            }
+            // Otherwise, jump to the declaring file
+            LOG.info(String.format("...declared in %s", toFile.get().getPath()));
+            files.add(toFile.get());
             return files;
         }
     }
@@ -373,21 +394,30 @@ public class JavaCompilerService {
     }
 
     private Set<URI> scanForPotentialReferences(Element to, TreePathScanner<Void, Set<URI>> scan) {
+        LOG.info(String.format("Find potential references to `%s`...", to));
+
+        // Check all files on source path
+        var allFiles = allJavaFiles.get();
+        LOG.info(String.format("...check %d files on the source path", allFiles.size()));
+
         // TODO this needs to use open text if available
-        // Check if the file imports `to` and contains the name of `to`
-        var hasWord = matchesName(to);
+        // Check if the file contains the name of `to`
+        var hasWord = hasWord(allFiles, to);
+
+        // You can't reference a TypeElement without importing it
+        if (to instanceof TypeElement) {
+            hasWord = imports(hasWord, (TypeElement) to);
+        }
+
         // Parse each file and check if the syntax tree is consistent with a definition of `to`
         // This produces some false positives, but parsing is much faster than compiling,
         // so it's an effective optimization
         var found = new HashSet<URI>();
         for (var f : hasWord) {
-            var root = Parser.parse(Paths.get(f));
+            var root = Parser.parse(f);
             scan.scan(root, found);
         }
-        LOG.info(
-                String.format(
-                        "...%d files contain syntax that might be a reference to `%s`",
-                        found.size(), to.getSimpleName()));
+        LOG.info(String.format("...%d files contain matching syntax", found.size()));
         return found;
     }
 
@@ -466,13 +496,22 @@ public class JavaCompilerService {
         return false;
     }
 
-    private List<URI> matchesName(Element to) {
-        LOG.info(String.format("Find potential references to `%s`...", to));
+    private List<Path> hasWord(Collection<Path> allFiles, Element to) {
+        // Figure out which of those files have the word `to`
+        var name = to.getSimpleName().toString();
+        if (name.equals("<init>")) name = to.getEnclosingElement().getSimpleName().toString();
+        var hasWord = new ArrayList<Path>();
+        for (var file : allFiles) {
+            if (cacheContainsWord.get(new ContainsWordKey(file, name))) {
+                hasWord.add(file);
+            }
+        }
+        LOG.info(String.format("...%d files contain the word `%s`", hasWord.size(), name));
 
-        // Check all files on source path
-        var allFiles = allJavaFiles.get();
-        LOG.info(String.format("...check %d files on the source path", allFiles.size()));
+        return hasWord;
+    }
 
+    private List<Path> imports(Collection<Path> allFiles, TypeElement to) {
         // Figure out which files import `to`, explicitly or implicitly
         var toPackage = packageName(to);
         var toClass = className(to);
@@ -484,18 +523,7 @@ public class JavaCompilerService {
         }
         LOG.info(String.format("...%d files import %s.%s", hasImport.size(), toPackage, toClass));
 
-        // Figure out which of those files have the word `to`
-        var name = to.getSimpleName().toString();
-        if (name.equals("<init>")) name = to.getEnclosingElement().getSimpleName().toString();
-        var hasWord = new ArrayList<URI>();
-        for (var file : hasImport) {
-            if (cacheContainsWord.get(new ContainsWordKey(file, name))) {
-                hasWord.add(file.toUri());
-            }
-        }
-        LOG.info(String.format("...%d files contain the word `%s`", hasWord.size(), name));
-
-        return hasWord;
+        return hasImport;
     }
 
     public static String packageName(Element e) {
