@@ -630,8 +630,9 @@ class JavaLanguageServer extends LanguageServer {
     // TODO take only URI and invalidate based on version
     private void updateActiveFile(URI uri) {
         if (activeFileCache == null || !activeFileCache.file.equals(uri) || activeFileCacheVersion != version(uri)) {
-            LOG.info("File has changed since last hover, recompiling");
+            LOG.info("Recompile active file...");
             activeFileCache = compiler.compileFile(uri, contents(uri));
+            activeFileCacheVersion = version(uri);
         }
     }
 
@@ -969,7 +970,8 @@ class JavaLanguageServer extends LanguageServer {
                 result.add(lens);
                 // TODO run all tests in file
                 // TODO run all tests in package
-            } else if (cacheParse.isTestMethod(d)) {
+            }
+            if (cacheParse.isTestMethod(d)) {
                 var arguments = new JsonArray();
                 arguments.add(uri.toString());
                 arguments.add(className);
@@ -978,7 +980,8 @@ class JavaLanguageServer extends LanguageServer {
                 var command = new Command("Run Test", "java.command.test.run", arguments);
                 var lens = new CodeLens(range.get(), command, null);
                 result.add(lens);
-            } else {
+            }
+            if (!cacheParse.isTestMethod(d)) {
                 // Unresolved "_ references" code lens
                 var start = range.get().start;
                 var line = start.line;
@@ -1012,7 +1015,12 @@ class JavaLanguageServer extends LanguageServer {
         var line = data.get(2).getAsInt() + 1;
         var character = data.get(3).getAsInt() + 1;
         // Update command
-        var title = countReferencesTitle(uri, line, character);
+        var count = countReferencesTitle(uri, line, character);
+        String title;
+        if (count == -1) title = "? references";
+        else if (count == 1) title = "1 reference";
+        else if (count == 100) title = "Many references";
+        else title = String.format("%d references", count);
         var arguments = new JsonArray();
         arguments.add(uri.toString());
         arguments.add(line - 1);
@@ -1022,16 +1030,15 @@ class JavaLanguageServer extends LanguageServer {
         return unresolved;
     }
 
-    private String countReferencesTitle(URI toUri, int toLine, int toColumn) {
-        var toContent = contents(toUri);
+    private int countReferencesTitle(URI toUri, int toLine, int toColumn) {
+        LOG.warning(String.format("Count references to %s(%d,%d)...", toUri.getPath(), toLine, toColumn));
 
         // Compile from-file and identify element under cursor
-        LOG.warning(String.format("Looking for references to %s(%d,%d)...", toUri.getPath(), toLine, toColumn));
         updateActiveFile(toUri);
         var toEl = activeFileCache.element(toLine, toColumn);
         if (!toEl.isPresent()) {
             LOG.warning("...no element at code lens");
-            return "? references";
+            return -1;
         }
 
         // Compile all files that *might* contain references to toEl
@@ -1039,7 +1046,7 @@ class JavaLanguageServer extends LanguageServer {
         fromFiles.add(toUri);
 
         // If it's too expensive to compute the code lens
-        if (fromFiles.size() > 10) return "Many references";
+        if (fromFiles.size() > 10) return 100;
 
         // Make sure all fromFiles -> toUri references are in the cache
         updateCountReferencesCache(toUri, fromFiles);
@@ -1051,8 +1058,7 @@ class JavaLanguageServer extends LanguageServer {
             var cachedFileCounts = countReferencesCache.get(from);
             count += cachedFileCounts.counts.getOrDefault(toPtr, 0);
         }
-        if (count == 1) return "1 reference";
-        return String.format("%d references", count);
+        return count;
     }
 
     /** countReferencesCache[file][ptr] is the number of references to ptr in file */
@@ -1066,16 +1072,12 @@ class JavaLanguageServer extends LanguageServer {
     /** countReferencesCacheFile is the file pointed to by every ptr in countReferencesCache[_][ptr] */
     private URI countReferencesCacheFile = URI.create("file:///NONE");
 
-    /** countReferencesCacheVersion is the version of countReferencesCacheFile that is currently cached */
-    private int countReferencesCacheVersion = -1;
-
     private void updateCountReferencesCache(URI toFile, Collection<URI> fromFiles) {
         // If cached file has changed, invalidate the whole cache
-        if (!toFile.equals(countReferencesCacheFile) || version(toFile) != countReferencesCacheVersion) {
+        if (!toFile.equals(countReferencesCacheFile)) {
             LOG.info(String.format("Cache count-references %s", Parser.fileName(toFile)));
             countReferencesCache.clear();
             countReferencesCacheFile = toFile;
-            countReferencesCacheVersion = version(toFile);
         }
 
         // Figure out which from-files are out-of-date
@@ -1099,7 +1101,7 @@ class JavaLanguageServer extends LanguageServer {
         if (outOfDate.isEmpty()) return;
         LOG.info(
                 String.format(
-                        "...%d files need to be re-counted for references to %s",
+                        "...%d files need to be counted for references to %s",
                         outOfDate.size(), Parser.fileName(toFile)));
         outOfDate.add(toFile);
         countReferencesCache.remove(toFile);
@@ -1111,7 +1113,12 @@ class JavaLanguageServer extends LanguageServer {
         // Find all references to all declarations
         var refs = batch.references(allEls);
 
-        // Update cached counts
+        // Reset all counts for files we just re-compiled
+        for (var fromUri : outOfDate) {
+            countReferencesCache.put(fromUri, new CountReferences());
+        }
+
+        // Increment cached counts
         for (var to : refs.keySet()) {
             var toPtr = new Ptr(to);
 
