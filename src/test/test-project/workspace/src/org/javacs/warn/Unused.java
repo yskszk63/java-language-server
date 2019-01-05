@@ -1,7 +1,7 @@
 package org.javacs.warn;
 
 class Unused {
-    void test() {
+    void test(int unusedParam) {
         int unusedLocal = 1;
     }
 }
