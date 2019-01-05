@@ -426,8 +426,9 @@ public class JavaCompilerService {
 
         // You can't reference a TypeElement without importing it
         if (to instanceof TypeElement) {
-            hasWord = imports(hasWord, (TypeElement) to);
+            hasWord = hasImport(hasWord, (TypeElement) to);
         }
+        // TODO for non-TypeElements, check for indirect imports
 
         // Parse each file and check if the syntax tree is consistent with a definition of `to`
         // This produces some false positives, but parsing is much faster than compiling,
@@ -531,7 +532,7 @@ public class JavaCompilerService {
         return hasWord;
     }
 
-    private List<Path> imports(Collection<Path> allFiles, TypeElement to) {
+    private List<Path> hasImport(Collection<Path> allFiles, TypeElement to) {
         // Figure out which files import `to`, explicitly or implicitly
         var toPackage = packageName(to);
         var toClass = className(to);
