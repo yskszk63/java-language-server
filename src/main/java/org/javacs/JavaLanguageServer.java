@@ -101,7 +101,7 @@ class JavaLanguageServer extends LanguageServer {
                 continue;
             }
             // Find start and end position
-            var content = contents(uri).content;
+            var content = contents(uri);
             var start = position(content, j.getStartPosition());
             var end = position(content, j.getEndPosition());
             var d = new org.javacs.lsp.Diagnostic();
@@ -343,7 +343,7 @@ class JavaLanguageServer extends LanguageServer {
         var started = Instant.now();
         var uri = position.textDocument.uri;
         if (!isJavaFile(uri)) return Optional.empty();
-        var content = contents(uri).content;
+        var content = contents(uri);
         var line = position.position.line + 1;
         var column = position.position.character + 1;
         // Figure out what kind of completion we want to do
@@ -624,14 +624,14 @@ class JavaLanguageServer extends LanguageServer {
         return Optional.of(md);
     }
 
-    // TODO change name
-    private CompileFile hoverCache;
+    private CompileFile activeFileCache;
+    private int activeFileCacheVersion = -1;
 
     // TODO take only URI and invalidate based on version
-    private void updateHoverCache(URI uri, String contents) {
-        if (hoverCache == null || !hoverCache.file.equals(uri) || !hoverCache.contents.equals(contents)) {
+    private void updateActiveFile(URI uri) {
+        if (activeFileCache == null || !activeFileCache.file.equals(uri) || activeFileCacheVersion != version(uri)) {
             LOG.info("File has changed since last hover, recompiling");
-            hoverCache = compiler.compileFile(uri, contents);
+            activeFileCache = compiler.compileFile(uri, contents(uri));
         }
     }
 
@@ -640,13 +640,12 @@ class JavaLanguageServer extends LanguageServer {
         // Compile entire file if it's changed since last hover
         var uri = position.textDocument.uri;
         if (!isJavaFile(uri)) return Optional.empty();
-        var content = contents(uri).content;
-        updateHoverCache(uri, content);
+        updateActiveFile(uri);
 
         // Find element undeer cursor
         var line = position.position.line + 1;
         var column = position.position.character + 1;
-        var el = hoverCache.element(line, column);
+        var el = activeFileCache.element(line, column);
         if (!el.isPresent()) return Optional.empty();
 
         // Add code hover message
@@ -745,7 +744,7 @@ class JavaLanguageServer extends LanguageServer {
     public Optional<SignatureHelp> signatureHelp(TextDocumentPositionParams position) {
         var uri = position.textDocument.uri;
         if (!isJavaFile(uri)) return Optional.empty();
-        var content = contents(uri).content;
+        var content = contents(uri);
         var line = position.position.line + 1;
         var column = position.position.character + 1;
         var focus = compiler.compileFocus(uri, content, line, column);
@@ -759,12 +758,11 @@ class JavaLanguageServer extends LanguageServer {
         if (!isJavaFile(fromUri)) return Optional.empty();
         var fromLine = position.position.line + 1;
         var fromColumn = position.position.character + 1;
-        var fromContent = contents(fromUri).content;
 
         // Compile from-file and identify element under cursor
         LOG.info(String.format("Go-to-def at %s:%d...", fromUri, fromLine));
-        updateHoverCache(fromUri, fromContent);
-        var toEl = hoverCache.element(fromLine, fromColumn);
+        updateActiveFile(fromUri);
+        var toEl = activeFileCache.element(fromLine, fromColumn);
         if (!toEl.isPresent()) {
             LOG.info(String.format("...no element at cursor"));
             return Optional.empty();
@@ -801,12 +799,12 @@ class JavaLanguageServer extends LanguageServer {
         if (!isJavaFile(toUri)) return Optional.empty();
         var toLine = position.position.line + 1;
         var toColumn = position.position.character + 1;
-        var toContent = contents(toUri).content;
+        var toContent = contents(toUri);
 
         // Compile from-file and identify element under cursor
         LOG.warning(String.format("Looking for references to %s(%d,%d)...", toUri.getPath(), toLine, toColumn));
-        updateHoverCache(toUri, toContent);
-        var toEl = hoverCache.element(toLine, toColumn);
+        updateActiveFile(toUri);
+        var toEl = activeFileCache.element(toLine, toColumn);
         if (!toEl.isPresent()) {
             LOG.warning("...no element under cursor");
             return Optional.empty();
@@ -842,7 +840,7 @@ class JavaLanguageServer extends LanguageServer {
         if (name.equals("<init>")) name = el.getEnclosingElement().getSimpleName().toString();
         var sources = new ArrayList<JavaFileObject>();
         for (var f : files) {
-            var contents = contents(f).content;
+            var contents = contents(f);
             var pruned = Pruner.prune(f, contents, name);
             sources.add(new StringFileObject(pruned, f));
         }
@@ -852,7 +850,7 @@ class JavaLanguageServer extends LanguageServer {
     private List<JavaFileObject> latestText(Collection<URI> files) {
         var sources = new ArrayList<JavaFileObject>();
         for (var f : files) {
-            sources.add(new StringFileObject(contents(f).content, f));
+            sources.add(new StringFileObject(contents(f), f));
         }
         return sources;
     }
@@ -862,12 +860,11 @@ class JavaLanguageServer extends LanguageServer {
     private int cacheParseVersion = -1;
 
     private void updateCachedParse(URI file) {
-        if (file.equals(cacheParseFile) && contents(file).version == cacheParseVersion) return;
+        if (file.equals(cacheParseFile) && version(file) == cacheParseVersion) return;
         LOG.info(String.format("Updating cached parse file to %s", file));
-        var contents = contents(file);
-        cacheParse = compiler.parseFile(file, contents.content);
+        cacheParse = compiler.parseFile(file, contents(file));
         cacheParseFile = file;
-        cacheParseVersion = contents.version;
+        cacheParseVersion = version(file);
     }
 
     @Override
@@ -981,19 +978,20 @@ class JavaLanguageServer extends LanguageServer {
                 var command = new Command("Run Test", "java.command.test.run", arguments);
                 var lens = new CodeLens(range.get(), command, null);
                 result.add(lens);
+            } else {
+                // Unresolved "_ references" code lens
+                var start = range.get().start;
+                var line = start.line;
+                var character = start.character;
+                var data = new JsonArray();
+                // TODO would textDocument/references do the same thing?
+                data.add("java.command.findReferences");
+                data.add(uri.toString());
+                data.add(line);
+                data.add(character);
+                var lens = new CodeLens(range.get(), null, data);
+                result.add(lens);
             }
-            // Unresolved "_ references" code lens
-            var start = range.get().start;
-            var line = start.line;
-            var character = start.character;
-            var data = new JsonArray();
-            // TODO would textDocument/references do the same thing?
-            data.add("java.command.findReferences");
-            data.add(uri.toString());
-            data.add(line);
-            data.add(character);
-            var lens = new CodeLens(range.get(), null, data);
-            result.add(lens);
         }
         return result;
     }
@@ -1025,12 +1023,12 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     private String countReferencesTitle(URI toUri, int toLine, int toColumn) {
-        var toContent = contents(toUri).content;
+        var toContent = contents(toUri);
 
         // Compile from-file and identify element under cursor
         LOG.warning(String.format("Looking for references to %s(%d,%d)...", toUri.getPath(), toLine, toColumn));
-        updateHoverCache(toUri, toContent);
-        var toEl = hoverCache.element(toLine, toColumn);
+        updateActiveFile(toUri);
+        var toEl = activeFileCache.element(toLine, toColumn);
         if (!toEl.isPresent()) {
             LOG.warning("...no element at code lens");
             return "? references";
@@ -1133,7 +1131,7 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public List<TextEdit> formatting(DocumentFormattingParams params) {
-        updateHoverCache(params.textDocument.uri, contents(params.textDocument.uri).content);
+        updateActiveFile(params.textDocument.uri);
 
         var edits = new ArrayList<TextEdit>();
         edits.addAll(fixImports());
@@ -1145,14 +1143,14 @@ class JavaLanguageServer extends LanguageServer {
     private List<TextEdit> fixImports() {
         // TODO if imports already match fixed-imports, return empty list
         // TODO preserve comments and other details of existing imports
-        var imports = hoverCache.fixImports();
-        var pos = hoverCache.sourcePositions();
-        var lines = hoverCache.root.getLineMap();
+        var imports = activeFileCache.fixImports();
+        var pos = activeFileCache.sourcePositions();
+        var lines = activeFileCache.root.getLineMap();
         var edits = new ArrayList<TextEdit>();
         // Delete all existing imports
-        for (var i : hoverCache.root.getImports()) {
+        for (var i : activeFileCache.root.getImports()) {
             if (!i.isStatic()) {
-                var offset = pos.getStartPosition(hoverCache.root, i);
+                var offset = pos.getStartPosition(activeFileCache.root, i);
                 var line = (int) lines.getLineNumber(offset) - 1;
                 var delete = new TextEdit(new Range(new Position(line, 0), new Position(line + 1, 0)), "");
                 edits.add(delete);
@@ -1163,15 +1161,15 @@ class JavaLanguageServer extends LanguageServer {
         long insertLine = -1;
         var insertText = new StringBuilder();
         // If there are imports, use the start of the first import as the insert position
-        for (var i : hoverCache.root.getImports()) {
+        for (var i : activeFileCache.root.getImports()) {
             if (!i.isStatic() && insertLine == -1) {
-                long offset = pos.getStartPosition(hoverCache.root, i);
+                long offset = pos.getStartPosition(activeFileCache.root, i);
                 insertLine = lines.getLineNumber(offset) - 1;
             }
         }
         // If there are no imports, insert after the package declaration
-        if (insertLine == -1 && hoverCache.root.getPackageName() != null) {
-            long offset = pos.getEndPosition(hoverCache.root, hoverCache.root.getPackageName());
+        if (insertLine == -1 && activeFileCache.root.getPackageName() != null) {
+            long offset = pos.getEndPosition(activeFileCache.root, activeFileCache.root.getPackageName());
             insertLine = lines.getLineNumber(offset);
             insertText.append("\n");
         }
@@ -1192,9 +1190,9 @@ class JavaLanguageServer extends LanguageServer {
 
     private List<TextEdit> addOverrides() {
         var edits = new ArrayList<TextEdit>();
-        var methods = hoverCache.needsOverrideAnnotation();
-        var pos = hoverCache.sourcePositions();
-        var lines = hoverCache.root.getLineMap();
+        var methods = activeFileCache.needsOverrideAnnotation();
+        var pos = activeFileCache.sourcePositions();
+        var lines = activeFileCache.root.getLineMap();
         for (var t : methods) {
             var methodStart = pos.getStartPosition(t.getCompilationUnit(), t.getLeaf());
             var insertLine = lines.getLineNumber(methodStart);
@@ -1396,17 +1394,16 @@ class JavaLanguageServer extends LanguageServer {
         return activeDocuments.get(openFile).version;
     }
 
-    VersionedContent contents(URI openFile) {
+    String contents(URI openFile) {
         if (!isJavaFile(openFile)) {
             LOG.warning("Ignoring non-java file " + openFile);
-            return VersionedContent.EMPTY;
+            return "";
         }
         if (activeDocuments.containsKey(openFile)) {
-            return activeDocuments.get(openFile);
+            return activeDocuments.get(openFile).content;
         }
         try {
-            var content = Files.readAllLines(Paths.get(openFile)).stream().collect(Collectors.joining("\n"));
-            return new VersionedContent(content, -1);
+            return Files.readAllLines(Paths.get(openFile)).stream().collect(Collectors.joining("\n"));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
