@@ -28,7 +28,9 @@ class WarnUnused extends TreePathScanner<Void, Void> {
 
     boolean isLocal(VariableTree t) {
         var parent = getCurrentPath().getParentPath().getLeaf();
-        return !(parent instanceof ClassTree) && !(parent instanceof MethodTree);
+        return !(parent instanceof ClassTree)
+                && !(parent instanceof MethodTree)
+                && !(parent instanceof LambdaExpressionTree);
     }
 
     boolean isPrivate(MethodTree t) {

@@ -114,12 +114,7 @@ public class CompileBatch {
         var refs = new ArrayList<TreePath>();
         class FindDefinitions extends TreePathScanner<Void, Void> {
             boolean sameSymbol(Element found) {
-                if (el.equals(found)) {
-                    var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
-                    var fileName = Parser.fileName(uri);
-                    return true;
-                }
-                return false;
+                return el.equals(found);
             }
 
             boolean isSubMethod(Element found) {
@@ -195,12 +190,7 @@ public class CompileBatch {
         var refs = new HashMap<Element, List<TreePath>>();
         class FindReferences extends TreePathScanner<Void, Void> {
             boolean sameSymbol(Element from, Element to) {
-                if (to.equals(from)) {
-                    var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
-                    var fileName = Parser.fileName(uri);
-                    return true;
-                }
-                return false;
+                return to.equals(from);
             }
 
             boolean isSuperMethod(Element from, Element to) {

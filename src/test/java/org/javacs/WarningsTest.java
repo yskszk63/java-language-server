@@ -31,9 +31,11 @@ public class WarningsTest {
     @Test
     public void unusedLocal() {
         server.reportErrors(List.of(FindResource.uri("org/javacs/warn/Unused.java")));
-        assertThat(errors, hasItem("unused(5)")); // int unusedLocal
-        assertThat(errors, hasItem("unused(8)")); // int unusedPrivate
-        assertThat(errors, not(hasItem("unused(4)")));
+        assertThat(errors, hasItem("unused(7)")); // int unusedLocal
+        assertThat(errors, hasItem("unused(10)")); // int unusedPrivate
+        assertThat(errors, hasItem("unused(13)")); // int unusedLocalInLambda
+        assertThat(errors, not(hasItem("unused(6)"))); // test(int unusedParam)
+        assertThat(errors, not(hasItem("unused(12)"))); // unusedLambdaParam -> {};
     }
 
     // TODO warn on type.equals(otherType)
