@@ -137,27 +137,43 @@ public class JavaCompilerService {
     public List<Diagnostic<? extends JavaFileObject>> reportErrors(Collection<URI> uris) {
         LOG.info(String.format("Report errors in %d files...", uris.size()));
 
-        var options = options(sourcePath, classPath);
         // Construct list of sources
         var files = new ArrayList<File>();
         for (var p : uris) files.add(new File(p));
         var sources = fileManager.getJavaFileObjectsFromFiles(files);
+
         // Create task
+        var options = options(sourcePath, classPath);
         var task =
                 (JavacTask) compiler.getTask(null, fileManager, diags::add, options, Collections.emptyList(), sources);
+        var trees = Trees.instance(task);
+
         // Print timing information for optimization
         var profiler = new Profiler();
         task.addTaskListener(profiler);
+
         // Run compilation
         diags.clear();
+        Iterable<? extends CompilationUnitTree> roots;
         try {
+            roots = task.parse();
             task.analyze();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
         profiler.print();
-
         LOG.info(String.format("...found %d errors", diags.size()));
+
+        // Check for unused privates
+        for (var r : roots) {
+            var warnUnused = new WarnUnused(task);
+            warnUnused.scan(r, null);
+            for (var unusedEl : warnUnused.notUsed()) {
+                var path = trees.getPath(unusedEl);
+                diags.add(
+                        new Warning(task, path, "unused", String.format("`%s` is not used", unusedEl.getSimpleName())));
+            }
+        }
 
         return Collections.unmodifiableList(new ArrayList<>(diags));
     }

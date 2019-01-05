@@ -19,18 +19,26 @@ class LanguageServerFixture {
         return getJavaLanguageServer(DEFAULT_WORKSPACE_ROOT, diagnostic -> LOG.info(diagnostic.message));
     }
 
+    static JavaLanguageServer getJavaLanguageServer(Consumer<Diagnostic> onError) {
+        return getJavaLanguageServer(DEFAULT_WORKSPACE_ROOT, onError);
+    }
+
     static JavaLanguageServer getJavaLanguageServer(Path workspaceRoot, Consumer<Diagnostic> onError) {
         return getJavaLanguageServer(
                 workspaceRoot,
                 new LanguageClient() {
+                    @Override
                     public void publishDiagnostics(PublishDiagnosticsParams params) {
                         params.diagnostics.forEach(onError);
                     }
 
+                    @Override
                     public void showMessage(ShowMessageParams params) {}
 
+                    @Override
                     public void registerCapability(String method, JsonElement options) {}
 
+                    @Override
                     public void customNotification(String method, JsonElement params) {}
                 });
     }
