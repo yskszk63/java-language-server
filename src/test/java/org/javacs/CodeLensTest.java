@@ -94,4 +94,12 @@ public class CodeLensTest {
         assertThat(titles, hasItem("4:0 references"));
         assertThat(titles, hasItem("6:0 references"));
     }
+
+    @Test
+    public void field() {
+        var lenses = lenses("/org/javacs/example/CodeLensField.java");
+        var titles = titles(lenses);
+        assertThat(titles, hasItem("3:0 references"));
+        assertThat(titles, hasItem("4:0 references"));
+    }
 }
