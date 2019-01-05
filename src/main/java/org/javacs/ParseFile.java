@@ -83,6 +83,10 @@ public class ParseFile {
     }
 
     public List<TreePath> declarations() {
+        return declarations(root);
+    }
+
+    static List<TreePath> declarations(CompilationUnitTree root) {
         var found = new ArrayList<TreePath>();
         class FindDeclarations extends TreePathScanner<Void, Void> {
             boolean isClass(Tree t) {

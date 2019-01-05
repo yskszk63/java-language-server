@@ -322,21 +322,24 @@ public class JavaCompilerService {
                     found.add(uri);
                 }
 
+                public boolean isName(Tree t) {
+                    if (t instanceof MemberSelectTree) {
+                        var select = (MemberSelectTree) t;
+                        return select.getIdentifier().contentEquals(findName);
+                    }
+                    if (t instanceof IdentifierTree) {
+                        var id = (IdentifierTree) t;
+                        return id.getName().contentEquals(findName);
+                    }
+                    return false;
+                }
+
                 @Override
                 public Void visitMethodInvocation(MethodInvocationTree t, Set<URI> found) {
                     // TODO try to disprove that this is a reference by looking at obvious special cases, like is the
                     // simple name of the type different?
                     var method = t.getMethodSelect();
-                    // outer.method()
-                    if (method instanceof MemberSelectTree) {
-                        var select = (MemberSelectTree) method;
-                        if (select.getIdentifier().contentEquals(findName)) add(found);
-                    }
-                    // method()
-                    if (method instanceof IdentifierTree) {
-                        var id = (IdentifierTree) method;
-                        if (id.getName().contentEquals(findName)) add(found);
-                    }
+                    if (isName(method)) add(found);
                     // Check other parts
                     return super.visitMethodInvocation(t, found);
                 }
@@ -345,6 +348,13 @@ public class JavaCompilerService {
                 public Void visitMemberReference(MemberReferenceTree t, Set<URI> found) {
                     if (t.getName().contentEquals(findName)) add(found);
                     return super.visitMemberReference(t, found);
+                }
+
+                @Override
+                public Void visitNewClass(NewClassTree t, Set<URI> found) {
+                    var cls = t.getIdentifier();
+                    if (isName(cls)) add(found);
+                    return super.visitNewClass(t, found);
                 }
             }
             return scanForPotentialReferences(to, new FindMethod());

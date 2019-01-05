@@ -348,6 +348,7 @@ class JavaLanguageServer extends LanguageServer {
         var column = position.position.character + 1;
         // Figure out what kind of completion we want to do
         var maybeCtx = compiler.parseFile(uri, content).completionContext(line, column);
+        // TODO don't complete inside of comments
         if (!maybeCtx.isPresent()) {
             var items = new ArrayList<CompletionItem>();
             for (var name : CompileFocus.TOP_LEVEL_KEYWORDS) {
@@ -848,7 +849,7 @@ class JavaLanguageServer extends LanguageServer {
         return sources;
     }
 
-    private List<JavaFileObject> latestText(List<URI> files) {
+    private List<JavaFileObject> latestText(Collection<URI> files) {
         var sources = new ArrayList<JavaFileObject>();
         for (var f : files) {
             sources.add(new StringFileObject(contents(f).content, f));
@@ -1039,20 +1040,94 @@ class JavaLanguageServer extends LanguageServer {
         // TODO if this gets too big, just show "Many references"
         var fromFiles = compiler.potentialReferences(toEl.get());
         fromFiles.add(toUri);
-        // TODO instead of pruning words (2x speedup at best),
-        // compile the whole file and save all references to all declarations in all open files.
-        // As soon as any open file is edited, discard this cache.
-        // This will re-use work across code lenses.
-        var batch = compiler.compileBatch(pruneWord(fromFiles, toEl.get()));
 
-        // Find toEl again, so that we have an Element from the current batch
-        var toElAgain = batch.element(toUri, toLine, toColumn).get();
+        // Make sure all fromFiles -> toUri references are in the cache
+        updateCountReferencesCache(toUri, fromFiles);
 
-        // Find all references to toElAgain
-        var fromTreePaths = batch.references(toElAgain);
-        var count = fromTreePaths.orElse(List.of()).size();
+        // Count up how many total references exist in fromFiles
+        var toPtr = new Ptr(toEl.get());
+        var count = 0;
+        for (var from : fromFiles) {
+            var cachedFileCounts = countReferencesCache.get(from);
+            count += cachedFileCounts.counts.getOrDefault(toPtr, 0);
+        }
         if (count == 1) return "1 reference";
         return String.format("%d references", count);
+    }
+
+    /** countReferencesCache[file][ptr] is the number of references to ptr in file */
+    private Map<URI, CountReferences> countReferencesCache = new HashMap<>();
+
+    private static class CountReferences {
+        final Map<Ptr, Integer> counts = new HashMap<>();
+        final Instant created = Instant.now();
+    }
+
+    /** countReferencesCacheFile is the file pointed to by every ptr in countReferencesCache[_][ptr] */
+    private URI countReferencesCacheFile = URI.create("file:///NONE");
+
+    /** countReferencesCacheVersion is the version of countReferencesCacheFile that is currently cached */
+    private int countReferencesCacheVersion = -1;
+
+    private void updateCountReferencesCache(URI toFile, Collection<URI> fromFiles) {
+        // If cached file has changed, invalidate the whole cache
+        if (!toFile.equals(countReferencesCacheFile) || version(toFile) != countReferencesCacheVersion) {
+            LOG.info(String.format("Cache count-references %s", Parser.fileName(toFile)));
+            countReferencesCache.clear();
+            countReferencesCacheFile = toFile;
+            countReferencesCacheVersion = version(toFile);
+        }
+
+        // Figure out which from-files are out-of-date
+        var outOfDate = new HashSet<URI>();
+        for (var f : fromFiles) {
+            Instant modified;
+            try {
+                modified = Files.getLastModifiedTime(Paths.get(f)).toInstant();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            var expired =
+                    !countReferencesCache.containsKey(f) || countReferencesCache.get(f).created.isBefore(modified);
+            if (expired) {
+                countReferencesCache.remove(f);
+                outOfDate.add(f);
+            }
+        }
+
+        // Compile all out-of-date files
+        if (outOfDate.isEmpty()) return;
+        LOG.info(
+                String.format(
+                        "...%d files need to be re-counted for references to %s",
+                        outOfDate.size(), Parser.fileName(toFile)));
+        // TODO this extra file could be eliminated by remembering a List<Ptr> for the current file
+        outOfDate.add(toFile);
+        countReferencesCache.remove(toFile);
+        var batch = compiler.compileBatch(latestText(outOfDate));
+
+        // Find all declarations in toFile
+        var allEls = batch.declarations(toFile);
+
+        // Find all references to all declarations
+        var refs = batch.references(allEls);
+
+        // Update cached counts
+        for (var to : refs.keySet()) {
+            var toPtr = new Ptr(to);
+
+            for (var from : refs.get(to)) {
+                var fromUri = from.getCompilationUnit().getSourceFile().toUri();
+                var counts = countReferencesCache.computeIfAbsent(fromUri, __ -> new CountReferences());
+                var c = counts.counts.getOrDefault(toPtr, 0);
+                counts.counts.put(toPtr, c + 1);
+            }
+        }
+
+        // Ensure that all fromFiles are in the cache, even if they contain no references to toFile
+        for (var fromUri : fromFiles) {
+            countReferencesCache.computeIfAbsent(fromUri, __ -> new CountReferences());
+        }
     }
 
     @Override
@@ -1313,6 +1388,11 @@ class JavaLanguageServer extends LanguageServer {
 
     Set<URI> activeDocuments() {
         return activeDocuments.keySet();
+    }
+
+    int version(URI openFile) {
+        if (!activeDocuments.containsKey(openFile)) return -1;
+        return activeDocuments.get(openFile).version;
     }
 
     VersionedContent contents(URI openFile) {

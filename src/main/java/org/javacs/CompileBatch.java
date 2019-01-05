@@ -168,17 +168,34 @@ public class CompileBatch {
     }
 
     public Optional<List<TreePath>> references(Element to) {
-        LOG.info(String.format("Search for references to `%s` in %d files...", to, roots.size()));
+        var map = references(List.of(to));
+        if (map.size() > 1) {
+            throw new RuntimeException(String.format("Searched for `%s` but found multiple %s", to, map.keySet()));
+        }
+        // Return the only element in the map
+        for (var path : map.values()) {
+            return Optional.of(path);
+        }
+        // Map is empty, to must have been removed due to errors
+        return Optional.empty();
+    }
 
-        if (to.asType().getKind() == TypeKind.ERROR) {
-            LOG.info(String.format("...`%s` is an error type, giving up", to.asType()));
-            return Optional.empty();
+    public Map<Element, List<TreePath>> references(List<Element> toAny) {
+        LOG.info(String.format("Search for references to %d elements in %d files...", toAny.size(), roots.size()));
+
+        var els = new ArrayList<Element>();
+        for (var to : toAny) {
+            if (to.asType().getKind() == TypeKind.ERROR) {
+                LOG.info(String.format("...`%s` is an error type, giving up", to.asType()));
+                continue;
+            }
+            els.add(to);
         }
 
-        var refs = new ArrayList<TreePath>();
+        var refs = new HashMap<Element, List<TreePath>>();
         class FindReferences extends TreePathScanner<Void, Void> {
-            boolean sameSymbol(Element found) {
-                if (to.equals(found)) {
+            boolean sameSymbol(Element from, Element to) {
+                if (to.equals(from)) {
                     var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
                     var fileName = Parser.fileName(uri);
                     return true;
@@ -186,12 +203,12 @@ public class CompileBatch {
                 return false;
             }
 
-            boolean isSuperMethod(Element found) {
+            boolean isSuperMethod(Element from, Element to) {
                 if (!(to instanceof ExecutableElement)) return false;
-                if (!(found instanceof ExecutableElement)) return false;
+                if (!(from instanceof ExecutableElement)) return false;
                 var subMethod = (ExecutableElement) to;
                 var subType = (TypeElement) subMethod.getEnclosingElement();
-                var superMethod = (ExecutableElement) found;
+                var superMethod = (ExecutableElement) from;
                 // TODO need to check if class is compatible as well
                 if (elements.overrides(subMethod, superMethod, subType)) {
                     LOG.info(String.format("...`%s.%s` overrides `%s`", subType, subMethod, superMethod));
@@ -201,9 +218,14 @@ public class CompileBatch {
             }
 
             void check(TreePath from) {
-                var found = trees.getElement(from);
-                var match = sameSymbol(found) || isSuperMethod(found);
-                if (match) refs.add(from);
+                for (var to : els) {
+                    var fromEl = trees.getElement(from);
+                    var match = sameSymbol(fromEl, to) || isSuperMethod(fromEl, to);
+                    if (match) {
+                        var list = refs.computeIfAbsent(to, __ -> new ArrayList<>());
+                        list.add(from);
+                    }
+                }
             }
 
             @Override
@@ -234,7 +256,30 @@ public class CompileBatch {
         for (var r : roots) {
             finder.scan(r, null);
         }
-        return Optional.of(refs);
+        return refs;
+    }
+
+    /**
+     * Find all elements in `file` that get turned into code-lenses. This needs to match the result of
+     * `ParseFile#declarations`
+     */
+    public List<Element> declarations(URI file) {
+        for (var r : roots) {
+            if (!r.getSourceFile().toUri().equals(file)) continue;
+            var paths = ParseFile.declarations(r);
+            var els = new ArrayList<Element>();
+            for (var p : paths) {
+                var e = trees.getElement(p);
+                assert e != null;
+                els.add(e);
+            }
+            return els;
+        }
+        var message = new StringJoiner(", ");
+        for (var r : roots) {
+            message.add(Parser.fileName(r.getSourceFile().toUri()));
+        }
+        throw new RuntimeException(file + " is not in " + message);
     }
 
     public Optional<Range> range(TreePath path) {
