@@ -170,8 +170,14 @@ public class JavaCompilerService {
             warnUnused.scan(r, null);
             for (var unusedEl : warnUnused.notUsed()) {
                 var path = trees.getPath(unusedEl);
-                diags.add(
-                        new Warning(task, path, "unused", String.format("`%s` is not used", unusedEl.getSimpleName())));
+                var message = String.format("`%s` is not used", unusedEl.getSimpleName());
+                Diagnostic.Kind kind;
+                if (unusedEl instanceof ExecutableElement) {
+                    kind = Diagnostic.Kind.OTHER;
+                } else {
+                    kind = Diagnostic.Kind.WARNING;
+                }
+                diags.add(new Warning(task, path, kind, "unused", message));
             }
         }
 

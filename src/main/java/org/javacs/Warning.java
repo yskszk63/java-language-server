@@ -11,21 +11,23 @@ class Warning implements Diagnostic<JavaFileObject> {
     private final JavaFileObject source;
     private final LineMap lines;
     private final long start, end;
+    private final Diagnostic.Kind kind;
     private final String code, message;
 
-    Warning(JavacTask task, TreePath path, String code, String message) {
+    Warning(JavacTask task, TreePath path, Diagnostic.Kind kind, String code, String message) {
         this.source = path.getCompilationUnit().getSourceFile();
         this.lines = path.getCompilationUnit().getLineMap();
         var pos = Trees.instance(task).getSourcePositions();
         this.start = pos.getStartPosition(path.getCompilationUnit(), path.getLeaf());
         this.end = pos.getEndPosition(path.getCompilationUnit(), path.getLeaf());
+        this.kind = kind;
         this.code = code;
         this.message = message;
     }
 
     @Override
     public Kind getKind() {
-        return Kind.WARNING;
+        return kind;
     }
 
     @Override

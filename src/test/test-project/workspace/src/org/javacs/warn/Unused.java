@@ -12,4 +12,12 @@ class Unused {
     Consumer<Integer> lambda = unusedLambdaParam -> {
         int unusedLocalInLambda;
     };
+
+    private int unusedMethod() {
+        return 0;
+    }
+
+    private Unused() { }
+
+    private Unused(int i) { }
 }

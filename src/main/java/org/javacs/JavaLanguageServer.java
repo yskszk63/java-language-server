@@ -67,9 +67,10 @@ class JavaLanguageServer extends LanguageServer {
             case MANDATORY_WARNING:
                 return DiagnosticSeverity.Warning;
             case NOTE:
+                return DiagnosticSeverity.Information;
             case OTHER:
             default:
-                return DiagnosticSeverity.Information;
+                return DiagnosticSeverity.Hint;
         }
     }
 

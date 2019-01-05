@@ -37,12 +37,24 @@ class WarnUnused extends TreePathScanner<Void, Void> {
         return t.getModifiers().getFlags().contains(Modifier.PRIVATE);
     }
 
+    boolean isEmptyConstructor(MethodTree t) {
+        return t.getParameters().isEmpty() && trees.getElement(getCurrentPath()).getKind() == ElementKind.CONSTRUCTOR;
+    }
+
     @Override
     public Void visitVariable(VariableTree t, Void __) {
         if (isPrivate(t) || isLocal(t)) {
             declared.add(current());
         }
         return super.visitVariable(t, null);
+    }
+
+    @Override
+    public Void visitMethod(MethodTree t, Void __) {
+        if (isPrivate(t) && !isEmptyConstructor(t)) {
+            declared.add(current());
+        }
+        return super.visitMethod(t, null);
     }
 
     @Override
