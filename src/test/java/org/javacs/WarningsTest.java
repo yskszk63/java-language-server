@@ -31,7 +31,8 @@ public class WarningsTest {
     @Test
     public void unusedLocal() {
         server.reportErrors(List.of(FindResource.uri("org/javacs/warn/Unused.java")));
-        assertThat(errors, hasItem("unused(5)"));
+        assertThat(errors, hasItem("unused(5)")); // int unusedLocal
+        assertThat(errors, hasItem("unused(8)")); // int unusedPrivate
         assertThat(errors, not(hasItem("unused(4)")));
     }
 }
