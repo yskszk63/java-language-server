@@ -48,20 +48,20 @@ public class CompileFile {
     }
 
     public Optional<Element> element(int line, int character) {
-        LOG.info(String.format("Looking for element at %s(%d,%d)...", file.getPath(), line, character));
+        // LOG.info(String.format("Looking for element at %s(%d,%d)...", file.getPath(), line, character));
 
         // First, look for a tree path
         var path = CompileFocus.findPath(task, root, line, character);
         if (path == null) {
-            LOG.info("...found nothing");
+            // LOG.info("...found nothing");
             return Optional.empty();
         }
-        LOG.info(String.format("...found tree `%s`", Parser.describeTree(path.getLeaf())));
+        // LOG.info(String.format("...found tree `%s`", Parser.describeTree(path.getLeaf())));
 
         // Then, convert the path to an element
         var el = trees.getElement(path);
         if (el == null) {
-            LOG.info(String.format("...tree does not correspond to an element"));
+            // LOG.info(String.format("...tree does not correspond to an element"));
             return Optional.empty();
         }
 

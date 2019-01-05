@@ -130,7 +130,7 @@ public class CompileBatch {
                 var subType = (TypeElement) subMethod.getEnclosingElement();
                 // TODO need to check if class is compatible as well
                 if (elements.overrides(subMethod, superMethod, subType)) {
-                    LOG.info(String.format("...`%s.%s` overrides `%s`", subType, subMethod, superMethod));
+                    // LOG.info(String.format("...`%s.%s` overrides `%s`", subType, subMethod, superMethod));
                     return true;
                 }
                 return false;
@@ -211,7 +211,7 @@ public class CompileBatch {
                 var superMethod = (ExecutableElement) from;
                 // TODO need to check if class is compatible as well
                 if (elements.overrides(subMethod, superMethod, subType)) {
-                    LOG.info(String.format("...`%s.%s` overrides `%s`", subType, subMethod, superMethod));
+                    // LOG.info(String.format("...`%s.%s` overrides `%s`", subType, subMethod, superMethod));
                     return true;
                 }
                 return false;
