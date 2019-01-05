@@ -209,17 +209,23 @@ public class LSP {
         LOG.info("Reading messages from queue...");
         processMessages:
         while (true) {
+            Message r;
             try {
                 // Take a break every 1s to check if receive has been closed
-                var r = pending.poll(1, TimeUnit.SECONDS);
-                // If receive has been closed, exit
-                if (r == endOfStream) {
-                    LOG.warning("Stream from client has been closed, exiting...");
-                    break processMessages;
-                }
-                // If poll(_) failed, loop again
-                if (r == null) continue;
-                // Otherwise, process the new message
+                r = pending.poll(1, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                LOG.log(Level.SEVERE, e.getMessage(), e);
+                continue;
+            }
+            // If receive has been closed, exit
+            if (r == endOfStream) {
+                LOG.warning("Stream from client has been closed, exiting...");
+                break processMessages;
+            }
+            // If poll(_) failed, loop again
+            if (r == null) continue;
+            // Otherwise, process the new message
+            try {
                 switch (r.method) {
                     case "initialize":
                         {
@@ -415,7 +421,7 @@ public class LSP {
                 }
             } catch (Exception e) {
                 LOG.log(Level.SEVERE, e.getMessage(), e);
-                // TODO send failure response if r was a request
+                respond(send, r.id, new ResponseError(ErrorCodes.InternalError, e.getMessage(), null));
             }
         }
     }
