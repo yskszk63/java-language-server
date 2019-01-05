@@ -275,6 +275,8 @@ public class CompileBatch {
             }
             return els;
         }
+
+        // Couldn't find file! Throw an error.
         var message = new StringJoiner(", ");
         for (var r : roots) {
             message.add(Parser.fileName(r.getSourceFile().toUri()));

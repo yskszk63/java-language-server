@@ -251,9 +251,19 @@ public class JavaCompilerService {
     public Set<URI> potentialDefinitions(Element to) {
         LOG.info(String.format("Find potential definitions of `%s`...", to));
 
+        // If `to` is private, any definitions must be in the same file
+        if (to.getModifiers().contains(Modifier.PRIVATE)) {
+            LOG.info(String.format("...`%s` is private", to));
+            var set = new HashSet<URI>();
+            declaringFile(to).ifPresent(set::add);
+            return set;
+        }
+
         // Check all files on source path
         var allFiles = allJavaFiles.get();
         LOG.info(String.format("...check %d files on the source path", allFiles.size()));
+
+        // TODO If `to` is package-private, any definitions must be in the same package
 
         if (to instanceof ExecutableElement) {
             // TODO this needs to use open text if available
@@ -290,11 +300,21 @@ public class JavaCompilerService {
     }
 
     public Set<URI> potentialReferences(Element to) {
+        LOG.info(String.format("Find potential references to `%s`...", to));
+
+        // If `to` is private, any definitions must be in the same file
+        if (to.getModifiers().contains(Modifier.PRIVATE)) {
+            LOG.info(String.format("...`%s` is private", to));
+            var set = new HashSet<URI>();
+            declaringFile(to).ifPresent(set::add);
+            return set;
+        }
+
         var findName = simpleName(to);
         var isField = to instanceof VariableElement && to.getEnclosingElement() instanceof TypeElement;
         var isType = to instanceof TypeElement;
         if (isField || isType) {
-            LOG.info(String.format("Find identifiers named `%s`", findName));
+            LOG.info(String.format("...find identifiers named `%s`", findName));
             class FindVar extends TreePathScanner<Void, Set<URI>> {
                 void add(Set<URI> found) {
                     var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
@@ -321,7 +341,7 @@ public class JavaCompilerService {
             }
             return scanForPotentialReferences(to, new FindVar());
         } else if (to instanceof ExecutableElement) {
-            LOG.info(String.format("Find method calls named `%s`", findName));
+            LOG.info(String.format("...find method calls named `%s`", findName));
             class FindMethod extends TreePathScanner<Void, Set<URI>> {
                 void add(Set<URI> found) {
                     var uri = getCurrentPath().getCompilationUnit().getSourceFile().toUri();
@@ -366,7 +386,7 @@ public class JavaCompilerService {
             return scanForPotentialReferences(to, new FindMethod());
         } else {
             // Fields, type parameters can only be referenced from within the same file
-            LOG.info(String.format("Find definition of `%s`", to));
+            LOG.info(String.format("...find definition of `%s`", to));
             var files = new HashSet<URI>();
             var toFile = declaringFile(to);
             // If there is no declaring file
@@ -394,8 +414,6 @@ public class JavaCompilerService {
     }
 
     private Set<URI> scanForPotentialReferences(Element to, TreePathScanner<Void, Set<URI>> scan) {
-        LOG.info(String.format("Find potential references to `%s`...", to));
-
         // Check all files on source path
         var allFiles = allJavaFiles.get();
         LOG.info(String.format("...check %d files on the source path", allFiles.size()));
@@ -403,6 +421,8 @@ public class JavaCompilerService {
         // TODO this needs to use open text if available
         // Check if the file contains the name of `to`
         var hasWord = hasWord(allFiles, to);
+
+        // TODO If `to` is package-private, any definitions must be in the same package
 
         // You can't reference a TypeElement without importing it
         if (to instanceof TypeElement) {
@@ -423,7 +443,7 @@ public class JavaCompilerService {
 
     private Optional<URI> declaringFile(Element e) {
         // Find top-level type surrounding `to`
-        LOG.info(String.format("Lookup up declaring file of `%s`...", e));
+        LOG.info(String.format("...looking up declaring file of `%s`...", e));
         var top = topLevelDeclaration(e);
         if (!top.isPresent()) {
             LOG.warning("...no top-level type!");

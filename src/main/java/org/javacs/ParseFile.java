@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Logger;
+import javax.lang.model.element.*;
 import org.javacs.lsp.*;
 
 
@@ -95,6 +96,10 @@ public class ParseFile {
                 return cls.getKind() == Tree.Kind.CLASS;
             }
 
+            boolean isPrivate(ModifiersTree t) {
+                return t.getFlags().contains(Modifier.PRIVATE);
+            }
+
             @Override 
             public Void visitClass​(ClassTree t, Void __) {
                 found.add(getCurrentPath());
@@ -104,8 +109,7 @@ public class ParseFile {
             @Override
             public Void visitMethod(MethodTree t, Void __) {
                 var path = getCurrentPath();
-                var parent = path.getParentPath().getLeaf();
-                if (isClass(parent)) {
+                if (!isPrivate(t.getModifiers())) {
                     found.add(path);
                 }
                 // Skip code lenses for local classes
@@ -116,7 +120,7 @@ public class ParseFile {
             public Void visitVariable(VariableTree t, Void __) {
                 var path = getCurrentPath();
                 var parent = path.getParentPath().getLeaf();
-                if (isClass(parent)) {
+                if (isClass(parent) && !isPrivate(t.getModifiers())) {
                     found.add(path);
                 }
                 // Skip code lenses for local classes
