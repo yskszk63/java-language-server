@@ -13,8 +13,6 @@ import java.util.logging.Logger;
 import javax.lang.model.element.*;
 import org.javacs.lsp.*;
 
-
-
 public class ParseFile {
     private final URI file;
     private final String contents;
@@ -26,7 +24,7 @@ public class ParseFile {
         Objects.requireNonNull(parent);
         Objects.requireNonNull(file);
         Objects.requireNonNull(contents);
-        
+
         this.file = file;
         this.contents = contents;
         this.task = CompileFocus.singleFileTask(parent, file, contents);
@@ -47,7 +45,7 @@ public class ParseFile {
         Objects.requireNonNull(contents);
         Objects.requireNonNull(task);
         Objects.requireNonNull(root);
-        
+
         this.file = file;
         this.contents = contents;
         this.task = task;
@@ -77,8 +75,7 @@ public class ParseFile {
         if (!(leaf instanceof ClassTree)) return false;
         var cls = (ClassTree) leaf;
         for (var m : cls.getMembers()) {
-            if (isTestMethod(new TreePath(path, m)))
-                return true;
+            if (isTestMethod(new TreePath(path, m))) return true;
         }
         return false;
     }
@@ -100,27 +97,28 @@ public class ParseFile {
                 return t.getFlags().contains(Modifier.PRIVATE);
             }
 
-            @Override 
-            public Void visitClass​(ClassTree t, Void __) {
+            @Override
+            public Void visitClass(ClassTree t, Void __) {
+                if (isPrivate(t.getModifiers())) return null;
                 found.add(getCurrentPath());
                 return super.visitClass(t, null);
             }
 
             @Override
             public Void visitMethod(MethodTree t, Void __) {
+                if (isPrivate(t.getModifiers())) return null;
                 var path = getCurrentPath();
-                if (!isPrivate(t.getModifiers())) {
-                    found.add(path);
-                }
+                found.add(path);
                 // Skip code lenses for local classes
                 return null;
             }
 
             @Override
             public Void visitVariable(VariableTree t, Void __) {
+                if (isPrivate(t.getModifiers())) return null;
                 var path = getCurrentPath();
                 var parent = path.getParentPath().getLeaf();
-                if (isClass(parent) && !isPrivate(t.getModifiers())) {
+                if (isClass(parent)) {
                     found.add(path);
                 }
                 // Skip code lenses for local classes
@@ -128,21 +126,21 @@ public class ParseFile {
             }
         }
         new FindDeclarations().scan(root, null);
-        
+
         return found;
     }
-    
+
     public Optional<Range> range(TreePath path) {
         return range(task, contents, path);
     }
 
     public Optional<CompletionContext> completionContext(int line, int character) {
         LOG.info(String.format("Finding completion position near %s(%d,%d)...", file, line, character));
-        
+
         var pos = trees.getSourcePositions();
         var lines = root.getLineMap();
         var cursor = lines.getPosition(line, character);
-        
+
         class FindCompletionPosition extends TreeScanner<Void, Void> {
             CompletionContext result = null;
             int insideClass = 0, insideMethod = 0;
@@ -166,7 +164,7 @@ public class ParseFile {
                 insideMethod--;
                 return null;
             }
-            
+
             @Override
             public Void visitMemberSelect(MemberSelectTree node, Void nothing) {
                 super.visitMemberSelect(node, nothing);
@@ -174,10 +172,16 @@ public class ParseFile {
                 if (containsCursor(node) && !containsCursor(node.getExpression()) && result == null) {
                     LOG.info("...position cursor before '.' in " + node);
                     long offset = pos.getEndPosition(root, node.getExpression());
-                    int line = (int) lines.getLineNumber(offset),
-                            character = (int) lines.getColumnNumber(offset);
+                    int line = (int) lines.getLineNumber(offset), character = (int) lines.getColumnNumber(offset);
                     var partialName = Objects.toString(node.getIdentifier(), "");
-                    result = new CompletionContext(line, character, insideClass > 0, insideMethod > 0, CompletionContext.Kind.MemberSelect, partialName);
+                    result =
+                            new CompletionContext(
+                                    line,
+                                    character,
+                                    insideClass > 0,
+                                    insideMethod > 0,
+                                    CompletionContext.Kind.MemberSelect,
+                                    partialName);
                 }
                 return null;
             }
@@ -189,10 +193,16 @@ public class ParseFile {
                 if (containsCursor(node) && !containsCursor(node.getQualifierExpression()) && result == null) {
                     LOG.info("...position cursor before '::' in " + node);
                     long offset = pos.getEndPosition(root, node.getQualifierExpression());
-                    int line = (int) lines.getLineNumber(offset),
-                            character = (int) lines.getColumnNumber(offset);
+                    int line = (int) lines.getLineNumber(offset), character = (int) lines.getColumnNumber(offset);
                     var partialName = Objects.toString(node.getName(), "");
-                    result = new CompletionContext(line, character, insideClass > 0, insideMethod > 0, CompletionContext.Kind.MemberReference, partialName);
+                    result =
+                            new CompletionContext(
+                                    line,
+                                    character,
+                                    insideClass > 0,
+                                    insideMethod > 0,
+                                    CompletionContext.Kind.MemberReference,
+                                    partialName);
                 }
                 return null;
             }
@@ -201,23 +211,28 @@ public class ParseFile {
             public Void visitCase(CaseTree node, Void nothing) {
                 var containsCursor = containsCursor(node);
                 for (var s : node.getStatements()) {
-                    if (containsCursor(s))
-                        containsCursor = false;
+                    if (containsCursor(s)) containsCursor = false;
                 }
 
                 if (containsCursor) {
                     LOG.info("...position cursor after case " + node.getExpression());
                     long offset = pos.getEndPosition(root, node.getExpression());
-                    int line = (int) lines.getLineNumber(offset),
-                            character = (int) lines.getColumnNumber(offset);
+                    int line = (int) lines.getLineNumber(offset), character = (int) lines.getColumnNumber(offset);
                     var partialName = Objects.toString(node.getExpression(), "");
-                    result = new CompletionContext(line, character, insideClass > 0, insideMethod > 0, CompletionContext.Kind.Case, partialName);
+                    result =
+                            new CompletionContext(
+                                    line,
+                                    character,
+                                    insideClass > 0,
+                                    insideMethod > 0,
+                                    CompletionContext.Kind.Case,
+                                    partialName);
                 } else {
                     super.visitCase(node, nothing);
                 }
                 return null;
             }
-            
+
             @Override
             public Void visitIdentifier(IdentifierTree node, Void nothing) {
                 super.visitIdentifier(node, nothing);
@@ -225,7 +240,14 @@ public class ParseFile {
                 if (containsCursor(node) && result == null) {
                     LOG.info("...position cursor after identifier " + node.getName());
                     var partialName = Objects.toString(node.getName(), "");
-                    result = new CompletionContext(line, character, insideClass > 0, insideMethod > 0, CompletionContext.Kind.Identifier, partialName);
+                    result =
+                            new CompletionContext(
+                                    line,
+                                    character,
+                                    insideClass > 0,
+                                    insideMethod > 0,
+                                    CompletionContext.Kind.Identifier,
+                                    partialName);
                 }
                 return null;
             }
@@ -236,7 +258,14 @@ public class ParseFile {
                     LOG.info("...position cursor after annotation " + node.getAnnotationType());
                     var id = (IdentifierTree) node.getAnnotationType();
                     var partialName = Objects.toString(id.getName(), "");
-                    result = new CompletionContext(line, character, insideClass > 0, insideMethod > 0, CompletionContext.Kind.Annotation, partialName);
+                    result =
+                            new CompletionContext(
+                                    line,
+                                    character,
+                                    insideClass > 0,
+                                    insideMethod > 0,
+                                    CompletionContext.Kind.Annotation,
+                                    partialName);
                 } else {
                     super.visitAnnotation(node, nothing);
                 }
@@ -271,7 +300,7 @@ public class ParseFile {
                 blocks.add(getCurrentPath());
                 return super.visitClass(t, null);
             }
-            
+
             @Override
             public Void visitBlock(BlockTree t, Void __) {
                 blocks.add(getCurrentPath());
@@ -296,10 +325,11 @@ public class ParseFile {
     /** Find and source code associated with a ptr */
     public Optional<TreePath> fuzzyFind(Ptr ptr) {
         LOG.info(String.format("...find fuzzy match of %s in %s ...", ptr, Parser.fileName(file)));
-        
+
         class FindPtr extends TreePathScanner<Void, Void> {
             int bestMatch = Ptr.NOT_MATCHED;
             TreePath found;
+
             void check() {
                 var path = getCurrentPath();
                 var mismatch = ptr.fuzzyMatch(path);
@@ -332,9 +362,11 @@ public class ParseFile {
         var find = new FindPtr();
         find.scan(root, null);
         if (find.found != null)
-            LOG.info(String.format("...`%s` with score %d is best match", Parser.describeTree(find.found.getLeaf()), find.bestMatch));
-        else 
-            LOG.info("...no match found");
+            LOG.info(
+                    String.format(
+                            "...`%s` with score %d is best match",
+                            Parser.describeTree(find.found.getLeaf()), find.bestMatch));
+        else LOG.info("...no match found");
         return Optional.ofNullable(find.found);
     }
 
@@ -356,7 +388,7 @@ public class ParseFile {
         var lines = root.getLineMap();
         var start = (int) pos.getStartPosition(root, path.getLeaf());
         var end = (int) pos.getEndPosition(root, path.getLeaf());
-        
+
         // If start is -1, give up
         if (start == -1) {
             LOG.warning(String.format("Couldn't locate `%s`", path.getLeaf()));
@@ -366,7 +398,7 @@ public class ParseFile {
         if (end == -1) {
             end = start + path.getLeaf().toString().length();
         }
-        
+
         if (path.getLeaf() instanceof ClassTree) {
             var cls = (ClassTree) path.getLeaf();
 
@@ -422,7 +454,7 @@ public class ParseFile {
         var startCol = (int) lines.getColumnNumber(start);
         var endLine = (int) lines.getLineNumber(end);
         var endCol = (int) lines.getColumnNumber(end);
-        var range = new Range(new Position(startLine-1, startCol-1), new Position(endLine-1, endCol-1));
+        var range = new Range(new Position(startLine - 1, startCol - 1), new Position(endLine - 1, endCol - 1));
 
         return Optional.of(range);
     }
@@ -445,6 +477,7 @@ public class ParseFile {
         }
         class FindEmptyDoc extends TreePathScanner<Void, Void> {
             DocCommentTree found;
+
             @Override
             public Void visitClass(ClassTree t, Void __) {
                 found = docs.getDocCommentTree(getCurrentPath());
