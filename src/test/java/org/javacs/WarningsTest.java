@@ -35,4 +35,7 @@ public class WarningsTest {
         assertThat(errors, hasItem("unused(8)")); // int unusedPrivate
         assertThat(errors, not(hasItem("unused(4)")));
     }
+
+    // TODO warn on type.equals(otherType)
+    // TODO warn on map.get(wrongKeyType)
 }
