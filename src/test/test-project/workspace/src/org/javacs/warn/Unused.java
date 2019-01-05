@@ -20,4 +20,6 @@ class Unused {
     private Unused() { }
 
     private Unused(int i) { }
+
+    private class UnusedClass { }
 }

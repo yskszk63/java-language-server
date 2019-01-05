@@ -801,7 +801,6 @@ class JavaLanguageServer extends LanguageServer {
         if (!isJavaFile(toUri)) return Optional.empty();
         var toLine = position.position.line + 1;
         var toColumn = position.position.character + 1;
-        var toContent = contents(toUri);
 
         // Compile from-file and identify element under cursor
         LOG.warning(String.format("Looking for references to %s(%d,%d)...", toUri.getPath(), toLine, toColumn));

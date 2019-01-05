@@ -172,7 +172,7 @@ public class JavaCompilerService {
                 var path = trees.getPath(unusedEl);
                 var message = String.format("`%s` is not used", unusedEl.getSimpleName());
                 Diagnostic.Kind kind;
-                if (unusedEl instanceof ExecutableElement) {
+                if (unusedEl instanceof ExecutableElement || unusedEl instanceof TypeElement) {
                     kind = Diagnostic.Kind.OTHER;
                 } else {
                     kind = Diagnostic.Kind.WARNING;

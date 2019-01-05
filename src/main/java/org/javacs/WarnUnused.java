@@ -26,15 +26,19 @@ class WarnUnused extends TreePathScanner<Void, Void> {
         return t.getModifiers().getFlags().contains(Modifier.PRIVATE);
     }
 
+    boolean isPrivate(MethodTree t) {
+        return t.getModifiers().getFlags().contains(Modifier.PRIVATE);
+    }
+
+    boolean isPrivate(ClassTree t) {
+        return t.getModifiers().getFlags().contains(Modifier.PRIVATE);
+    }
+
     boolean isLocal(VariableTree t) {
         var parent = getCurrentPath().getParentPath().getLeaf();
         return !(parent instanceof ClassTree)
                 && !(parent instanceof MethodTree)
                 && !(parent instanceof LambdaExpressionTree);
-    }
-
-    boolean isPrivate(MethodTree t) {
-        return t.getModifiers().getFlags().contains(Modifier.PRIVATE);
     }
 
     boolean isEmptyConstructor(MethodTree t) {
@@ -55,6 +59,14 @@ class WarnUnused extends TreePathScanner<Void, Void> {
             declared.add(current());
         }
         return super.visitMethod(t, null);
+    }
+
+    @Override
+    public Void visitClass(ClassTree t, Void __) {
+        if (isPrivate(t)) {
+            declared.add(current());
+        }
+        return super.visitClass(t, null);
     }
 
     @Override
