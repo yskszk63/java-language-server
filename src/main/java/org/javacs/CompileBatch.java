@@ -163,91 +163,32 @@ public class CompileBatch {
     }
 
     public Optional<List<TreePath>> references(Element to) {
-        var map = references(List.of(to));
-        if (map.size() > 1) {
-            throw new RuntimeException(String.format("Searched for `%s` but found multiple %s", to, map.keySet()));
+        LOG.info(String.format("Search for references to %s...", to));
+
+        // If to is an error, we won't be able to find anything
+        if (to.asType().getKind() == TypeKind.ERROR) {
+            LOG.info(String.format("...`%s` is an error type, giving up", to.asType()));
+            return Optional.empty();
         }
-        // Return the only element in the map
-        for (var path : map.values()) {
-            return Optional.of(path);
+
+        // Otherwise, scan roots for references
+        List<TreePath> list = new ArrayList<TreePath>();
+        var map = Map.of(to, list);
+        var finder = new FindReferences(task);
+        for (var r : roots) {
+            finder.scan(r, map);
         }
-        // Map is empty, to must have been removed due to errors
-        return Optional.empty();
+        LOG.info(String.format("...found %d references", list.size()));
+        return Optional.of(list);
     }
 
-    public Map<Element, List<TreePath>> references(List<Element> toAny) {
-        LOG.info(String.format("Search for references to %d elements in %d files...", toAny.size(), roots.size()));
-
-        var els = new ArrayList<Element>();
-        for (var to : toAny) {
-            if (to.asType().getKind() == TypeKind.ERROR) {
-                LOG.info(String.format("...`%s` is an error type, giving up", to.asType()));
-                continue;
-            }
-            els.add(to);
-        }
-
-        var refs = new HashMap<Element, List<TreePath>>();
-        class FindReferences extends TreePathScanner<Void, Void> {
-            boolean sameSymbol(Element from, Element to) {
-                return to.equals(from);
-            }
-
-            boolean isSuperMethod(Element from, Element to) {
-                if (!(to instanceof ExecutableElement)) return false;
-                if (!(from instanceof ExecutableElement)) return false;
-                var subMethod = (ExecutableElement) to;
-                var subType = (TypeElement) subMethod.getEnclosingElement();
-                var superMethod = (ExecutableElement) from;
-                // TODO need to check if class is compatible as well
-                if (elements.overrides(subMethod, superMethod, subType)) {
-                    // LOG.info(String.format("...`%s.%s` overrides `%s`", subType, subMethod, superMethod));
-                    return true;
-                }
-                return false;
-            }
-
-            void check(TreePath from) {
-                for (var to : els) {
-                    var fromEl = trees.getElement(from);
-                    var match = sameSymbol(fromEl, to) || isSuperMethod(fromEl, to);
-                    if (match) {
-                        var list = refs.computeIfAbsent(to, __ -> new ArrayList<>());
-                        list.add(from);
-                    }
-                }
-            }
-
-            @Override
-            public Void visitMemberReference(MemberReferenceTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitMemberReference(t, null);
-            }
-
-            @Override
-            public Void visitMemberSelect(MemberSelectTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitMemberSelect(t, null);
-            }
-
-            @Override
-            public Void visitIdentifier(IdentifierTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitIdentifier(t, null);
-            }
-
-            @Override
-            public Void visitNewClass(NewClassTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitNewClass(t, null);
-            }
-        }
-        var finder = new FindReferences();
+    public Index index(URI from, List<Element> toAny) {
         for (var r : roots) {
-            finder.scan(r, null);
+            if (r.getSourceFile().toUri().equals(from)) {
+                return new Index(task, r, parent.diags, toAny);
+            }
         }
-        LOG.info(String.format("...found %d references", refs.size()));
-        return refs;
+        throw new RuntimeException(from + " is not in compiled batch");
     }
 
     /**

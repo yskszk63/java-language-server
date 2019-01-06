@@ -816,9 +816,9 @@ class JavaLanguageServer extends LanguageServer {
         }
 
         // Compile all files that *might* contain references to toEl
-        var fromFiles = compiler.potentialReferences(toEl.get());
-        fromFiles.add(toUri);
-        var batch = compiler.compileBatch(pruneWord(fromFiles, toEl.get()));
+        var fromUris = compiler.potentialReferences(toEl.get());
+        fromUris.add(toUri);
+        var batch = compiler.compileBatch(pruneWord(fromUris, toEl.get()));
 
         // Find toEl again, so that we have an Element from the current batch
         var toElAgain = batch.element(toUri, toLine, toColumn).get();
@@ -985,7 +985,7 @@ class JavaLanguageServer extends LanguageServer {
                 var lens = new CodeLens(range.get(), command, null);
                 result.add(lens);
             }
-            if (!cacheParse.isTestMethod(d)) {
+            if (!cacheParse.isTestMethod(d) && !cacheParse.isTestClass(d)) {
                 // Unresolved "_ references" code lens
                 var start = range.get().start;
                 var line = start.line;
@@ -1045,98 +1045,83 @@ class JavaLanguageServer extends LanguageServer {
             return -1;
         }
 
+        // TODO if new Ptr(toEl) has already been counted, we don't need to re-count unless from-files have been
+        // modified or contain errors
+
         // Compile all files that *might* contain references to toEl
-        var fromFiles = compiler.potentialReferences(toEl.get());
-        fromFiles.add(toUri);
+        var fromUris = compiler.potentialReferences(toEl.get());
+        fromUris.add(toUri);
 
         // If it's too expensive to compute the code lens
-        if (fromFiles.size() > 10) return 100;
+        if (fromUris.size() > 10) return 100;
 
-        // Make sure all fromFiles -> toUri references are in the cache
-        updateCountReferencesCache(toUri, fromFiles);
+        // Make sure all fromUris -> toUri references are in the cache
+        var declarations = activeFileCache.declarations();
+        updateCountReferencesCache(fromUris, toUri, declarations);
 
-        // Count up how many total references exist in fromFiles
+        // Count up how many total references exist in fromUris
         var toPtr = new Ptr(toEl.get());
         var count = 0;
-        for (var from : fromFiles) {
-            var cachedFileCounts = countReferencesCache.get(from);
-            count += cachedFileCounts.counts.getOrDefault(toPtr, 0);
+        for (var fromUri : fromUris) {
+            var fromFile = Paths.get(fromUri);
+            var toFile = Paths.get(toUri);
+            var cachedFileCounts = countReferencesCache.get(fromFile, toFile);
+            count += cachedFileCounts.count(toPtr);
         }
         return count;
     }
 
-    /** countReferencesCache[file][ptr] is the number of references to ptr in file */
-    private Map<URI, CountReferences> countReferencesCache = new HashMap<>();
+    /** countReferencesCache.get(fromFile, toFile) is a count of all references from fromFile to toFile */
+    private final Cache<Path, Index> countReferencesCache = new Cache<>();
 
-    private static class CountReferences {
-        final Map<Ptr, Integer> counts = new HashMap<>();
-        final Instant created = Instant.now();
-    }
-
-    /** countReferencesCacheFile is the file pointed to by every ptr in countReferencesCache[_][ptr] */
+    /**
+     * countReferencesCacheFile is the target of every reference currently in countReferencesCache. Index#needsUpdate(_)
+     * assumes that the user edits one file at a time, and checks whether edits to that file invalidate the cached
+     * index. To guarantee this assumption, we simply invalidate all cached indices when the user changes files.
+     */
     private URI countReferencesCacheFile = URI.create("file:///NONE");
 
-    private void updateCountReferencesCache(URI toFile, Collection<URI> fromFiles) {
-        // If cached file has changed, invalidate the whole cache
-        if (!toFile.equals(countReferencesCacheFile)) {
-            LOG.info(String.format("Cache count-references %s", Parser.fileName(toFile)));
+    private void updateCountReferencesCache(Collection<URI> fromUris, URI toUri, Collection<Element> toEls) {
+        // If the user changes files, invalidate all cached indices
+        if (!toUri.equals(countReferencesCacheFile)) {
             countReferencesCache.clear();
-            countReferencesCacheFile = toFile;
+            countReferencesCacheFile = toUri;
         }
-
-        // Figure out which from-files are out-of-date
+        // Convert Element to Ptr, which can be compared across compilation tasks
+        var toPtrs = new HashSet<Ptr>();
+        for (var el : toEls) {
+            toPtrs.add(new Ptr(el));
+        }
+        // Check which files need to be udpated
         var outOfDate = new HashSet<URI>();
-        for (var f : fromFiles) {
-            Instant modified;
-            try {
-                modified = Files.getLastModifiedTime(Paths.get(f)).toInstant();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            var expired =
-                    !countReferencesCache.containsKey(f) || countReferencesCache.get(f).created.isBefore(modified);
-            if (expired) {
-                countReferencesCache.remove(f);
-                outOfDate.add(f);
-            }
+        var toFile = Paths.get(toUri);
+        for (var fromUri : fromUris) {
+            var fromFile = Paths.get(fromUri);
+            var needsUpdate =
+                    countReferencesCache.needs(fromFile, toFile)
+                            || countReferencesCache.get(fromFile, toFile).needsUpdate(toPtrs);
+            if (needsUpdate) outOfDate.add(fromFile.toUri());
         }
-
-        // Compile all out-of-date files
-        if (outOfDate.isEmpty()) return;
-        LOG.info(
-                String.format(
-                        "...%d files need to be counted for references to %s",
-                        outOfDate.size(), Parser.fileName(toFile)));
-        outOfDate.add(toFile);
-        countReferencesCache.remove(toFile);
-        var batch = compiler.compileBatch(latestText(outOfDate));
+        // If indexes are all up-to-date, we are done
+        if (outOfDate.isEmpty()) {
+            LOG.info(String.format("...all references to %s are already indexed", Parser.fileName(toUri)));
+            return;
+        }
+        // Compile all files that need to be updated in a batch
+        outOfDate.add(toUri);
+        var batch = compiler.compileBatch(outOfDate);
 
         // Find all declarations in toFile
-        var allEls = batch.declarations(toFile);
+        var toElsAgain = batch.declarations(toUri);
 
-        // Find all references to all declarations
-        var refs = batch.references(allEls);
-
-        // Reset all counts for files we just re-compiled
+        // Index outOfDate
+        LOG.info(
+                String.format(
+                        "...search for references to %d elements in %d files", toElsAgain.size(), outOfDate.size()));
         for (var fromUri : outOfDate) {
-            countReferencesCache.put(fromUri, new CountReferences());
-        }
-
-        // Increment cached counts
-        for (var to : refs.keySet()) {
-            var toPtr = new Ptr(to);
-
-            for (var from : refs.get(to)) {
-                var fromUri = from.getCompilationUnit().getSourceFile().toUri();
-                var counts = countReferencesCache.computeIfAbsent(fromUri, __ -> new CountReferences());
-                var c = counts.counts.getOrDefault(toPtr, 0);
-                counts.counts.put(toPtr, c + 1);
-            }
-        }
-
-        // Ensure that all fromFiles are in the cache, even if they contain no references to toFile
-        for (var fromUri : fromFiles) {
-            countReferencesCache.computeIfAbsent(fromUri, __ -> new CountReferences());
+            var fromFile = Paths.get(fromUri);
+            var index = batch.index(fromUri, toElsAgain);
+            countReferencesCache.load(fromFile, toFile, index);
         }
     }
 

@@ -70,4 +70,8 @@ class Cache<K, V> {
         }
         return map.get(k).value;
     }
+
+    void clear() {
+        map.clear();
+    }
 }

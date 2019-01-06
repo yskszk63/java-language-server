@@ -47,6 +47,21 @@ public class CompileFile {
         return trees.getSourcePositions();
     }
 
+    /**
+     * Find all elements in `file` that get turned into code-lenses. This needs to match the result of
+     * `ParseFile#declarations`
+     */
+    public List<Element> declarations() {
+        var paths = ParseFile.declarations(root);
+        var els = new ArrayList<Element>();
+        for (var p : paths) {
+            var e = trees.getElement(p);
+            assert e != null;
+            els.add(e);
+        }
+        return els;
+    }
+
     public Optional<Element> element(int line, int character) {
         // LOG.info(String.format("Looking for element at %s(%d,%d)...", file.getPath(), line, character));
 

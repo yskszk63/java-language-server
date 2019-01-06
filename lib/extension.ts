@@ -6,6 +6,7 @@ import * as FS from "fs";
 import { window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation } from 'vscode';
 import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType} from "vscode-languageclient";
 
+// If we want to profile using VisualVM, we have to run the language server using regular java, not jlink
 const visualVm = false;
 
 /** Called when extension is activated */

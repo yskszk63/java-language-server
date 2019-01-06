@@ -86,4 +86,10 @@ class WarnUnused extends TreePathScanner<Void, Void> {
         used.add(current());
         return super.visitMemberReference(t, null);
     }
+
+    @Override
+    public Void visitNewClass(NewClassTree t, Void __) {
+        used.add(current());
+        return super.visitNewClass(t, null);
+    }
 }
