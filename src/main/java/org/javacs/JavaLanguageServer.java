@@ -1020,7 +1020,7 @@ class JavaLanguageServer extends LanguageServer {
         var line = data.get(2).getAsInt() + 1;
         var character = data.get(3).getAsInt() + 1;
         // Update command
-        var count = countReferencesTitle(uri, line, character);
+        var count = countReferences(uri, line, character);
         String title;
         if (count == -1) title = "? references";
         else if (count == 1) title = "1 reference";
@@ -1035,95 +1035,133 @@ class JavaLanguageServer extends LanguageServer {
         return unresolved;
     }
 
-    private int countReferencesTitle(URI toUri, int toLine, int toColumn) {
-        LOG.warning(String.format("Count references to %s(%d,%d)...", toUri.getPath(), toLine, toColumn));
+    /**
+     * countReferencesCcacheCountReferencesFileacheFile is the target of every reference currently in
+     * countReferencesCache. Index#needsUpdate(_) assumes that the user edits one file at a time, and checks whether
+     * edits to that file invalidate the cached index. To guarantee this assumption, we simply invalidate all cached
+     * indices when the user changes files.
+     */
+    private URI cacheCountReferencesFile = URI.create("file:///NONE");
+    /** cacheCountReferences[toDeclaration] is a list of all files that have references to toDeclaration */
+    private final Map<Ptr, List<Index>> cacheCountReferences = new HashMap<>();
+    /**
+     * cacheCountReferences[toDeclaration] == TOO_EXPENSIVE indicates there are too many potential references to
+     * toDeclaration
+     */
+    private static final List<Index> TOO_EXPENSIVE = new ArrayList<>();
+    /** countReferencesCache[fromFile] is a count of all references from fromFile to cacheCountReferencesFile */
+    private final Map<URI, Index> cacheIndex = new HashMap<>();
 
-        // Compile from-file and identify element under cursor
+    private boolean cacheCountReferencesNeedsUpdate(Ptr toPtr, Set<Ptr> signature) {
+        if (!cacheCountReferences.containsKey(toPtr)) return true;
+        for (var index : cacheCountReferences.get(toPtr)) {
+            if (index.needsUpdate(signature)) return true;
+        }
+        return false;
+    }
+
+    private int countReferences(URI toUri, int toLine, int toColumn) {
+        // If the user changes files, invalidate all cached indices
+        if (!toUri.equals(cacheCountReferencesFile)) {
+            cacheCountReferences.clear();
+            cacheIndex.clear();
+            cacheCountReferencesFile = toUri;
+        }
+
+        // Make sure the active file is compiled
         updateActiveFile(toUri);
+
+        // Find the element we want to count references to
         var toEl = activeFileCache.element(toLine, toColumn);
         if (!toEl.isPresent()) {
             LOG.warning("...no element at code lens");
             return -1;
         }
-
-        // TODO if new Ptr(toEl) has already been counted, we don't need to re-count unless from-files have been
-        // modified or contain errors
-
-        // Compile all files that *might* contain references to toEl
-        var fromUris = compiler.potentialReferences(toEl.get());
-        fromUris.add(toUri);
-
-        // If it's too expensive to compute the code lens
-        if (fromUris.size() > 10) return 100;
-
-        // Make sure all fromUris -> toUri references are in the cache
-        var declarations = activeFileCache.declarations();
-        updateCountReferencesCache(fromUris, toUri, declarations);
-
-        // Count up how many total references exist in fromUris
         var toPtr = new Ptr(toEl.get());
-        var count = 0;
-        for (var fromUri : fromUris) {
-            var fromFile = Paths.get(fromUri);
-            var toFile = Paths.get(toUri);
-            var cachedFileCounts = countReferencesCache.get(fromFile, toFile);
-            count += cachedFileCounts.count(toPtr);
+
+        // Find the signature of the target file
+        var declarations = activeFileCache.declarations();
+        var signature = new HashSet<Ptr>();
+        for (var el : declarations) {
+            signature.add(new Ptr(el));
         }
+
+        // If the signature has changed, or the from-files contain errors, we need to redo the count
+        if (cacheCountReferencesNeedsUpdate(toPtr, signature)) {
+            LOG.info(String.format("Count references to `%s`...", toPtr));
+
+            // Compile all files that *might* contain references to toEl
+            var fromUris = compiler.potentialReferences(toEl.get());
+            fromUris.add(toUri);
+
+            // If it's too expensive to compute the code lens
+            if (fromUris.size() > 10) {
+                LOG.info(
+                        String.format(
+                                "...there are %d potential references, which is too expensive to compile",
+                                fromUris.size()));
+                cacheCountReferences.put(toPtr, TOO_EXPENSIVE);
+            } else {
+                // Make sure all fromUris -> toUri references are in cacheIndex
+                var list = index(fromUris, toUri, signature);
+                cacheCountReferences.put(toPtr, list);
+            }
+        } else {
+            LOG.info(String.format("Using cached count references to `%s`", toPtr));
+        }
+
+        // Count up references out of index
+        var count = 0;
+        var list = cacheCountReferences.get(toPtr);
+        if (list == TOO_EXPENSIVE) return 100;
+        for (var index : list) {
+            count += index.count(toPtr);
+        }
+
         return count;
     }
 
-    /** countReferencesCache.get(fromFile, toFile) is a count of all references from fromFile to toFile */
-    private final Cache<Path, Index> countReferencesCache = new Cache<>();
+    private boolean cacheIndexNeedsUpdate(URI fromUri, Set<Ptr> signature) {
+        if (!cacheIndex.containsKey(fromUri)) return true;
+        return cacheIndex.get(fromUri).needsUpdate(signature);
+    }
 
-    /**
-     * countReferencesCacheFile is the target of every reference currently in countReferencesCache. Index#needsUpdate(_)
-     * assumes that the user edits one file at a time, and checks whether edits to that file invalidate the cached
-     * index. To guarantee this assumption, we simply invalidate all cached indices when the user changes files.
-     */
-    private URI countReferencesCacheFile = URI.create("file:///NONE");
-
-    private void updateCountReferencesCache(Collection<URI> fromUris, URI toUri, Collection<Element> toEls) {
-        // If the user changes files, invalidate all cached indices
-        if (!toUri.equals(countReferencesCacheFile)) {
-            countReferencesCache.clear();
-            countReferencesCacheFile = toUri;
-        }
-        // Convert Element to Ptr, which can be compared across compilation tasks
-        var toPtrs = new HashSet<Ptr>();
-        for (var el : toEls) {
-            toPtrs.add(new Ptr(el));
-        }
-        // Check which files need to be udpated
+    private List<Index> index(Collection<URI> fromUris, URI toUri, Set<Ptr> signature) {
+        // Check which files need to be updated
         var outOfDate = new HashSet<URI>();
-        var toFile = Paths.get(toUri);
         for (var fromUri : fromUris) {
-            var fromFile = Paths.get(fromUri);
-            var needsUpdate =
-                    countReferencesCache.needs(fromFile, toFile)
-                            || countReferencesCache.get(fromFile, toFile).needsUpdate(toPtrs);
-            if (needsUpdate) outOfDate.add(fromFile.toUri());
+            if (cacheIndexNeedsUpdate(fromUri, signature)) {
+                outOfDate.add(fromUri);
+            }
         }
-        // If indexes are all up-to-date, we are done
-        if (outOfDate.isEmpty()) {
-            LOG.info(String.format("...all references to %s are already indexed", Parser.fileName(toUri)));
-            return;
-        }
-        // Compile all files that need to be updated in a batch
-        outOfDate.add(toUri);
-        var batch = compiler.compileBatch(outOfDate);
 
-        // Find all declarations in toFile
-        var toElsAgain = batch.declarations(toUri);
+        // Update out-of-date indices
+        if (!outOfDate.isEmpty()) {
+            // Compile all files that need to be updated in a batch
+            outOfDate.add(toUri);
+            var batch = compiler.compileBatch(outOfDate);
 
-        // Index outOfDate
-        LOG.info(
-                String.format(
-                        "...search for references to %d elements in %d files", toElsAgain.size(), outOfDate.size()));
-        for (var fromUri : outOfDate) {
-            var fromFile = Paths.get(fromUri);
-            var index = batch.index(fromUri, toElsAgain);
-            countReferencesCache.load(fromFile, toFile, index);
+            // Find all declarations in toFile
+            var toEls = batch.declarations(toUri);
+
+            // Index outOfDate
+            LOG.info(
+                    String.format(
+                            "...search for references to %d elements in %d files", toEls.size(), outOfDate.size()));
+            for (var fromUri : outOfDate) {
+                var index = batch.index(fromUri, toEls);
+                cacheIndex.put(fromUri, index);
+            }
+        } else {
+            LOG.info("...all indexes are cached and up-to-date");
         }
+
+        // List all indices
+        var list = new ArrayList<Index>();
+        for (var fromUri : fromUris) {
+            list.add(cacheIndex.get(fromUri));
+        }
+        return list;
     }
 
     @Override
