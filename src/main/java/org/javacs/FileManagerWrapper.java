@@ -20,6 +20,8 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 
+// TODO instead of forwarding to delegate, implement a from-scratch JavaFileManager that knows how to get open text from
+// FileStore
 class FileManagerWrapper implements StandardJavaFileManager {
     private final StandardJavaFileManager delegate;
 

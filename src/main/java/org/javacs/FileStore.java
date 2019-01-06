@@ -97,21 +97,30 @@ class FileStore {
         return activeDocuments.keySet();
     }
 
-    static int version(URI openFile) {
-        if (!activeDocuments.containsKey(openFile)) return -1;
-        return activeDocuments.get(openFile).version;
+    static int version(URI file) {
+        if (!activeDocuments.containsKey(file)) return -1;
+        return activeDocuments.get(file).version;
     }
 
-    static String contents(URI openFile) {
-        if (!isJavaFile(openFile)) {
-            LOG.warning("Ignoring non-java file " + openFile);
+    static String contents(URI file) {
+        if (!isJavaFile(file)) {
+            LOG.warning("Ignoring non-java file " + file);
             return "";
         }
-        if (activeDocuments.containsKey(openFile)) {
-            return activeDocuments.get(openFile).content;
+        if (activeDocuments.containsKey(file)) {
+            return activeDocuments.get(file).content;
         }
         try {
-            return Files.readAllLines(Paths.get(openFile)).stream().collect(Collectors.joining("\n"));
+            // TODO I think there is a faster path here
+            return Files.readAllLines(Paths.get(file)).stream().collect(Collectors.joining("\n"));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static BufferedReader lines(Path file) {
+        try {
+            return Files.newBufferedReader(file);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

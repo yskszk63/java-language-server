@@ -124,6 +124,7 @@ public class JavaCompilerService {
     public CompileBatch compileBatch(Collection<URI> uris, ReportProgress progress) {
         var files = new ArrayList<File>();
         for (var p : uris) files.add(new File(p));
+        // TODO should get current contents of open files from FileStore
         var sources = fileManager.getJavaFileObjectsFromFiles(files);
         var list = new ArrayList<JavaFileObject>();
         for (var s : sources) list.add(s);
@@ -140,6 +141,7 @@ public class JavaCompilerService {
         // Construct list of sources
         var files = new ArrayList<File>();
         for (var p : uris) files.add(new File(p));
+        // TODO should get current contents of open files from FileStore
         var sources = fileManager.getJavaFileObjectsFromFiles(files);
 
         // Create task
@@ -438,9 +440,8 @@ public class JavaCompilerService {
 
     private boolean containsTopLevelDeclaration(Path file, String simpleClassName) {
         var find = Pattern.compile("\\b(class|interface|enum) +" + simpleClassName + "\\b");
-        try (var lines = Files.newBufferedReader(file)) {
-            var line = lines.readLine();
-            while (line != null) {
+        try (var lines = FileStore.lines(file)) {
+            for (var line = lines.readLine(); line != null; line = lines.readLine()) {
                 if (find.matcher(line).find()) return true;
                 line = lines.readLine();
             }

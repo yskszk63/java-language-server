@@ -27,7 +27,6 @@ public class BenchmarkPruner {
                 var file = it.next();
                 if (!Files.isRegularFile(file)) continue;
                 var contents = String.join("\n", Files.readAllLines(file));
-                ;
                 if (prune) {
                     contents = Pruner.prune(file.toUri(), contents, "isWord");
                 }

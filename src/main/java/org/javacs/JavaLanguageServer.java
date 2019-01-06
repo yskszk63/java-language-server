@@ -362,6 +362,8 @@ class JavaLanguageServer extends LanguageServer {
         }
         // Compile again, focusing on a region that depends on what type of completion we want to do
         var ctx = maybeCtx.get();
+        // TODO CompileFocus should have a "patch" mechanism where we recompile the current file without creating a new
+        // task
         var focus = compiler.compileFocus(uri, content, ctx.line, ctx.character);
         // Do a specific type of completion
         List<Completion> cs;
@@ -750,6 +752,8 @@ class JavaLanguageServer extends LanguageServer {
         var content = FileStore.contents(uri);
         var line = position.position.line + 1;
         var column = position.position.character + 1;
+        // TODO CompileFocus should have a "patch" mechanism where we recompile the current file without creating a new
+        // task
         var focus = compiler.compileFocus(uri, content, line, column);
         var help = focus.methodInvocation().map(this::asSignatureHelp);
         return help;

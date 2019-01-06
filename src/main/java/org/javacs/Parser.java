@@ -7,7 +7,6 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.logging.Logger;
@@ -38,6 +37,7 @@ class Parser {
     }
 
     static JavacTask parseTask(Path source) {
+        // TODO should get current contents of open files from FileStore
         JavaFileObject file =
                 fileManager.getJavaFileObjectsFromFiles(Collections.singleton(source.toFile())).iterator().next();
         return parseTask(file);
@@ -239,11 +239,8 @@ class Parser {
         var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
         var importStatic = Pattern.compile("^import +static +" + toPackage + "\\." + toClass);
         var startOfClass = Pattern.compile("^[\\w ]*class +\\w+");
-        // TODO this needs to use open text if available
-        try (var read = Files.newBufferedReader(file)) {
-            while (true) {
-                var line = read.readLine();
-                if (line == null) return false;
+        try (var lines = FileStore.lines(file)) {
+            for (var line = lines.readLine(); line != null; line = lines.readLine()) {
                 if (startOfClass.matcher(line).find()) return false;
                 if (samePackage.matcher(line).find()) return true;
                 if (importClass.matcher(line).find()) return true;
@@ -254,14 +251,14 @@ class Parser {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        return false;
     }
 
     static String packageName(Path file) {
         var packagePattern = Pattern.compile("^package +(.*);");
         var startOfClass = Pattern.compile("^[\\w ]*class +\\w+");
-        // TODO this needs to use open text if available
-        try (var read = Files.newBufferedReader(file)) {
-            for (var line = read.readLine(); line != null; line = read.readLine()) {
+        try (var lines = FileStore.lines(file)) {
+            for (var line = lines.readLine(); line != null; line = lines.readLine()) {
                 if (startOfClass.matcher(line).find()) return "";
                 var matchPackage = packagePattern.matcher(line);
                 if (matchPackage.matches()) {
@@ -269,21 +266,19 @@ class Parser {
                     return id;
                 }
             }
-            return "";
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        return "";
     }
 
     static Set<String> importsPackages(Path file) {
         var importStatic = Pattern.compile("^import +static +(.+);");
         var importAny = Pattern.compile("^import +(.+);");
         var startOfClass = Pattern.compile("^[\\w ]*class +\\w+");
-        // TODO this needs to use open text if available
-        try (var read = Files.newBufferedReader(file)) {
-            var pkgs = new HashSet<String>();
-
-            for (var line = read.readLine(); line != null; line = read.readLine()) {
+        var pkgs = new HashSet<String>();
+        try (var lines = FileStore.lines(file)) {
+            for (var line = lines.readLine(); line != null; line = lines.readLine()) {
                 if (startOfClass.matcher(line).find()) break;
                 var matchImportStatic = importStatic.matcher(line);
                 if (matchImportStatic.matches()) {
@@ -305,11 +300,10 @@ class Parser {
                     pkgs.add(id);
                 }
             }
-
-            return pkgs;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        return pkgs;
     }
 
     /** Find all already-imported symbols in all .java files in workspace */
@@ -320,11 +314,8 @@ class Parser {
         var importStar = Pattern.compile("^import +([\\w\\.]+)\\.\\*;");
         var importSimple = Pattern.compile("^import +(\\w+);");
         for (var path : allJavaFiles) {
-            try (var lines = Files.newBufferedReader(path)) {
-                while (true) {
-                    var line = lines.readLine();
-                    // If we reach the end of the file, stop looking for imports
-                    if (line == null) break;
+            try (var lines = FileStore.lines(path)) {
+                for (var line = lines.readLine(); line != null; line = lines.readLine()) {
                     // If we reach a class declaration, stop looking for imports
                     // TODO This could be a little more specific
                     if (line.contains("class")) break;

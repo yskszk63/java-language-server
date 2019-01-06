@@ -4,11 +4,8 @@ import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.util.*;
@@ -218,13 +215,7 @@ public class CompileBatch {
 
     public Optional<Range> range(TreePath path) {
         var uri = path.getCompilationUnit().getSourceFile().toUri();
-        var file = Paths.get(uri);
-        String contents;
-        try {
-            contents = Files.readAllLines(file).stream().collect(Collectors.joining("\n"));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        var contents = FileStore.contents(uri);
         return ParseFile.range(task, contents, path);
     }
 

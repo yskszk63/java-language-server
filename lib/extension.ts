@@ -7,6 +7,7 @@ import { window, workspace, ExtensionContext, commands, tasks, Task, TaskExecuti
 import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType} from "vscode-languageclient";
 
 // If we want to profile using VisualVM, we have to run the language server using regular java, not jlink
+// This is intended to be used in the 'F5' debug-extension mode, where the extension is running against the actual source, not build.vsix
 const visualVm = false;
 
 /** Called when extension is activated */

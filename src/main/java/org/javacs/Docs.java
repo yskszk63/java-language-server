@@ -45,6 +45,7 @@ public class Docs {
         // Find the file el was declared in
         var className = ptr.qualifiedClassName();
         try {
+            // TODO should get current contents of open files from FileStore
             var fromSourcePath =
                     fileManager.getJavaFileForInput(
                             StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
@@ -55,6 +56,7 @@ public class Docs {
             for (var module : Classes.JDK_MODULES) {
                 var moduleLocation = fileManager.getLocationForModule(StandardLocation.MODULE_SOURCE_PATH, module);
                 if (moduleLocation == null) continue;
+                // TODO should get current contents of open files from FileStore
                 var fromModuleSourcePath =
                         fileManager.getJavaFileForInput(moduleLocation, className, JavaFileObject.Kind.SOURCE);
                 if (fromModuleSourcePath != null) {
