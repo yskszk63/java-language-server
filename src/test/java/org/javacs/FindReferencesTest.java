@@ -5,13 +5,10 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 import org.javacs.lsp.*;
 import org.junit.Test;
 
 public class FindReferencesTest {
-    private static final Logger LOG = Logger.getLogger("main");
-
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     protected List<String> items(String file, int row, int column) {

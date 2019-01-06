@@ -437,7 +437,6 @@ public class CompileFocus {
 
     private List<ExecutableElement> thisMethods() {
         var thisType = enclosingClass();
-        var types = task.getTypes();
         var result = new ArrayList<ExecutableElement>();
 
         if (thisType instanceof DeclaredType) {

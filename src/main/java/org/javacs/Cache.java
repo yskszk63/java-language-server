@@ -6,51 +6,68 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
+import java.util.Objects;
 
+/** Cache maps a file + an arbitrary key to a value. When the file is modified, the mapping expires. */
 class Cache<K, V> {
-    private class Entry {
+    private class Key {
+        final Path file;
+        final K key;
+
+        Key(Path file, K key) {
+            this.file = file;
+            this.key = key;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (other.getClass() != Key.class) return false;
+            var that = (Key) other;
+            return Objects.equals(this.key, that.key) && Objects.equals(this.file, that.file);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(file, key);
+        }
+    }
+
+    private class Value {
         final V value;
         final Instant created = Instant.now();
 
-        Entry(V value) {
+        Value(V value) {
             this.value = value;
         }
     }
 
-    private Map<K, Entry> map = new HashMap<>();
+    private final Map<Key, Value> map = new HashMap<>();
 
-    private final Function<K, V> loader;
+    boolean needs(Path file, K key) {
+        // If key is not in map, it needs to be loaded
+        if (!map.containsKey(key)) return true;
 
-    private final Function<K, Path> asFile;
-
-    Cache(Function<K, V> loader, Function<K, Path> asFile) {
-        this.loader = loader;
-        this.asFile = asFile;
-    }
-
-    private void load(K key) {
-        // TODO limit total size of cache
-        var value = loader.apply(key);
-        map.put(key, new Entry(value));
-    }
-
-    V get(K key) {
-        // Check if file is missing from cache
-        if (!map.containsKey(key)) load(key);
-
-        // Check if file is out-of-date
+        // If key was loaded before file was last modified, it needs to be reloaded
         var value = map.get(key);
-        var file = asFile.apply(key);
         Instant modified;
         try {
             modified = Files.getLastModifiedTime(file).toInstant();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        if (value.created.isBefore(modified)) load(key);
+        return value.created.isBefore(modified);
+    }
 
-        // Get up-to-date file from cache
-        return map.get(key).value;
+    void load(Path file, K key, V value) {
+        // TODO limit total size of cache
+        map.put(new Key(file, key), new Value(value));
+    }
+
+    V get(Path file, K key) {
+        var k = new Key(file, key);
+        if (!map.containsKey(k)) {
+            throw new IllegalArgumentException(k + " is not in map " + map);
+        }
+        return map.get(k).value;
     }
 }

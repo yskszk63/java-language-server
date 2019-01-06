@@ -180,94 +180,9 @@ public class JavaCompilerService {
                 diags.add(new Warning(task, path, kind, "unused", message));
             }
         }
+        // TODO hint fields that could be final
 
         return Collections.unmodifiableList(new ArrayList<>(diags));
-    }
-
-    private static class ContainsImportKey {
-        final Path file;
-        final String toPackage, toClass;
-
-        ContainsImportKey(Path file, String toPackage, String toClass) {
-            this.file = file;
-            this.toPackage = toPackage;
-            this.toClass = toClass;
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (!(other instanceof ContainsImportKey)) return false;
-            var that = (ContainsImportKey) other;
-            if (!Objects.equals(this.file, that.file)) return false;
-            if (!Objects.equals(this.toPackage, that.toPackage)) return false;
-            if (!Objects.equals(this.toClass, that.toClass)) return false;
-            return true;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(file, toPackage, toClass);
-        }
-    }
-
-    private static Cache<ContainsImportKey, Boolean> cacheContainsImport =
-            new Cache<>(k -> containsImport(k.toPackage, k.toClass, k.file), k -> k.file);
-
-    static boolean containsImport(String toPackage, String toClass, Path file) {
-        if (toPackage.isEmpty()) return true;
-        var samePackage = Pattern.compile("^package +" + toPackage + ";");
-        var importClass = Pattern.compile("^import +" + toPackage + "\\." + toClass + ";");
-        var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
-        var importStatic = Pattern.compile("^import +static +" + toPackage + "\\." + toClass);
-        var startOfClass = Pattern.compile("^[\\w ]*class +\\w+");
-        // TODO this needs to use open text if available
-        try (var read = Files.newBufferedReader(file)) {
-            while (true) {
-                var line = read.readLine();
-                if (line == null) return false;
-                if (startOfClass.matcher(line).find()) return false;
-                if (samePackage.matcher(line).find()) return true;
-                if (importClass.matcher(line).find()) return true;
-                if (importStar.matcher(line).find()) return true;
-                if (importStatic.matcher(line).find()) return true;
-                if (importClass.matcher(line).find()) return true;
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static class ContainsWordKey {
-        final Path file;
-        final String word;
-
-        ContainsWordKey(Path file, String word) {
-            this.file = file;
-            this.word = word;
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (!(other instanceof ContainsWordKey)) return false;
-            var that = (ContainsWordKey) other;
-            if (!Objects.equals(this.file, that.file)) return false;
-            if (!Objects.equals(this.word, that.word)) return false;
-            return true;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(file, word);
-        }
-    }
-
-    private static Cache<ContainsWordKey, Boolean> cacheContainsWord =
-            new Cache<>(k -> containsWord(k.word, k.file), k -> k.file);
-
-    static boolean containsWord(String name, Path file) {
-        if (!name.matches("\\w*")) throw new RuntimeException(String.format("`%s` is not a word", name));
-        // TODO this needs to use open text if available
-        return Parser.containsWord(file, name);
     }
 
     public Set<URI> potentialDefinitions(Element to) {
@@ -281,16 +196,28 @@ public class JavaCompilerService {
             return set;
         }
 
-        // Check all files on source path
-        var allFiles = allJavaFiles.get();
-        LOG.info(String.format("...check %d files on the source path", allFiles.size()));
-
-        // TODO If `to` is package-private, any definitions must be in the same package
-
         if (to instanceof ExecutableElement) {
+            var allFiles = new HashSet<Path>();
+
+            // Look in files in my own package
+            var myPkg = packageName(to);
+            var myPkgFiles = sourceFilesInPackages(Set.of(myPkg));
+            allFiles.addAll(myPkgFiles);
+            LOG.info(String.format("...check %d files in package %s", myPkgFiles.size(), myPkg));
+
+            // If `to` is not package-private, look in other packages
+            if (!isPackagePrivate(to)) {
+                var descendents = descendentPackages(myPkg);
+                var files = sourceFilesInPackages(descendents);
+                allFiles.addAll(files);
+                LOG.info(
+                        String.format(
+                                "...check %d files in %d descendent packages", allFiles.size(), descendents.size()));
+            }
+
             // TODO this needs to use open text if available
             // Check if the file contains the name of `to`
-            var hasWord = hasWord(allFiles, to);
+            var hasWord = containsWord(allFiles, to);
             // Parse each file and check if the syntax tree is consistent with a definition of `to`
             // This produces some false positives, but parsing is much faster than compiling,
             // so it's an effective optimization
@@ -435,22 +362,35 @@ public class JavaCompilerService {
         return e.getSimpleName();
     }
 
+    private boolean isPackagePrivate(Element to) {
+        return !to.getModifiers().contains(Modifier.PROTECTED) && !to.getModifiers().contains(Modifier.PUBLIC);
+    }
+
     private Set<URI> scanForPotentialReferences(Element to, TreePathScanner<Void, Set<URI>> scan) {
-        // Check all files on source path
-        var allFiles = allJavaFiles.get();
-        LOG.info(String.format("...check %d files on the source path", allFiles.size()));
+        var allFiles = new HashSet<Path>();
+
+        // Look in files in my own package
+        var myPkg = packageName(to);
+        var myPkgFiles = sourceFilesInPackages(Set.of(myPkg));
+        allFiles.addAll(myPkgFiles);
+        LOG.info(String.format("...check %d files in my own package %s", myPkgFiles.size(), myPkg));
+
+        // If `to` is not package-private, look in other packages
+        if (!isPackagePrivate(to)) {
+            var descendents = descendentPackages(myPkg);
+            var files = sourceFilesInPackages(descendents);
+            allFiles.addAll(files);
+            LOG.info(String.format("...check %d files in %d descendent packages", allFiles.size(), descendents.size()));
+        }
 
         // TODO this needs to use open text if available
         // Check if the file contains the name of `to`
-        var hasWord = hasWord(allFiles, to);
-
-        // TODO If `to` is package-private, any definitions must be in the same package
+        var hasWord = containsWord(allFiles, to);
 
         // You can't reference a TypeElement without importing it
         if (to instanceof TypeElement) {
-            hasWord = hasImport(hasWord, (TypeElement) to);
+            hasWord = containsImport(hasWord, (TypeElement) to);
         }
-        // TODO for non-TypeElements, check for indirect imports
 
         // Parse each file and check if the syntax tree is consistent with a definition of `to`
         // This produces some false positives, but parsing is much faster than compiling,
@@ -461,6 +401,7 @@ public class JavaCompilerService {
             scan.scan(root, found);
         }
         LOG.info(String.format("...%d files contain matching syntax", found.size()));
+
         return found;
     }
 
@@ -539,13 +480,132 @@ public class JavaCompilerService {
         return false;
     }
 
-    private List<Path> hasWord(Collection<Path> allFiles, Element to) {
+    private static Cache<Void, Set<String>> cacheParseImportedPackages = new Cache<>();
+
+    private static Set<String> parseImportedPackages(Path file) {
+        if (cacheParseImportedPackages.needs(file, null)) {
+            var pkgs = Parser.importsPackages(file);
+            cacheParseImportedPackages.load(file, null, pkgs);
+        }
+        return cacheParseImportedPackages.get(file, null);
+    }
+
+    private static Cache<Void, String> cacheParsePackageName = new Cache<>();
+
+    private String packageName(Path file) {
+        if (cacheParsePackageName.needs(file, null)) {
+            var pkg = Parser.packageName(file);
+            cacheParsePackageName.load(file, null, pkg);
+        }
+        return cacheParsePackageName.get(file, null);
+    }
+
+    /** What packages are directly imported by child? */
+    private Set<String> importsPackages(Collection<String> children) {
+        var pkgs = new HashSet<String>();
+        for (var file : sourceFilesInPackages(children)) {
+            var fileImports = parseImportedPackages(file);
+            pkgs.addAll(fileImports);
+        }
+        return pkgs;
+    }
+
+    /** What packages transitively import parent? */
+    private Collection<String> descendentPackages(String ancestor) {
+        if (ancestor.equals("java.lang")) return allPackagesInSourcePath();
+
+        // invert[parent] is a set of all the packages that import parent
+        var invert = isImportedBy();
+
+        // Find all packages that transitively import ancestor
+        var descendents = new HashSet<String>();
+        var todo = new ArrayDeque<String>();
+        var done = new HashSet<String>();
+        todo.add(ancestor);
+        while (!todo.isEmpty()) {
+            var next = todo.pop();
+            if (!invert.containsKey(next)) continue;
+            var children = invert.get(next);
+            for (var child : children) {
+                if (!descendents.contains(child)) {
+                    LOG.info(String.format("...%s imports %s", child, next));
+                    descendents.add(child);
+                }
+            }
+            done.add(next);
+            for (var i : children) {
+                if (!done.contains(i)) todo.add(i);
+            }
+        }
+        return descendents;
+    }
+
+    private Map<String, Set<String>> isImportedBy() {
+        var map = new HashMap<String, Set<String>>();
+
+        for (var f : allJavaFiles.get()) {
+            var child = packageName(f);
+            var imports = parseImportedPackages(f);
+            for (var parent : imports) {
+                if (!map.containsKey(parent)) {
+                    map.put(parent, new HashSet<>());
+                }
+                map.get(parent).add(child);
+            }
+        }
+
+        return map;
+    }
+
+    /** List .java source files in package */
+    private List<Path> sourceFilesInPackages(Collection<String> inPackage) {
+        var packagePaths = new HashSet<Path>();
+        for (var pkg : inPackage) {
+            var path = Paths.get(pkg.replace('.', File.separatorChar));
+            packagePaths.add(path);
+        }
+        var files = new ArrayList<Path>();
+        for (var f : allJavaFiles.get()) {
+            var dir = f.getParent();
+            for (var packagePath : packagePaths) {
+                if (dir.endsWith(packagePath)) {
+                    files.add(f);
+                }
+            }
+        }
+        return files;
+    }
+
+    private List<String> allPackagesInSourcePath() {
+        var pkgs = new ArrayList<String>();
+        for (var f : allJavaFiles.get()) {
+            for (var src : sourcePath) {
+                if (f.startsWith(src)) {
+                    var dir = f.getParent();
+                    var rel = src.relativize(dir);
+                    var pkg = rel.toString().replace(File.separatorChar, '.');
+                    pkgs.add(pkg);
+                }
+            }
+        }
+        return pkgs;
+    }
+
+    private static Cache<String, Boolean> cacheContainsWord = new Cache<>();
+
+    private List<Path> containsWord(Collection<Path> allFiles, Element to) {
         // Figure out which of those files have the word `to`
         var name = to.getSimpleName().toString();
         if (name.equals("<init>")) name = to.getEnclosingElement().getSimpleName().toString();
+        if (!name.matches("\\w*")) throw new RuntimeException(String.format("`%s` is not a word", name));
         var hasWord = new ArrayList<Path>();
         for (var file : allFiles) {
-            if (cacheContainsWord.get(new ContainsWordKey(file, name))) {
+            if (cacheContainsWord.needs(file, name)) {
+                // TODO this needs to use open text if available
+                var found = Parser.containsWord(file, name);
+                cacheContainsWord.load(file, name, found);
+            }
+            if (cacheContainsWord.get(file, name)) {
                 hasWord.add(file);
             }
         }
@@ -554,13 +614,20 @@ public class JavaCompilerService {
         return hasWord;
     }
 
-    private List<Path> hasImport(Collection<Path> allFiles, TypeElement to) {
+    private static Cache<String, Boolean> cacheContainsImport = new Cache<>();
+
+    private List<Path> containsImport(Collection<Path> allFiles, TypeElement to) {
         // Figure out which files import `to`, explicitly or implicitly
+        var qName = to.getQualifiedName().toString();
         var toPackage = packageName(to);
         var toClass = className(to);
         var hasImport = new ArrayList<Path>();
         for (var file : allFiles) {
-            if (cacheContainsImport.get(new ContainsImportKey(file, toPackage, toClass))) {
+            if (cacheContainsImport.needs(file, qName)) {
+                var found = Parser.containsImport(file, toPackage, toClass);
+                cacheContainsImport.load(file, qName, found);
+            }
+            if (cacheContainsImport.get(file, qName)) {
                 hasImport.add(file);
             }
         }

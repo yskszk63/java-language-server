@@ -232,6 +232,86 @@ class Parser {
         return new Location(dUri, new Range(new Position(startLine, startCol), new Position(endLine, endCol)));
     }
 
+    static boolean containsImport(Path file, String toPackage, String toClass) {
+        if (toPackage.isEmpty()) return true;
+        var samePackage = Pattern.compile("^package +" + toPackage + ";");
+        var importClass = Pattern.compile("^import +" + toPackage + "\\." + toClass + ";");
+        var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
+        var importStatic = Pattern.compile("^import +static +" + toPackage + "\\." + toClass);
+        var startOfClass = Pattern.compile("^[\\w ]*class +\\w+");
+        // TODO this needs to use open text if available
+        try (var read = Files.newBufferedReader(file)) {
+            while (true) {
+                var line = read.readLine();
+                if (line == null) return false;
+                if (startOfClass.matcher(line).find()) return false;
+                if (samePackage.matcher(line).find()) return true;
+                if (importClass.matcher(line).find()) return true;
+                if (importStar.matcher(line).find()) return true;
+                if (importStatic.matcher(line).find()) return true;
+                if (importClass.matcher(line).find()) return true;
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static String packageName(Path file) {
+        var packagePattern = Pattern.compile("^package +(.*);");
+        var startOfClass = Pattern.compile("^[\\w ]*class +\\w+");
+        // TODO this needs to use open text if available
+        try (var read = Files.newBufferedReader(file)) {
+            for (var line = read.readLine(); line != null; line = read.readLine()) {
+                if (startOfClass.matcher(line).find()) return "";
+                var matchPackage = packagePattern.matcher(line);
+                if (matchPackage.matches()) {
+                    var id = matchPackage.group(1);
+                    return id;
+                }
+            }
+            return "";
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static Set<String> importsPackages(Path file) {
+        var importStatic = Pattern.compile("^import +static +(.+);");
+        var importAny = Pattern.compile("^import +(.+);");
+        var startOfClass = Pattern.compile("^[\\w ]*class +\\w+");
+        // TODO this needs to use open text if available
+        try (var read = Files.newBufferedReader(file)) {
+            var pkgs = new HashSet<String>();
+
+            for (var line = read.readLine(); line != null; line = read.readLine()) {
+                if (startOfClass.matcher(line).find()) break;
+                var matchImportStatic = importStatic.matcher(line);
+                if (matchImportStatic.matches()) {
+                    var id = matchImportStatic.group(1);
+                    var pkg = new StringJoiner(".");
+                    for (var part : id.split("\\.")) {
+                        var firstChar = part.charAt(0);
+                        if (Character.isUpperCase(firstChar) || firstChar == '*') break;
+                        pkg.add(part);
+                    }
+                    pkgs.add(pkg.toString());
+                    continue;
+                }
+                var matchImportAny = importAny.matcher(line);
+                if (matchImportAny.matches()) {
+                    var id = matchImportAny.group(1);
+                    var lastDot = id.lastIndexOf(".");
+                    if (lastDot != -1) id = id.substring(0, lastDot);
+                    pkgs.add(id);
+                }
+            }
+
+            return pkgs;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     /** Find all already-imported symbols in all .java files in workspace */
     static ExistingImports existingImports(Collection<Path> allJavaFiles) {
         var classes = new HashSet<String>();

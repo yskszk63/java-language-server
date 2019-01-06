@@ -42,9 +42,9 @@ public class ParserTest {
     @Test
     public void largeFilePossibleReference() {
         var largeFile = Paths.get(FindResource.uri("/org/javacs/example/LargeFile.java"));
-        assertTrue(JavaCompilerService.containsImport("java.util.logging", "Logger", largeFile));
-        assertTrue(JavaCompilerService.containsWord("removeMethodBodies", largeFile));
-        assertFalse(JavaCompilerService.containsWord("removeMethodBodiez", largeFile));
+        assertTrue(Parser.containsImport(largeFile, "java.util.logging", "Logger"));
+        assertTrue(Parser.containsWord(largeFile, "removeMethodBodies"));
+        assertFalse(Parser.containsWord(largeFile, "removeMethodBodiez"));
     }
 
     @Test
