@@ -328,7 +328,7 @@ public class JavaCompilerService {
                 return files;
             }
             // If the declaring file isn't a normal file, for example if it's in src.zip
-            if (!JavaLanguageServer.isJavaFile(toFile.get())) {
+            if (!FileStore.isJavaFile(toFile.get())) {
                 LOG.info(String.format("...%s is not on the source path", toFile.get()));
                 return files;
             }

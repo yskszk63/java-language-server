@@ -14,12 +14,8 @@ import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreePath;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.StringReader;
-import java.io.StringWriter;
 import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -37,7 +33,6 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.UUID;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -47,8 +42,6 @@ import javax.tools.JavaFileObject;
 import org.javacs.lsp.*;
 
 class JavaLanguageServer extends LanguageServer {
-    private static final Logger LOG = Logger.getLogger("main");
-
     // TODO allow multiple workspace roots
     private Path workspaceRoot;
     private SourcePath sourcePath;
@@ -57,7 +50,6 @@ class JavaLanguageServer extends LanguageServer {
     private Set<Path> classPath = Set.of();
 
     JavaCompilerService compiler;
-    private final Map<URI, VersionedContent> activeDocuments = new HashMap<>();
 
     private static int severity(Diagnostic.Kind kind) {
         switch (kind) {
@@ -102,7 +94,7 @@ class JavaLanguageServer extends LanguageServer {
                 continue;
             }
             // Find start and end position
-            var content = contents(uri);
+            var content = FileStore.contents(uri);
             var start = position(content, j.getStartPosition());
             var end = position(content, j.getEndPosition());
             var d = new org.javacs.lsp.Diagnostic();
@@ -272,7 +264,7 @@ class JavaLanguageServer extends LanguageServer {
         var created = new HashSet<Path>();
         var deleted = new HashSet<Path>();
         for (var c : params.changes) {
-            if (!isJavaFile(c.uri)) continue;
+            if (!FileStore.isJavaFile(c.uri)) continue;
             var file = Paths.get(c.uri);
             switch (c.type) {
                 case FileChangeType.Created:
@@ -347,8 +339,8 @@ class JavaLanguageServer extends LanguageServer {
         // TODO reuse previous compilation when changes are small
         var started = Instant.now();
         var uri = position.textDocument.uri;
-        if (!isJavaFile(uri)) return Optional.empty();
-        var content = contents(uri);
+        if (!FileStore.isJavaFile(uri)) return Optional.empty();
+        var content = FileStore.contents(uri);
         var line = position.position.line + 1;
         var column = position.position.character + 1;
         // Figure out what kind of completion we want to do
@@ -634,10 +626,12 @@ class JavaLanguageServer extends LanguageServer {
 
     // TODO take only URI and invalidate based on version
     private void updateActiveFile(URI uri) {
-        if (activeFileCache == null || !activeFileCache.file.equals(uri) || activeFileCacheVersion != version(uri)) {
+        if (activeFileCache == null
+                || !activeFileCache.file.equals(uri)
+                || activeFileCacheVersion != FileStore.version(uri)) {
             LOG.info("Recompile active file...");
-            activeFileCache = compiler.compileFile(uri, contents(uri));
-            activeFileCacheVersion = version(uri);
+            activeFileCache = compiler.compileFile(uri, FileStore.contents(uri));
+            activeFileCacheVersion = FileStore.version(uri);
         }
     }
 
@@ -645,7 +639,7 @@ class JavaLanguageServer extends LanguageServer {
     public Optional<Hover> hover(TextDocumentPositionParams position) {
         // Compile entire file if it's changed since last hover
         var uri = position.textDocument.uri;
-        if (!isJavaFile(uri)) return Optional.empty();
+        if (!FileStore.isJavaFile(uri)) return Optional.empty();
         updateActiveFile(uri);
 
         // Find element undeer cursor
@@ -749,8 +743,8 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public Optional<SignatureHelp> signatureHelp(TextDocumentPositionParams position) {
         var uri = position.textDocument.uri;
-        if (!isJavaFile(uri)) return Optional.empty();
-        var content = contents(uri);
+        if (!FileStore.isJavaFile(uri)) return Optional.empty();
+        var content = FileStore.contents(uri);
         var line = position.position.line + 1;
         var column = position.position.character + 1;
         var focus = compiler.compileFocus(uri, content, line, column);
@@ -761,7 +755,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public Optional<List<Location>> gotoDefinition(TextDocumentPositionParams position) {
         var fromUri = position.textDocument.uri;
-        if (!isJavaFile(fromUri)) return Optional.empty();
+        if (!FileStore.isJavaFile(fromUri)) return Optional.empty();
         var fromLine = position.position.line + 1;
         var fromColumn = position.position.character + 1;
 
@@ -802,7 +796,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public Optional<List<Location>> findReferences(ReferenceParams position) {
         var toUri = position.textDocument.uri;
-        if (!isJavaFile(toUri)) return Optional.empty();
+        if (!FileStore.isJavaFile(toUri)) return Optional.empty();
         var toLine = position.position.line + 1;
         var toColumn = position.position.character + 1;
 
@@ -845,7 +839,7 @@ class JavaLanguageServer extends LanguageServer {
         if (name.equals("<init>")) name = el.getEnclosingElement().getSimpleName().toString();
         var sources = new ArrayList<JavaFileObject>();
         for (var f : files) {
-            var contents = contents(f);
+            var contents = FileStore.contents(f);
             var pruned = Pruner.prune(f, contents, name);
             sources.add(new StringFileObject(pruned, f));
         }
@@ -855,7 +849,7 @@ class JavaLanguageServer extends LanguageServer {
     private List<JavaFileObject> latestText(Collection<URI> files) {
         var sources = new ArrayList<JavaFileObject>();
         for (var f : files) {
-            sources.add(new StringFileObject(contents(f), f));
+            sources.add(new StringFileObject(FileStore.contents(f), f));
         }
         return sources;
     }
@@ -865,17 +859,17 @@ class JavaLanguageServer extends LanguageServer {
     private int cacheParseVersion = -1;
 
     private void updateCachedParse(URI file) {
-        if (file.equals(cacheParseFile) && version(file) == cacheParseVersion) return;
+        if (file.equals(cacheParseFile) && FileStore.version(file) == cacheParseVersion) return;
         LOG.info(String.format("Updating cached parse file to %s", file));
-        cacheParse = compiler.parseFile(file, contents(file));
+        cacheParse = compiler.parseFile(file, FileStore.contents(file));
         cacheParseFile = file;
-        cacheParseVersion = version(file);
+        cacheParseVersion = FileStore.version(file);
     }
 
     @Override
     public List<SymbolInformation> documentSymbol(DocumentSymbolParams params) {
         var uri = params.textDocument.uri;
-        if (!isJavaFile(uri)) return List.of();
+        if (!FileStore.isJavaFile(uri)) return List.of();
         updateCachedParse(uri);
         var paths = cacheParse.documentSymbols();
         var infos = new ArrayList<SymbolInformation>();
@@ -954,7 +948,7 @@ class JavaLanguageServer extends LanguageServer {
     public List<CodeLens> codeLens(CodeLensParams params) {
         // TODO just create a blank code lens on every method, then resolve it async
         var uri = params.textDocument.uri;
-        if (!isJavaFile(uri)) return List.of();
+        if (!FileStore.isJavaFile(uri)) return List.of();
         updateCachedParse(uri);
         var declarations = cacheParse.declarations();
         var result = new ArrayList<CodeLens>();
@@ -1288,120 +1282,38 @@ class JavaLanguageServer extends LanguageServer {
         throw new RuntimeException("TODO");
     }
 
-    static boolean isJavaFile(URI uri) {
-        return uri.getScheme().equals("file") && uri.getPath().endsWith(".java");
-    }
-
     private List<URI> recentlyOpened = new ArrayList<>();
 
     @Override
     public void didOpenTextDocument(DidOpenTextDocumentParams params) {
-        var document = params.textDocument;
-        var uri = document.uri;
-        if (!isJavaFile(uri)) return;
-        LOG.info(String.format("Opened %s", Parser.fileName(uri)));
-        activeDocuments.put(uri, new VersionedContent(document.text, document.version));
-        recentlyOpened.add(uri);
-        updateCachedParse(uri); // So that subsequent documentSymbol and codeLens requests will be faster
+        FileStore.open(params);
+        recentlyOpened.add(params.textDocument.uri); // Lint this document later
+        updateCachedParse(
+                params.textDocument.uri); // So that subsequent documentSymbol and codeLens requests will be faster
     }
 
     @Override
     public void didChangeTextDocument(DidChangeTextDocumentParams params) {
-        var document = params.textDocument;
-        var uri = document.uri;
-        if (isJavaFile(uri)) {
-            var existing = activeDocuments.get(uri);
-            var newText = existing.content;
-
-            if (document.version > existing.version) {
-                for (var change : params.contentChanges) {
-                    if (change.range == null) newText = change.text;
-                    else newText = patch(newText, change);
-                }
-
-                activeDocuments.put(uri, new VersionedContent(newText, document.version));
-            } else LOG.warning("Ignored change with version " + document.version + " <= " + existing.version);
-        }
-    }
-
-    private String patch(String sourceText, TextDocumentContentChangeEvent change) {
-        try {
-            var range = change.range;
-            var reader = new BufferedReader(new StringReader(sourceText));
-            var writer = new StringWriter();
-
-            // Skip unchanged lines
-            int line = 0;
-
-            while (line < range.start.line) {
-                writer.write(reader.readLine() + '\n');
-                line++;
-            }
-
-            // Skip unchanged chars
-            for (int character = 0; character < range.start.character; character++) writer.write(reader.read());
-
-            // Write replacement text
-            writer.write(change.text);
-
-            // Skip replaced text
-            reader.skip(change.rangeLength);
-
-            // Write remaining text
-            while (true) {
-                int next = reader.read();
-
-                if (next == -1) return writer.toString();
-                else writer.write(next);
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        FileStore.change(params);
     }
 
     @Override
     public void didCloseTextDocument(DidCloseTextDocumentParams params) {
-        var document = params.textDocument;
-        var uri = document.uri;
-        if (isJavaFile(uri)) {
-            // Remove from source cache
-            activeDocuments.remove(uri);
+        FileStore.close(params);
 
+        if (FileStore.isJavaFile(params.textDocument.uri)) {
             // Clear diagnostics
-            publishDiagnostics(Collections.singletonList(uri), List.of());
+            publishDiagnostics(List.of(params.textDocument.uri), List.of());
         }
     }
 
     @Override
     public void didSaveTextDocument(DidSaveTextDocumentParams params) {
-        var uri = params.textDocument.uri;
-        if (isJavaFile(uri)) {
+        if (FileStore.isJavaFile(params.textDocument.uri)) {
             // Re-lint all active documents
-            reportErrors(activeDocuments.keySet());
+            reportErrors(FileStore.activeDocuments());
         }
     }
 
-    Set<URI> activeDocuments() {
-        return activeDocuments.keySet();
-    }
-
-    int version(URI openFile) {
-        if (!activeDocuments.containsKey(openFile)) return -1;
-        return activeDocuments.get(openFile).version;
-    }
-
-    String contents(URI openFile) {
-        if (!isJavaFile(openFile)) {
-            LOG.warning("Ignoring non-java file " + openFile);
-            return "";
-        }
-        if (activeDocuments.containsKey(openFile)) {
-            return activeDocuments.get(openFile).content;
-        }
-        try {
-            return Files.readAllLines(Paths.get(openFile)).stream().collect(Collectors.joining("\n"));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    private static final Logger LOG = Logger.getLogger("main");
 }
