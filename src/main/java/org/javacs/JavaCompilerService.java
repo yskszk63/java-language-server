@@ -141,7 +141,7 @@ public class JavaCompilerService {
         // Construct list of sources
         var files = new ArrayList<File>();
         for (var uri : uris) {
-            if (FileStore.isJavaFile(uri)) {
+            if (SourcePath.isJavaFile(uri)) {
                 files.add(new File(uri));
                 ;
             }
@@ -335,7 +335,7 @@ public class JavaCompilerService {
                 return files;
             }
             // If the declaring file isn't a normal file, for example if it's in src.zip
-            if (!FileStore.isJavaFile(toFile.get())) {
+            if (!SourcePath.isJavaFile(toFile.get())) {
                 LOG.info(String.format("...%s is not on the source path", toFile.get()));
                 return files;
             }
@@ -430,13 +430,22 @@ public class JavaCompilerService {
         var isPublic = e.getModifiers().contains(Modifier.PUBLIC);
         if (!isPublic) {
             for (var root : sourcePath) {
+                // Create directory where this package would live, if this package is in this part of the source path
                 var absDir = root.resolve(packagePath);
+                // If package isn't in this part of the source path, keep looking
+                if (!Files.exists(absDir)) continue;
+                // List dirs
+                Iterable<Path> list;
                 try {
-                    var foundFile =
-                            Files.list(absDir).filter(f -> containsTopLevelDeclaration(f, className)).findFirst();
-                    if (foundFile.isPresent()) return foundFile.map(Path::toUri);
+                    list = Files.list(absDir)::iterator;
                 } catch (IOException err) {
                     throw new RuntimeException(err);
+                }
+                // Check each .java file in the package for package-private class declarations
+                for (var f : list) {
+                    if (SourcePath.isJavaFile(f) && containsTopLevelDeclaration(f, className)) {
+                        return Optional.of(f.toUri());
+                    }
                 }
             }
         }

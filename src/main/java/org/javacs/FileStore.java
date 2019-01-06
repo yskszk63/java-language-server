@@ -55,21 +55,17 @@ class FileStore {
         }
     }
 
-    static boolean isJavaFile(URI uri) {
-        return uri.getScheme().equals("file") && uri.getPath().endsWith(".java");
-    }
-
     static void open(DidOpenTextDocumentParams params) {
         var document = params.textDocument;
         var uri = document.uri;
-        if (!isJavaFile(uri)) return;
+        if (!SourcePath.isJavaFile(uri)) return;
         activeDocuments.put(uri, new VersionedContent(document.text, document.version));
     }
 
     static void change(DidChangeTextDocumentParams params) {
         var document = params.textDocument;
         var uri = document.uri;
-        if (isJavaFile(uri)) {
+        if (SourcePath.isJavaFile(uri)) {
             var existing = activeDocuments.get(uri);
             var newText = existing.content;
 
@@ -87,7 +83,7 @@ class FileStore {
     static void close(DidCloseTextDocumentParams params) {
         var document = params.textDocument;
         var uri = document.uri;
-        if (isJavaFile(uri)) {
+        if (SourcePath.isJavaFile(uri)) {
             // Remove from source cache
             activeDocuments.remove(uri);
         }
@@ -103,7 +99,7 @@ class FileStore {
     }
 
     static String contents(URI file) {
-        if (!isJavaFile(file)) {
+        if (!SourcePath.isJavaFile(file)) {
             LOG.warning("Ignoring non-java file " + file);
             return "";
         }

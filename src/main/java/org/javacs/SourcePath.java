@@ -2,6 +2,7 @@ package org.javacs;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -93,9 +94,13 @@ class SourcePath {
         return false;
     }
 
-    private static boolean isJavaFile(Path file) {
+    static boolean isJavaFile(Path file) {
         var name = file.getFileName().toString();
         return name.endsWith(".java") && !name.equals("module-info.java");
+    }
+
+    static boolean isJavaFile(URI uri) {
+        return uri.getScheme().equals("file") && isJavaFile(Paths.get(uri));
     }
 
     private static Set<Path> allJavaFilesInDirs(Set<Path> dirs) {
