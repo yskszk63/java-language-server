@@ -197,23 +197,7 @@ public class JavaCompilerService {
         }
 
         if (to instanceof ExecutableElement) {
-            var allFiles = new HashSet<Path>();
-
-            // Look in files in my own package
-            var myPkg = packageName(to);
-            var myPkgFiles = sourceFilesInPackages(Set.of(myPkg));
-            allFiles.addAll(myPkgFiles);
-            LOG.info(String.format("...check %d files in package %s", myPkgFiles.size(), myPkg));
-
-            // If `to` is not package-private, look in other packages
-            if (!isPackagePrivate(to)) {
-                var descendents = descendentPackages(myPkg);
-                var files = sourceFilesInPackages(descendents);
-                allFiles.addAll(files);
-                LOG.info(
-                        String.format(
-                                "...check %d files in %d descendent packages", allFiles.size(), descendents.size()));
-            }
+            var allFiles = possibleFiles(to);
 
             // TODO this needs to use open text if available
             // Check if the file contains the name of `to`
@@ -367,21 +351,7 @@ public class JavaCompilerService {
     }
 
     private Set<URI> scanForPotentialReferences(Element to, TreePathScanner<Void, Set<URI>> scan) {
-        var allFiles = new HashSet<Path>();
-
-        // Look in files in my own package
-        var myPkg = packageName(to);
-        var myPkgFiles = sourceFilesInPackages(Set.of(myPkg));
-        allFiles.addAll(myPkgFiles);
-        LOG.info(String.format("...check %d files in my own package %s", myPkgFiles.size(), myPkg));
-
-        // If `to` is not package-private, look in other packages
-        if (!isPackagePrivate(to)) {
-            var descendents = descendentPackages(myPkg);
-            var files = sourceFilesInPackages(descendents);
-            allFiles.addAll(files);
-            LOG.info(String.format("...check %d files in %d descendent packages", allFiles.size(), descendents.size()));
-        }
+        var allFiles = possibleFiles(to);
 
         // TODO this needs to use open text if available
         // Check if the file contains the name of `to`
@@ -480,115 +450,30 @@ public class JavaCompilerService {
         return false;
     }
 
-    private static Cache<Void, Set<String>> cacheParseImportedPackages = new Cache<>();
-
-    private static Set<String> parseImportedPackages(Path file) {
-        if (cacheParseImportedPackages.needs(file, null)) {
-            var pkgs = Parser.importsPackages(file);
-            cacheParseImportedPackages.load(file, null, pkgs);
+    private Set<Path> possibleFiles(Element to) {
+        // If `to` is package-private, only look in my own package
+        if (isPackagePrivate(to)) {
+            var myPkg = packageName(to);
+            var allFiles = sourceFilesInPackages(myPkg);
+            LOG.info(String.format("...check %d files in my own package %s", allFiles.size(), myPkg));
         }
-        return cacheParseImportedPackages.get(file, null);
-    }
-
-    private static Cache<Void, String> cacheParsePackageName = new Cache<>();
-
-    private String packageName(Path file) {
-        if (cacheParsePackageName.needs(file, null)) {
-            var pkg = Parser.packageName(file);
-            cacheParsePackageName.load(file, null, pkg);
-        }
-        return cacheParsePackageName.get(file, null);
-    }
-
-    /** What packages are directly imported by child? */
-    private Set<String> importsPackages(Collection<String> children) {
-        var pkgs = new HashSet<String>();
-        for (var file : sourceFilesInPackages(children)) {
-            var fileImports = parseImportedPackages(file);
-            pkgs.addAll(fileImports);
-        }
-        return pkgs;
-    }
-
-    /** What packages transitively import parent? */
-    private Collection<String> descendentPackages(String ancestor) {
-        if (ancestor.equals("java.lang")) return allPackagesInSourcePath();
-
-        // invert[parent] is a set of all the packages that import parent
-        var invert = isImportedBy();
-
-        // Find all packages that transitively import ancestor
-        var descendents = new HashSet<String>();
-        var todo = new ArrayDeque<String>();
-        var done = new HashSet<String>();
-        todo.add(ancestor);
-        while (!todo.isEmpty()) {
-            var next = todo.pop();
-            if (!invert.containsKey(next)) continue;
-            var children = invert.get(next);
-            for (var child : children) {
-                if (!descendents.contains(child)) {
-                    LOG.info(String.format("...%s imports %s", child, next));
-                    descendents.add(child);
-                }
-            }
-            done.add(next);
-            for (var i : children) {
-                if (!done.contains(i)) todo.add(i);
-            }
-        }
-        return descendents;
-    }
-
-    private Map<String, Set<String>> isImportedBy() {
-        var map = new HashMap<String, Set<String>>();
-
-        for (var f : allJavaFiles.get()) {
-            var child = packageName(f);
-            var imports = parseImportedPackages(f);
-            for (var parent : imports) {
-                if (!map.containsKey(parent)) {
-                    map.put(parent, new HashSet<>());
-                }
-                map.get(parent).add(child);
-            }
-        }
-
-        return map;
+        // Otherwise search all files
+        var allFiles = allJavaFiles.get();
+        LOG.info(String.format("...check %d files", allFiles.size()));
+        return allFiles;
     }
 
     /** List .java source files in package */
-    private List<Path> sourceFilesInPackages(Collection<String> inPackage) {
-        var packagePaths = new HashSet<Path>();
-        for (var pkg : inPackage) {
-            var path = Paths.get(pkg.replace('.', File.separatorChar));
-            packagePaths.add(path);
-        }
-        var files = new ArrayList<Path>();
+    private Set<Path> sourceFilesInPackages(String inPackage) {
+        var packagePath = Paths.get(inPackage.replace('.', File.separatorChar));
+        var files = new HashSet<Path>();
         for (var f : allJavaFiles.get()) {
             var dir = f.getParent();
-            for (var packagePath : packagePaths) {
-                if (dir.endsWith(packagePath)) {
-                    files.add(f);
-                }
+            if (dir.endsWith(packagePath)) {
+                files.add(f);
             }
         }
         return files;
-    }
-
-    private List<String> allPackagesInSourcePath() {
-        var pkgs = new ArrayList<String>();
-        for (var f : allJavaFiles.get()) {
-            for (var src : sourcePath) {
-                if (f.startsWith(src)) {
-                    var dir = f.getParent();
-                    var rel = src.relativize(dir);
-                    var pkg = rel.toString().replace(File.separatorChar, '.');
-                    pkgs.add(pkg);
-                }
-            }
-        }
-        return pkgs;
     }
 
     private static Cache<String, Boolean> cacheContainsWord = new Cache<>();

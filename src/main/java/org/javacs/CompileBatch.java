@@ -286,11 +286,5 @@ public class CompileBatch {
         return ParseFile.range(task, contents, path);
     }
 
-    private static boolean isField(Element to) {
-        if (!(to instanceof VariableElement)) return false;
-        var field = (VariableElement) to;
-        return field.getEnclosingElement() instanceof TypeElement;
-    }
-
     private static final Logger LOG = Logger.getLogger("main");
 }
