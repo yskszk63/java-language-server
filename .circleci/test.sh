@@ -1,4 +1,4 @@
-java -cp $(cat cp.txt):$(pwd)/target/classes:$(pwd)/target/test-classes org.junit.runner.JUnitCore \
+java -cp $(cat target/cp.txt):$(pwd)/target/classes:$(pwd)/target/test-classes org.junit.runner.JUnitCore \
     org.javacs.ArtifactTest \
     org.javacs.ClassesTest \
     org.javacs.CodeLensTest \

@@ -39,7 +39,6 @@ jobs:
           key: v1-dependencies-{{ checksum "pom.xml" }}
         
       - run: mvn compile test-compile
-      - run: mvn dependency:build-classpath -DincludeScope=test -Dmdep.outputFile=cp.txt
       - run: ./.circleci/test.sh
 
 
