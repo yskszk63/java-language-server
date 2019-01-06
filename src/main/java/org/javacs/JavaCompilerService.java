@@ -479,17 +479,30 @@ public class JavaCompilerService {
     private static Cache<String, Boolean> cacheContainsWord = new Cache<>();
 
     private List<Path> containsWord(Collection<Path> allFiles, Element to) {
-        // Figure out which of those files have the word `to`
+        // Figure out what name we're looking for
         var name = to.getSimpleName().toString();
         if (name.equals("<init>")) name = to.getEnclosingElement().getSimpleName().toString();
         if (!name.matches("\\w*")) throw new RuntimeException(String.format("`%s` is not a word", name));
-        var hasWord = new ArrayList<Path>();
+
+        // Figure out all files that need to be re-scanned
+        var outOfDate = new ArrayList<Path>();
         for (var file : allFiles) {
             if (cacheContainsWord.needs(file, name)) {
-                // TODO this needs to use open text if available
-                var found = Parser.containsWord(file, name);
-                cacheContainsWord.load(file, name, found);
+                outOfDate.add(file);
             }
+        }
+
+        // Update those files in cacheContainsWord
+        LOG.info(String.format("...scanning %d out-of-date files for the word `%s`", outOfDate.size(), name));
+        for (var file : outOfDate) {
+            // TODO this needs to use open text if available
+            var found = Parser.containsWord(file, name);
+            cacheContainsWord.load(file, name, found);
+        }
+
+        // Assemble list of all files that contain name
+        var hasWord = new ArrayList<Path>();
+        for (var file : allFiles) {
             if (cacheContainsWord.get(file, name)) {
                 hasWord.add(file);
             }
