@@ -319,7 +319,7 @@ public class JavaCompilerService {
             return scanForPotentialReferences(to, new FindMethod());
         } else {
             // Fields, type parameters can only be referenced from within the same file
-            LOG.info(String.format("...find definition of `%s`", to));
+            LOG.info(String.format("...references to `%s` must be in the same file", to));
             var files = new HashSet<URI>();
             var toFile = declaringFile(to);
             // If there is no declaring file

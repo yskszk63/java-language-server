@@ -246,6 +246,7 @@ public class CompileBatch {
         for (var r : roots) {
             finder.scan(r, null);
         }
+        LOG.info(String.format("...found %d references", refs.size()));
         return refs;
     }
 

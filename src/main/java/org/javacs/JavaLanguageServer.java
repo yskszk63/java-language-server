@@ -110,6 +110,9 @@ class JavaLanguageServer extends LanguageServer {
             d.range = new Range(start, end);
             d.code = j.getCode();
             d.message = j.getMessage(null);
+            if (j.getCode().equals("unused")) {
+                d.tags = List.of(DiagnosticTag.Unnecessary);
+            }
             // Add to byUri
             var ds = byUri.computeIfAbsent(uri, __ -> new ArrayList<>());
             ds.add(d);
@@ -341,6 +344,7 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public Optional<CompletionList> completion(TextDocumentPositionParams position) {
+        // TODO reuse previous compilation when changes are small
         var started = Instant.now();
         var uri = position.textDocument.uri;
         if (!isJavaFile(uri)) return Optional.empty();
@@ -1019,7 +1023,7 @@ class JavaLanguageServer extends LanguageServer {
         String title;
         if (count == -1) title = "? references";
         else if (count == 1) title = "1 reference";
-        else if (count == 100) title = "Many references";
+        else if (count == 100) title = "Find references";
         else title = String.format("%d references", count);
         var arguments = new JsonArray();
         arguments.add(uri.toString());
