@@ -148,6 +148,20 @@ public class GotoTest {
     }
 
     @Test
+    public void gotoImplementsRunnable() {
+        String file = "/org/javacs/example/GotoOtherPackageMethod.java";
+
+        assertThat(doGoto(file, 7, 12), hasItem("ImplementsRunnable.java:5"));
+    }
+
+    @Test
+    public void gotoImplementsConsumer() {
+        String file = "/org/javacs/example/GotoOtherPackageMethod.java";
+
+        assertThat(doGoto(file, 11, 12), hasItem("ImplementsConsumer.java:7"));
+    }
+
+    @Test
     public void gotoError() {
         String file = "/org/javacs/example/GotoError.java";
 
