@@ -140,7 +140,12 @@ public class JavaCompilerService {
 
         // Construct list of sources
         var files = new ArrayList<File>();
-        for (var p : uris) files.add(new File(p));
+        for (var uri : uris) {
+            if (FileStore.isJavaFile(uri)) {
+                files.add(new File(uri));
+                ;
+            }
+        }
         // TODO should get current contents of open files from FileStore
         var sources = fileManager.getJavaFileObjectsFromFiles(files);
 

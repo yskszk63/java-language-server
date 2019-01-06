@@ -2,7 +2,6 @@ package org.javacs;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,7 +31,11 @@ class SourcePath {
      */
     boolean create(Set<Path> javaFiles) {
         if (javaFiles.isEmpty()) return false;
-        allJavaFiles.addAll(javaFiles);
+        for (var f : javaFiles) {
+            if (isJavaFile(f)) {
+                allJavaFiles.add(f);
+            }
+        }
         return checkSourceRoots();
     }
 
@@ -52,6 +55,7 @@ class SourcePath {
      */
     // TODO batch this
     boolean update(Path javaFile) {
+        if (!isJavaFile(javaFile)) return false;
         // Check if file is in an existing source root
         for (var root : sourceRoots) {
             if (!javaFile.startsWith(root)) continue;
@@ -89,12 +93,16 @@ class SourcePath {
         return false;
     }
 
+    private static boolean isJavaFile(Path file) {
+        var name = file.getFileName().toString();
+        return name.endsWith(".java") && !name.equals("module-info.java");
+    }
+
     private static Set<Path> allJavaFilesInDirs(Set<Path> dirs) {
         var all = new HashSet<Path>();
-        var match = FileSystems.getDefault().getPathMatcher("glob:*.java");
         for (var dir : dirs) {
             try {
-                Files.walk(dir).filter(java -> match.matches(java.getFileName())).forEach(all::add);
+                Files.walk(dir).filter(SourcePath::isJavaFile).forEach(all::add);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
