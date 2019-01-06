@@ -43,8 +43,9 @@ class Cache<K, V> {
 
     private final Map<Key, Value> map = new HashMap<>();
 
-    boolean needs(Path file, K key) {
+    boolean needs(Path file, K k) {
         // If key is not in map, it needs to be loaded
+        var key = new Key(file, k);
         if (!map.containsKey(key)) return true;
 
         // If key was loaded before file was last modified, it needs to be reloaded
@@ -58,17 +59,19 @@ class Cache<K, V> {
         return value.created.isBefore(modified);
     }
 
-    void load(Path file, K key, V value) {
+    void load(Path file, K k, V v) {
         // TODO limit total size of cache
-        map.put(new Key(file, key), new Value(value));
+        var key = new Key(file, k);
+        var value = new Value(v);
+        map.put(key, value);
     }
 
-    V get(Path file, K key) {
-        var k = new Key(file, key);
-        if (!map.containsKey(k)) {
+    V get(Path file, K k) {
+        var key = new Key(file, k);
+        if (!map.containsKey(key)) {
             throw new IllegalArgumentException(k + " is not in map " + map);
         }
-        return map.get(k).value;
+        return map.get(key).value;
     }
 
     void clear() {
