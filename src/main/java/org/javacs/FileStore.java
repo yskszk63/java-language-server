@@ -6,7 +6,9 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.net.URI;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -20,6 +22,38 @@ import org.javacs.lsp.TextDocumentContentChangeEvent;
 class FileStore {
 
     private static final Map<URI, VersionedContent> activeDocuments = new HashMap<>();
+    private static final Map<Path, Instant> modified = new HashMap<>();
+
+    static Instant modified(Path file) {
+        // If we've never checked before, look up modified time on disk
+        if (!modified.containsKey(file)) {
+            readModifiedFromDisk(file);
+        }
+
+        // Look up modified time from cache
+        return modified.get(file);
+    }
+
+    static void externalCreate(Path file) {
+        readModifiedFromDisk(file);
+    }
+
+    static void externalChange(Path file) {
+        readModifiedFromDisk(file);
+    }
+
+    static void externalDelete(Path file) {
+        modified.remove(file);
+    }
+
+    private static void readModifiedFromDisk(Path file) {
+        try {
+            var time = Files.getLastModifiedTime(file).toInstant();
+            modified.put(file, time);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     static boolean isJavaFile(URI uri) {
         return uri.getScheme().equals("file") && uri.getPath().endsWith(".java");

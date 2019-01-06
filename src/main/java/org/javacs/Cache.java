@@ -1,7 +1,5 @@
 package org.javacs;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.HashMap;
@@ -50,12 +48,7 @@ class Cache<K, V> {
 
         // If key was loaded before file was last modified, it needs to be reloaded
         var value = map.get(key);
-        Instant modified;
-        try {
-            modified = Files.getLastModifiedTime(file).toInstant();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        var modified = FileStore.modified(file);
         return value.created.isBefore(modified);
     }
 

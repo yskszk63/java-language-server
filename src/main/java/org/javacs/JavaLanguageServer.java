@@ -268,12 +268,15 @@ class JavaLanguageServer extends LanguageServer {
             var file = Paths.get(c.uri);
             switch (c.type) {
                 case FileChangeType.Created:
+                    FileStore.externalCreate(file);
                     created.add(file);
                     break;
                 case FileChangeType.Changed:
+                    FileStore.externalChange(file);
                     if (sourcePath.update(file)) changed = true;
                     break;
                 case FileChangeType.Deleted:
+                    FileStore.externalDelete(file);
                     deleted.add(file);
                     break;
             }
