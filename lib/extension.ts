@@ -4,8 +4,9 @@
 import * as Path from "path";
 import * as FS from "fs";
 import { window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation } from 'vscode';
-
 import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType} from "vscode-languageclient";
+
+const visualVm = false;
 
 /** Called when extension is activated */
 export function activate(context: ExtensionContext) {
@@ -43,6 +44,10 @@ export function activate(context: ExtensionContext) {
         command: launcher,
         args: [],
         options: { cwd: context.extensionPath }
+    }
+
+    if (visualVm) {
+        serverOptions = visualVmConfig(context);
     }
 
     // Copied from typescript
