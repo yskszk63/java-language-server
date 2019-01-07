@@ -143,9 +143,9 @@ public class JavaCompilerService {
         for (var uri : uris) {
             if (SourcePath.isJavaFile(uri)) {
                 files.add(new File(uri));
-                ;
             }
         }
+        if (files.isEmpty()) return List.of();
         // TODO should get current contents of open files from FileStore
         var sources = fileManager.getJavaFileObjectsFromFiles(files);
 
