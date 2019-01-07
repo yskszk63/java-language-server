@@ -299,7 +299,7 @@ class JavaLanguageServer extends LanguageServer {
             case ENUM_CONSTANT:
                 return CompletionItemKind.EnumMember;
             case EXCEPTION_PARAMETER:
-                return CompletionItemKind.Variable;
+                return CompletionItemKind.Property;
             case FIELD:
                 return CompletionItemKind.Field;
             case STATIC_INIT:
@@ -314,7 +314,7 @@ class JavaLanguageServer extends LanguageServer {
             case PACKAGE:
                 return CompletionItemKind.Module;
             case PARAMETER:
-                return CompletionItemKind.Variable;
+                return CompletionItemKind.Property;
             case RESOURCE_VARIABLE:
                 return CompletionItemKind.Variable;
             case TYPE_PARAMETER:

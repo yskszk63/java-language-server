@@ -19,5 +19,6 @@
     },
     "java.testMethod": ["mvn", "test", "-Dtest=${class}#${method}"],
     "java.testClass": ["mvn", "test", "-Dtest=${class}"],
+    // "typescript.tsserver.trace": "verbose",
     // "java.trace.server": "verbose",
 }
