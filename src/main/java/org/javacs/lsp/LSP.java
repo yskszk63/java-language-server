@@ -421,7 +421,9 @@ public class LSP {
                 }
             } catch (Exception e) {
                 LOG.log(Level.SEVERE, e.getMessage(), e);
-                respond(send, r.id, new ResponseError(ErrorCodes.InternalError, e.getMessage(), null));
+                if (r.id != null) {
+                    respond(send, r.id, new ResponseError(ErrorCodes.InternalError, e.getMessage(), null));
+                }
             }
         }
     }
