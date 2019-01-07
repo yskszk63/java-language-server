@@ -6,5 +6,4 @@
 ## Navigation
 - Go-to-subclasses
 - Test coverage codelens
-- Go-to-definition for overriding methods
 - Go-to-implementation for overridden methods

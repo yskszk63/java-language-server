@@ -992,7 +992,6 @@ class JavaLanguageServer extends LanguageServer {
                 var line = start.line;
                 var character = start.character;
                 var data = new JsonArray();
-                // TODO would textDocument/references do the same thing?
                 data.add("java.command.findReferences");
                 data.add(uri.toString());
                 data.add(line);
