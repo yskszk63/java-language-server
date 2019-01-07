@@ -306,6 +306,16 @@ public class CompletionsTest extends CompletionsBase {
         assertThat(suggestions, hasItems("length"));
     }
 
+    @Test
+    public void indirectSuper() {
+        var file = "/org/javacs/example/CompleteIndirectSuper.java";
+
+        // a.?
+        var suggestions = insertText(file, 5, 14);
+
+        assertThat(suggestions, hasItems("selfMethod", "super1Method", "super2Method"));
+    }
+
     @Ignore // We are now managing imports with FixImports
     @Test
     public void addImport() {

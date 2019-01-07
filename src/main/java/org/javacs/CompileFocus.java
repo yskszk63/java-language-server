@@ -15,6 +15,7 @@ import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.Types;
 
 public class CompileFocus {
     public static final int MAX_COMPLETION_ITEMS = 50;
@@ -25,6 +26,7 @@ public class CompileFocus {
     private final int line, character;
     private final JavacTask task;
     private final Trees trees;
+    private final Types types;
     private final CompilationUnitTree root;
     private final TreePath path;
 
@@ -36,6 +38,7 @@ public class CompileFocus {
         this.character = character;
         this.task = singleFileTask(parent, file, this.contents);
         this.trees = Trees.instance(task);
+        this.types = task.getTypes();
 
         var profiler = new Profiler();
         task.addTaskListener(profiler);
@@ -296,46 +299,48 @@ public class CompileFocus {
                 LOG.warning(String.format("`...%s` has not type", path.getLeaf()));
                 return List.of();
             }
-            if (hasMembers(type)) {
-                LOG.info(String.format("...completing virtual members of %s", type));
-
-                var result = new ArrayList<Completion>();
-                var ts = supersWithSelf(type);
-                var alreadyAdded = new HashSet<String>();
-                for (var t : ts) {
-                    var e = types.asElement(t);
-                    if (e != null) {
-                        for (var member : e.getEnclosedElements()) {
-                            // Don't add statics
-                            if (member.getModifiers().contains(Modifier.STATIC)) continue;
-                            // Don't add constructors
-                            if (member.getSimpleName().contentEquals("<init>")) continue;
-                            // Skip overridden members from superclass
-                            if (alreadyAdded.contains(member.toString())) continue;
-
-                            // If type is a DeclaredType, check accessibility of member
-                            if (type instanceof DeclaredType) {
-                                if (trees.isAccessible(scope, member, (DeclaredType) type)) {
-                                    result.add(Completion.ofElement(member));
-                                }
-                            }
-                            // Otherwise, accessibility rules are very complicated
-                            // Give up and just declare that everything is accessible
-                            else result.add(Completion.ofElement(member));
-                            // Remember the signature of the added method, so we don't re-add it later
-                            alreadyAdded.add(member.toString());
-                        }
-                    }
-
-                    if (t instanceof ArrayType) {
-                        result.add(Completion.ofKeyword("length"));
-                    }
-                }
-                return result;
-            } else {
+            if (!hasMembers(type)) {
                 LOG.warning("...don't know how to complete members of type " + type);
                 return Collections.emptyList();
             }
+
+            var result = new ArrayList<Completion>();
+            var ts = supersWithSelf(type);
+            var alreadyAdded = new HashSet<String>();
+            LOG.info(String.format("...completing virtual members of %s and %d supers", type, ts.size()));
+            for (var t : ts) {
+                var e = types.asElement(t);
+                if (e == null) {
+                    LOG.warning(String.format("...can't convert supertype `%s` to element, skipping", t));
+                    continue;
+                }
+                for (var member : e.getEnclosedElements()) {
+                    // Don't add statics
+                    if (member.getModifiers().contains(Modifier.STATIC)) continue;
+                    // Don't add constructors
+                    if (member.getSimpleName().contentEquals("<init>")) continue;
+                    // Skip overridden members from superclass
+                    if (alreadyAdded.contains(member.toString())) continue;
+
+                    // If type is a DeclaredType, check accessibility of member
+                    if (type instanceof DeclaredType) {
+                        if (trees.isAccessible(scope, member, (DeclaredType) type)) {
+                            result.add(Completion.ofElement(member));
+                            alreadyAdded.add(member.toString());
+                        }
+                    }
+                    // Otherwise, accessibility rules are very complicated
+                    // Give up and just declare that everything is accessible
+                    else {
+                        result.add(Completion.ofElement(member));
+                        alreadyAdded.add(member.toString());
+                    }
+                }
+            }
+            if (type instanceof ArrayType) {
+                result.add(Completion.ofKeyword("length"));
+            }
+            return result;
         }
     }
 
@@ -489,18 +494,20 @@ public class CompileFocus {
         return false;
     }
 
-    private List<TypeMirror> supersWithSelf(TypeMirror t) {
-        var elements = task.getElements();
-        var types = task.getTypes();
-        var result = new ArrayList<TypeMirror>();
-        result.add(t);
-        // Add members of superclasses and interfaces
-        result.addAll(types.directSupertypes(t));
+    private Set<TypeMirror> supersWithSelf(TypeMirror t) {
+        var types = new HashSet<TypeMirror>();
+        collectSupers(t, types);
         // Object type is not included by default
         // We need to add it to get members like .equals(other) and .hashCode()
-        // TODO this may add things twice for interfaces with no super-interfaces
-        result.add(elements.getTypeElement("java.lang.Object").asType());
-        return result;
+        types.add(task.getElements().getTypeElement("java.lang.Object").asType());
+        return types;
+    }
+
+    private void collectSupers(TypeMirror t, Set<TypeMirror> supers) {
+        supers.add(t);
+        for (var s : types.directSupertypes(t)) {
+            collectSupers(s, supers);
+        }
     }
 
     private boolean hasMembers(TypeMirror type) {
