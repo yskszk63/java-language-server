@@ -440,18 +440,6 @@ public class CompileFocus {
         return enclosingClass.asType();
     }
 
-    private List<ExecutableElement> thisMethods() {
-        var thisType = enclosingClass();
-        var result = new ArrayList<ExecutableElement>();
-
-        if (thisType instanceof DeclaredType) {
-            var type = (DeclaredType) thisType;
-            result.addAll(virtualMethods(type));
-        }
-
-        return result;
-    }
-
     private void collectSuperMethods(TypeMirror thisType, List<ExecutableElement> result) {
         var types = task.getTypes();
 
