@@ -1036,25 +1036,25 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     /**
-     * countReferencesCcacheCountReferencesFileacheFile is the target of every reference currently in
-     * countReferencesCache. Index#needsUpdate(_) assumes that the user edits one file at a time, and checks whether
-     * edits to that file invalidate the cached index. To guarantee this assumption, we simply invalidate all cached
-     * indices when the user changes files.
+     * cacheReferencesFile is the target of every reference currently in cacheIndex. Index#needsUpdate(_) assumes that
+     * the user edits one file at a time, and checks whether edits to that file invalidate the cached index. To
+     * guarantee this assumption, we simply invalidate all cached indices when the user changes files.
      */
-    private URI cacheCountReferencesFile = URI.create("file:///NONE");
+    private URI cacheReferencesFile = URI.create("file:///NONE");
     /** cacheCountReferences[toDeclaration] is a list of all files that have references to toDeclaration */
-    private final Map<Ptr, List<Index>> cacheCountReferences = new HashMap<>();
+    private final Map<Ptr, List<URI>> cacheReferences = new HashMap<>();
     /**
      * cacheCountReferences[toDeclaration] == TOO_EXPENSIVE indicates there are too many potential references to
      * toDeclaration
      */
-    private static final List<Index> TOO_EXPENSIVE = new ArrayList<>();
-    /** countReferencesCache[fromFile] is a count of all references from fromFile to cacheCountReferencesFile */
+    private static final List<URI> TOO_EXPENSIVE = new ArrayList<>();
+    /** cacheIndex[fromFile] is a count of all references from fromFile to cacheCountReferencesFile */
     private final Map<URI, Index> cacheIndex = new HashMap<>();
 
-    private boolean cacheCountReferencesNeedsUpdate(Ptr toPtr, Set<Ptr> signature) {
-        if (!cacheCountReferences.containsKey(toPtr)) return true;
-        for (var index : cacheCountReferences.get(toPtr)) {
+    private boolean cacheReferencesNeedsUpdate(Ptr toPtr, Set<Ptr> signature) {
+        if (!cacheReferences.containsKey(toPtr)) return true;
+        for (var fromUri : cacheReferences.get(toPtr)) {
+            var index = cacheIndex.get(fromUri);
             if (index.needsUpdate(signature)) return true;
         }
         return false;
@@ -1062,10 +1062,10 @@ class JavaLanguageServer extends LanguageServer {
 
     private int countReferences(URI toUri, int toLine, int toColumn) {
         // If the user changes files, invalidate all cached indices
-        if (!toUri.equals(cacheCountReferencesFile)) {
-            cacheCountReferences.clear();
+        if (!toUri.equals(cacheReferencesFile)) {
+            cacheReferences.clear();
             cacheIndex.clear();
-            cacheCountReferencesFile = toUri;
+            cacheReferencesFile = toUri;
         }
 
         // Make sure the active file is compiled
@@ -1087,12 +1087,12 @@ class JavaLanguageServer extends LanguageServer {
         }
 
         // If the signature has changed, or the from-files contain errors, we need to redo the count
-        if (cacheCountReferencesNeedsUpdate(toPtr, signature)) {
+        if (cacheReferencesNeedsUpdate(toPtr, signature)) {
             LOG.info(String.format("Count references to `%s`...", toPtr));
 
             // Compile all files that *might* contain references to toEl
             var fromUris = compiler.potentialReferences(toEl.get());
-            fromUris.add(toUri);
+            fromUris.remove(toUri);
 
             // If it's too expensive to compute the code lens
             if (fromUris.size() > 10) {
@@ -1100,21 +1100,25 @@ class JavaLanguageServer extends LanguageServer {
                         String.format(
                                 "...there are %d potential references, which is too expensive to compile",
                                 fromUris.size()));
-                cacheCountReferences.put(toPtr, TOO_EXPENSIVE);
+                cacheReferences.put(toPtr, TOO_EXPENSIVE);
             } else {
                 // Make sure all fromUris -> toUri references are in cacheIndex
-                var list = index(fromUris, toUri, signature);
-                cacheCountReferences.put(toPtr, list);
+                var list = referencesFile(fromUris, toUri, signature);
+                cacheReferences.put(toPtr, list);
             }
         } else {
             LOG.info(String.format("Using cached count references to `%s`", toPtr));
         }
 
+        // Always update active file
+        var activeIndex = activeFileCache.index(declarations);
+        var count = activeIndex.count(toPtr);
+
         // Count up references out of index
-        var count = 0;
-        var list = cacheCountReferences.get(toPtr);
-        if (list == TOO_EXPENSIVE) return 100;
-        for (var index : list) {
+        var fromUris = cacheReferences.get(toPtr);
+        if (fromUris == TOO_EXPENSIVE) return 100;
+        for (var fromUri : fromUris) {
+            var index = cacheIndex.get(fromUri);
             count += index.count(toPtr);
         }
 
@@ -1123,10 +1127,23 @@ class JavaLanguageServer extends LanguageServer {
 
     private boolean cacheIndexNeedsUpdate(URI fromUri, Set<Ptr> signature) {
         if (!cacheIndex.containsKey(fromUri)) return true;
-        return cacheIndex.get(fromUri).needsUpdate(signature);
+        var index = cacheIndex.get(fromUri);
+        if (index.hasErrors) {
+            LOG.info(
+                    String.format("...%s needs to be re-indexed because it contains errors", Parser.fileName(fromUri)));
+            return true;
+        }
+        if (index.needsUpdate(signature)) {
+            LOG.info(
+                    String.format(
+                            "...%s needs to be re-indexed because it refers to a declaration that has changed",
+                            Parser.fileName(fromUri)));
+            return true;
+        }
+        return false;
     }
 
-    private List<Index> index(Collection<URI> fromUris, URI toUri, Set<Ptr> signature) {
+    private List<URI> referencesFile(Collection<URI> fromUris, URI toUri, Set<Ptr> signature) {
         // Check which files need to be updated
         var outOfDate = new HashSet<URI>();
         for (var fromUri : fromUris) {
@@ -1156,12 +1173,13 @@ class JavaLanguageServer extends LanguageServer {
             LOG.info("...all indexes are cached and up-to-date");
         }
 
-        // List all indices
-        var list = new ArrayList<Index>();
+        // Figure out which files actually reference one of the Ptrs in signature
+        var actuallyReferencesFile = new ArrayList<URI>();
         for (var fromUri : fromUris) {
-            list.add(cacheIndex.get(fromUri));
+            var index = cacheIndex.get(fromUri);
+            if (index.total() > 0) actuallyReferencesFile.add(fromUri);
         }
-        return list;
+        return actuallyReferencesFile;
     }
 
     @Override

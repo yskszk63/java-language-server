@@ -62,6 +62,10 @@ public class CompileFile {
         return els;
     }
 
+    public Index index(List<Element> declarations) {
+        return new Index(task, root, parent.diags, declarations);
+    }
+
     public Optional<Element> element(int line, int character) {
         // LOG.info(String.format("Looking for element at %s(%d,%d)...", file.getPath(), line, character));
 

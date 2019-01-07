@@ -15,7 +15,7 @@ class Index {
     /** map[ptr] is the number of references to ptr */
     private final Map<Ptr, Integer> referenceCounts = new HashMap<>();
     /** hasErrors is true if there were compilation errors when we created this index */
-    private boolean hasErrors;
+    final boolean hasErrors;
 
     Index(
             JavacTask task,
@@ -38,15 +38,25 @@ class Index {
         }
 
         // Check if there are any errors in from
+        this.hasErrors = hasErrors(from, errors);
+    }
+
+    private static boolean hasErrors(
+            CompilationUnitTree from, Collection<Diagnostic<? extends JavaFileObject>> errors) {
         var fromUri = from.getSourceFile().toUri();
         for (var err : errors) {
-            if (err.getSource().toUri().equals(fromUri)) hasErrors = true;
+            if (err.getSource().toUri().equals(fromUri) && err.getKind() == Diagnostic.Kind.ERROR) {
+                return true;
+            }
         }
+        return false;
     }
 
     boolean needsUpdate(Set<Ptr> signature) {
         if (hasErrors) return true;
         for (var expected : referenceCounts.keySet()) {
+            // Note: in theory, you could change the return type of a method, and this could secretly change the
+            // references counts
             if (!signature.contains(expected)) return true;
         }
         return false;
@@ -54,5 +64,13 @@ class Index {
 
     int count(Ptr to) {
         return referenceCounts.getOrDefault(to, 0);
+    }
+
+    int total() {
+        var sum = 0;
+        for (var count : referenceCounts.values()) {
+            sum += count;
+        }
+        return sum;
     }
 }

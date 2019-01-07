@@ -179,15 +179,6 @@ public class CompileBatch {
         return Optional.of(list);
     }
 
-    public Index index(URI from, List<Element> toAny) {
-        for (var r : roots) {
-            if (r.getSourceFile().toUri().equals(from)) {
-                return new Index(task, r, parent.diags, toAny);
-            }
-        }
-        throw new RuntimeException(from + " is not in compiled batch");
-    }
-
     /**
      * Find all elements in `file` that get turned into code-lenses. This needs to match the result of
      * `ParseFile#declarations`
@@ -211,6 +202,15 @@ public class CompileBatch {
             message.add(Parser.fileName(r.getSourceFile().toUri()));
         }
         throw new RuntimeException(file + " is not in " + message);
+    }
+
+    public Index index(URI from, List<Element> declarations) {
+        for (var r : roots) {
+            if (r.getSourceFile().toUri().equals(from)) {
+                return new Index(task, r, parent.diags, declarations);
+            }
+        }
+        throw new RuntimeException(from + " is not in compiled batch");
     }
 
     public Optional<Range> range(TreePath path) {
