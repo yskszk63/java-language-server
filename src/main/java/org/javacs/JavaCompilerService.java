@@ -27,8 +27,8 @@ public class JavaCompilerService {
     final List<Diagnostic<? extends JavaFileObject>> diags = new ArrayList<>();
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files
     // TODO intercept files that aren't in the batch and erase method bodies so compilation is faster
-    final StandardJavaFileManager fileManager =
-            new FileManagerWrapper(compiler.getStandardFileManager(diags::add, null, Charset.defaultCharset()));
+    final StandardJavaFileManager fileManager;
+    static final boolean useSourceFileManager = true;
 
     public JavaCompilerService(
             Set<Path> sourcePath, Supplier<Set<Path>> allJavaFiles, Set<Path> classPath, Set<Path> docPath) {
@@ -54,6 +54,12 @@ public class JavaCompilerService {
         docSourcePath.addAll(docPath);
         this.docs = new Docs(docSourcePath);
         this.classPathClasses = Classes.classPathTopLevelClasses(classPath);
+        this.fileManager =
+                useSourceFileManager
+                        ? new SourceFileManager(sourcePath, classPath)
+                        : new FileManagerWrapper(
+                                compiler.getStandardFileManager(diags::add, null, Charset.defaultCharset()));
+        ;
     }
 
     /** Combine source path or class path entries using the system separator, for example ':' in unix */
@@ -64,8 +70,10 @@ public class JavaCompilerService {
     static List<String> options(Set<Path> sourcePath, Set<Path> classPath) {
         var list = new ArrayList<String>();
 
-        Collections.addAll(list, "-classpath", joinPath(classPath));
-        Collections.addAll(list, "-sourcepath", joinPath(sourcePath));
+        if (!useSourceFileManager) {
+            Collections.addAll(list, "-classpath", joinPath(classPath));
+            Collections.addAll(list, "-sourcepath", joinPath(sourcePath));
+        }
         // Collections.addAll(list, "-verbose");
         Collections.addAll(list, "-proc:none");
         Collections.addAll(list, "-g");
