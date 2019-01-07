@@ -13,7 +13,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
 import javax.tools.Diagnostic;
@@ -22,8 +21,6 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 public class JavaCompilerServiceTest {
-    private static final Logger LOG = Logger.getLogger("main");
-
     static {
         Main.setRootFormat();
     }
@@ -250,7 +247,6 @@ public class JavaCompilerServiceTest {
         for (var d : diags) {
             var file = Parser.fileName(d.getSource().toUri());
             var line = d.getLineNumber();
-            var kind = d.getKind();
             var msg = d.getMessage(null);
             var string = String.format("%s(%d): %s", file, line, msg);
             strings.add(string);

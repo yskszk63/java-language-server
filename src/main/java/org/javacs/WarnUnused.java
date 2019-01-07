@@ -7,6 +7,7 @@ import javax.lang.model.element.*;
 
 class WarnUnused extends TreePathScanner<Void, Void> {
     private final Trees trees;
+    // TODO ignore writes when calculating used
     private final Set<Element> declared = new HashSet<>(), used = new HashSet<>();
 
     WarnUnused(JavacTask task) {
