@@ -56,7 +56,7 @@ public class JavaCompilerService {
         this.classPathClasses = Classes.classPathTopLevelClasses(classPath);
         this.fileManager =
                 useSourceFileManager
-                        ? new SourceFileManager(sourcePath, classPath)
+                        ? new SourceFileManager(sourcePath)
                         : new FileManagerWrapper(
                                 compiler.getStandardFileManager(diags::add, null, Charset.defaultCharset()));
         ;
@@ -70,10 +70,8 @@ public class JavaCompilerService {
     static List<String> options(Set<Path> sourcePath, Set<Path> classPath) {
         var list = new ArrayList<String>();
 
-        if (!useSourceFileManager) {
-            Collections.addAll(list, "-classpath", joinPath(classPath));
-            Collections.addAll(list, "-sourcepath", joinPath(sourcePath));
-        }
+        Collections.addAll(list, "-classpath", joinPath(classPath));
+        Collections.addAll(list, "-sourcepath", joinPath(sourcePath));
         // Collections.addAll(list, "-verbose");
         Collections.addAll(list, "-proc:none");
         Collections.addAll(list, "-g");
@@ -196,6 +194,7 @@ public class JavaCompilerService {
             }
         }
         // TODO hint fields that could be final
+        // TODO hint unused exception
 
         return Collections.unmodifiableList(new ArrayList<>(diags));
     }

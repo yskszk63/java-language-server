@@ -32,8 +32,7 @@ public class ParseFile {
         var profiler = new Profiler();
         task.addTaskListener(profiler);
         try {
-            var it = task.parse().iterator();
-            this.root = it.hasNext() ? it.next() : null; // TODO something better than null when no class is present
+            this.root = task.parse().iterator().next();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

@@ -32,8 +32,7 @@ public class CompileFile {
         var profiler = new Profiler();
         task.addTaskListener(profiler);
         try {
-            var it = task.parse().iterator();
-            this.root = it.hasNext() ? it.next() : null; // TODO something better than null when no class is present
+            this.root = task.parse().iterator().next();
             // The results of task.analyze() are unreliable when errors are present
             // You can get at `Element` values using `Trees`
             task.analyze();

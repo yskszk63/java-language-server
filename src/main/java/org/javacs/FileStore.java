@@ -1,7 +1,10 @@
 package org.javacs;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.net.URI;
@@ -9,9 +12,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.javacs.lsp.DidChangeTextDocumentParams;
@@ -22,7 +28,42 @@ import org.javacs.lsp.TextDocumentContentChangeEvent;
 class FileStore {
 
     private static final Map<URI, VersionedContent> activeDocuments = new HashMap<>();
-    private static final Map<Path, Instant> modified = new HashMap<>();
+
+    /**
+     * modified[file] is the modified time of file. modified contains .java files and directories on the source path. If
+     * modified contains a directory, it contains all the .java files in that directory. modified is sorted, so you can
+     * list all the .java files in a directory by doing modified.tailSet(directory)
+     */
+    private static final TreeMap<Path, Instant> modified = new TreeMap<>();
+
+    /** Needed in tests */
+    static void reset() {
+        modified.clear();
+        activeDocuments.clear();
+    }
+
+    static List<Path> list(Path dir, String packageName) {
+        // If we've never indexed dir, index it now
+        if (!modified.containsKey(dir)) {
+            LOG.info(String.format("Indexing %s for the first time", dir));
+            try {
+                modified.put(dir, Instant.EPOCH);
+                Files.walk(dir).filter(SourcePath::isJavaFile).forEach(FileStore::readModifiedFromDisk);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        // Walk through a section of index, starting at dir and ending when we find the next dir
+        var afterDir = modified.tailMap(dir, false).keySet();
+        var packageDir = dir.resolve(packageName.replace('.', File.separatorChar));
+        var list = new ArrayList<Path>();
+        for (var file : afterDir) {
+            if (!SourcePath.isJavaFile(file)) continue;
+            if (!file.startsWith(dir)) break;
+            if (file.startsWith(packageDir)) list.add(file);
+        }
+        return list;
+    }
 
     static Instant modified(Path file) {
         // If we've never checked before, look up modified time on disk
@@ -109,6 +150,37 @@ class FileStore {
         try {
             // TODO I think there is a faster path here
             return Files.readAllLines(Paths.get(file)).stream().collect(Collectors.joining("\n"));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static String contents(Path file) {
+        return contents(file.toUri());
+    }
+
+    static InputStream inputStream(Path file) {
+        var uri = file.toUri();
+        if (activeDocuments.containsKey(uri)) {
+            var string = activeDocuments.get(uri).content;
+            var bytes = string.getBytes();
+            return new ByteArrayInputStream(bytes);
+        }
+        try {
+            return Files.newInputStream(file);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static BufferedReader bufferedReader(Path file) {
+        var uri = file.toUri();
+        if (activeDocuments.containsKey(uri)) {
+            var string = activeDocuments.get(uri).content;
+            return new BufferedReader(new StringReader(string));
+        }
+        try {
+            return Files.newBufferedReader(file);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

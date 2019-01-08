@@ -38,7 +38,7 @@ class WarnUnused extends TreePathScanner<Void, Void> {
     boolean isLocal(VariableTree t) {
         var parent = getCurrentPath().getParentPath().getLeaf();
         return !(parent instanceof ClassTree)
-                && !(parent instanceof MethodTree)
+                && !(parent instanceof MethodTree) // TODO hint for unused parameters
                 && !(parent instanceof LambdaExpressionTree);
     }
 

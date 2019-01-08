@@ -9,12 +9,18 @@ import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.javacs.lsp.*;
+import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
 public class CompletionsTest extends CompletionsBase {
 
     // TODO rename Autocomplete Complete because Autocomplete is long and ugly
+
+    @Before
+    public void setup() {
+        FileStore.reset();
+    }
 
     @Test
     public void staticMember() {

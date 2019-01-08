@@ -9,32 +9,31 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.function.Predicate;
-import java.util.jar.JarFile;
+import java.util.logging.Logger;
 import java.util.stream.Stream;
 import javax.tools.*;
 
 class SourceFileManager implements StandardJavaFileManager {
     private final StandardJavaFileManager delegate = createDelegateFileManager();
+    private final Set<Path> sourcePath;
 
-    private final Set<Path> sourcePath, classPath;
-
-    SourceFileManager(Set<Path> sourcePath, Set<Path> classPath) {
+    SourceFileManager(Set<Path> sourcePath) {
         this.sourcePath = sourcePath;
-        this.classPath = classPath;
     }
 
     private static StandardJavaFileManager createDelegateFileManager() {
         var compiler = ServiceLoader.load(JavaCompiler.class).iterator().next();
-        return compiler.getStandardFileManager(__ -> {}, null, Charset.defaultCharset());
+        return compiler.getStandardFileManager(SourceFileManager::logError, null, Charset.defaultCharset());
+    }
+
+    private static void logError(Diagnostic<?> error) {
+        LOG.warning(error.getMessage(null));
     }
 
     @Override
     public ClassLoader getClassLoader(Location location) {
         var thisClassLoader = getClass().getClassLoader();
-        if (location == StandardLocation.CLASS_PATH) {
-            return new URLClassLoader(urls(classPath), thisClassLoader);
-        } else if (location == StandardLocation.SOURCE_PATH) {
+        if (location == StandardLocation.SOURCE_PATH) {
             return new URLClassLoader(urls(sourcePath), thisClassLoader);
         } else {
             return thisClassLoader;
@@ -57,10 +56,11 @@ class SourceFileManager implements StandardJavaFileManager {
     @Override
     public Iterable<JavaFileObject> list(
             Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
-        if (location == StandardLocation.CLASS_PATH) {
-            return list(classPath, this::isClassPathFile);
-        } else if (location == StandardLocation.SOURCE_PATH) {
-            return list(sourcePath, this::isJavaSource);
+        if (location == StandardLocation.SOURCE_PATH) {
+            var dirs = sourcePath.stream();
+            var files = dirs.flatMap(dir -> FileStore.list(dir, packageName).stream());
+            var filter = files.map(this::asJavaFileObject).filter(this::isJavaSource);
+            return filter::iterator;
         } else {
             return delegate.list(location, packageName, kinds, recurse);
         }
@@ -68,16 +68,6 @@ class SourceFileManager implements StandardJavaFileManager {
 
     private boolean isJavaSource(JavaFileObject file) {
         return file.getName().endsWith(".java");
-    }
-
-    private boolean isClassPathFile(JavaFileObject file) {
-        var name = file.getName();
-        return name.endsWith(".class") || name.endsWith(".jar");
-    }
-
-    private Iterable<JavaFileObject> list(Set<Path> dirs, Predicate<JavaFileObject> filter) {
-        var stream = dirs.stream().flatMap(this::list).flatMap(this::asJavaFileObjects).filter(filter);
-        return stream::iterator;
     }
 
     private Stream<Path> list(Path dir) {
@@ -89,19 +79,8 @@ class SourceFileManager implements StandardJavaFileManager {
         }
     }
 
-    private Stream<JavaFileObject> asJavaFileObjects(Path file) {
-        var fileName = file.getFileName().toString();
-        if (fileName.endsWith(".jar")) {
-            JarFile jar;
-            try {
-                jar = new JarFile(file.toFile());
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            return jar.stream().map(entry -> new JarFileObject(file, entry));
-        } else {
-            return Stream.of(new SourceFileObject(file));
-        }
+    private JavaFileObject asJavaFileObject(Path file) {
+        return new SourceFileObject(file);
     }
 
     @Override
@@ -109,13 +88,6 @@ class SourceFileManager implements StandardJavaFileManager {
         if (location == StandardLocation.SOURCE_PATH) {
             var source = (SourceFileObject) file;
             return sourceFileBinaryName(sourcePath, source);
-        } else if (location == StandardLocation.CLASS_PATH && file instanceof SourceFileObject) {
-            var source = (SourceFileObject) file;
-            return sourceFileBinaryName(classPath, source);
-        } else if (location == StandardLocation.CLASS_PATH && file instanceof JarFileObject) {
-            var jarFile = (JarFileObject) file;
-            var relativePath = jarFile.entry.getName();
-            return binaryName(relativePath);
         } else {
             return delegate.inferBinaryName(location, file);
         }
@@ -148,20 +120,18 @@ class SourceFileManager implements StandardJavaFileManager {
 
     @Override
     public boolean handleOption(String current, Iterator<String> remaining) {
-        return false;
+        return delegate.handleOption(current, remaining);
     }
 
     @Override
     public boolean hasLocation(Location location) {
-        return location == StandardLocation.CLASS_PATH
-                || location == StandardLocation.SOURCE_PATH
-                || delegate.hasLocation(location);
+        return location == StandardLocation.SOURCE_PATH || delegate.hasLocation(location);
     }
 
     @Override
     public JavaFileObject getJavaFileForInput(Location location, String className, JavaFileObject.Kind kind)
             throws IOException {
-        if (location == StandardLocation.SOURCE_PATH || location == StandardLocation.CLASS_PATH) {
+        if (location == StandardLocation.SOURCE_PATH) {
             var relative = className.replace('.', '/') + kind.extension;
             return findFileForInput(location, relative);
         }
@@ -170,7 +140,7 @@ class SourceFileManager implements StandardJavaFileManager {
 
     @Override
     public FileObject getFileForInput(Location location, String packageName, String relativeName) throws IOException {
-        if (location == StandardLocation.SOURCE_PATH || location == StandardLocation.CLASS_PATH) {
+        if (location == StandardLocation.SOURCE_PATH) {
             var relative = relativeName;
             if (!packageName.isEmpty()) {
                 relative = packageName.replace('.', '/') + '/' + relative;
@@ -181,32 +151,10 @@ class SourceFileManager implements StandardJavaFileManager {
     }
 
     private JavaFileObject findFileForInput(Location location, String relative) {
-        if (location == StandardLocation.CLASS_PATH) {
-            for (var root : classPath) {
-                if (Files.isDirectory(root)) {
-                    var absolute = root.resolve(relative);
-                    if (Files.exists(absolute)) {
-                        return new SourceFileObject(root);
-                    }
-                } else if (root.getFileName().toString().endsWith(".jar")) {
-                    JarFile jar;
-                    try {
-                        jar = new JarFile(root.toFile());
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                    var entry = jar.getJarEntry(relative);
-                    if (entry != null) {
-                        return new JarFileObject(root, entry);
-                    }
-                }
-            }
-        } else if (location == StandardLocation.SOURCE_PATH) {
-            for (var root : sourcePath) {
-                var absolute = root.resolve(relative);
-                if (Files.exists(absolute)) {
-                    return new SourceFileObject(root);
-                }
+        for (var root : sourcePath) {
+            var absolute = root.resolve(relative);
+            if (Files.exists(absolute)) {
+                return new SourceFileObject(absolute);
             }
         }
         return null;
@@ -232,7 +180,7 @@ class SourceFileManager implements StandardJavaFileManager {
 
     @Override
     public int isSupportedOption(String option) {
-        return -1;
+        return delegate.isSupportedOption(option);
     }
 
     @Override
@@ -263,17 +211,9 @@ class SourceFileManager implements StandardJavaFileManager {
 
     @Override
     public boolean contains(Location location, FileObject file) throws IOException {
-        if (file instanceof SourceFileObject && location == StandardLocation.SOURCE_PATH) {
+        if (location == StandardLocation.SOURCE_PATH) {
             var source = (SourceFileObject) file;
             return contains(sourcePath, source);
-        } else if (file instanceof JarFileObject) {
-            var jarFile = (JarFileObject) file;
-            for (var jar : classPath) {
-                if (jarFile.jar.equals(jar)) {
-                    return true;
-                }
-            }
-            return false;
         } else {
             return delegate.contains(location, file);
         }
@@ -324,4 +264,6 @@ class SourceFileManager implements StandardJavaFileManager {
     public Iterable<? extends File> getLocation(Location location) {
         throw new UnsupportedOperationException();
     }
+
+    private static final Logger LOG = Logger.getLogger("main");
 }

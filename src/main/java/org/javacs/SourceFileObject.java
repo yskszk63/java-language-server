@@ -2,9 +2,7 @@ package org.javacs;
 
 import java.io.*;
 import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.NestingKind;
 import javax.tools.JavaFileObject;
@@ -40,8 +38,7 @@ class SourceFileObject implements JavaFileObject {
 
     @Override
     public boolean isNameCompatible(String simpleName, Kind kind) {
-        var relative = Paths.get(simpleName.replace('.', '/'));
-        return path.endsWith(relative);
+        return path.getFileName().toString().equals(simpleName + kind.extension);
     }
 
     @Override
@@ -66,7 +63,7 @@ class SourceFileObject implements JavaFileObject {
 
     @Override
     public InputStream openInputStream() throws IOException {
-        return Files.newInputStream(path);
+        return FileStore.inputStream(path);
     }
 
     @Override
@@ -76,12 +73,12 @@ class SourceFileObject implements JavaFileObject {
 
     @Override
     public Reader openReader(boolean ignoreEncodingErrors) throws IOException {
-        return Files.newBufferedReader(path);
+        return FileStore.bufferedReader(path);
     }
 
     @Override
     public CharSequence getCharContent(boolean ignoreEncodingErrors) throws IOException {
-        return Files.readString(path);
+        return FileStore.contents(path);
     }
 
     @Override
@@ -91,11 +88,7 @@ class SourceFileObject implements JavaFileObject {
 
     @Override
     public long getLastModified() {
-        try {
-            return Files.getLastModifiedTime(path).toMillis();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        return FileStore.modified(path).toEpochMilli();
     }
 
     @Override
