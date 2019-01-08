@@ -43,7 +43,7 @@ class WarnUnused extends TreePathScanner<Void, Void> {
     }
 
     boolean isEmptyConstructor(MethodTree t) {
-        return t.getParameters().isEmpty() && trees.getElement(getCurrentPath()).getKind() == ElementKind.CONSTRUCTOR;
+        return t.getParameters().isEmpty() && t.getReturnType() == null;
     }
 
     @Override
