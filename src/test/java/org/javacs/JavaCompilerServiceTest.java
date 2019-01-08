@@ -64,7 +64,7 @@ public class JavaCompilerServiceTest {
         return join.toString();
     }
 
-    private URI resourceUri(String resourceFile) {
+    static URI resourceUri(String resourceFile) {
         var root = JavaCompilerServiceTest.simpleProjectSrc();
         var file = root.resolve(resourceFile);
         return file.toUri();

@@ -5,7 +5,6 @@ import com.sun.source.util.*;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.Charset;
 import java.nio.file.*;
 import java.util.*;
 import java.util.function.Supplier;
@@ -28,7 +27,6 @@ public class JavaCompilerService {
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files
     // TODO intercept files that aren't in the batch and erase method bodies so compilation is faster
     final StandardJavaFileManager fileManager;
-    static final boolean useSourceFileManager = true;
 
     public JavaCompilerService(
             Set<Path> sourcePath, Supplier<Set<Path>> allJavaFiles, Set<Path> classPath, Set<Path> docPath) {
@@ -54,11 +52,7 @@ public class JavaCompilerService {
         docSourcePath.addAll(docPath);
         this.docs = new Docs(docSourcePath);
         this.classPathClasses = Classes.classPathTopLevelClasses(classPath);
-        this.fileManager =
-                useSourceFileManager
-                        ? new SourceFileManager(sourcePath)
-                        : new FileManagerWrapper(
-                                compiler.getStandardFileManager(diags::add, null, Charset.defaultCharset()));
+        this.fileManager = new SourceFileManager(sourcePath);
         ;
     }
 

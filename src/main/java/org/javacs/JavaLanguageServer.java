@@ -848,15 +848,16 @@ class JavaLanguageServer extends LanguageServer {
         for (var f : files) {
             var contents = FileStore.contents(f);
             var pruned = Pruner.prune(f, contents, name);
-            sources.add(new StringFileObject(pruned, f));
+            sources.add(new SourceFileObject(f, pruned));
         }
         return sources;
     }
 
+    // TODO pretty sure this is unnecessary now that SourceFileObject delegates to FileStore
     private List<JavaFileObject> latestText(Collection<URI> files) {
         var sources = new ArrayList<JavaFileObject>();
         for (var f : files) {
-            sources.add(new StringFileObject(FileStore.contents(f), f));
+            sources.add(new SourceFileObject(f));
         }
         return sources;
     }

@@ -64,7 +64,7 @@ public class CompileFocus {
                         parent.diags::add,
                         JavaCompilerService.options(parent.sourcePath, parent.classPath),
                         Collections.emptyList(),
-                        Collections.singletonList(new StringFileObject(contents, file)));
+                        List.of(new SourceFileObject(file, contents)));
     }
 
     /** Find the smallest element that includes the cursor */

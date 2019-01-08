@@ -465,7 +465,7 @@ public class ParseFile {
     private static final DocCommentTree EMPTY_DOC = makeEmptyDoc();
 
     private static DocCommentTree makeEmptyDoc() {
-        var file = new StringFileObject("/** */ class Foo { }", URI.create("file:///Foo.java"));
+        var file = new SourceFileObject(URI.create("file:///Foo.java"), "/** */ class Foo { }");
         var task = Parser.parseTask(file);
         var docs = DocTrees.instance(task);
         CompilationUnitTree root;

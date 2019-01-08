@@ -107,9 +107,10 @@ class Pruner {
         return buffer.toString();
     }
 
+    // TODO can get rid of contents now that SourceFileObject references FileStore
     static String prune(URI file, String contents, int line, int character) {
         // Parse file
-        var task = Parser.parseTask(new StringFileObject(contents, file));
+        var task = Parser.parseTask(new SourceFileObject(file, contents));
         CompilationUnitTree root;
         try {
             root = task.parse().iterator().next();
@@ -124,6 +125,7 @@ class Pruner {
         return prune(root, pos, buffer, new long[] {cursor});
     }
 
+    // TODO can get rid of contents now that SourceFileObject references FileStore
     static String prune(URI file, String contents, String name) {
         // Find all occurrences of name in contents
         var list = new ArrayList<Long>();
@@ -137,7 +139,7 @@ class Pruner {
             offsets[i] = list.get(i);
         }
         // Parse file
-        var task = Parser.parseTask(new StringFileObject(contents, file));
+        var task = Parser.parseTask(new SourceFileObject(file, contents));
         CompilationUnitTree root;
         try {
             root = task.parse().iterator().next();

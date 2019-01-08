@@ -3,15 +3,32 @@ package org.javacs;
 import java.io.*;
 import java.net.URI;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.NestingKind;
 import javax.tools.JavaFileObject;
 
 class SourceFileObject implements JavaFileObject {
+    /** path is the absolute path to this file on disk */
     final Path path;
+    /** contents is the text in this file, or null if we should use the text in FileStore */
+    final String contents;
+
+    SourceFileObject(URI uri) {
+        this(Paths.get(uri));
+    }
 
     SourceFileObject(Path path) {
+        this(path, null);
+    }
+
+    SourceFileObject(URI uri, String contents) {
+        this(Paths.get(uri), contents);
+    }
+
+    SourceFileObject(Path path, String contents) {
         this.path = path;
+        this.contents = contents;
     }
 
     @Override
@@ -63,6 +80,10 @@ class SourceFileObject implements JavaFileObject {
 
     @Override
     public InputStream openInputStream() throws IOException {
+        if (contents != null) {
+            var bytes = contents.getBytes();
+            return new ByteArrayInputStream(bytes);
+        }
         return FileStore.inputStream(path);
     }
 
@@ -73,11 +94,17 @@ class SourceFileObject implements JavaFileObject {
 
     @Override
     public Reader openReader(boolean ignoreEncodingErrors) throws IOException {
+        if (contents != null) {
+            return new StringReader(contents);
+        }
         return FileStore.bufferedReader(path);
     }
 
     @Override
     public CharSequence getCharContent(boolean ignoreEncodingErrors) throws IOException {
+        if (contents != null) {
+            return contents;
+        }
         return FileStore.contents(path);
     }
 

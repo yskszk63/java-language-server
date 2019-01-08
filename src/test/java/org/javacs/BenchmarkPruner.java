@@ -15,12 +15,12 @@ import org.openjdk.jmh.annotations.*;
 @Fork(1)
 public class BenchmarkPruner {
     private static Path sourceRoot = Paths.get("src/main/java").normalize();
-    private static List<StringFileObject> files = files(false);
-    private static List<StringFileObject> pruned = files(true);
+    private static List<SourceFileObject> files = files(false);
+    private static List<SourceFileObject> pruned = files(true);
 
-    private static List<StringFileObject> files(boolean prune) {
+    private static List<SourceFileObject> files(boolean prune) {
         try {
-            var files = new ArrayList<StringFileObject>();
+            var files = new ArrayList<SourceFileObject>();
             var dir = Paths.get("src/main/java/org/javacs").normalize();
             var it = Files.list(dir).iterator();
             while (it.hasNext()) {
@@ -30,7 +30,7 @@ public class BenchmarkPruner {
                 if (prune) {
                     contents = Pruner.prune(file.toUri(), contents, "isWord");
                 }
-                files.add(new StringFileObject(contents, file.toUri()));
+                files.add(new SourceFileObject(file, contents));
             }
             return files;
         } catch (IOException e) {
