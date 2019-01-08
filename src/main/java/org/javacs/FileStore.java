@@ -25,6 +25,8 @@ import org.javacs.lsp.DidCloseTextDocumentParams;
 import org.javacs.lsp.DidOpenTextDocumentParams;
 import org.javacs.lsp.TextDocumentContentChangeEvent;
 
+// TODO get rid of SourcePath and track source path dynamically here
+
 class FileStore {
 
     private static final Map<URI, VersionedContent> activeDocuments = new HashMap<>();
@@ -60,7 +62,9 @@ class FileStore {
         for (var file : afterDir) {
             if (!SourcePath.isJavaFile(file)) continue;
             if (!file.startsWith(dir)) break;
-            if (file.startsWith(packageDir)) list.add(file);
+            if (file.getParent().equals(packageDir)) {
+                list.add(file);
+            }
         }
         return list;
     }
@@ -141,8 +145,7 @@ class FileStore {
 
     static String contents(URI file) {
         if (!SourcePath.isJavaFile(file)) {
-            LOG.warning("Ignoring non-java file " + file);
-            return "";
+            throw new RuntimeException(file + " is not a java file");
         }
         if (activeDocuments.containsKey(file)) {
             return activeDocuments.get(file).content;

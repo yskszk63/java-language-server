@@ -10,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.logging.Logger;
-import java.util.stream.Stream;
 import javax.tools.*;
 
 class SourceFileManager implements StandardJavaFileManager {
@@ -67,16 +66,7 @@ class SourceFileManager implements StandardJavaFileManager {
     }
 
     private boolean isJavaSource(JavaFileObject file) {
-        return file.getName().endsWith(".java");
-    }
-
-    private Stream<Path> list(Path dir) {
-        try {
-            if (!Files.exists(dir)) return Stream.of();
-            return Files.walk(dir).filter(Files::isRegularFile);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        return SourcePath.isJavaFile(file.toUri());
     }
 
     private JavaFileObject asJavaFileObject(Path file) {
@@ -105,7 +95,7 @@ class SourceFileManager implements StandardJavaFileManager {
 
     private String binaryName(String relativePath) {
         var slash = removeExtension(relativePath);
-        return slash.replace('/', '.');
+        return slash.replace(File.separatorChar, '.');
     }
 
     private String removeExtension(String fileName) {
@@ -153,6 +143,7 @@ class SourceFileManager implements StandardJavaFileManager {
     private JavaFileObject findFileForInput(Location location, String relative) {
         for (var root : sourcePath) {
             var absolute = root.resolve(relative);
+            if (!SourcePath.isJavaFile(absolute)) return null;
             if (Files.exists(absolute)) {
                 return new SourceFileObject(absolute);
             }
@@ -257,12 +248,12 @@ class SourceFileManager implements StandardJavaFileManager {
 
     @Override
     public void setLocation(Location location, Iterable<? extends File> files) throws IOException {
-        throw new UnsupportedOperationException();
+        delegate.setLocation(location, files);
     }
 
     @Override
     public Iterable<? extends File> getLocation(Location location) {
-        throw new UnsupportedOperationException();
+        return delegate.getLocation(location);
     }
 
     private static final Logger LOG = Logger.getLogger("main");

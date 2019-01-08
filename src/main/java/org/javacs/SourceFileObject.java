@@ -27,6 +27,7 @@ class SourceFileObject implements JavaFileObject {
     }
 
     SourceFileObject(Path path, String contents) {
+        if (!SourcePath.isJavaFile(path)) throw new RuntimeException(path + " is not a java source");
         this.path = path;
         this.contents = contents;
     }

@@ -9,33 +9,38 @@ import java.util.logging.Logger;
 
 class Profiler implements TaskListener {
     Set<URI> files = new HashSet<>();
-    Map<TaskEvent.Kind, Instant> started = new EnumMap<>(TaskEvent.Kind.class);
+    Map<URI, Map<TaskEvent.Kind, Instant>> started = new HashMap<>();
     Map<TaskEvent.Kind, Duration> profile = new EnumMap<>(TaskEvent.Kind.class);
 
     @Override
     public void started(TaskEvent e) {
-        started.put(e.getKind(), Instant.now());
-        files.add(e.getSourceFile().toUri());
+        var uri = e.getSourceFile().toUri();
+        var kind = e.getKind();
+        var fileStarted = started.computeIfAbsent(uri, __ -> new EnumMap<>(TaskEvent.Kind.class));
+        fileStarted.put(kind, Instant.now());
+        files.add(uri);
         // TODO show the user a warning when we're compiling a lot of files that aren't in the classpath
     }
 
     @Override
     public void finished(TaskEvent e) {
-        var k = e.getKind();
-        var start = started.getOrDefault(k, Instant.now());
+        var uri = e.getSourceFile().toUri();
+        var kind = e.getKind();
+        var fileStarted = started.computeIfAbsent(uri, __ -> new HashMap<>());
+        var start = fileStarted.getOrDefault(kind, Instant.now());
         var elapsed = Duration.between(start, Instant.now());
-        var soFar = profile.getOrDefault(k, Duration.ZERO);
+        var soFar = profile.getOrDefault(kind, Duration.ZERO);
         var total = soFar.plus(elapsed);
-        profile.put(k, total);
+        profile.put(kind, total);
     }
 
     void print() {
         var lines = new StringJoiner("; ");
-        for (var k : TaskEvent.Kind.values()) {
-            if (!profile.containsKey(k)) continue;
-            var elapsed = profile.get(k);
+        for (var kind : TaskEvent.Kind.values()) {
+            if (!profile.containsKey(kind)) continue;
+            var elapsed = profile.get(kind);
             var s = elapsed.getSeconds() + elapsed.getNano() / 1000.0 / 1000.0 / 1000.0;
-            lines.add(String.format("%s: %.3fs", k, s));
+            lines.add(String.format("%s: %.3fs", kind, s));
         }
         // TODO log names if n is small
         LOG.info(String.format("Compiled %d files: %s", files.size(), lines));
