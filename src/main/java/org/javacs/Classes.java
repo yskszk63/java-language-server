@@ -9,9 +9,7 @@ import java.net.URLClassLoader;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -115,9 +113,7 @@ class Classes {
         "jdk.zipfs",
     };
 
-    private static Set<String> loadError = new HashSet<String>();
-
-    static ClassSource jdkTopLevelClasses() {
+    static Set<String> jdkTopLevelClasses() {
         LOG.info("Searching for top-level classes in the JDK");
 
         var classes = new HashSet<String>();
@@ -142,29 +138,10 @@ class Classes {
 
         LOG.info(String.format("Found %d classes in the java platform", classes.size()));
 
-        class PlatformClassSource implements ClassSource {
-            @Override
-            public Set<String> classes() {
-                return Collections.unmodifiableSet(classes);
-            }
-
-            @Override
-            public Optional<Class<?>> load(String className) {
-                if (loadError.contains(className)) return Optional.empty();
-
-                try {
-                    return Optional.of(ClassLoader.getPlatformClassLoader().loadClass(className));
-                } catch (ClassNotFoundException | NoClassDefFoundError | ClassFormatError e) {
-                    LOG.log(Level.WARNING, "Could not load " + className + ": " + e.getMessage());
-                    loadError.add(className);
-                    return Optional.empty();
-                }
-            }
-        }
-        return new PlatformClassSource();
+        return classes;
     }
 
-    static ClassSource classPathTopLevelClasses(Set<Path> classPath) {
+    static Set<String> classPathTopLevelClasses(Set<Path> classPath) {
         LOG.info(String.format("Searching for top-level classes in %d classpath locations", classPath.size()));
 
         Function<Path, URL> toUrl =
@@ -187,26 +164,7 @@ class Classes {
 
         LOG.info(String.format("Found %d classes in classpath", classes.size()));
 
-        class ClassPathClassSource implements ClassSource {
-            @Override
-            public Set<String> classes() {
-                return Collections.unmodifiableSet(classes);
-            }
-
-            @Override
-            public Optional<Class<?>> load(String className) {
-                if (loadError.contains(className)) return Optional.empty();
-
-                try {
-                    return Optional.of(classLoader.loadClass(className));
-                } catch (ClassNotFoundException | NoClassDefFoundError | ClassFormatError e) {
-                    LOG.log(Level.WARNING, "Could not load " + className + ": " + e.getMessage());
-                    loadError.add(className);
-                    return Optional.empty();
-                }
-            }
-        }
-        return new ClassPathClassSource();
+        return classes;
     }
 
     private static final Logger LOG = Logger.getLogger("main");

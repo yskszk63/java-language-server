@@ -18,7 +18,7 @@ public class JavaCompilerService {
     final Set<Path> classPath, docPath;
     final JavaCompiler compiler = ServiceLoader.load(JavaCompiler.class).iterator().next();
     final Docs docs;
-    final ClassSource jdkClasses = Classes.jdkTopLevelClasses(), classPathClasses;
+    final Set<String> jdkClasses = Classes.jdkTopLevelClasses(), classPathClasses;
     // Diagnostics from the last compilation task
     final List<Diagnostic<? extends JavaFileObject>> diags = new ArrayList<>();
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files

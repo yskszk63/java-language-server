@@ -15,6 +15,8 @@ import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Types;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardLocation;
 
 public class CompileFocus {
     public static final int MAX_COMPLETION_ITEMS = 50;
@@ -625,8 +627,8 @@ public class CompileFocus {
                         result.add(prefix);
                     }
                 };
-        for (var name : parent.jdkClasses.classes()) checkClassName.accept(name);
-        for (var name : parent.classPathClasses.classes()) checkClassName.accept(name);
+        for (var name : parent.jdkClasses) checkClassName.accept(name);
+        for (var name : parent.classPathClasses) checkClassName.accept(name);
         return result;
     }
 
@@ -665,9 +667,10 @@ public class CompileFocus {
 
             // Check JDK
             LOG.info("...checking JDK");
-            for (var c : parent.jdkClasses.classes()) {
+            for (var c : parent.jdkClasses) {
                 if (tooManyItems(result.size())) return;
-                if (matchesPartialName.test(c) && parent.jdkClasses.isAccessibleFromPackage(c, packageName)) {
+                if (!matchesPartialName.test(c)) continue;
+                if (isSamePackage(c, packageName) || isPublicClassFile(c)) {
                     result.add(Completion.ofClassName(c, isImported(c)));
                 }
             }
@@ -675,9 +678,10 @@ public class CompileFocus {
             // Check classpath
             LOG.info("...checking classpath");
             var classPathNames = new HashSet<String>();
-            for (var c : parent.classPathClasses.classes()) {
+            for (var c : parent.classPathClasses) {
                 if (tooManyItems(result.size())) return;
-                if (matchesPartialName.test(c) && parent.classPathClasses.isAccessibleFromPackage(c, packageName)) {
+                if (!matchesPartialName.test(c)) continue;
+                if (isSamePackage(c, packageName) || isPublicClassFile(c)) {
                     result.add(Completion.ofClassName(c, isImported(c)));
                     classPathNames.add(c);
                 }
@@ -696,6 +700,35 @@ public class CompileFocus {
                     result.addAll(accessibleClasses(file, partialName, packageName, classPathNames));
                 }
             }
+        }
+    }
+
+    private boolean isSamePackage(String className, String fromPackage) {
+        return Parser.mostName(className).equals(fromPackage);
+    }
+
+    private boolean isPublicClassFile(String className) {
+        try {
+            var platform =
+                    parent.fileManager.getJavaFileForInput(
+                            StandardLocation.PLATFORM_CLASS_PATH, className, JavaFileObject.Kind.CLASS);
+            if (platform != null) return isPublic(platform);
+            var classpath =
+                    parent.fileManager.getJavaFileForInput(
+                            StandardLocation.CLASS_PATH, className, JavaFileObject.Kind.CLASS);
+            if (classpath != null) return isPublic(classpath);
+            return false;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private boolean isPublic(JavaFileObject classFile) {
+        try (var in = classFile.openInputStream()) {
+            var header = ClassHeader.of(in);
+            return header.isPublic;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 

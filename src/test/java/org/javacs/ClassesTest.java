@@ -16,18 +16,16 @@ public class ClassesTest {
     @Test
     public void list() {
         var jdk = Classes.jdkTopLevelClasses();
-        assertThat(jdk.classes(), hasItem("java.util.List"));
-        assertThat(jdk.load("java.util.List"), not(nullValue()));
+        assertThat(jdk, hasItem("java.util.List"));
 
         var empty = Classes.classPathTopLevelClasses(Collections.emptySet());
-        assertThat(empty.classes(), not(hasItem("java.util.List")));
+        assertThat(empty, not(hasItem("java.util.List")));
     }
 
     @Test
     public void arrayList() {
         var jdk = Classes.jdkTopLevelClasses();
-        assertThat(jdk.classes(), hasItem("java.util.ArrayList"));
-        assertThat(jdk.load("java.util.ArrayList"), not(nullValue()));
+        assertThat(jdk, hasItem("java.util.ArrayList"));
     }
 
     @Test
@@ -46,9 +44,6 @@ public class ClassesTest {
 
         var main = found.stream().filter(c -> c.getName().equals("org.javacs.Main")).findFirst();
         assertTrue(main.isPresent());
-
-        var load = main.get().load();
-        assertNotNull(load);
     }
 
     void ancestors(ClassLoader classLoader) {

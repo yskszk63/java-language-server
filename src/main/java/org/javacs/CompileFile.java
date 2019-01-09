@@ -220,8 +220,8 @@ public class CompileFile {
         // TODO cache parsed imports on a per-file basis
         var sourcePathImports = Parser.existingImports(FileStore.all());
         var classes = new HashSet<String>();
-        classes.addAll(parent.jdkClasses.classes());
-        classes.addAll(parent.classPathClasses.classes());
+        classes.addAll(parent.jdkClasses);
+        classes.addAll(parent.classPathClasses);
         var fixes = Parser.resolveSymbols(unresolved, sourcePathImports, classes);
         // Figure out which existing imports are actually used
         var trees = Trees.instance(task);
