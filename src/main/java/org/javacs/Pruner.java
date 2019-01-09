@@ -107,9 +107,9 @@ class Pruner {
         return buffer.toString();
     }
 
-    // TODO can get rid of contents now that SourceFileObject references FileStore
-    static String prune(URI file, String contents, int line, int character) {
+    static String prune(URI file, int line, int character) {
         // Parse file
+        var contents = FileStore.contents(file);
         var task = Parser.parseTask(new SourceFileObject(file, contents));
         CompilationUnitTree root;
         try {
@@ -125,9 +125,9 @@ class Pruner {
         return prune(root, pos, buffer, new long[] {cursor});
     }
 
-    // TODO can get rid of contents now that SourceFileObject references FileStore
-    static String prune(URI file, String contents, String name) {
+    static String prune(URI file, String name) {
         // Find all occurrences of name in contents
+        var contents = FileStore.contents(file);
         var list = new ArrayList<Long>();
         var pattern = Pattern.compile("\\b" + Pattern.quote(name) + "\\b");
         var matcher = pattern.matcher(contents);

@@ -14,19 +14,16 @@ import javax.lang.model.element.*;
 import org.javacs.lsp.*;
 
 public class ParseFile {
-    private final URI file;
     private final String contents;
     private final JavacTask task;
     private final Trees trees;
     private final CompilationUnitTree root;
 
-    ParseFile(JavaCompilerService parent, URI file, String contents) {
+    ParseFile(JavaCompilerService parent, URI file) {
         Objects.requireNonNull(parent);
         Objects.requireNonNull(file);
-        Objects.requireNonNull(contents);
 
-        this.file = file;
-        this.contents = contents;
+        this.contents = FileStore.contents(file);
         this.task = CompileFocus.singleFileTask(parent, file, contents);
         this.trees = Trees.instance(task);
         var profiler = new Profiler();
@@ -39,14 +36,15 @@ public class ParseFile {
         profiler.print();
     }
 
-    ParseFile(URI file, String contents, JavacTask task, CompilationUnitTree root) {
-        Objects.requireNonNull(file);
-        Objects.requireNonNull(contents);
+    ParseFile(JavacTask task, CompilationUnitTree root) {
         Objects.requireNonNull(task);
         Objects.requireNonNull(root);
 
-        this.file = file;
-        this.contents = contents;
+        try {
+            this.contents = root.getSourceFile().getCharContent(true).toString();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         this.task = task;
         this.trees = Trees.instance(task);
         this.root = root;
@@ -134,7 +132,10 @@ public class ParseFile {
     }
 
     public Optional<CompletionContext> completionContext(int line, int character) {
-        LOG.info(String.format("Finding completion position near %s(%d,%d)...", file, line, character));
+        LOG.info(
+                String.format(
+                        "Finding completion position near %s(%d,%d)...",
+                        root.getSourceFile().toUri(), line, character));
 
         var pos = trees.getSourcePositions();
         var lines = root.getLineMap();
@@ -323,7 +324,9 @@ public class ParseFile {
 
     /** Find and source code associated with a ptr */
     public Optional<TreePath> fuzzyFind(Ptr ptr) {
-        LOG.info(String.format("...find fuzzy match of %s in %s ...", ptr, Parser.fileName(file)));
+        LOG.info(
+                String.format(
+                        "...find fuzzy match of %s in %s ...", ptr, Parser.fileName(root.getSourceFile().toUri())));
 
         class FindPtr extends TreePathScanner<Void, Void> {
             int bestMatch = Ptr.NOT_MATCHED;
@@ -378,7 +381,6 @@ public class ParseFile {
         return doc;
     }
 
-    // TODO get rid of this and expose SourcePositions
     static Optional<Range> range(JavacTask task, String contents, TreePath path) {
         // Find start position
         var trees = Trees.instance(task);

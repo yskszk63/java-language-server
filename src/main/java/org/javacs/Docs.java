@@ -82,13 +82,7 @@ public class Docs {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        String contents;
-        try {
-            contents = file.getCharContent(true).toString();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return new ParseFile(file.toUri(), contents, task, root);
+        return new ParseFile(task, root);
     }
 
     private static final Pattern HTML_TAG = Pattern.compile("<(\\w+)>");

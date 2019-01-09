@@ -29,10 +29,10 @@ public class CompileFocus {
     private final CompilationUnitTree root;
     private final TreePath path;
 
-    CompileFocus(JavaCompilerService parent, URI file, String contents, int line, int character) {
+    CompileFocus(JavaCompilerService parent, URI file, int line, int character) {
         this.parent = parent;
         this.file = file;
-        this.contents = Pruner.prune(file, contents, line, character);
+        this.contents = Pruner.prune(file, line, character);
         this.line = line;
         this.character = character;
         this.task = singleFileTask(parent, file, this.contents);
@@ -647,7 +647,7 @@ public class CompileFocus {
         LOG.info(String.format("...found %d locals", locals.size()));
 
         // Add static imports
-        var staticImports = staticImports(file, contents, partialName);
+        var staticImports = staticImports(file, partialName);
         for (var m : staticImports) {
             result.add(Completion.ofElement(m));
         }
@@ -724,7 +724,7 @@ public class CompileFocus {
         return result;
     }
 
-    private List<Element> staticImports(URI file, String contents, String partialName) {
+    private List<Element> staticImports(URI file, String partialName) {
         var result = new ArrayList<Element>();
         for (var i : root.getImports()) {
             if (!i.isStatic()) continue;

@@ -24,11 +24,12 @@ public class BenchmarkPruner {
             while (it.hasNext()) {
                 var file = it.next();
                 if (!Files.isRegularFile(file)) continue;
-                var contents = String.join("\n", Files.readAllLines(file));
                 if (prune) {
-                    contents = Pruner.prune(file.toUri(), contents, "isWord");
+                    var contents = Pruner.prune(file.toUri(), "isWord");
+                    files.add(new SourceFileObject(file, contents));
+                } else {
+                    files.add(new SourceFileObject(file));
                 }
-                files.add(new SourceFileObject(file, contents));
             }
             return files;
         } catch (IOException e) {

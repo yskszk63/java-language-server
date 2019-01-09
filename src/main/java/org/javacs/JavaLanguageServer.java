@@ -332,11 +332,10 @@ class JavaLanguageServer extends LanguageServer {
         var started = Instant.now();
         var uri = position.textDocument.uri;
         if (!FileStore.isJavaFile(uri)) return Optional.empty();
-        var content = FileStore.contents(uri);
         var line = position.position.line + 1;
         var column = position.position.character + 1;
         // Figure out what kind of completion we want to do
-        var maybeCtx = compiler.parseFile(uri, content).completionContext(line, column);
+        var maybeCtx = compiler.parseFile(uri).completionContext(line, column);
         // TODO don't complete inside of comments
         if (!maybeCtx.isPresent()) {
             var items = new ArrayList<CompletionItem>();
@@ -353,7 +352,7 @@ class JavaLanguageServer extends LanguageServer {
         var ctx = maybeCtx.get();
         // TODO CompileFocus should have a "patch" mechanism where we recompile the current file without creating a new
         // task
-        var focus = compiler.compileFocus(uri, content, ctx.line, ctx.character);
+        var focus = compiler.compileFocus(uri, ctx.line, ctx.character);
         // Do a specific type of completion
         List<Completion> cs;
         boolean isIncomplete;
@@ -624,7 +623,7 @@ class JavaLanguageServer extends LanguageServer {
                 || !activeFileCache.file.equals(uri)
                 || activeFileCacheVersion != FileStore.version(uri)) {
             LOG.info("Recompile active file...");
-            activeFileCache = compiler.compileFile(uri, FileStore.contents(uri));
+            activeFileCache = compiler.compileFile(uri);
             activeFileCacheVersion = FileStore.version(uri);
         }
     }
@@ -738,12 +737,11 @@ class JavaLanguageServer extends LanguageServer {
     public Optional<SignatureHelp> signatureHelp(TextDocumentPositionParams position) {
         var uri = position.textDocument.uri;
         if (!FileStore.isJavaFile(uri)) return Optional.empty();
-        var content = FileStore.contents(uri);
         var line = position.position.line + 1;
         var column = position.position.character + 1;
         // TODO CompileFocus should have a "patch" mechanism where we recompile the current file without creating a new
         // task
-        var focus = compiler.compileFocus(uri, content, line, column);
+        var focus = compiler.compileFocus(uri, line, column);
         var help = focus.methodInvocation().map(this::asSignatureHelp);
         return help;
     }
@@ -835,8 +833,7 @@ class JavaLanguageServer extends LanguageServer {
         if (name.equals("<init>")) name = el.getEnclosingElement().getSimpleName().toString();
         var sources = new ArrayList<JavaFileObject>();
         for (var f : files) {
-            var contents = FileStore.contents(f);
-            var pruned = Pruner.prune(f, contents, name);
+            var pruned = Pruner.prune(f, name);
             sources.add(new SourceFileObject(f, pruned));
         }
         return sources;
@@ -858,7 +855,7 @@ class JavaLanguageServer extends LanguageServer {
     private void updateCachedParse(URI file) {
         if (file.equals(cacheParseFile) && FileStore.version(file) == cacheParseVersion) return;
         LOG.info(String.format("Updating cached parse file to %s", file));
-        cacheParse = compiler.parseFile(file, FileStore.contents(file));
+        cacheParse = compiler.parseFile(file);
         cacheParseFile = file;
         cacheParseVersion = FileStore.version(file);
     }

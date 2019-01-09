@@ -77,16 +77,16 @@ public class JavaCompilerService {
         return docs;
     }
 
-    public ParseFile parseFile(URI file, String contents) {
-        return new ParseFile(this, file, contents);
+    public ParseFile parseFile(URI file) {
+        return new ParseFile(this, file);
     }
 
-    public CompileFocus compileFocus(URI file, String contents, int line, int character) {
-        return new CompileFocus(this, file, contents, line, character);
+    public CompileFocus compileFocus(URI file, int line, int character) {
+        return new CompileFocus(this, file, line, character);
     }
 
-    public CompileFile compileFile(URI file, String contents) {
-        return new CompileFile(this, file, contents);
+    public CompileFile compileFile(URI file) {
+        return new CompileFile(this, file);
     }
 
     public CompileBatch compileBatch(Collection<URI> uris) {
@@ -96,7 +96,6 @@ public class JavaCompilerService {
     public CompileBatch compileBatch(Collection<URI> uris, ReportProgress progress) {
         var files = new ArrayList<File>();
         for (var p : uris) files.add(new File(p));
-        // TODO should get current contents of open files from FileStore
         var sources = fileManager.getJavaFileObjectsFromFiles(files);
         var list = new ArrayList<JavaFileObject>();
         for (var s : sources) list.add(s);

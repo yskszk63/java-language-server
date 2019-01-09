@@ -23,10 +23,10 @@ public class CompileFile {
     private final Trees trees;
     public final CompilationUnitTree root;
 
-    CompileFile(JavaCompilerService parent, URI file, String contents) {
+    CompileFile(JavaCompilerService parent, URI file) {
         this.parent = parent;
         this.file = file;
-        this.contents = contents;
+        this.contents = FileStore.contents(file);
         this.task = CompileFocus.singleFileTask(parent, file, contents);
         this.trees = Trees.instance(task);
         var profiler = new Profiler();
