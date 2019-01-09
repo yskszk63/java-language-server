@@ -1,24 +1,2 @@
-java -cp $(cat target/cp.txt):$(pwd)/target/classes:$(pwd)/target/test-classes org.junit.runner.JUnitCore \
-    org.javacs.ArtifactTest \
-    org.javacs.ClassesTest \
-    org.javacs.CodeLensTest \
-    org.javacs.CompletionsScopesTest \
-    org.javacs.CompletionsTest \
-    org.javacs.DocsTest \
-    org.javacs.FindReferencesTest \
-    org.javacs.FormattingTest \
-    org.javacs.GotoTest \
-    org.javacs.InferBazelConfigTest \
-    org.javacs.InferConfigTest \
-    org.javacs.JavaCompilerServiceTest \
-    org.javacs.ParserFixImportsTest \
-    org.javacs.ParserTest \
-    org.javacs.PrunerTest \
-    org.javacs.PtrTest \
-    org.javacs.SearchTest \
-    org.javacs.SignatureHelpTest \
-    org.javacs.StringSearchTest \
-    org.javacs.SymbolUnderCursorTest \
-    org.javacs.TipFormatterTest \
-    org.javacs.lsp.LanguageServerTest \
-    org.javacs.lsp.LspTest 
+FILES=`find src/test/java -name '*Test.java' | sed -e 's|^src/test/java/||' -e 's|.java$||' -e 's|/|.|g'`
+java -cp $(cat target/cp.txt):$(pwd)/target/classes:$(pwd)/target/test-classes org.junit.runner.JUnitCore $FILES
