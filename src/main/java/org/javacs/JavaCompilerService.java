@@ -24,7 +24,7 @@ public class JavaCompilerService {
     final List<Diagnostic<? extends JavaFileObject>> diags = new ArrayList<>();
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files
     // TODO intercept files that aren't in the batch and erase method bodies so compilation is faster
-    final StandardJavaFileManager fileManager;
+    final SourceFileManager fileManager;
 
     public JavaCompilerService(Set<Path> classPath, Set<Path> docPath) {
         System.err.println("Class path:");

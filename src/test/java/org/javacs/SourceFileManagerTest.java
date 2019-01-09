@@ -21,8 +21,8 @@ public class SourceFileManagerTest {
     private static SourceFileManager createSourceFileManager() {
         var fileManager = new SourceFileManager();
         try {
-            fileManager.setLocationFromPaths(StandardLocation.SOURCE_PATH, List.of(src));
-            fileManager.setLocationFromPaths(StandardLocation.CLASS_PATH, List.of(classes));
+            fileManager.setLocation(StandardLocation.SOURCE_PATH, List.of(src.toFile()));
+            fileManager.setLocation(StandardLocation.CLASS_PATH, List.of(classes.toFile()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
