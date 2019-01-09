@@ -11,11 +11,13 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
+import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -28,6 +30,11 @@ public class JavaCompilerServiceTest {
 
     static Path simpleProjectSrc() {
         return Paths.get("src/test/test-project/simple").normalize();
+    }
+
+    @Before
+    public void setWorkspaceRoot() {
+        FileStore.setWorkspaceRoots(Set.of(simpleProjectSrc()));
     }
 
     static String contents(String resourceFile) {
@@ -248,7 +255,8 @@ public class JavaCompilerServiceTest {
     @Test
     public void localDoc() {
         var uri = resourceUri("LocalMethodDoc.java");
-        var method = compiler.compileFocus(uri, 3, 21).methodInvocation().get().activeMethod.get();
+        var invocation = compiler.compileFocus(uri, 3, 21).methodInvocation().get();
+        var method = invocation.activeMethod.get();
         var ptr = new Ptr(method);
         var file = compiler.docs().find(ptr).get();
         var parse = compiler.docs().parse(file);
