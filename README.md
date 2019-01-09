@@ -2,7 +2,7 @@
 
 A Java [language server](https://github.com/Microsoft/vscode-languageserver-protocol) implemented using the Java compiler API. 
 
-[![CircleCI](https://circleci.com/gh/georgewfraser/java-language-server.png)](https://circleci.com/gh/georgewfraser/java-language-server)
+[![CircleCI](https://circleci.com/gh/georgewfraser/java-language-server.svg?style=svg)](https://circleci.com/gh/georgewfraser/java-language-server)
 
 ## Installation
 
