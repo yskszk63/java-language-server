@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.logging.Logger;
 import javax.tools.*;
+import org.junit.Before;
 import org.junit.Test;
 
 public class SourceFileManagerTest {
@@ -18,7 +19,7 @@ public class SourceFileManagerTest {
     final StandardJavaFileManager standardFileManager = createDelegateFileManager();
 
     private static SourceFileManager createSourceFileManager() {
-        var fileManager = new SourceFileManager(Set.of(src));
+        var fileManager = new SourceFileManager();
         try {
             fileManager.setLocationFromPaths(StandardLocation.SOURCE_PATH, List.of(src));
             fileManager.setLocationFromPaths(StandardLocation.CLASS_PATH, List.of(classes));
@@ -40,6 +41,11 @@ public class SourceFileManagerTest {
             throw new RuntimeException(e);
         }
         return fileManager;
+    }
+
+    @Before
+    public void setWorkspaceRoot() {
+        FileStore.setWorkspaceRoots(Set.of(LanguageServerFixture.DEFAULT_WORKSPACE_ROOT));
     }
 
     @Test

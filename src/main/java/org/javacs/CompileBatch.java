@@ -79,7 +79,7 @@ public class CompileBatch {
                         null,
                         parent.fileManager,
                         parent.diags::add,
-                        JavaCompilerService.options(parent.sourcePath, parent.classPath),
+                        JavaCompilerService.options(parent.classPath),
                         Collections.emptyList(),
                         sources);
     }

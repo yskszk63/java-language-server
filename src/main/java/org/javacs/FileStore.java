@@ -13,9 +13,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.logging.Logger;
@@ -25,76 +28,146 @@ import org.javacs.lsp.DidCloseTextDocumentParams;
 import org.javacs.lsp.DidOpenTextDocumentParams;
 import org.javacs.lsp.TextDocumentContentChangeEvent;
 
-// TODO get rid of SourcePath and track source path dynamically here
-
 class FileStore {
+
+    private static final Set<Path> workspaceRoots = new HashSet<>();
 
     private static final Map<URI, VersionedContent> activeDocuments = new HashMap<>();
 
-    /**
-     * modified[file] is the modified time of file. modified contains .java files and directories on the source path. If
-     * modified contains a directory, it contains all the .java files in that directory. modified is sorted, so you can
-     * list all the .java files in a directory by doing modified.tailSet(directory)
-     */
-    private static final TreeMap<Path, Instant> modified = new TreeMap<>();
+    /** javaSources[file] is the javaSources time of a .java source file. */
+    private static final TreeMap<Path, Info> javaSources = new TreeMap<>();
 
-    /** Needed in tests */
-    static void reset() {
-        modified.clear();
-        activeDocuments.clear();
+    private static class Info {
+        final Instant modified;
+        final String packageName;
+
+        Info(Instant modified, String packageName) {
+            this.modified = modified;
+            this.packageName = packageName;
+        }
     }
 
-    static List<Path> list(Path dir, String packageName) {
-        // If we've never indexed dir, index it now
-        if (!modified.containsKey(dir)) {
-            LOG.info(String.format("Indexing %s for the first time", dir));
-            try {
-                modified.put(dir, Instant.EPOCH);
-                Files.walk(dir).filter(SourcePath::isJavaFile).forEach(FileStore::readModifiedFromDisk);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+    static void setWorkspaceRoots(Set<Path> newRoots) {
+        newRoots = normalize(newRoots);
+        for (var root : workspaceRoots) {
+            if (!newRoots.contains(root)) {
+                workspaceRoots.removeIf(f -> f.startsWith(root));
             }
         }
-        // Walk through a section of index, starting at dir and ending when we find the next dir
-        var afterDir = modified.tailMap(dir, false).keySet();
-        var packageDir = dir.resolve(packageName.replace('.', File.separatorChar));
-        var list = new ArrayList<Path>();
-        for (var file : afterDir) {
-            if (!SourcePath.isJavaFile(file)) continue;
-            if (!file.startsWith(dir)) break;
-            if (file.getParent().equals(packageDir)) {
-                list.add(file);
+        for (var root : newRoots) {
+            if (!workspaceRoots.contains(root)) {
+                addFiles(root);
             }
+        }
+        workspaceRoots.clear();
+        workspaceRoots.addAll(newRoots);
+    }
+
+    private static Set<Path> normalize(Set<Path> newRoots) {
+        var normalize = new HashSet<Path>();
+        for (var root : newRoots) {
+            normalize.add(root.toAbsolutePath().normalize());
+        }
+        return normalize;
+    }
+
+    private static void addFiles(Path root) {
+        try {
+            Files.walk(root).filter(FileStore::isJavaFile).forEach(FileStore::readInfoFromDisk);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static Collection<Path> all() {
+        return javaSources.keySet();
+    }
+
+    static List<Path> list(String packageName) {
+        var list = new ArrayList<Path>();
+        for (var kv : javaSources.entrySet()) {
+            var file = kv.getKey();
+            var info = kv.getValue();
+            if (!FileStore.isJavaFile(file)) continue;
+            if (info.packageName.equals(packageName)) list.add(file);
         }
         return list;
     }
 
+    static boolean contains(Path file) {
+        return isJavaFile(file) && javaSources.containsKey(file);
+    }
+
     static Instant modified(Path file) {
         // If we've never checked before, look up modified time on disk
-        if (!modified.containsKey(file)) {
-            readModifiedFromDisk(file);
+        if (!javaSources.containsKey(file)) {
+            readInfoFromDisk(file);
         }
 
         // Look up modified time from cache
-        return modified.get(file);
+        return javaSources.get(file).modified;
+    }
+
+    static String packageName(Path file) {
+        // If we've never checked before, look up modified time on disk
+        if (!javaSources.containsKey(file)) {
+            readInfoFromDisk(file);
+        }
+
+        // Look up modified time from cache
+        return javaSources.get(file).packageName;
+    }
+
+    static String suggestedPackageName(Path file) {
+        var sourceRoot = sourceRoot(file);
+        var relativePath = sourceRoot.relativize(file).getParent();
+        if (relativePath == null) return "";
+        return relativePath.toString().replace(File.separatorChar, '.');
+    }
+
+    private static Path sourceRoot(Path file) {
+        for (var dir = file.getParent(); dir != null; dir = dir.getParent()) {
+            for (var related : javaSourcesIn(dir)) {
+                if (related.equals(file)) continue;
+                var packageName = packageName(related);
+                var relativePath = Paths.get(packageName.replace('.', File.separatorChar));
+                var sourceRoot = dir;
+                for (var i = 0; i < relativePath.getNameCount(); i++) {
+                    sourceRoot = sourceRoot.getParent();
+                }
+                return sourceRoot;
+            }
+        }
+        return file.getParent();
+    }
+
+    private static List<Path> javaSourcesIn(Path dir) {
+        var tail = javaSources.tailMap(dir, false);
+        var list = new ArrayList<Path>();
+        for (var file : tail.keySet()) {
+            if (!file.startsWith(dir)) break;
+            list.add(file);
+        }
+        return list;
     }
 
     static void externalCreate(Path file) {
-        readModifiedFromDisk(file);
+        readInfoFromDisk(file);
     }
 
     static void externalChange(Path file) {
-        readModifiedFromDisk(file);
+        readInfoFromDisk(file);
     }
 
     static void externalDelete(Path file) {
-        modified.remove(file);
+        javaSources.remove(file);
     }
 
-    private static void readModifiedFromDisk(Path file) {
+    private static void readInfoFromDisk(Path file) {
         try {
             var time = Files.getLastModifiedTime(file).toInstant();
-            modified.put(file, time);
+            var packageName = Parser.packageName(file);
+            javaSources.put(file, new Info(time, packageName));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -103,14 +176,14 @@ class FileStore {
     static void open(DidOpenTextDocumentParams params) {
         var document = params.textDocument;
         var uri = document.uri;
-        if (!SourcePath.isJavaFile(uri)) return;
+        if (!FileStore.isJavaFile(uri)) return;
         activeDocuments.put(uri, new VersionedContent(document.text, document.version));
     }
 
     static void change(DidChangeTextDocumentParams params) {
         var document = params.textDocument;
         var uri = document.uri;
-        if (SourcePath.isJavaFile(uri)) {
+        if (FileStore.isJavaFile(uri)) {
             var existing = activeDocuments.get(uri);
             var newText = existing.content;
 
@@ -128,7 +201,7 @@ class FileStore {
     static void close(DidCloseTextDocumentParams params) {
         var document = params.textDocument;
         var uri = document.uri;
-        if (SourcePath.isJavaFile(uri)) {
+        if (FileStore.isJavaFile(uri)) {
             // Remove from source cache
             activeDocuments.remove(uri);
         }
@@ -144,7 +217,7 @@ class FileStore {
     }
 
     static String contents(URI file) {
-        if (!SourcePath.isJavaFile(file)) {
+        if (!FileStore.isJavaFile(file)) {
             throw new RuntimeException(file + " is not a java file");
         }
         if (activeDocuments.containsKey(file)) {
@@ -230,6 +303,76 @@ class FileStore {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    static boolean isJavaFile(Path file) {
+        var name = file.getFileName().toString();
+        // We hide module-info.java from javac, because when javac sees module-info.java
+        // it goes into "module mode" and starts looking for classes on the module class path.
+        // This becomes evident when javac starts recompiling *way too much* on each task,
+        // because it doesn't realize there are already up-to-date .class files.
+        // The better solution would be for java-language server to detect the presence of module-info.java,
+        // and go into its own "module mode" where it infers a module source path and a module class path.
+        return name.endsWith(".java") && !name.equals("module-info.java");
+    }
+
+    static boolean isJavaFile(URI uri) {
+        return uri.getScheme().equals("file") && isJavaFile(Paths.get(uri));
+    }
+
+    private static Set<Path> allJavaFilesInDirs(Set<Path> dirs) {
+        var all = new HashSet<Path>();
+        for (var dir : dirs) {
+            try {
+                Files.walk(dir).filter(FileStore::isJavaFile).forEach(all::add);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return all;
+    }
+
+    private static Set<Path> sourcePath(Set<Path> workspaceRoots) {
+        LOG.info("Searching for source roots in " + workspaceRoots);
+
+        var certaintyThreshold = 10;
+        var sourceRoots = new HashMap<Path, Integer>();
+        fileLoop:
+        for (var file : allJavaFilesInDirs(workspaceRoots)) {
+            // First, check if we already have a high-confidence source root containing file
+            for (var root : sourceRoots.keySet()) {
+                var confidence = sourceRoots.get(root);
+                if (file.startsWith(root) && confidence > certaintyThreshold) {
+                    continue fileLoop;
+                }
+            }
+            // Otherwise, parse the file and look at its package declaration
+            var parse = Parser.parse(file);
+            var packageName = Objects.toString(parse.getPackageName(), "");
+            var packagePath = packageName.replace('.', File.separatorChar);
+            // If file has no package declaration, don't try to guess a source root
+            // This is probably a new file that the user will add a package declaration to later
+            if (packagePath.isEmpty()) {
+                LOG.warning("Ignoring file with missing package declaration " + file);
+                continue fileLoop;
+            }
+            // If path to file contradicts package declaration, give up
+            var dir = file.getParent();
+            if (!dir.endsWith(packagePath)) {
+                LOG.warning("Java source file " + file + " is not in " + packagePath);
+                continue fileLoop;
+            }
+            // Otherwise, use the package declaration to guess the source root
+            var up = Paths.get(packagePath).getNameCount();
+            var sourceRoot = dir;
+            for (int i = 0; i < up; i++) {
+                sourceRoot = sourceRoot.getParent();
+            }
+            // Increment our confidence in sourceRoot as a source root
+            var count = sourceRoots.getOrDefault(sourceRoot, 0);
+            sourceRoots.put(sourceRoot, count + 1);
+        }
+        return sourceRoots.keySet();
     }
 
     private static final Logger LOG = Logger.getLogger("main");

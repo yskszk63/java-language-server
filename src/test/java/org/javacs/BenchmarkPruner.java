@@ -2,7 +2,6 @@ package org.javacs;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,7 +13,6 @@ import org.openjdk.jmh.annotations.*;
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
 public class BenchmarkPruner {
-    private static Path sourceRoot = Paths.get("src/main/java").normalize();
     private static List<SourceFileObject> files = files(false);
     private static List<SourceFileObject> pruned = files(true);
 
@@ -39,13 +37,7 @@ public class BenchmarkPruner {
     }
 
     private static JavaCompilerService createCompiler() {
-        return new JavaCompilerService(
-                Collections.singleton(sourceRoot),
-                () -> {
-                    throw new RuntimeException("Unimplemented");
-                },
-                Collections.emptySet(),
-                Collections.emptySet());
+        return new JavaCompilerService(Collections.emptySet(), Collections.emptySet());
     }
 
     @Benchmark

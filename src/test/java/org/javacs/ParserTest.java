@@ -58,8 +58,8 @@ public class ParserTest {
     public void findExistingImports() {
         var rel = Paths.get("src", "org", "javacs", "doimport");
         var dir = LanguageServerFixture.DEFAULT_WORKSPACE_ROOT.resolve(rel);
-        var sourcePath = new SourcePath(Collections.singleton(dir));
-        var existing = Parser.existingImports(sourcePath.allJavaFiles());
+        FileStore.setWorkspaceRoots(Collections.singleton(dir));
+        var existing = Parser.existingImports(FileStore.all());
         assertThat(existing.classes, hasItems("java.util.List"));
         assertThat(existing.packages, hasItems("java.util", "java.io"));
     }

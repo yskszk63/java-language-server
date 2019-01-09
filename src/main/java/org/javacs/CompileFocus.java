@@ -2,7 +2,6 @@ package org.javacs;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
@@ -62,7 +61,7 @@ public class CompileFocus {
                         null,
                         parent.fileManager,
                         parent.diags::add,
-                        JavaCompilerService.options(parent.sourcePath, parent.classPath),
+                        JavaCompilerService.options(parent.classPath),
                         Collections.emptyList(),
                         List.of(new SourceFileObject(file, contents)));
     }
@@ -135,12 +134,8 @@ public class CompileFocus {
         if (!insideClass) {
             // If no package declaration is present, suggest package [inferred name];
             if (root.getPackage() == null) {
-                relativeToSourcePath(file)
-                        .ifPresent(
-                                relative -> {
-                                    var name = relative.toString().replace(File.separatorChar, '.');
-                                    result.add(Completion.ofSnippet("package " + name, "package " + name + ";\n\n"));
-                                });
+                var name = FileStore.suggestedPackageName(Paths.get(file));
+                result.add(Completion.ofSnippet("package " + name, "package " + name + ";\n\n"));
             }
             // If no class declaration is present, suggest class [file name]
             var hasClassDeclaration = false;
@@ -405,17 +400,6 @@ public class CompileFocus {
         "float",
         "double",
     };
-
-    private Optional<Path> relativeToSourcePath(URI source) {
-        var p = Paths.get(source);
-        for (var root : parent.sourcePath) {
-            if (p.startsWith(root)) {
-                var rel = root.relativize(p.getParent());
-                return Optional.of(rel);
-            }
-        }
-        return Optional.empty();
-    }
 
     private List<ExecutableElement> virtualMethods(DeclaredType type) {
         var result = new ArrayList<ExecutableElement>();
@@ -701,11 +685,11 @@ public class CompileFocus {
 
             // Check sourcepath
             LOG.info("...checking source path");
-            for (var file : parent.allJavaFiles.get()) {
+            for (var file : FileStore.all()) {
                 if (tooManyItems(result.size())) return;
                 // If file is in the same package, any class defined in the file is accessible
-                var pathBasedPackageName = parent.pathBasedPackageName(file);
-                var samePackage = pathBasedPackageName.equals(packageName) || pathBasedPackageName.isEmpty();
+                var otherPackageName = FileStore.packageName(file);
+                var samePackage = otherPackageName.equals(packageName) || otherPackageName.isEmpty();
                 // If file is in a different package, only a public class with the same name as the file is accessible
                 var maybePublic = matchesPartialName(file.getFileName().toString(), partialName);
                 if (samePackage || maybePublic) {

@@ -44,7 +44,6 @@ import org.javacs.lsp.*;
 class JavaLanguageServer extends LanguageServer {
     // TODO allow multiple workspace roots
     private Path workspaceRoot;
-    private SourcePath sourcePath;
     private final LanguageClient client;
     private Set<String> externalDependencies = Set.of();
     private Set<Path> classPath = Set.of();
@@ -145,8 +144,7 @@ class JavaLanguageServer extends LanguageServer {
         // If classpath is specified by the user, don't infer anything
         if (!classPath.isEmpty()) {
             javaEndProgress();
-            return new JavaCompilerService(
-                    sourcePath.sourceRoots(), sourcePath::allJavaFiles, classPath, Collections.emptySet());
+            return new JavaCompilerService(classPath, Collections.emptySet());
         }
         // Otherwise, combine inference with user-specified external dependencies
         else {
@@ -159,7 +157,7 @@ class JavaLanguageServer extends LanguageServer {
             var docPath = infer.buildDocPath();
 
             javaEndProgress();
-            return new JavaCompilerService(sourcePath.sourceRoots(), sourcePath::allJavaFiles, classPath, docPath);
+            return new JavaCompilerService(classPath, docPath);
         }
     }
 
@@ -180,7 +178,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public InitializeResult initialize(InitializeParams params) {
         this.workspaceRoot = Paths.get(params.rootUri);
-        this.sourcePath = new SourcePath(Set.of(workspaceRoot));
+        FileStore.setWorkspaceRoots(Set.of(Paths.get(params.rootUri)));
 
         var c = new JsonObject();
         c.addProperty("textDocumentSync", 2); // Incremental
@@ -260,30 +258,21 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
         // TODO update config when pom.xml changes
-        var changed = false;
-        var created = new HashSet<Path>();
-        var deleted = new HashSet<Path>();
         for (var c : params.changes) {
-            if (!SourcePath.isJavaFile(c.uri)) continue;
+            if (!FileStore.isJavaFile(c.uri)) continue;
             var file = Paths.get(c.uri);
             switch (c.type) {
                 case FileChangeType.Created:
                     FileStore.externalCreate(file);
-                    created.add(file);
                     break;
                 case FileChangeType.Changed:
                     FileStore.externalChange(file);
-                    if (sourcePath.update(file)) changed = true;
                     break;
                 case FileChangeType.Deleted:
                     FileStore.externalDelete(file);
-                    deleted.add(file);
                     break;
             }
         }
-        if (sourcePath.create(created)) changed = true;
-        if (sourcePath.delete(deleted)) changed = true;
-        if (changed) this.compiler = createCompiler();
     }
 
     private Integer completionItemKind(Element e) {
@@ -342,7 +331,7 @@ class JavaLanguageServer extends LanguageServer {
         // TODO reuse previous compilation when changes are small
         var started = Instant.now();
         var uri = position.textDocument.uri;
-        if (!SourcePath.isJavaFile(uri)) return Optional.empty();
+        if (!FileStore.isJavaFile(uri)) return Optional.empty();
         var content = FileStore.contents(uri);
         var line = position.position.line + 1;
         var column = position.position.character + 1;
@@ -644,7 +633,7 @@ class JavaLanguageServer extends LanguageServer {
     public Optional<Hover> hover(TextDocumentPositionParams position) {
         // Compile entire file if it's changed since last hover
         var uri = position.textDocument.uri;
-        if (!SourcePath.isJavaFile(uri)) return Optional.empty();
+        if (!FileStore.isJavaFile(uri)) return Optional.empty();
         updateActiveFile(uri);
 
         // Find element undeer cursor
@@ -748,7 +737,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public Optional<SignatureHelp> signatureHelp(TextDocumentPositionParams position) {
         var uri = position.textDocument.uri;
-        if (!SourcePath.isJavaFile(uri)) return Optional.empty();
+        if (!FileStore.isJavaFile(uri)) return Optional.empty();
         var content = FileStore.contents(uri);
         var line = position.position.line + 1;
         var column = position.position.character + 1;
@@ -762,7 +751,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public Optional<List<Location>> gotoDefinition(TextDocumentPositionParams position) {
         var fromUri = position.textDocument.uri;
-        if (!SourcePath.isJavaFile(fromUri)) return Optional.empty();
+        if (!FileStore.isJavaFile(fromUri)) return Optional.empty();
         var fromLine = position.position.line + 1;
         var fromColumn = position.position.character + 1;
 
@@ -803,7 +792,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public Optional<List<Location>> findReferences(ReferenceParams position) {
         var toUri = position.textDocument.uri;
-        if (!SourcePath.isJavaFile(toUri)) return Optional.empty();
+        if (!FileStore.isJavaFile(toUri)) return Optional.empty();
         var toLine = position.position.line + 1;
         var toColumn = position.position.character + 1;
 
@@ -877,7 +866,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public List<SymbolInformation> documentSymbol(DocumentSymbolParams params) {
         var uri = params.textDocument.uri;
-        if (!SourcePath.isJavaFile(uri)) return List.of();
+        if (!FileStore.isJavaFile(uri)) return List.of();
         updateCachedParse(uri);
         var paths = cacheParse.documentSymbols();
         var infos = new ArrayList<SymbolInformation>();
@@ -956,7 +945,7 @@ class JavaLanguageServer extends LanguageServer {
     public List<CodeLens> codeLens(CodeLensParams params) {
         // TODO just create a blank code lens on every method, then resolve it async
         var uri = params.textDocument.uri;
-        if (!SourcePath.isJavaFile(uri)) return List.of();
+        if (!FileStore.isJavaFile(uri)) return List.of();
         updateCachedParse(uri);
         var declarations = cacheParse.declarations();
         var result = new ArrayList<CodeLens>();
@@ -1190,6 +1179,7 @@ class JavaLanguageServer extends LanguageServer {
         edits.addAll(fixImports());
         edits.addAll(addOverrides());
         // TODO replace var with type name when vars are copy-pasted into fields
+        // TODO replace ThisClass.staticMethod() with staticMethod() when ThisClass is useless
         return edits;
     }
 
@@ -1364,7 +1354,7 @@ class JavaLanguageServer extends LanguageServer {
     public void didCloseTextDocument(DidCloseTextDocumentParams params) {
         FileStore.close(params);
 
-        if (SourcePath.isJavaFile(params.textDocument.uri)) {
+        if (FileStore.isJavaFile(params.textDocument.uri)) {
             // Clear diagnostics
             publishDiagnostics(List.of(params.textDocument.uri), List.of());
         }
@@ -1372,7 +1362,7 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public void didSaveTextDocument(DidSaveTextDocumentParams params) {
-        if (SourcePath.isJavaFile(params.textDocument.uri)) {
+        if (FileStore.isJavaFile(params.textDocument.uri)) {
             // Re-lint all active documents
             reportErrors(FileStore.activeDocuments());
         }

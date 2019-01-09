@@ -11,7 +11,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
@@ -25,29 +24,10 @@ public class JavaCompilerServiceTest {
         Main.setRootFormat();
     }
 
-    private JavaCompilerService compiler =
-            new JavaCompilerService(
-                    Collections.singleton(simpleProjectSrc()),
-                    JavaCompilerServiceTest::allJavaFiles,
-                    Collections.emptySet(),
-                    Collections.emptySet());
-
-    static Path mavenProjectSrc() {
-        return Paths.get("src/test/test-project/workspace/src").normalize();
-    }
+    private JavaCompilerService compiler = new JavaCompilerService(Collections.emptySet(), Collections.emptySet());
 
     static Path simpleProjectSrc() {
         return Paths.get("src/test/test-project/simple").normalize();
-    }
-
-    static Set<Path> allJavaFiles() {
-        try {
-            return Files.walk(simpleProjectSrc())
-                    .filter(f -> f.getFileName().toString().endsWith(".java"))
-                    .collect(Collectors.toSet());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     static String contents(String resourceFile) {
@@ -301,18 +281,5 @@ public class JavaCompilerServiceTest {
     public void matchesPartialName() {
         assertTrue(CompileFocus.matchesPartialName("foobar", "foo"));
         assertFalse(CompileFocus.matchesPartialName("foo", "foobar"));
-    }
-
-    @Test
-    public void packageName() {
-        var compiler =
-                new JavaCompilerService(
-                        Collections.singleton(mavenProjectSrc()),
-                        JavaCompilerServiceTest::allJavaFiles,
-                        Collections.emptySet(),
-                        Collections.emptySet());
-        assertThat(
-                compiler.pathBasedPackageName(FindResource.path("/org/javacs/example/Goto.java")),
-                equalTo("org.javacs.example"));
     }
 }

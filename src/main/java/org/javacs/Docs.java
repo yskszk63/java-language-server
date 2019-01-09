@@ -24,12 +24,14 @@ public class Docs {
         }
     }
 
-    Docs(Set<Path> sourcePath) {
+    Docs(Set<Path> docPath) {
         this.fileManager =
                 ServiceLoader.load(JavaCompiler.class).iterator().next().getStandardFileManager(__ -> {}, null, null);
 
         // Compute the full source path, including src.zip for platform classes
-        var sourcePathFiles = sourcePath.stream().map(Path::toFile).collect(Collectors.toSet());
+        // TODO source path needs to somehow get from FileStore to here; maybe write a FileManager that fuses FileStore
+        // with docPath?
+        var sourcePathFiles = docPath.stream().map(Path::toFile).collect(Collectors.toSet());
 
         try {
             fileManager.setLocation(StandardLocation.SOURCE_PATH, sourcePathFiles);

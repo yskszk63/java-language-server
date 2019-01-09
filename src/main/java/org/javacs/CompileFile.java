@@ -217,7 +217,8 @@ public class CompileFile {
             }
         }
         // Look at imports in other classes to help us guess how to fix imports
-        var sourcePathImports = Parser.existingImports(parent.allJavaFiles.get());
+        // TODO cache parsed imports on a per-file basis
+        var sourcePathImports = Parser.existingImports(FileStore.all());
         var classes = new HashSet<String>();
         classes.addAll(parent.jdkClasses.classes());
         classes.addAll(parent.classPathClasses.classes());

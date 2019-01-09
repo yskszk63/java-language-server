@@ -269,6 +269,7 @@ class Parser {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        // TODO fall back on parsing file
         return "";
     }
 

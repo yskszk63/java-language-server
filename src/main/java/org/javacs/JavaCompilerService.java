@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.*;
 import java.util.*;
-import java.util.function.Supplier;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -17,8 +16,7 @@ import javax.tools.*;
 // TODO eliminate uses of URI in favor of Path
 public class JavaCompilerService {
     // Not modifiable! If you want to edit these, you need to create a new instance
-    final Set<Path> sourcePath, classPath, docPath;
-    final Supplier<Set<Path>> allJavaFiles;
+    final Set<Path> classPath, docPath;
     final JavaCompiler compiler = ServiceLoader.load(JavaCompiler.class).iterator().next();
     final Docs docs;
     final ClassSource jdkClasses = Classes.jdkTopLevelClasses(), classPathClasses;
@@ -28,12 +26,7 @@ public class JavaCompilerService {
     // TODO intercept files that aren't in the batch and erase method bodies so compilation is faster
     final StandardJavaFileManager fileManager;
 
-    public JavaCompilerService(
-            Set<Path> sourcePath, Supplier<Set<Path>> allJavaFiles, Set<Path> classPath, Set<Path> docPath) {
-        System.err.println("Source path:");
-        for (var p : sourcePath) {
-            System.err.println("  " + p);
-        }
+    public JavaCompilerService(Set<Path> classPath, Set<Path> docPath) {
         System.err.println("Class path:");
         for (var p : classPath) {
             System.err.println("  " + p);
@@ -42,17 +35,12 @@ public class JavaCompilerService {
         for (var p : docPath) {
             System.err.println("  " + p);
         }
-        // sourcePath and classPath can't actually be modified, because JavaCompiler remembers them from task to task
-        this.sourcePath = Collections.unmodifiableSet(sourcePath);
-        this.allJavaFiles = allJavaFiles;
+        // classPath can't actually be modified, because JavaCompiler remembers it from task to task
         this.classPath = Collections.unmodifiableSet(classPath);
         this.docPath = Collections.unmodifiableSet(docPath);
-        var docSourcePath = new HashSet<Path>();
-        docSourcePath.addAll(sourcePath);
-        docSourcePath.addAll(docPath);
-        this.docs = new Docs(docSourcePath);
+        this.docs = new Docs(docPath);
         this.classPathClasses = Classes.classPathTopLevelClasses(classPath);
-        this.fileManager = new SourceFileManager(sourcePath);
+        this.fileManager = new SourceFileManager();
         ;
     }
 
@@ -61,11 +49,10 @@ public class JavaCompilerService {
         return classOrSourcePath.stream().map(p -> p.toString()).collect(Collectors.joining(File.pathSeparator));
     }
 
-    static List<String> options(Set<Path> sourcePath, Set<Path> classPath) {
+    static List<String> options(Set<Path> classPath) {
         var list = new ArrayList<String>();
 
         Collections.addAll(list, "-classpath", joinPath(classPath));
-        Collections.addAll(list, "-sourcepath", joinPath(sourcePath));
         // Collections.addAll(list, "-verbose");
         Collections.addAll(list, "-proc:none");
         Collections.addAll(list, "-g");
@@ -84,21 +71,6 @@ public class JavaCompilerService {
                 "-Xlint:static");
 
         return list;
-    }
-
-    String pathBasedPackageName(Path javaFile) {
-        if (!javaFile.getFileName().toString().endsWith(".java")) {
-            LOG.warning(javaFile + " does not end in .java");
-            return "???";
-        }
-        for (var dir : sourcePath) {
-            if (!javaFile.startsWith(dir)) continue;
-            var packageDir = javaFile.getParent();
-            var relative = dir.relativize(packageDir);
-            return relative.toString().replace('/', '.');
-        }
-        LOG.warning(javaFile + " is not in the source path " + sourcePath);
-        return "???";
     }
 
     public Docs docs() {
@@ -141,7 +113,7 @@ public class JavaCompilerService {
         // Construct list of sources
         var files = new ArrayList<File>();
         for (var uri : uris) {
-            if (SourcePath.isJavaFile(uri)) {
+            if (FileStore.isJavaFile(uri)) {
                 files.add(new File(uri));
             }
         }
@@ -150,7 +122,7 @@ public class JavaCompilerService {
         var sources = fileManager.getJavaFileObjectsFromFiles(files);
 
         // Create task
-        var options = options(sourcePath, classPath);
+        var options = options(classPath);
         var task =
                 (JavacTask) compiler.getTask(null, fileManager, diags::add, options, Collections.emptyList(), sources);
         var trees = Trees.instance(task);
@@ -336,7 +308,7 @@ public class JavaCompilerService {
                 return files;
             }
             // If the declaring file isn't a normal file, for example if it's in src.zip
-            if (!SourcePath.isJavaFile(toFile.get())) {
+            if (!FileStore.isJavaFile(toFile.get())) {
                 LOG.info(String.format("...%s is not on the source path", toFile.get()));
                 return files;
             }
@@ -418,36 +390,12 @@ public class JavaCompilerService {
         var lastDot = name.lastIndexOf('.');
         var packageName = lastDot == -1 ? "" : name.substring(0, lastDot);
         var className = name.substring(lastDot + 1);
-        // First, look for a file named [ClassName].java
-        var packagePath = Paths.get(packageName.replace('.', File.separatorChar));
-        var publicClassPath = packagePath.resolve(className + ".java");
-        for (var root : sourcePath) {
-            var absPath = root.resolve(publicClassPath);
-            if (Files.exists(absPath) && containsTopLevelDeclaration(absPath, className)) {
-                return Optional.of(absPath.toUri());
-            }
-        }
-        // Then, look for a secondary declaration in all java files in the package
         var isPublic = e.getModifiers().contains(Modifier.PUBLIC);
-        if (!isPublic) {
-            for (var root : sourcePath) {
-                // Create directory where this package would live, if this package is in this part of the source path
-                var absDir = root.resolve(packagePath);
-                // If package isn't in this part of the source path, keep looking
-                if (!Files.exists(absDir)) continue;
-                // List dirs
-                Iterable<Path> list;
-                try {
-                    list = Files.list(absDir)::iterator;
-                } catch (IOException err) {
-                    throw new RuntimeException(err);
-                }
-                // Check each .java file in the package for package-private class declarations
-                for (var f : list) {
-                    if (SourcePath.isJavaFile(f) && containsTopLevelDeclaration(f, className)) {
-                        return Optional.of(f.toUri());
-                    }
-                }
+        for (var file : FileStore.list(packageName)) {
+            // Public classes have to be declared in files named ClassName.java
+            if (isPublic && !file.getFileName().toString().equals(className + ".java")) continue;
+            if (containsTopLevelDeclaration(file, className)) {
+                return Optional.of(file.toUri());
             }
         }
         return Optional.empty();
@@ -466,30 +414,18 @@ public class JavaCompilerService {
         return false;
     }
 
-    private Set<Path> possibleFiles(Element to) {
+    private Collection<Path> possibleFiles(Element to) {
         // If `to` is package-private, only look in my own package
         if (isPackagePrivate(to)) {
             var myPkg = packageName(to);
-            var allFiles = sourceFilesInPackages(myPkg);
+            var allFiles = FileStore.list(myPkg);
             LOG.info(String.format("...check %d files in my own package %s", allFiles.size(), myPkg));
+            return allFiles;
         }
         // Otherwise search all files
-        var allFiles = allJavaFiles.get();
+        var allFiles = FileStore.all();
         LOG.info(String.format("...check %d files", allFiles.size()));
         return allFiles;
-    }
-
-    /** List .java source files in package */
-    private Set<Path> sourceFilesInPackages(String inPackage) {
-        var packagePath = Paths.get(inPackage.replace('.', File.separatorChar));
-        var files = new HashSet<Path>();
-        for (var f : allJavaFiles.get()) {
-            var dir = f.getParent();
-            if (dir.endsWith(packagePath)) {
-                files.add(f);
-            }
-        }
-        return files;
     }
 
     private static Cache<String, Boolean> cacheContainsWord = new Cache<>();
@@ -605,7 +541,7 @@ public class JavaCompilerService {
         LOG.info(String.format("Searching for `%s`...", query));
 
         var result = new ArrayList<TreePath>();
-        var files = allJavaFiles.get();
+        var files = FileStore.all();
         var checked = 0;
         var parsed = 0;
         for (var file : files) {

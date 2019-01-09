@@ -2,14 +2,11 @@ package org.javacs;
 
 import com.google.gson.Gson;
 import java.util.*;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.javacs.lsp.*;
 
 public class CompletionsBase {
-    protected static final Logger LOG = Logger.getLogger("main");
-
     protected static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     protected Set<String> insertTemplate(String file, int row, int column) {
