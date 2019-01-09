@@ -13,7 +13,7 @@ import javax.tools.*;
 public class Docs {
 
     /** File manager with source-path + platform sources, which we will use to look up individual source files */
-    private final StandardJavaFileManager fileManager;
+    private final SourceFileManager fileManager = new SourceFileManager();
 
     private static Path srcZip() {
         try {
@@ -25,12 +25,7 @@ public class Docs {
     }
 
     Docs(Set<Path> docPath) {
-        this.fileManager =
-                ServiceLoader.load(JavaCompiler.class).iterator().next().getStandardFileManager(__ -> {}, null, null);
-
-        // Compute the full source path, including src.zip for platform classes
-        // TODO source path needs to somehow get from FileStore to here; maybe write a FileManager that fuses FileStore
-        // with docPath?
+        // Path to source .jars + src.zip
         var sourcePathFiles = docPath.stream().map(Path::toFile).collect(Collectors.toSet());
 
         try {

@@ -113,5 +113,9 @@ class SourceFileManager extends ForwardingJavaFileManager<StandardJavaFileManage
         fileManager.setLocation(location, files);
     }
 
+    public void setLocationFromPaths(Location location, Collection<? extends Path> searchpath) throws IOException {
+        fileManager.setLocationFromPaths(location, searchpath);
+    }
+
     private static final Logger LOG = Logger.getLogger("main");
 }

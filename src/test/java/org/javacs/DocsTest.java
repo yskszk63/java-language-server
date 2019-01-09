@@ -4,9 +4,16 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
 import java.util.Set;
+import org.junit.Before;
 import org.junit.Test;
 
 public class DocsTest {
+
+    @Before
+    public void setWorkspaceRoot() {
+        FileStore.setWorkspaceRoots(Set.of(LanguageServerFixture.SIMPLE_WORKSPACE_ROOT));
+    }
+
     @Test
     public void classDoc() {
         var sourcePath = Set.of(JavaCompilerServiceTest.simpleProjectSrc());
