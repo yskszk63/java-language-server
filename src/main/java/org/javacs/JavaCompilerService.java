@@ -8,7 +8,6 @@ import java.net.URI;
 import java.nio.file.*;
 import java.util.*;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.lang.model.element.*;
 import javax.tools.*;
@@ -234,7 +233,13 @@ public class JavaCompilerService {
                 }
 
                 boolean method() {
-                    return getCurrentPath().getParentPath().getLeaf() instanceof MethodInvocationTree;
+                    var leaf = getCurrentPath().getLeaf();
+                    var parent = getCurrentPath().getParentPath().getLeaf();
+                    if (parent instanceof MethodInvocationTree) {
+                        var method = (MethodInvocationTree) parent;
+                        return method.getMethodSelect() == leaf;
+                    }
+                    return false;
                 }
 
                 @Override
@@ -386,31 +391,14 @@ public class JavaCompilerService {
     /** Find the file `e` was declared in */
     private Optional<URI> findDeclaringFile(TypeElement e) {
         var name = e.getQualifiedName().toString();
-        var lastDot = name.lastIndexOf('.');
-        var packageName = lastDot == -1 ? "" : name.substring(0, lastDot);
-        var className = name.substring(lastDot + 1);
-        var isPublic = e.getModifiers().contains(Modifier.PUBLIC);
-        for (var file : FileStore.list(packageName)) {
-            // Public classes have to be declared in files named ClassName.java
-            if (isPublic && !file.getFileName().toString().equals(className + ".java")) continue;
-            if (containsTopLevelDeclaration(file, className)) {
-                return Optional.of(file.toUri());
-            }
+        JavaFileObject file;
+        try {
+            file = fileManager.getJavaFileForInput(StandardLocation.SOURCE_PATH, name, JavaFileObject.Kind.SOURCE);
+        } catch (IOException err) {
+            throw new RuntimeException(err);
         }
-        return Optional.empty();
-    }
-
-    private boolean containsTopLevelDeclaration(Path file, String simpleClassName) {
-        var find = Pattern.compile("\\b(class|interface|enum) +" + simpleClassName + "\\b");
-        try (var lines = FileStore.lines(file)) {
-            for (var line = lines.readLine(); line != null; line = lines.readLine()) {
-                if (find.matcher(line).find()) return true;
-                line = lines.readLine();
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return false;
+        if (file == null) return Optional.empty();
+        return Optional.of(file.toUri());
     }
 
     private Collection<Path> possibleFiles(Element to) {

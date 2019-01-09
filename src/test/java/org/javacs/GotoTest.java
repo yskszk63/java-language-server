@@ -168,6 +168,13 @@ public class GotoTest {
         assertThat(doGoto(file, 5, 22), empty());
     }
 
+    @Test
+    public void packagePrivate() {
+        var suggestions = doGoto(file, 50, 42);
+
+        assertThat(suggestions, hasItem("GotoPackagePrivate.java:4"));
+    }
+
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     private List<String> doGoto(String file, int row, int column) {

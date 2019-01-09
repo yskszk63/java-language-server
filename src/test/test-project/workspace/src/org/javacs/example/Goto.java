@@ -45,4 +45,8 @@ public class Goto<Param> {
     }
     public Param getParam() {
     }
+    
+    void testGotoPackagePrivate() {
+        var x = GotoPackagePrivate.PUBLIC_FIELD;
+    }
 }
