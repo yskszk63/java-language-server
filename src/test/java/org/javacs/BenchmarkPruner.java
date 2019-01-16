@@ -1,11 +1,9 @@
 package org.javacs;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.*;
 
@@ -13,43 +11,34 @@ import org.openjdk.jmh.annotations.*;
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
 public class BenchmarkPruner {
-    private static List<SourceFileObject> files = files(false);
-    private static List<SourceFileObject> pruned = files(true);
+    private static SourceFileObject file = file(false);
+    private static SourceFileObject pruned = file(true);
+    private static JavaCompilerService compiler = createCompiler();
 
-    private static List<SourceFileObject> files(boolean prune) {
-        try {
-            var files = new ArrayList<SourceFileObject>();
-            var dir = Paths.get("src/main/java/org/javacs").normalize();
-            var it = Files.list(dir).iterator();
-            while (it.hasNext()) {
-                var file = it.next();
-                if (!Files.isRegularFile(file)) continue;
-                if (prune) {
-                    var contents = Pruner.prune(file.toUri(), "isWord");
-                    files.add(new SourceFileObject(file, contents));
-                } else {
-                    files.add(new SourceFileObject(file));
-                }
-            }
-            return files;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+    private static SourceFileObject file(boolean prune) {
+        var file = Paths.get("src/main/java/org/javacs/JavaCompilerService.java").normalize();
+        if (prune) {
+            var contents = Pruner.prune(file.toUri(), "isWord");
+            return new SourceFileObject(file, contents);
+        } else {
+            return new SourceFileObject(file);
         }
     }
 
     private static JavaCompilerService createCompiler() {
-        return new JavaCompilerService(Collections.emptySet(), Collections.emptySet());
+        var workspaceRoot = Paths.get(".").normalize().toAbsolutePath();
+        FileStore.setWorkspaceRoots(Set.of(workspaceRoot));
+        var classPath = new InferConfig(workspaceRoot).classPath();
+        return new JavaCompilerService(classPath, Collections.emptySet());
     }
 
     @Benchmark
     public void pruned() {
-        var compiler = createCompiler();
-        compiler.compileBatch(pruned);
+        compiler.compileBatch(List.of(pruned));
     }
 
     @Benchmark
     public void plain() {
-        var compiler = createCompiler();
-        compiler.compileBatch(files);
+        compiler.compileBatch(List.of(file));
     }
 }
