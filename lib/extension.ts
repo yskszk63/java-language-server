@@ -114,26 +114,28 @@ function runFindReferences(uri: string, lineNumber: number, column: number) {
 }
 
 interface JavaTestTask extends TaskDefinition {
-    enclosingClass: string
-    method: string
+    className: string
+    methodName: string
 }
 
-function runTest(sourceUri: string, enclosingClass: string, method: string): Thenable<TaskExecution> {
+function runTest(sourceUri: string, className: string, methodName: string): Thenable<TaskExecution> {
+    let file = Uri.parse(sourceUri).fsPath;
+    file = Path.relative(workspace.rootPath, file);
 	let kind: JavaTestTask = {
 		type: 'java.task.test',
-        enclosingClass: enclosingClass,
-        method: method,
+        className: className,
+        methodName: methodName,
     }
     var shell;
     let config = workspace.getConfiguration('java')
     // Run method or class
-    if (method != null) {
+    if (methodName != null) {
         let command = config.get('testMethod') as string[]
         if (command.length == 0) {
             window.showErrorMessage('Set "java.testMethod" in .vscode/settings.json')
             shell = new ShellExecution('echo', ['Set "java.testMethod" in .vscode/settings.json, for example ["mvn", "test", "-Dtest=${class}#${method}"]'])
         } else {
-            shell = templateCommand(command, enclosingClass, method)
+            shell = templateCommand(command, file, className, methodName)
         }
     } else {
         let command = config.get('testClass') as string[]
@@ -141,7 +143,7 @@ function runTest(sourceUri: string, enclosingClass: string, method: string): The
             window.showErrorMessage('Set "java.testClass" in .vscode/settings.json')
             shell = new ShellExecution('echo', ['Set "java.testClass" in .vscode/settings.json, for example ["mvn", "test", "-Dtest=${class}"]'])
         } else {
-            shell = templateCommand(command, enclosingClass, method)
+            shell = templateCommand(command, file, className, methodName)
         }
     }
 	let workspaceFolder = workspace.getWorkspaceFolder(Uri.parse(sourceUri))
@@ -149,17 +151,18 @@ function runTest(sourceUri: string, enclosingClass: string, method: string): The
 	return tasks.executeTask(task)
 }
 
-function templateCommand(command: string[], enclosingClass: string, method: string) {
+function templateCommand(command: string[], file: string, className: string, methodName: string) {
     // Replace template parameters
     var replaced = []
     for (var i = 0; i < command.length; i++) {
-        replaced[i] = command[i].replace('${class}', enclosingClass).replace('${method}', method)
+        let c = command[i]
+        c = c.replace('${file}', file)
+        c = c.replace('${class}', className)
+        c = c.replace('${method}', methodName)
+        replaced[i] = c
     }
     // Populate env
-    let env = {} as {[key: string]: string};
-    let config = workspace.getConfiguration('java')
-    if (config.has('home')) 
-        env['JAVA_HOME'] = config.get('home')
+    let env = {...process.env} as {[key: string]: string};
     return new ShellExecution(replaced[0], replaced.slice(1), {env})
 }
 

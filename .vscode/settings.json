@@ -17,8 +17,8 @@
     "[java]": {
         "editor.formatOnSave": true
     },
-    "java.testMethod": ["mvn", "test", "-Dtest=${class}#${method}"],
-    "java.testClass": ["mvn", "test", "-Dtest=${class}"],
+    "java.testMethod": ["scripts/run_test.sh", "${class}", "${method}"],
+    "java.testClass": ["scripts/run_test.sh", "${class}"],
     // "typescript.tsserver.trace": "verbose",
     // "java.trace.server": "verbose",
 }
