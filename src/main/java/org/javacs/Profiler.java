@@ -8,6 +8,8 @@ import java.util.*;
 import java.util.logging.Logger;
 
 class Profiler implements TaskListener {
+    static boolean quiet = false;
+
     Set<URI> files = new HashSet<>();
     Map<URI, Map<TaskEvent.Kind, Instant>> started = new HashMap<>();
     Map<TaskEvent.Kind, Duration> profile = new EnumMap<>(TaskEvent.Kind.class);
@@ -35,6 +37,7 @@ class Profiler implements TaskListener {
     }
 
     void print() {
+        if (quiet) return;
         var lines = new StringJoiner("; ");
         for (var kind : TaskEvent.Kind.values()) {
             if (!profile.containsKey(kind)) continue;
