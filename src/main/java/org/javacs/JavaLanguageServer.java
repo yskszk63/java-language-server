@@ -839,15 +839,6 @@ class JavaLanguageServer extends LanguageServer {
         return sources;
     }
 
-    // TODO pretty sure this is unnecessary now that SourceFileObject delegates to FileStore
-    private List<JavaFileObject> latestText(Collection<URI> files) {
-        var sources = new ArrayList<JavaFileObject>();
-        for (var f : files) {
-            sources.add(new SourceFileObject(f));
-        }
-        return sources;
-    }
-
     private ParseFile cacheParse;
     private URI cacheParseFile = URI.create("file:///NONE");;
     private int cacheParseVersion = -1;
