@@ -135,7 +135,7 @@ public class ParseFile {
         LOG.info(
                 String.format(
                         "Finding completion position near %s(%d,%d)...",
-                        root.getSourceFile().toUri(), line, character));
+                        root.getSourceFile().toUri().getPath(), line, character));
 
         var pos = trees.getSourcePositions();
         var lines = root.getLineMap();

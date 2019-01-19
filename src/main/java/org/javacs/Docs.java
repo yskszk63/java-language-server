@@ -46,7 +46,7 @@ public class Docs {
                     fileManager.getJavaFileForInput(
                             StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
             if (fromSourcePath != null) {
-                LOG.info(String.format("...found %s on source path", fromSourcePath.toUri()));
+                LOG.info(String.format("...found %s on source path", fromSourcePath.toUri().getPath()));
                 return Optional.of(fromSourcePath);
             }
             for (var module : Classes.JDK_MODULES) {

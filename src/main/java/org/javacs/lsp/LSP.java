@@ -416,6 +416,9 @@ public class LSP {
                             respond(send, r.id, response);
                             break;
                         }
+                    case "$/cancelRequest":
+                        // Already handled in peek(message)
+                        break;
                     default:
                         LOG.warning(String.format("Don't know what to do with method `%s`", r.method));
                 }
