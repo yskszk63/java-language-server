@@ -26,15 +26,11 @@ class SourceFileManager extends ForwardingJavaFileManager<StandardJavaFileManage
     public Iterable<JavaFileObject> list(
             Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
         if (location == StandardLocation.SOURCE_PATH) {
-            var stream = FileStore.list(packageName).stream().map(this::asJavaFileObject).filter(this::isJavaSource);
+            var stream = FileStore.list(packageName).stream().map(this::asJavaFileObject);
             return stream::iterator;
         } else {
             return super.list(location, packageName, kinds, recurse);
         }
-    }
-
-    private boolean isJavaSource(JavaFileObject file) {
-        return FileStore.isJavaFile(file.toUri());
     }
 
     private JavaFileObject asJavaFileObject(Path file) {

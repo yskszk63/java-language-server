@@ -35,6 +35,7 @@ class FileStore {
     private static final Map<URI, VersionedContent> activeDocuments = new HashMap<>();
 
     /** javaSources[file] is the javaSources time of a .java source file. */
+    // TODO organize by package name for speed of list(...)
     private static final TreeMap<Path, Info> javaSources = new TreeMap<>();
 
     private static class Info {
@@ -88,7 +89,6 @@ class FileStore {
         for (var kv : javaSources.entrySet()) {
             var file = kv.getKey();
             var info = kv.getValue();
-            if (!FileStore.isJavaFile(file)) continue;
             if (info.packageName.equals(packageName)) list.add(file);
         }
         return list;
@@ -176,14 +176,14 @@ class FileStore {
     static void open(DidOpenTextDocumentParams params) {
         var document = params.textDocument;
         var uri = document.uri;
-        if (!FileStore.isJavaFile(uri)) return;
+        if (!isJavaFile(uri)) return;
         activeDocuments.put(uri, new VersionedContent(document.text, document.version));
     }
 
     static void change(DidChangeTextDocumentParams params) {
         var document = params.textDocument;
         var uri = document.uri;
-        if (FileStore.isJavaFile(uri)) {
+        if (isJavaFile(uri)) {
             var existing = activeDocuments.get(uri);
             var newText = existing.content;
 
@@ -201,7 +201,7 @@ class FileStore {
     static void close(DidCloseTextDocumentParams params) {
         var document = params.textDocument;
         var uri = document.uri;
-        if (FileStore.isJavaFile(uri)) {
+        if (isJavaFile(uri)) {
             // Remove from source cache
             activeDocuments.remove(uri);
         }
@@ -217,7 +217,7 @@ class FileStore {
     }
 
     static String contents(URI file) {
-        if (!FileStore.isJavaFile(file)) {
+        if (!isJavaFile(file)) {
             throw new RuntimeException(file + " is not a java file");
         }
         if (activeDocuments.containsKey(file)) {
