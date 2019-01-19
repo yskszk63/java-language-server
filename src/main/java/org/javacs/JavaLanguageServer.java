@@ -328,12 +328,12 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public Optional<CompletionList> completion(TextDocumentPositionParams position) {
-        // TODO reuse previous compilation when changes are small
         var started = Instant.now();
         var uri = position.textDocument.uri;
         if (!FileStore.isJavaFile(uri)) return Optional.empty();
         var line = position.position.line + 1;
         var column = position.position.character + 1;
+        LOG.info(String.format("Complete at %s(%d,%d)", uri.getPath(), line, column));
         // Figure out what kind of completion we want to do
         var maybeCtx = compiler.parseFile(uri).completionContext(line, column);
         // TODO don't complete inside of comments
