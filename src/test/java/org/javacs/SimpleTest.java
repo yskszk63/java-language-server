@@ -1,8 +1,11 @@
 package org.javacs;
 
-import com.sun.source.util.JavacTask;
-import com.sun.source.util.TaskEvent;
-import com.sun.source.util.TaskListener;
+import static org.hamcrest.Matchers.*;
+import static org.junit.Assert.*;
+
+import com.sun.source.tree.*;
+import com.sun.source.util.*;
+import com.sun.tools.javac.TaskPoolProvider;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
@@ -15,7 +18,8 @@ import org.junit.Test;
 
 public class SimpleTest implements TaskListener, DiagnosticListener<JavaFileObject> {
     final JavaCompiler compiler = ServiceLoader.load(JavaCompiler.class).iterator().next();
-    final Path src = Paths.get("src/main/java").toAbsolutePath();
+    final Path src = Paths.get("dummy/src").toAbsolutePath();
+    final Path foo = src.resolve("foo/bar/Foo.java");
     final List<String> options = List.of("-sourcepath", src.toString(), "-verbose", "-proc:none");
 
     @Before
@@ -24,42 +28,56 @@ public class SimpleTest implements TaskListener, DiagnosticListener<JavaFileObje
     }
 
     @Test
-    public void standardFileManager() throws IOException {
+    public void freshTask() throws IOException {
         var fileManager = compiler.getStandardFileManager(this, null, Charset.defaultCharset());
-
-        LOG.info("Compile once...");
-        var files = fileManager.getJavaFileObjects(src.resolve("org/javacs/JavaLanguageServer.java"));
-        var task = (JavacTask) compiler.getTask(null, fileManager, this, options, null, files);
-
-        task.addTaskListener(this);
-        task.analyze();
-
-        LOG.info("Compile twice...");
-        task = (JavacTask) compiler.getTask(null, fileManager, this, options, null, files);
-        task.addTaskListener(this);
-        task.analyze();
+        for (var i = 0; i < 2; i++) {
+            LOG.info(String.format("Compile %d...", i));
+            var files = fileManager.getJavaFileObjects(foo);
+            var task = (JavacTask) compiler.getTask(null, fileManager, this, options, null, files);
+            checkInvokeType(task);
+        }
     }
 
     @Test
-    public void sourceFileManager() throws IOException {
-        FileStore.setWorkspaceRoots(Set.of(Paths.get(".").toAbsolutePath()));
-        var fileManager = new SourceFileManager();
+    public void taskPool() throws IOException {
+        var fileManager = compiler.getStandardFileManager(this, null, Charset.defaultCharset());
+        var pool = TaskPoolProvider.createTaskPool(1);
+        for (var i = 0; i < 2; i++) {
+            var files = fileManager.getJavaFileObjects(foo);
+            LOG.info(String.format("Compile %d...", i));
+            pool.getTask(
+                    null,
+                    fileManager,
+                    this,
+                    options,
+                    null,
+                    files,
+                    task -> {
+                        checkInvokeType(task);
+                        return "Done!";
+                    });
+        }
+    }
 
-        LOG.info("Compile once...");
-        var files =
-                fileManager.getJavaFileObjectsFromFiles(
-                        List.of(src.resolve("org/javacs/JavaLanguageServer.java").toFile()));
-        var task = (JavacTask) compiler.getTask(null, fileManager, this, options, null, files);
+    private void checkInvokeType(JavacTask task) {
         task.addTaskListener(this);
-        task.analyze();
-        LOG.info("...finished once");
-
-        for (var i = 0; i < 3; i++) {
-            LOG.info(String.format("Compile again %d...", i));
-            task = (JavacTask) compiler.getTask(null, fileManager, this, options, null, files);
-            task.addTaskListener(this);
+        try {
+            var root = task.parse().iterator().next();
             task.analyze();
-            LOG.info(String.format("...finished %d", i));
+            LOG.info("Scan " + root);
+            new TreePathScanner<Void, Void>() {
+                @Override
+                public Void visitMethodInvocation(MethodInvocationTree t, Void __) {
+                    if (t.getMethodSelect().toString().equals("Bar.test")) {
+                        var type = Trees.instance(task).getTypeMirror(getCurrentPath());
+                        LOG.info("Check " + t + ": " + type);
+                        assertThat(type.toString(), equalTo("int"));
+                    }
+                    return null;
+                }
+            }.scan(root, null);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
