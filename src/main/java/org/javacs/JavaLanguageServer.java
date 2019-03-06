@@ -644,7 +644,7 @@ class JavaLanguageServer extends LanguageServer {
         // Add code hover message
         var result = new ArrayList<MarkedString>();
         var code = hoverCode(el.get());
-        result.add(new MarkedString("java.hover", code));
+        result.add(new MarkedString("java", code));
         // Add docs hover message
         var docs = hoverDocs(el.get());
         if (docs.isPresent()) {
