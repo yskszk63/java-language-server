@@ -646,13 +646,15 @@ class JavaLanguageServer extends LanguageServer {
 
         // Add docs hover message
         var docs = hoverDocs(el.get());
-        docs.filter(Predicate.not(String::isBlank)).ifPresent(doc -> {
-            result.add(new MarkedString(doc));
-        });
+        docs.filter(Predicate.not(String::isBlank))
+                .ifPresent(
+                        doc -> {
+                            result.add(new MarkedString(doc));
+                        });
 
         // Add code hover message
         var code = hoverCode(el.get());
-        result.add(new MarkedString("java", code));
+        result.add(new MarkedString("java.hover", code));
 
         return Optional.of(new Hover(result));
     }
