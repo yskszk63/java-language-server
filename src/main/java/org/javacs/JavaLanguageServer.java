@@ -855,6 +855,13 @@ class JavaLanguageServer extends LanguageServer {
         cacheParse = compiler.parseFile(file);
         cacheParseFile = file;
         cacheParseVersion = FileStore.version(file);
+        // Create field decorations
+        var decorations = new DecorationParams();
+        decorations.uri = file;
+        for (var f : cacheParse.fieldReferences()) {
+            cacheParse.range(f).ifPresent(decorations.fields::add);
+        }
+        client.customNotification("java/setDecorations", gson.toJsonTree(decorations));
     }
 
     @Override

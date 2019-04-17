@@ -478,6 +478,20 @@ public class ParseFile {
         return Parser.findSymbolsMatching(root, "");
     }
 
+    public List<TreePath> fieldReferences() {
+        class Find extends TreePathScanner<Void, Void> {
+            List<TreePath> fields = new ArrayList<>();
+
+            public Void visitIdentifier(IdentifierTree t, Void __) {
+                fields.add(getCurrentPath());
+                return super.visitIdentifier(t, null);
+            }
+        }
+        var find = new Find();
+        find.scan(root, null);
+        return find.fields;
+    }
+
     private static final DocCommentTree EMPTY_DOC = makeEmptyDoc();
 
     private static DocCommentTree makeEmptyDoc() {
