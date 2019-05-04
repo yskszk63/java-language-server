@@ -48,6 +48,7 @@ import com.sun.tools.javac.util.DefinedBy.Api;
 import com.sun.tools.javac.util.Log;
 import java.io.PrintStream;
 import java.io.Writer;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -190,7 +191,13 @@ public class TaskPool {
             if (ctx.polluted) {
                 statPolluted++;
             } else {
-                //            task.cleanup();
+                try {
+                    var method = JavacTaskImpl.class.getDeclaredMethod("cleanup");
+                    method.setAccessible(true);
+                    method.invoke(task);
+                } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                    throw new RuntimeException(e);
+                }
                 synchronized (this) {
                     while (cacheSize() + 1 > maxPoolSize) {
                         ReusableContext toRemove =
