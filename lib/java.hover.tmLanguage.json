@@ -13,29 +13,8 @@
 			"include": "#annotation"
 		},
 		{
-			"match": "\\b(\\w+\\.)*[A-Z]\\w*\\b",
-			"captures": {
-				"0": {
-					"patterns": [
-						{
-							"match": "\\b\\w+\\b",
-							"name": "storage.type.java"
-						},
-						{
-							"match": "\\.",
-							"name": "keyword.other.dot"
-						}
-					]
-				}
-			}
-		},
-		{
 			"match": "\\b(byte|short|int|long|char|float|double|boolean|void)\\b",
-			"name": "storage.type.java"
-		},
-		{
-			"match": "\\b([a-z]\\w*)\\b",
-			"name": "variable.java"
+			"name": "keyword.other.type"
 		}
 	],
 	"repository": {
@@ -118,10 +97,6 @@
 				{
 					"match": "\\b(this|super)\\b",
 					"name": "variable.language.java"
-				},
-				{
-					"match": "[\\?<>\\[\\]]",
-					"name": "keyword.other"
 				}
 			]
 		},
