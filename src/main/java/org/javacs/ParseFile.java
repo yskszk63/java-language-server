@@ -534,6 +534,13 @@ public class ParseFile {
             @Override
             public Void visitClass(ClassTree t, Void __) {
                 scope = scope.enter(true);
+                // Add fields in advance so forward references color correctly
+                for (var member : t.getMembers()) {
+                    if (member instanceof VariableTree) {
+                        var field = (VariableTree) member;
+                        scope.add(field.getName());
+                    }
+                }
                 super.visitClass(t, null);
                 scope = scope.leave();
                 return null;
@@ -574,8 +581,10 @@ public class ParseFile {
             public Void visitVariable(VariableTree t, Void __) {
                 if (scope.isClass) {
                     fields.add(getCurrentPath());
+                } else {
+                    // Class fields are added before scanning
+                    scope.add(t.getName());
                 }
-                scope.add(t.getName());
                 return super.visitVariable(t, null);
             }
 

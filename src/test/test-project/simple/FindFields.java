@@ -11,6 +11,11 @@ class FindFields {
         int methodReference = field();
         int memberReference = param.field;
         var insideMethodCall = this;
-        System.out.println(insideMethodCall.field);
+        call(insideMethodCall.field);
+        var checkForward = forwardReference;
     }
+
+    void call(int param) { }
+
+    int forwardReference = 2;
 }

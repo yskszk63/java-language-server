@@ -289,6 +289,13 @@ public class JavaCompilerServiceTest {
         }
         assertThat(
                 strings,
-                containsInAnyOrder("int field = 1", "field", "this.field", "param.field", "insideMethodCall.field"));
+                containsInAnyOrder(
+                        "int field = 1",
+                        "int forwardReference = 2",
+                        "field",
+                        "this.field",
+                        "param.field",
+                        "insideMethodCall.field",
+                        "forwardReference"));
     }
 }
