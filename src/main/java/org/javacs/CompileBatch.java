@@ -1192,6 +1192,10 @@ public class CompileBatch implements AutoCloseable {
                     }
                 }
 
+                private boolean special(Name name) {
+                    return name.contentEquals("this") || name.contentEquals("super") || name.contentEquals("class");
+                }
+
                 @Override
                 public Void visitVariable(VariableTree t, Void __) {
                     check();
@@ -1200,13 +1204,13 @@ public class CompileBatch implements AutoCloseable {
 
                 @Override
                 public Void visitMemberSelect(MemberSelectTree t, Void __) {
-                    if (!t.getIdentifier().contentEquals("this")) check();
+                    if (!special(t.getIdentifier())) check();
                     return super.visitMemberSelect(t, null);
                 }
 
                 @Override
                 public Void visitIdentifier(IdentifierTree t, Void __) {
-                    if (!t.getName().contentEquals("this")) check();
+                    if (!special(t.getName())) check();
                     return super.visitIdentifier(t, null);
                 }
             }
