@@ -26,13 +26,10 @@
 
 package org.javacs;
 
-import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.TaskEvent;
-import com.sun.source.util.TaskEvent.Kind;
 import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.api.*;
-import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.comp.Annotate;
 import com.sun.tools.javac.comp.Check;
@@ -46,17 +43,14 @@ import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.DefinedBy;
 import com.sun.tools.javac.util.DefinedBy.Api;
 import com.sun.tools.javac.util.Log;
-import java.io.PrintStream;
 import java.io.Writer;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import javax.tools.Diagnostic;
@@ -119,7 +113,6 @@ public class TaskPool {
      * @param options compiler options, {@code null} means no options
      * @param classes names of classes to be processed by annotation processing, {@code null} means no class names
      * @param compilationUnits the compilation units to compile, {@code null} means no compilation units
-     * @param worker that should be run with the task
      * @return an object representing the compilation
      * @throws RuntimeException if an unrecoverable error occurred in a user supplied component. The {@linkplain
      *     Throwable#getCause() cause} will be the error in user code.
@@ -165,13 +158,6 @@ public class TaskPool {
     // where:
     private long cacheSize() {
         return options2Contexts.values().stream().flatMap(Collection::stream).count();
-    }
-
-    public void printStatistics(PrintStream out) {
-        out.println(statReused + " reused Contexts");
-        out.println(statNew + " newly created Contexts");
-        out.println(statPolluted + " polluted Contexts");
-        out.println(statRemoved + " removed Contexts");
     }
 
     public class Borrow implements AutoCloseable {
@@ -220,8 +206,6 @@ public class TaskPool {
 
     static class ReusableContext extends Context implements TaskListener {
 
-        Set<CompilationUnitTree> roots = new HashSet<>();
-
         List<String> arguments;
         boolean polluted = false;
 
@@ -256,57 +240,13 @@ public class TaskPool {
                 Annotate.instance(this).newRound();
                 CompileStates.instance(this).clear();
                 MultiTaskListener.instance(this).clear();
-
-                // find if any of the roots have redefined java.* classes
-                Symtab syms = Symtab.instance(this);
-                //                pollutionScanner.scan(roots, syms);
-                roots.clear();
             }
         }
-
-        /**
-         * This scanner detects as to whether the shared context has been polluted. This happens whenever a compiled
-         * program redefines a core class (in 'java.*' package) or when (typically because of cyclic inheritance) the
-         * symbol kind of a core class has been touched.
-         */
-        /*
-        TreeScanner<Void, Symtab> pollutionScanner = new TreeScanner<Void, Symtab>() {
-            @Override @DefinedBy(Api.COMPILER_TREE)
-            public Void visitClass(ClassTree node, Symtab syms) {
-                Symbol sym = ((JCClassDecl)node).sym;
-                if (sym != null) {
-                    syms.removeClass(sym.packge().modle, sym.flatName());
-                    Type sup = supertype(sym);
-                    if (isCoreClass(sym) ||
-                            (sup != null && isCoreClass(sup.tsym) && sup.tsym.kind != Kinds.Kind.TYP)) {
-                        polluted = true;
-                    }
-                }
-                return super.visitClass(node, syms);
-            }
-
-            private boolean isCoreClass(Symbol s) {
-                return s.flatName().toString().startsWith("java.");
-            }
-
-            private Type supertype(Symbol s) {
-                if (s.type == null ||
-                        !s.type.hasTag(TypeTag.CLASS)) {
-                    return null;
-                } else {
-                    ClassType ct = (ClassType)s.type;
-                    return ct.supertype_field;
-                }
-            }
-        };
-        */
 
         @Override
         @DefinedBy(Api.COMPILER_TREE)
         public void finished(TaskEvent e) {
-            if (e.getKind() == Kind.PARSE) {
-                roots.add(e.getCompilationUnit());
-            }
+            // do nothing
         }
 
         @Override
