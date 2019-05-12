@@ -494,11 +494,11 @@ public class ParseFile {
             boolean isClass;
             Set<Name> locals = new HashSet<>();
 
-            boolean isValue(Name name) {
+            boolean isLocal(Name name) {
                 if (name.contentEquals("this") || name.contentEquals("super")) return true;
                 if (locals.contains(name)) return true;
                 if (parent == null) return false;
-                return parent.isValue(name);
+                return parent.isLocal(name);
             }
 
             boolean isField(Name name) {
@@ -515,7 +515,7 @@ public class ParseFile {
                 locals.add(name);
             }
 
-            Scope enter(boolean isClass) { // TODO boolean is not highlighting
+            Scope enter(boolean isClass) {
                 var child = new Scope();
                 child.parent = this;
                 child.isClass = isClass;
@@ -547,6 +547,13 @@ public class ParseFile {
                 return null;
             }
 
+            /** Starting with an uppercase is a heuristic for being the name of a class */
+            boolean isUpperCase(Name name) {
+                if (name.length() == 0) return false;
+                var first = name.charAt(0);
+                return Character.isUpperCase(first);
+            }
+
             /** Does path refer to a value, not a type? */
             boolean isValue(Tree t) {
                 switch (t.getKind()) {
@@ -554,10 +561,10 @@ public class ParseFile {
                         return true;
                     case MEMBER_SELECT:
                         var select = (MemberSelectTree) t;
-                        return isValue(select.getExpression());
+                        return isUpperCase(select.getIdentifier()) || isValue(select.getExpression());
                     case IDENTIFIER:
                         var id = (IdentifierTree) t;
-                        return scope.isValue(id.getName());
+                        return isUpperCase(id.getName()) || scope.isLocal(id.getName());
                     default:
                         return false;
                 }
@@ -582,7 +589,7 @@ public class ParseFile {
 
             @Override
             public Void visitMemberSelect(MemberSelectTree t, Void __) {
-                if (t != lastInvokedMethod && isValue(t)) {
+                if (t != lastInvokedMethod && !t.getIdentifier().contentEquals("class") && isValue(t.getExpression())) {
                     fields.add(getCurrentPath());
                 }
                 return super.visitMemberSelect(t, null);
@@ -597,6 +604,7 @@ public class ParseFile {
             }
         }
         var find = new Find();
+        // TODO this is slow on big files like JavaLanguageServer.java
         LOG.info(String.format("Check %s for fields...", root.getSourceFile().getName()));
         find.scan(root, null);
         LOG.info(String.format("...found %d fields", find.fields.size()));

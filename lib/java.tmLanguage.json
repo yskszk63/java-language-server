@@ -848,8 +848,7 @@
 					"name": "keyword.other.var"
 				},
 				{
-					"match": "\\b\\w+\\b",
-					"name": "meta.type.var.java"
+					"include": "#primitive"
 				}
 			]
 		},
