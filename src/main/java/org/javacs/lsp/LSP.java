@@ -211,6 +211,7 @@ public class LSP {
 
         // Process messages on main thread
         LOG.info("Reading messages from queue...");
+        var hasAsyncWork = false;
         processMessages:
         while (true) {
             Message r;
@@ -228,10 +229,14 @@ public class LSP {
             }
             // If poll(_) failed, loop again
             if (r == null) {
-                server.doAsyncWork();
+                if (hasAsyncWork) {
+                    server.doAsyncWork();
+                    hasAsyncWork = false;
+                }
                 continue;
             }
             // Otherwise, process the new message
+            hasAsyncWork = true;
             try {
                 switch (r.method) {
                     case "initialize":
