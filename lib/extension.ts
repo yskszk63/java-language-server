@@ -225,18 +225,18 @@ function createProgressListeners(client: LanguageClient) {
     // Use custom notifications to do advanced syntax highlighting
 	const fieldDecorationType = window.createTextEditorDecorationType({
         color: new ThemeColor('javaFieldColor')
-	});
-    client.onNotification(new NotificationType('java/setDecorations'), (event: DecorationParams) => {
+    });
+    const fieldDecorations: {[uri: string]: Range[]} = {};
+    function updateVisibleDecorations() {
         // TODO when we switch to a text editor that was not previously visible, there will be no decorations
         for (let editor of window.visibleTextEditors) {
-            var file = event.files[editor.document.uri.toString()];
+            var file = fieldDecorations[editor.document.uri.toString()];
             if (file == null) {
-                console.log(`No decorations on ${editor.document.uri}`);
                 editor.setDecorations(fieldDecorationType, []);
                 continue;
             }
             const decorations: DecorationOptions[] = [];
-            for (let field of file.fields) {
+            for (let field of file) {
                 const start = new VS.Position(field.start.line, field.start.character)
                 const end = new VS.Position(field.end.line, field.end.character)
                 const decoration = { range: new VS.Range(start, end) };
@@ -244,6 +244,13 @@ function createProgressListeners(client: LanguageClient) {
             }
             editor.setDecorations(fieldDecorationType, decorations);
         }
+    }
+    window.onDidChangeVisibleTextEditors(updateVisibleDecorations);
+    client.onNotification(new NotificationType('java/setDecorations'), (event: DecorationParams) => {
+        for (let uri of Object.keys(event.files)) {
+            fieldDecorations[uri] = event.files[uri].fields;
+        }
+        updateVisibleDecorations();
     });
 }
 
