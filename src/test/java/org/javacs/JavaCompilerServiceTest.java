@@ -277,4 +277,18 @@ public class JavaCompilerServiceTest {
         assertTrue(CompileBatch.matchesPartialName("foobar", "foo"));
         assertFalse(CompileBatch.matchesPartialName("foo", "foobar"));
     }
+
+    @Test
+    public void findFields() {
+        var uri = resourceUri("FindFields.java");
+        var parsed = compiler.parseFile(uri);
+        var refs = parsed.fieldReferences();
+        var strings = new ArrayList<String>();
+        for (var r : refs) {
+            strings.add(r.getLeaf().toString());
+        }
+        assertThat(
+                strings,
+                containsInAnyOrder("int field = 1", "field", "this.field", "param.field", "insideMethodCall.field"));
+    }
 }

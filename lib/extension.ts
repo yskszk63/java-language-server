@@ -3,8 +3,9 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as Path from "path";
 import * as FS from "fs";
-import { window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation } from 'vscode';
-import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType} from "vscode-languageclient";
+import { window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, DecorationOptions, ThemeColor } from 'vscode';
+import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType, Range} from "vscode-languageclient";
+import * as VS from "vscode";
 
 // If we want to profile using VisualVM, we have to run the language server using regular java, not jlink
 // This is intended to be used in the 'F5' debug-extension mode, where the extension is running against the actual source, not build.vsix
@@ -171,6 +172,11 @@ interface ProgressMessage {
     increment: number
 }
 
+interface DecorationMessage {
+    uri: string;
+    fields: Range[]
+}
+
 function createProgressListeners(client: LanguageClient) {
 	// Create a "checking files" progress indicator
 	let progressListener = new class {
@@ -211,7 +217,30 @@ function createProgressListeners(client: LanguageClient) {
 	});
 	client.onNotification(new NotificationType('java/endProgress'), () => {
 		progressListener.endProgress();
+    });
+
+    // Use custom notifications to do advanced syntax highlighting
+	const fieldDecorationType = window.createTextEditorDecorationType({
+        color: new ThemeColor('javaFieldColor')
 	});
+    client.onNotification(new NotificationType('java/setDecorations'), (event: DecorationMessage) => {
+        if (!window.activeTextEditor) {
+            console.log('No active text editor');
+            return;
+        }
+        if (window.activeTextEditor.document.uri.toString() != event.uri) {
+            console.log(`Decorations on ${event.uri} don't match open document ${window.activeTextEditor.document.uri}`);
+            return;
+        }
+        const decorations: DecorationOptions[] = [];
+        for (let field of event.fields) {
+            const start = new VS.Position(field.start.line, field.start.character)
+            const end = new VS.Position(field.end.line, field.end.character)
+            const decoration = { range: new VS.Range(start, end) };
+            decorations.push(decoration);
+        }
+		window.activeTextEditor.setDecorations(fieldDecorationType, decorations);
+    });
 }
 
 function platformSpecificLauncher(): string[] {
@@ -246,6 +275,7 @@ function visualVmConfig(context: ExtensionContext): ServerOptions {
         '-Xdebug',
         // '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005',
         'org.javacs.Main',
+        // Exports, needed at compile and runtime for access
         "--add-exports", "jdk.compiler/com.sun.tools.javac.api=javacs",
         "--add-exports", "jdk.compiler/com.sun.tools.javac.code=javacs",
         "--add-exports", "jdk.compiler/com.sun.tools.javac.comp=javacs",
@@ -253,6 +283,8 @@ function visualVmConfig(context: ExtensionContext): ServerOptions {
         "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=javacs",
         "--add-exports", "jdk.compiler/com.sun.tools.javac.model=javacs",
         "--add-exports", "jdk.compiler/com.sun.tools.javac.util=javacs",
+        // Opens, needed at runtime for reflection
+        "--add-opens", "jdk.compiler/com.sun.tools.javac.api=javacs",
     ];
     
     console.log(javaExecutablePath + ' ' + args.join(' '));

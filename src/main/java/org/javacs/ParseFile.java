@@ -465,6 +465,16 @@ public class ParseFile {
             }
             end = start + name.length();
         }
+        if (path.getLeaf() instanceof MemberSelectTree) {
+            var member = (MemberSelectTree) path.getLeaf();
+            var name = member.getIdentifier().toString();
+            start = contents.indexOf(name, start);
+            if (start == -1) {
+                LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", name, path.getLeaf()));
+                return Optional.empty();
+            }
+            end = start + name.length();
+        }
         var startLine = (int) lines.getLineNumber(start);
         var startCol = (int) lines.getColumnNumber(start);
         var endLine = (int) lines.getLineNumber(end);
@@ -476,6 +486,121 @@ public class ParseFile {
 
     public List<TreePath> documentSymbols() {
         return Parser.findSymbolsMatching(root, "");
+    }
+
+    public List<TreePath> fieldReferences() {
+        class Scope {
+            Scope parent;
+            boolean isClass;
+            Set<Name> locals = new HashSet<>();
+
+            boolean isValue(Name name) {
+                if (name.contentEquals("this") || name.contentEquals("super")) return true;
+                if (locals.contains(name)) return true;
+                if (parent == null) return false;
+                return parent.isValue(name);
+            }
+
+            boolean isField(Name name) {
+                if (locals.contains(name)) {
+                    return isClass;
+                }
+                if (parent == null) {
+                    return false;
+                }
+                return parent.isField(name);
+            }
+
+            void add(Name name) {
+                locals.add(name);
+            }
+
+            Scope enter(boolean isClass) { // TODO boolean is not highlighting
+                var child = new Scope();
+                child.parent = this;
+                child.isClass = isClass;
+                return child;
+            }
+
+            Scope leave() {
+                return parent;
+            }
+        }
+        class Find extends TreePathScanner<Void, Void> {
+            List<TreePath> fields = new ArrayList<>();
+            Scope scope = new Scope();
+
+            // TODO completing @Override crashes language server
+            @Override
+            public Void visitClass(ClassTree t, Void __) {
+                scope = scope.enter(true);
+                super.visitClass(t, null);
+                scope = scope.leave();
+                return null;
+            }
+
+            @Override
+            public Void visitMethod(MethodTree t, Void __) {
+                scope = scope.enter(false);
+                super.visitMethod(t, null);
+                scope = scope.leave();
+                return null;
+            }
+
+            /** Does path refer to a value, not a type? */
+            boolean isValue(Tree t) {
+                switch (t.getKind()) {
+                    case METHOD_INVOCATION:
+                        return true;
+                    case MEMBER_SELECT:
+                        var select = (MemberSelectTree) t;
+                        return isValue(select.getExpression());
+                    case IDENTIFIER:
+                        var id = (IdentifierTree) t;
+                        return scope.isValue(id.getName());
+                    default:
+                        return false;
+                }
+            }
+
+            @Override
+            public Void visitVariable(VariableTree t, Void __) {
+                if (scope.isClass) {
+                    fields.add(getCurrentPath());
+                }
+                scope.add(t.getName());
+                return super.visitVariable(t, null);
+            }
+
+            Tree lastInvokedMethod;
+
+            @Override
+            public Void visitMethodInvocation(MethodInvocationTree t, Void __) {
+                lastInvokedMethod = t.getMethodSelect();
+                return super.visitMethodInvocation(t, null);
+            }
+
+            @Override
+            public Void visitMemberSelect(MemberSelectTree t, Void __) {
+                if (t != lastInvokedMethod && isValue(t)) {
+                    fields.add(getCurrentPath());
+                }
+                return super.visitMemberSelect(t, null);
+            }
+
+            @Override
+            public Void visitIdentifier(IdentifierTree t, Void __) {
+                if (t != lastInvokedMethod && scope.isField(t.getName())) {
+                    fields.add(getCurrentPath());
+                }
+                return super.visitIdentifier(t, null);
+            }
+        }
+        var find = new Find();
+        LOG.info(String.format("Check %s for fields...", root.getSourceFile().getName()));
+        find.scan(root, null);
+        LOG.info(String.format("...found %d fields", find.fields.size()));
+        return find.fields;
     }
 
     private static final DocCommentTree EMPTY_DOC = makeEmptyDoc();

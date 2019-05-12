@@ -855,6 +855,16 @@ class JavaLanguageServer extends LanguageServer {
         cacheParse = compiler.parseFile(file);
         cacheParseFile = file;
         cacheParseVersion = FileStore.version(file);
+        createFieldDecorations();
+    }
+
+    private void createFieldDecorations() {
+        var decorations = new DecorationParams();
+        decorations.uri = cacheParseFile;
+        for (var f : cacheParse.fieldReferences()) {
+            cacheParse.range(f).ifPresent(decorations.fields::add);
+        }
+        client.customNotification("java/setDecorations", gson.toJsonTree(decorations));
     }
 
     @Override
@@ -1308,7 +1318,7 @@ class JavaLanguageServer extends LanguageServer {
         }
 
         // Convert offset to 0-based line and character
-        var startLine = (int) lines.getLineNumber(start) - 1;
+        var startLine = (int) lines.getLineNumber(start) - 1; // TODO (int) is not coloring
         var startChar = (int) lines.getColumnNumber(start) - 1;
         var endLine = (int) lines.getLineNumber(end) - 1;
         var endChar = (int) lines.getColumnNumber(end) - 1;
@@ -1336,9 +1346,12 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public void didOpenTextDocument(DidOpenTextDocumentParams params) {
         FileStore.open(params);
-        recentlyOpened.add(params.textDocument.uri); // Lint this document later
-        updateCachedParse(
-                params.textDocument.uri); // So that subsequent documentSymbol and codeLens requests will be faster
+        if (FileStore.isJavaFile(params.textDocument.uri)) {
+            // Lint this document later
+            recentlyOpened.add(params.textDocument.uri);
+            // So that subsequent documentSymbol and codeLens requests will be faster
+            updateCachedParse(params.textDocument.uri);
+        }
     }
 
     @Override
@@ -1361,6 +1374,8 @@ class JavaLanguageServer extends LanguageServer {
         if (FileStore.isJavaFile(params.textDocument.uri)) {
             // Re-lint all active documents
             reportErrors(FileStore.activeDocuments());
+            // Re-label all fields in saved file
+            updateCachedParse(params.textDocument.uri);
         }
     }
 
