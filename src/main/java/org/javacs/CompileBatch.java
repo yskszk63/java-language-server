@@ -96,12 +96,20 @@ public class CompileBatch implements AutoCloseable {
         return Optional.ofNullable(el);
     }
 
+    private boolean okUnused(Name name) {
+        for (var i = 0; i < name.length(); i++) {
+            if (name.charAt(i) != '_') return false;
+        }
+        return true;
+    }
+
     public List<Diagnostic<? extends JavaFileObject>> reportErrors() {
         // Check for unused privates
         for (var r : roots) {
             var warnUnused = new WarnUnused(borrow.task);
             warnUnused.scan(r, null);
             for (var unusedEl : warnUnused.notUsed()) {
+                if (okUnused(unusedEl.getSimpleName())) continue;
                 var path = trees.getPath(unusedEl);
                 var message = String.format("`%s` is not used", unusedEl.getSimpleName());
                 Diagnostic.Kind kind;
