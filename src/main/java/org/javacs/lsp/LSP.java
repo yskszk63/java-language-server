@@ -216,8 +216,8 @@ public class LSP {
         while (true) {
             Message r;
             try {
-                // Take a break every 1s
-                r = pending.poll(1, TimeUnit.SECONDS);
+                // Take a break periodically
+                r = pending.poll(200, TimeUnit.MILLISECONDS);
             } catch (Exception e) {
                 LOG.log(Level.SEVERE, e.getMessage(), e);
                 continue;
