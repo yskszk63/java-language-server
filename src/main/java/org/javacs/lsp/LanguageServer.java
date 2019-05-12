@@ -116,7 +116,5 @@ public class LanguageServer {
         throw new RuntimeException("Unimplemented");
     }
 
-    public void doAsyncWork() {
-        throw new RuntimeException("Unimplemented");
-    }
+    public void doAsyncWork() {}
 }

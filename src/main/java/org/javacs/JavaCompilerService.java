@@ -80,6 +80,7 @@ public class JavaCompilerService {
     }
 
     public CompileBatch compileFocus(URI uri, int line, int character) {
+        // TODO consider pruning other files as well to speed up compilation?
         var contents = Pruner.prune(uri, line, character);
         var file = new SourceFileObject(uri, contents);
         return compileBatch(List.of(file));

@@ -115,6 +115,7 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     void lint(Collection<URI> uris) {
+        // TODO only lint the current focus, merging errors/decorations with existing
         if (uris.isEmpty()) return;
         var batch = compiler.compileUris(uris);
         // Report compilation errors
@@ -1349,12 +1350,14 @@ class JavaLanguageServer extends LanguageServer {
         if (FileStore.isJavaFile(params.textDocument.uri)) {
             // So that subsequent documentSymbol and codeLens requests will be faster
             updateCachedParse(params.textDocument.uri);
+            uncheckedChanges = true;
         }
     }
 
     @Override
     public void didChangeTextDocument(DidChangeTextDocumentParams params) {
         FileStore.change(params);
+        uncheckedChanges = true;
     }
 
     @Override
@@ -1375,10 +1378,15 @@ class JavaLanguageServer extends LanguageServer {
         }
     }
 
+    private boolean uncheckedChanges = false;
+
     @Override
     public void doAsyncWork() {
-        // Re-lint all active documents
-        lint(FileStore.activeDocuments());
+        if (uncheckedChanges) {
+            // Re-lint all active documents
+            lint(FileStore.activeDocuments());
+            uncheckedChanges = false;
+        }
     }
 
     private static final Logger LOG = Logger.getLogger("main");

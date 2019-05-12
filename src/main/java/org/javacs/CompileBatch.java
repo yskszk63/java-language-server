@@ -1167,6 +1167,7 @@ public class CompileBatch implements AutoCloseable {
 
             @Override
             public Void visitErroneous(ErroneousTree node, Void nothing) {
+                if (node.getErrorTrees() == null) return null;
                 for (var t : node.getErrorTrees()) {
                     scan(t, nothing);
                 }
