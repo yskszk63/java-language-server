@@ -172,9 +172,12 @@ interface ProgressMessage {
     increment: number
 }
 
-interface DecorationMessage {
-    uri: string;
-    fields: Range[]
+interface DecorationParams {
+    files: {
+        [uri: string]: {
+            fields: Range[]
+        }
+    }
 }
 
 function createProgressListeners(client: LanguageClient) {
@@ -223,23 +226,24 @@ function createProgressListeners(client: LanguageClient) {
 	const fieldDecorationType = window.createTextEditorDecorationType({
         color: new ThemeColor('javaFieldColor')
 	});
-    client.onNotification(new NotificationType('java/setDecorations'), (event: DecorationMessage) => {
-        if (!window.activeTextEditor) {
-            console.log('No active text editor');
-            return;
+    client.onNotification(new NotificationType('java/setDecorations'), (event: DecorationParams) => {
+        // TODO when we switch to a text editor that was not previously visible, there will be no decorations
+        for (let editor of window.visibleTextEditors) {
+            var file = event.files[editor.document.uri.toString()];
+            if (file == null) {
+                console.log(`No decorations on ${editor.document.uri}`);
+                editor.setDecorations(fieldDecorationType, []);
+                continue;
+            }
+            const decorations: DecorationOptions[] = [];
+            for (let field of file.fields) {
+                const start = new VS.Position(field.start.line, field.start.character)
+                const end = new VS.Position(field.end.line, field.end.character)
+                const decoration = { range: new VS.Range(start, end) };
+                decorations.push(decoration);
+            }
+            editor.setDecorations(fieldDecorationType, decorations);
         }
-        if (window.activeTextEditor.document.uri.toString() != event.uri) {
-            console.log(`Decorations on ${event.uri} don't match open document ${window.activeTextEditor.document.uri}`);
-            return;
-        }
-        const decorations: DecorationOptions[] = [];
-        for (let field of event.fields) {
-            const start = new VS.Position(field.start.line, field.start.character)
-            const end = new VS.Position(field.end.line, field.end.character)
-            const decoration = { range: new VS.Range(start, end) };
-            decorations.push(decoration);
-        }
-		window.activeTextEditor.setDecorations(fieldDecorationType, decorations);
     });
 }
 

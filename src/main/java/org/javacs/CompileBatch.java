@@ -96,6 +96,29 @@ public class CompileBatch implements AutoCloseable {
         return Optional.ofNullable(el);
     }
 
+    public List<Diagnostic<? extends JavaFileObject>> reportErrors() {
+        // Check for unused privates
+        for (var r : roots) {
+            var warnUnused = new WarnUnused(borrow.task);
+            warnUnused.scan(r, null);
+            for (var unusedEl : warnUnused.notUsed()) {
+                var path = trees.getPath(unusedEl);
+                var message = String.format("`%s` is not used", unusedEl.getSimpleName());
+                Diagnostic.Kind kind;
+                if (unusedEl instanceof ExecutableElement || unusedEl instanceof TypeElement) {
+                    kind = Diagnostic.Kind.OTHER;
+                } else {
+                    kind = Diagnostic.Kind.WARNING;
+                }
+                parent.diags.add(new Warning(borrow.task, path, kind, "unused", message));
+            }
+        }
+        // TODO hint fields that could be final
+        // TODO hint unused exception
+
+        return Collections.unmodifiableList(new ArrayList<>(parent.diags));
+    }
+
     public Optional<List<TreePath>> definitions(Element el) {
         LOG.info(String.format("Search for definitions of `%s` in %d files...", el, roots.size()));
 
@@ -169,6 +192,8 @@ public class CompileBatch implements AutoCloseable {
         var map = Map.of(to, list);
         var finder = new FindReferences(borrow.task);
         for (var r : roots) {
+            // TODO jump to scan takes me to a specific method in this file, which is misleading. The actual
+            // implementation is in the super of FindReferences.
             finder.scan(r, map);
         }
         LOG.info(String.format("...found %d references", list.size()));
@@ -1146,6 +1171,51 @@ public class CompileBatch implements AutoCloseable {
             throw new RuntimeException(message);
         }
         return find.found;
+    }
+
+    /** Adds syntax coloring that's too complicated to figure out using file-local information. */
+    Map<URI, Map<TreePath, ElementKind>> decorations() {
+        LOG.info(String.format("Performing advanced syntax coloring of %d files...", roots.size()));
+        var decorations = new HashMap<URI, Map<TreePath, ElementKind>>();
+        for (var root : roots) {
+            var locals = new HashMap<TreePath, ElementKind>();
+            class FindDecorations extends TreePathScanner<Void, Void> { // TODO < is highlighting
+                private void check() {
+                    var path = getCurrentPath();
+                    var el = trees.getElement(path);
+                    if (el == null) return;
+                    var kind = el.getKind();
+                    switch (kind) {
+                        case FIELD:
+                            locals.put(path, kind);
+                            break;
+                    }
+                }
+
+                @Override
+                public Void visitVariable(VariableTree t, Void __) {
+                    check();
+                    return super.visitVariable(t, null);
+                }
+
+                @Override
+                public Void visitMemberSelect(MemberSelectTree t, Void __) {
+                    if (!t.getIdentifier().contentEquals("this")) check();
+                    return super.visitMemberSelect(t, null);
+                }
+
+                @Override
+                public Void visitIdentifier(IdentifierTree t, Void __) {
+                    if (!t.getName().contentEquals("this")) check();
+                    return super.visitIdentifier(t, null);
+                }
+            }
+            var find = new FindDecorations();
+            find.scan(root, null);
+            decorations.put(root.getSourceFile().toUri(), locals);
+        }
+        LOG.info("...finished syntax coloring");
+        return decorations;
     }
 
     private static final Logger LOG = Logger.getLogger("main");

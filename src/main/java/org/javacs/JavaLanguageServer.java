@@ -35,6 +35,7 @@ import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
@@ -118,18 +119,36 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     void reportErrors(Collection<URI> uris) {
-        var messages = compiler.reportErrors(uris);
+        var batch = compiler.compileUris(uris);
+        // Report compilation errors
+        var messages = batch.reportErrors();
         publishDiagnostics(uris, messages);
+        // Add tricky syntax coloring
+        var decorations = new DecorationParams();
+        batch.decorations()
+                .forEach(
+                        (uri, paths) -> {
+                            var file = new DecorateFile();
+                            decorations.files.put(uri, file);
+
+                            paths.forEach(
+                                    (path, kind) -> {
+                                        if (kind == ElementKind.FIELD) {
+                                            batch.range(path).ifPresent(file.fields::add);
+                                        }
+                                    });
+                        });
+        client.customNotification("java/setDecorations", GSON.toJsonTree(decorations));
     }
 
-    private static final Gson gson = new Gson();
+    private static final Gson GSON = new Gson();
 
     private void javaStartProgress(JavaStartProgressParams params) {
-        client.customNotification("java/startProgress", gson.toJsonTree(params));
+        client.customNotification("java/startProgress", GSON.toJsonTree(params));
     }
 
     private void javaReportProgress(JavaReportProgressParams params) {
-        client.customNotification("java/reportProgress", gson.toJsonTree(params));
+        client.customNotification("java/reportProgress", GSON.toJsonTree(params));
     }
 
     private void javaEndProgress() {
@@ -220,7 +239,7 @@ class JavaLanguageServer extends LanguageServer {
         watchJava.addProperty("globPattern", "**/*.java");
         watchers.add(watchJava);
         options.add("watchers", watchers);
-        client.registerCapability("workspace/didChangeWatchedFiles", gson.toJsonTree(options));
+        client.registerCapability("workspace/didChangeWatchedFiles", GSON.toJsonTree(options));
     }
 
     @Override
@@ -855,16 +874,6 @@ class JavaLanguageServer extends LanguageServer {
         cacheParse = compiler.parseFile(file);
         cacheParseFile = file;
         cacheParseVersion = FileStore.version(file);
-        createFieldDecorations();
-    }
-
-    private void createFieldDecorations() {
-        var decorations = new DecorationParams();
-        decorations.uri = cacheParseFile;
-        for (var f : cacheParse.fieldReferences()) {
-            cacheParse.range(f).ifPresent(decorations.fields::add);
-        }
-        client.customNotification("java/setDecorations", gson.toJsonTree(decorations));
     }
 
     @Override

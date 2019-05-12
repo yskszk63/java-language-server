@@ -10,8 +10,6 @@ class FindFields {
         int thisReference = this.field;
         int methodReference = field();
         int memberReference = param.field;
-        var insideMethodCall = this;
-        call(insideMethodCall.field);
         var checkForward = forwardReference;
     }
 
