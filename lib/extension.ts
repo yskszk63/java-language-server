@@ -175,6 +175,7 @@ interface ProgressMessage {
 interface DecorationParams {
     files: {
         [uri: string]: {
+            version: number;
             fields: Range[]
         }
     }
@@ -226,17 +227,30 @@ function createProgressListeners(client: LanguageClient) {
 	const fieldDecorationType = window.createTextEditorDecorationType({
         color: new ThemeColor('javaFieldColor')
     });
-    const fieldDecorations: {[uri: string]: Range[]} = {};
+    // TODO these ranges refer to a particular version of the document that may be out of date
+    var fieldDecorations: DecorationParams;
     function updateVisibleDecorations() {
-        // TODO when we switch to a text editor that was not previously visible, there will be no decorations
+        // No field decorations have been received
+        if (fieldDecorations == null) {
+            console.log('No decorations have yet been received');
+            return;
+        }
         for (let editor of window.visibleTextEditors) {
-            var file = fieldDecorations[editor.document.uri.toString()];
+            const uri = editor.document.uri.toString();
+            const file = fieldDecorations.files[uri];
+            // Field decorations do not include the open file
             if (file == null) {
+                console.log(`No decorations available for ${editor.document.uri}`);
                 editor.setDecorations(fieldDecorationType, []);
                 continue;
             }
+            // Field decorations are out-of-date
+            if (file.version != editor.document.version) {
+                console.log(`Decorations for ${editor.document.uri} refer to version ${file.version} which is < ${editor.document.version}`);
+                continue;
+            }
             const decorations: DecorationOptions[] = [];
-            for (let field of file) {
+            for (let field of file.fields) {
                 const start = new VS.Position(field.start.line, field.start.character)
                 const end = new VS.Position(field.end.line, field.end.character)
                 const decoration = { range: new VS.Range(start, end) };
@@ -247,9 +261,7 @@ function createProgressListeners(client: LanguageClient) {
     }
     window.onDidChangeVisibleTextEditors(updateVisibleDecorations);
     client.onNotification(new NotificationType('java/setDecorations'), (event: DecorationParams) => {
-        for (let uri of Object.keys(event.files)) {
-            fieldDecorations[uri] = event.files[uri].fields;
-        }
+        fieldDecorations = event;
         updateVisibleDecorations();
     });
 }

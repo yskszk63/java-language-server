@@ -115,6 +115,7 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     void lint(Collection<URI> uris) {
+        if (uris.isEmpty()) return;
         var batch = compiler.compileUris(uris);
         // Report compilation errors
         var messages = batch.reportErrors();
@@ -125,6 +126,7 @@ class JavaLanguageServer extends LanguageServer {
                 .forEach(
                         (uri, paths) -> {
                             var file = new DecorateFile();
+                            file.version = FileStore.version(uri);
                             decorations.files.put(uri, file);
 
                             paths.forEach(

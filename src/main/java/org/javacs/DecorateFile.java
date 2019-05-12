@@ -5,5 +5,6 @@ import java.util.List;
 import org.javacs.lsp.Range;
 
 public class DecorateFile {
+    public int version;
     public List<Range> fields = new ArrayList<>();
 }
