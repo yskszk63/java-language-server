@@ -40,6 +40,7 @@ public class ParseFile {
         this.contents = FileStore.contents(file);
         this.task = singleFileTask(parent, file, contents);
         this.trees = Trees.instance(task);
+        LOG.info("Parse " + Parser.fileName(file) + "...");
         var profiler = new Profiler();
         task.addTaskListener(profiler);
         try {

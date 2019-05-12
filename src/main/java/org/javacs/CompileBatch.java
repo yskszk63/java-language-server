@@ -38,6 +38,7 @@ public class CompileBatch implements AutoCloseable {
         this.types = borrow.task.getTypes();
         this.roots = new ArrayList<CompilationUnitTree>();
         // Print timing information for optimization
+        LOG.info("Compile " + files.size() + " files...");
         var profiler = new Profiler();
         borrow.task.addTaskListener(profiler);
         // Compile all roots

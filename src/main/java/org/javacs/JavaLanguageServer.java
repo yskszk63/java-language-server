@@ -88,10 +88,6 @@ class JavaLanguageServer extends LanguageServer {
             // Check that error is in an open file
             var uri = j.getSource().toUri();
             if (!files.contains(uri)) {
-                LOG.warning(
-                        String.format(
-                                "Skipped error at %s(%d,%d) because that file isn't open",
-                                uri, j.getLineNumber(), j.getColumnNumber()));
                 continue;
             }
             // Find start and end position
@@ -118,7 +114,7 @@ class JavaLanguageServer extends LanguageServer {
         }
     }
 
-    void reportErrors(Collection<URI> uris) {
+    void lint(Collection<URI> uris) {
         var batch = compiler.compileUris(uris);
         // Report compilation errors
         var messages = batch.reportErrors();
@@ -1345,14 +1341,10 @@ class JavaLanguageServer extends LanguageServer {
         throw new RuntimeException("TODO");
     }
 
-    private List<URI> recentlyOpened = new ArrayList<>();
-
     @Override
     public void didOpenTextDocument(DidOpenTextDocumentParams params) {
         FileStore.open(params);
         if (FileStore.isJavaFile(params.textDocument.uri)) {
-            // Lint this document later
-            recentlyOpened.add(params.textDocument.uri);
             // So that subsequent documentSymbol and codeLens requests will be faster
             updateCachedParse(params.textDocument.uri);
         }
@@ -1377,18 +1369,14 @@ class JavaLanguageServer extends LanguageServer {
     public void didSaveTextDocument(DidSaveTextDocumentParams params) {
         if (FileStore.isJavaFile(params.textDocument.uri)) {
             // Re-lint all active documents
-            reportErrors(FileStore.activeDocuments());
-            // Re-label all fields in saved file
-            updateCachedParse(params.textDocument.uri);
+            lint(FileStore.activeDocuments());
         }
     }
 
     @Override
     public void doAsyncWork() {
-        if (!recentlyOpened.isEmpty()) {
-            reportErrors(recentlyOpened);
-            recentlyOpened.clear();
-        }
+        // Re-lint all active documents
+        lint(FileStore.activeDocuments());
     }
 
     private static final Logger LOG = Logger.getLogger("main");
