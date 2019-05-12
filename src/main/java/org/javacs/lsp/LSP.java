@@ -215,7 +215,7 @@ public class LSP {
         while (true) {
             Message r;
             try {
-                // Take a break every 1s to check if receive has been closed
+                // Take a break every 1s
                 r = pending.poll(1, TimeUnit.SECONDS);
             } catch (Exception e) {
                 LOG.log(Level.SEVERE, e.getMessage(), e);
@@ -227,7 +227,10 @@ public class LSP {
                 break processMessages;
             }
             // If poll(_) failed, loop again
-            if (r == null) continue;
+            if (r == null) {
+                server.doAsyncWork();
+                continue;
+            }
             // Otherwise, process the new message
             try {
                 switch (r.method) {

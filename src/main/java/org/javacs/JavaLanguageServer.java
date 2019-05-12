@@ -1008,11 +1008,6 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public CodeLens resolveCodeLens(CodeLens unresolved) {
-        // TODO This is pretty klugey, should happen asynchronously after CodeLenses are shown
-        if (!recentlyOpened.isEmpty()) {
-            reportErrors(recentlyOpened);
-            recentlyOpened.clear();
-        }
         // Unpack data
         var data = unresolved.data;
         var command = data.get(0).getAsString();
@@ -1385,6 +1380,14 @@ class JavaLanguageServer extends LanguageServer {
             reportErrors(FileStore.activeDocuments());
             // Re-label all fields in saved file
             updateCachedParse(params.textDocument.uri);
+        }
+    }
+
+    @Override
+    public void doAsyncWork() {
+        if (!recentlyOpened.isEmpty()) {
+            reportErrors(recentlyOpened);
+            recentlyOpened.clear();
         }
     }
 

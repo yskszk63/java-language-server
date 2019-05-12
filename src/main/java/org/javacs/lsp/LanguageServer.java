@@ -115,4 +115,8 @@ public class LanguageServer {
     public List<DocumentLink> documentLink(DocumentLinkParams params) {
         throw new RuntimeException("Unimplemented");
     }
+
+    public void doAsyncWork() {
+        throw new RuntimeException("Unimplemented");
+    }
 }
