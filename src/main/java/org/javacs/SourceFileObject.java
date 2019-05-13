@@ -14,10 +14,6 @@ class SourceFileObject implements JavaFileObject {
     /** contents is the text in this file, or null if we should use the text in FileStore */
     final String contents;
 
-    SourceFileObject(URI uri) {
-        this(Paths.get(uri));
-    }
-
     SourceFileObject(Path path) {
         this(path, null);
     }
@@ -45,7 +41,7 @@ class SourceFileObject implements JavaFileObject {
         return kindFromExtension(name);
     }
 
-    static Kind kindFromExtension(String name) {
+    private static Kind kindFromExtension(String name) {
         for (var candidate : Kind.values()) {
             if (name.endsWith(candidate.extension)) {
                 return candidate;
@@ -80,7 +76,7 @@ class SourceFileObject implements JavaFileObject {
     }
 
     @Override
-    public InputStream openInputStream() throws IOException {
+    public InputStream openInputStream() {
         if (contents != null) {
             var bytes = contents.getBytes();
             return new ByteArrayInputStream(bytes);
@@ -89,12 +85,12 @@ class SourceFileObject implements JavaFileObject {
     }
 
     @Override
-    public OutputStream openOutputStream() throws IOException {
+    public OutputStream openOutputStream() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Reader openReader(boolean ignoreEncodingErrors) throws IOException {
+    public Reader openReader(boolean ignoreEncodingErrors) {
         if (contents != null) {
             return new StringReader(contents);
         }
@@ -102,7 +98,7 @@ class SourceFileObject implements JavaFileObject {
     }
 
     @Override
-    public CharSequence getCharContent(boolean ignoreEncodingErrors) throws IOException {
+    public CharSequence getCharContent(boolean ignoreEncodingErrors) {
         if (contents != null) {
             return contents;
         }
@@ -110,7 +106,7 @@ class SourceFileObject implements JavaFileObject {
     }
 
     @Override
-    public Writer openWriter() throws IOException {
+    public Writer openWriter() {
         throw new UnsupportedOperationException();
     }
 

@@ -9,7 +9,7 @@ import java.util.logging.Logger;
 import javax.tools.*;
 
 class SourceFileManager extends ForwardingJavaFileManager<StandardJavaFileManager> {
-    public SourceFileManager() {
+    SourceFileManager() {
         super(createDelegateFileManager());
     }
 
@@ -108,7 +108,7 @@ class SourceFileManager extends ForwardingJavaFileManager<StandardJavaFileManage
         }
     }
 
-    public Iterable<? extends JavaFileObject> getJavaFileObjectsFromFiles(Iterable<? extends File> files) {
+    Iterable<? extends JavaFileObject> getJavaFileObjectsFromFiles(Iterable<? extends File> files) {
         var result = new ArrayList<JavaFileObject>();
         for (var f : files) {
             result.add(new SourceFileObject(f.toPath()));
@@ -116,11 +116,11 @@ class SourceFileManager extends ForwardingJavaFileManager<StandardJavaFileManage
         return result;
     }
 
-    public void setLocation(Location location, Iterable<? extends File> files) throws IOException {
+    void setLocation(Location location, Iterable<? extends File> files) throws IOException {
         fileManager.setLocation(location, files);
     }
 
-    public void setLocationFromPaths(Location location, Collection<? extends Path> searchpath) throws IOException {
+    void setLocationFromPaths(Location location, Collection<? extends Path> searchpath) throws IOException {
         fileManager.setLocationFromPaths(location, searchpath);
     }
 
