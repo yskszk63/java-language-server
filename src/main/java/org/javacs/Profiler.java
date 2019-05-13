@@ -11,29 +11,32 @@ class Profiler implements TaskListener {
     static boolean quiet = false;
 
     Set<URI> files = new HashSet<>();
-    Map<URI, Map<TaskEvent.Kind, Instant>> started = new HashMap<>();
+
+    TaskEvent current;
+    Instant started = Instant.EPOCH;
     Map<TaskEvent.Kind, Duration> profile = new EnumMap<>(TaskEvent.Kind.class);
 
     @Override
     public void started(TaskEvent e) {
-        var uri = e.getSourceFile().toUri();
-        var kind = e.getKind();
-        var fileStarted = started.computeIfAbsent(uri, __ -> new EnumMap<>(TaskEvent.Kind.class));
-        fileStarted.put(kind, Instant.now());
-        files.add(uri);
-        // TODO show the user a warning when we're compiling a lot of files that aren't in the classpath
+        files.add(e.getSourceFile().toUri());
+        endCurrent();
+        current = e;
+        started = Instant.now();
     }
 
     @Override
     public void finished(TaskEvent e) {
-        var uri = e.getSourceFile().toUri();
-        var kind = e.getKind();
-        var fileStarted = started.computeIfAbsent(uri, __ -> new HashMap<>());
-        var start = fileStarted.getOrDefault(kind, Instant.now());
-        var elapsed = Duration.between(start, Instant.now());
-        var soFar = profile.getOrDefault(kind, Duration.ZERO);
-        var total = soFar.plus(elapsed);
-        profile.put(kind, total);
+        endCurrent();
+    }
+
+    private void endCurrent() {
+        if (current == null) return;
+        var soFar = profile.getOrDefault(current.getKind(), Duration.ZERO);
+        var add = Duration.between(started, Instant.now());
+        var total = soFar.plus(add);
+        profile.put(current.getKind(), total);
+        current = null;
+        started = Instant.EPOCH;
     }
 
     void print() {
@@ -42,7 +45,7 @@ class Profiler implements TaskListener {
         for (var kind : TaskEvent.Kind.values()) {
             if (!profile.containsKey(kind)) continue;
             var elapsed = profile.get(kind);
-            var s = elapsed.getSeconds() + elapsed.getNano() / 1000.0 / 1000.0 / 1000.0;
+            var s = elapsed.getSeconds() + elapsed.getNano() / 10e9;
             lines.add(String.format("%s: %.3fs", kind, s));
         }
         // If n is small, print each file name
