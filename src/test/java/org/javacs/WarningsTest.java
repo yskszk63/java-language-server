@@ -30,7 +30,7 @@ public class WarningsTest {
 
     @Test
     public void unusedLocal() {
-        server.reportErrors(List.of(FindResource.uri("org/javacs/warn/Unused.java")));
+        server.lint(List.of(FindResource.uri("org/javacs/warn/Unused.java")));
         assertThat(errors, hasItem("unused(7)")); // int unusedLocal
         assertThat(errors, hasItem("unused(10)")); // int unusedPrivate
         assertThat(errors, hasItem("unused(13)")); // int unusedLocalInLambda

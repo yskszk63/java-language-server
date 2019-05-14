@@ -1182,5 +1182,54 @@ public class CompileBatch implements AutoCloseable {
         return find.found;
     }
 
+    /** Adds syntax coloring that's too complicated to figure out using file-local information. */
+    Map<URI, Map<TreePath, ElementKind>> decorations() {
+        LOG.info(String.format("Performing advanced syntax coloring of %d files...", roots.size()));
+        var decorations = new HashMap<URI, Map<TreePath, ElementKind>>();
+        for (var root : roots) {
+            var locals = new HashMap<TreePath, ElementKind>();
+            class FindDecorations extends TreePathScanner<Void, Void> { // TODO < is highlighting
+                private void check() {
+                    var path = getCurrentPath();
+                    var el = trees.getElement(path);
+                    if (el == null) return;
+                    var kind = el.getKind();
+                    switch (kind) {
+                        case FIELD:
+                            locals.put(path, kind);
+                            break;
+                    }
+                }
+
+                private boolean special(Name name) {
+                    return name.contentEquals("this") || name.contentEquals("super") || name.contentEquals("class");
+                }
+
+                @Override
+                public Void visitVariable(VariableTree t, Void __) {
+                    check();
+                    return super.visitVariable(t, null);
+                }
+
+                @Override
+                public Void visitMemberSelect(MemberSelectTree t, Void __) {
+                    if (!special(t.getIdentifier())) check();
+                    return super.visitMemberSelect(t, null);
+                }
+
+                @Override
+                public Void visitIdentifier(IdentifierTree t, Void __) {
+                    if (!special(t.getName())) check();
+                    return super.visitIdentifier(t, null);
+                }
+            }
+            var find = new FindDecorations();
+            find.scan(root, null);
+            decorations.put(root.getSourceFile().toUri(), locals);
+        }
+        LOG.info("...finished syntax coloring");
+        return decorations;
+    }
+
     private static final Logger LOG = Logger.getLogger("main");
 }

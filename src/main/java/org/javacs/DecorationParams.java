@@ -1,11 +1,9 @@
 package org.javacs;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-import org.javacs.lsp.Range;
+import java.util.HashMap;
+import java.util.Map;
 
 public class DecorationParams {
-    public URI uri;
-    public List<Range> fields = new ArrayList<>();
+    public Map<URI, DecorateFile> files = new HashMap<>();
 }

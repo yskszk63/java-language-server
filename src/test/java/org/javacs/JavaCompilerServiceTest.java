@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
 import org.junit.Before;
@@ -279,23 +280,25 @@ public class JavaCompilerServiceTest {
     }
 
     @Test
-    public void findFields() {
+    public void decorateFields() {
         var uri = resourceUri("FindFields.java");
-        var parsed = compiler.parseFile(uri);
-        var refs = parsed.fieldReferences();
+        var compile = compiler.compileFile(uri);
+        var decorations = compile.decorations().get(uri);
         var strings = new ArrayList<String>();
-        for (var r : refs) {
-            strings.add(r.getLeaf().toString());
-        }
+        decorations.forEach(
+                (key, val) -> {
+                    if (val == ElementKind.FIELD) {
+                        strings.add(key.getLeaf().toString());
+                    }
+                });
         assertThat(
                 strings,
                 containsInAnyOrder(
                         "int field = 1",
-                        "int forwardReference = 2",
                         "field",
                         "this.field",
                         "param.field",
-                        "insideMethodCall.field",
-                        "forwardReference"));
+                        "forwardReference",
+                        "int forwardReference = 2"));
     }
 }

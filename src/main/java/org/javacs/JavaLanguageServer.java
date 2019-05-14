@@ -35,6 +35,7 @@ import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
@@ -113,13 +114,30 @@ class JavaLanguageServer extends LanguageServer {
         }
     }
 
-    void reportErrors(Collection<URI> uris) {
+    void lint(Collection<URI> uris) {
         // TODO only lint the current focus, merging errors/decorations with existing
         if (uris.isEmpty()) return;
         var batch = compiler.compileUris(uris);
         // Report compilation errors
         var messages = batch.reportErrors();
         publishDiagnostics(uris, messages);
+        // Add tricky syntax coloring
+        var decorations = new DecorationParams();
+        batch.decorations()
+                .forEach(
+                        (uri, paths) -> {
+                            var file = new DecorateFile();
+                            file.version = FileStore.version(uri);
+                            decorations.files.put(uri, file);
+
+                            paths.forEach(
+                                    (path, kind) -> {
+                                        if (kind == ElementKind.FIELD) {
+                                            batch.range(path).ifPresent(file.fields::add);
+                                        }
+                                    });
+                        });
+        client.customNotification("java/setDecorations", gson.toJsonTree(decorations));
     }
 
     private static final Gson gson = new Gson();
@@ -855,16 +873,6 @@ class JavaLanguageServer extends LanguageServer {
         cacheParse = compiler.parseFile(file);
         cacheParseFile = file;
         cacheParseVersion = FileStore.version(file);
-        createFieldDecorations();
-    }
-
-    private void createFieldDecorations() {
-        var decorations = new DecorationParams();
-        decorations.uri = cacheParseFile;
-        for (var f : cacheParse.fieldReferences()) {
-            cacheParse.range(f).ifPresent(decorations.fields::add);
-        }
-        client.customNotification("java/setDecorations", gson.toJsonTree(decorations));
     }
 
     @Override
@@ -1001,7 +1009,7 @@ class JavaLanguageServer extends LanguageServer {
     public CodeLens resolveCodeLens(CodeLens unresolved) {
         // TODO This is pretty klugey, should happen asynchronously after CodeLenses are shown
         if (!recentlyOpened.isEmpty()) {
-            reportErrors(recentlyOpened);
+            lint(recentlyOpened);
             recentlyOpened.clear();
         }
         // Unpack data
@@ -1373,9 +1381,7 @@ class JavaLanguageServer extends LanguageServer {
     public void didSaveTextDocument(DidSaveTextDocumentParams params) {
         if (FileStore.isJavaFile(params.textDocument.uri)) {
             // Re-lint all active documents
-            reportErrors(FileStore.activeDocuments());
-            // Re-label all fields in saved file
-            updateCachedParse(params.textDocument.uri);
+            lint(FileStore.activeDocuments());
         }
     }
 
