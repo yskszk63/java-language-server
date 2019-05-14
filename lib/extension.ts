@@ -172,9 +172,13 @@ interface ProgressMessage {
     increment: number
 }
 
-interface DecorationMessage {
-    uri: string;
-    fields: Range[]
+interface DecorationParams {
+    files: {
+        [uri: string]: {
+            version: number;
+            fields: Range[]
+        }
+    }
 }
 
 function createProgressListeners(client: LanguageClient) {
@@ -222,24 +226,43 @@ function createProgressListeners(client: LanguageClient) {
     // Use custom notifications to do advanced syntax highlighting
 	const fieldDecorationType = window.createTextEditorDecorationType({
         color: new ThemeColor('javaFieldColor')
-	});
-    client.onNotification(new NotificationType('java/setDecorations'), (event: DecorationMessage) => {
-        if (!window.activeTextEditor) {
-            console.log('No active text editor');
+    });
+    // TODO these ranges refer to a particular version of the document that may be out of date
+    var fieldDecorations: DecorationParams;
+    function updateVisibleDecorations() {
+        // No field decorations have been received
+        if (fieldDecorations == null) {
+            console.log('No decorations have yet been received');
             return;
         }
-        if (window.activeTextEditor.document.uri.toString() != event.uri) {
-            console.log(`Decorations on ${event.uri} don't match open document ${window.activeTextEditor.document.uri}`);
-            return;
+        for (let editor of window.visibleTextEditors) {
+            const uri = editor.document.uri.toString();
+            const file = fieldDecorations.files[uri];
+            // Field decorations do not include the open file
+            if (file == null) {
+                console.log(`No decorations available for ${editor.document.uri}`);
+                editor.setDecorations(fieldDecorationType, []);
+                continue;
+            }
+            // Field decorations are out-of-date
+            if (file.version != editor.document.version) {
+                console.log(`Decorations for ${editor.document.uri} refer to version ${file.version} which is < ${editor.document.version}`);
+                continue;
+            }
+            const decorations: DecorationOptions[] = [];
+            for (let field of file.fields) {
+                const start = new VS.Position(field.start.line, field.start.character)
+                const end = new VS.Position(field.end.line, field.end.character)
+                const decoration = { range: new VS.Range(start, end) };
+                decorations.push(decoration);
+            }
+            editor.setDecorations(fieldDecorationType, decorations);
         }
-        const decorations: DecorationOptions[] = [];
-        for (let field of event.fields) {
-            const start = new VS.Position(field.start.line, field.start.character)
-            const end = new VS.Position(field.end.line, field.end.character)
-            const decoration = { range: new VS.Range(start, end) };
-            decorations.push(decoration);
-        }
-		window.activeTextEditor.setDecorations(fieldDecorationType, decorations);
+    }
+    window.onDidChangeVisibleTextEditors(updateVisibleDecorations);
+    client.onNotification(new NotificationType('java/setDecorations'), (event: DecorationParams) => {
+        fieldDecorations = event;
+        updateVisibleDecorations();
     });
 }
 

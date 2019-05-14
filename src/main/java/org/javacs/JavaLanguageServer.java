@@ -35,6 +35,7 @@ import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
@@ -87,10 +88,6 @@ class JavaLanguageServer extends LanguageServer {
             // Check that error is in an open file
             var uri = j.getSource().toUri();
             if (!files.contains(uri)) {
-                LOG.warning(
-                        String.format(
-                                "Skipped error at %s(%d,%d) because that file isn't open",
-                                uri, j.getLineNumber(), j.getColumnNumber()));
                 continue;
             }
             // Find start and end position
@@ -117,9 +114,30 @@ class JavaLanguageServer extends LanguageServer {
         }
     }
 
-    void reportErrors(Collection<URI> uris) {
-        var messages = compiler.reportErrors(uris);
+    void lint(Collection<URI> uris) {
+        // TODO only lint the current focus, merging errors/decorations with existing
+        if (uris.isEmpty()) return;
+        var batch = compiler.compileUris(uris);
+        // Report compilation errors
+        var messages = batch.reportErrors();
         publishDiagnostics(uris, messages);
+        // Add tricky syntax coloring
+        var decorations = new DecorationParams();
+        batch.decorations()
+                .forEach(
+                        (uri, paths) -> {
+                            var file = new DecorateFile();
+                            file.version = FileStore.version(uri);
+                            decorations.files.put(uri, file);
+
+                            paths.forEach(
+                                    (path, kind) -> {
+                                        if (kind == ElementKind.FIELD) {
+                                            batch.range(path).ifPresent(file.fields::add);
+                                        }
+                                    });
+                        });
+        client.customNotification("java/setDecorations", gson.toJsonTree(decorations));
     }
 
     private static final Gson gson = new Gson();
@@ -855,16 +873,6 @@ class JavaLanguageServer extends LanguageServer {
         cacheParse = compiler.parseFile(file);
         cacheParseFile = file;
         cacheParseVersion = FileStore.version(file);
-        createFieldDecorations();
-    }
-
-    private void createFieldDecorations() {
-        var decorations = new DecorationParams();
-        decorations.uri = cacheParseFile;
-        for (var f : cacheParse.fieldReferences()) {
-            cacheParse.range(f).ifPresent(decorations.fields::add);
-        }
-        client.customNotification("java/setDecorations", gson.toJsonTree(decorations));
     }
 
     @Override
@@ -999,11 +1007,6 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public CodeLens resolveCodeLens(CodeLens unresolved) {
-        // TODO This is pretty klugey, should happen asynchronously after CodeLenses are shown
-        if (!recentlyOpened.isEmpty()) {
-            reportErrors(recentlyOpened);
-            recentlyOpened.clear();
-        }
         // Unpack data
         var data = unresolved.data;
         var command = data.get(0).getAsString();
@@ -1341,22 +1344,20 @@ class JavaLanguageServer extends LanguageServer {
         throw new RuntimeException("TODO");
     }
 
-    private List<URI> recentlyOpened = new ArrayList<>();
-
     @Override
     public void didOpenTextDocument(DidOpenTextDocumentParams params) {
         FileStore.open(params);
         if (FileStore.isJavaFile(params.textDocument.uri)) {
-            // Lint this document later
-            recentlyOpened.add(params.textDocument.uri);
             // So that subsequent documentSymbol and codeLens requests will be faster
             updateCachedParse(params.textDocument.uri);
+            uncheckedChanges = true;
         }
     }
 
     @Override
     public void didChangeTextDocument(DidChangeTextDocumentParams params) {
         FileStore.change(params);
+        uncheckedChanges = true;
     }
 
     @Override
@@ -1373,9 +1374,18 @@ class JavaLanguageServer extends LanguageServer {
     public void didSaveTextDocument(DidSaveTextDocumentParams params) {
         if (FileStore.isJavaFile(params.textDocument.uri)) {
             // Re-lint all active documents
-            reportErrors(FileStore.activeDocuments());
-            // Re-label all fields in saved file
-            updateCachedParse(params.textDocument.uri);
+            lint(FileStore.activeDocuments());
+        }
+    }
+
+    private boolean uncheckedChanges = false;
+
+    @Override
+    public void doAsyncWork() {
+        if (uncheckedChanges) {
+            // Re-lint all active documents
+            lint(FileStore.activeDocuments());
+            uncheckedChanges = false;
         }
     }
 

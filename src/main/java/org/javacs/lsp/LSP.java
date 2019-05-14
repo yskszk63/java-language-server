@@ -211,12 +211,13 @@ public class LSP {
 
         // Process messages on main thread
         LOG.info("Reading messages from queue...");
+        var hasAsyncWork = false;
         processMessages:
         while (true) {
             Message r;
             try {
-                // Take a break every 1s to check if receive has been closed
-                r = pending.poll(1, TimeUnit.SECONDS);
+                // Take a break periodically
+                r = pending.poll(200, TimeUnit.MILLISECONDS);
             } catch (Exception e) {
                 LOG.log(Level.SEVERE, e.getMessage(), e);
                 continue;
@@ -227,8 +228,15 @@ public class LSP {
                 break processMessages;
             }
             // If poll(_) failed, loop again
-            if (r == null) continue;
+            if (r == null) {
+                if (hasAsyncWork) {
+                    server.doAsyncWork();
+                    hasAsyncWork = false;
+                }
+                continue;
+            }
             // Otherwise, process the new message
+            hasAsyncWork = true;
             try {
                 switch (r.method) {
                     case "initialize":
