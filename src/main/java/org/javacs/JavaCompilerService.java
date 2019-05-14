@@ -80,6 +80,7 @@ public class JavaCompilerService {
     }
 
     public CompileBatch compileFocus(URI uri, int line, int character) {
+        // TODO consider pruning other files as well to speed up compilation?
         var contents = Pruner.prune(uri, line, character);
         var file = new SourceFileObject(uri, contents);
         return compileBatch(List.of(file));
@@ -100,64 +101,6 @@ public class JavaCompilerService {
 
     public CompileBatch compileBatch(Collection<? extends JavaFileObject> sources) {
         return new CompileBatch(this, sources);
-    }
-
-    public List<Diagnostic<? extends JavaFileObject>> reportErrors(Collection<URI> uris) {
-        LOG.info(String.format("Report errors in %d files...", uris.size()));
-
-        // Construct list of sources
-        var files = new ArrayList<File>();
-        for (var uri : uris) {
-            if (FileStore.isJavaFile(uri)) {
-                files.add(new File(uri));
-            }
-        }
-        if (files.isEmpty()) return List.of();
-        // TODO should get current contents of open files from FileStore
-        var sources = fileManager.getJavaFileObjectsFromFiles(files);
-
-        // Create task
-        var options = options(classPath);
-        try (var borrow = compiler.getTask(null, fileManager, diags::add, options, Collections.emptyList(), sources)) {
-            var trees = Trees.instance(borrow.task);
-
-            // Print timing information for optimization
-            var profiler = new Profiler();
-            borrow.task.addTaskListener(profiler);
-
-            // Run compilation
-            diags.clear();
-            Iterable<? extends CompilationUnitTree> roots;
-            try {
-                roots = borrow.task.parse();
-                borrow.task.analyze();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            profiler.print();
-            LOG.info(String.format("...found %d errors", diags.size()));
-
-            // Check for unused privates
-            for (var r : roots) {
-                var warnUnused = new WarnUnused(borrow.task);
-                warnUnused.scan(r, null);
-                for (var unusedEl : warnUnused.notUsed()) {
-                    var path = trees.getPath(unusedEl);
-                    var message = String.format("`%s` is not used", unusedEl.getSimpleName());
-                    Diagnostic.Kind kind;
-                    if (unusedEl instanceof ExecutableElement || unusedEl instanceof TypeElement) {
-                        kind = Diagnostic.Kind.OTHER;
-                    } else {
-                        kind = Diagnostic.Kind.WARNING;
-                    }
-                    diags.add(new Warning(borrow.task, path, kind, "unused", message));
-                }
-            }
-            // TODO hint fields that could be final
-            // TODO hint unused exception
-
-            return Collections.unmodifiableList(new ArrayList<>(diags));
-        }
     }
 
     public Set<URI> potentialDefinitions(Element to) {

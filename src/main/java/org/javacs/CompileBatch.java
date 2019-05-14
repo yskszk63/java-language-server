@@ -96,6 +96,37 @@ public class CompileBatch implements AutoCloseable {
         return Optional.ofNullable(el);
     }
 
+    private boolean okUnused(Name name) {
+        for (var i = 0; i < name.length(); i++) {
+            if (name.charAt(i) != '_') return false;
+        }
+        return true;
+    }
+
+    public List<Diagnostic<? extends JavaFileObject>> reportErrors() {
+        // Check for unused privates
+        for (var r : roots) {
+            var warnUnused = new WarnUnused(borrow.task);
+            warnUnused.scan(r, null);
+            for (var unusedEl : warnUnused.notUsed()) {
+                if (okUnused(unusedEl.getSimpleName())) continue;
+                var path = trees.getPath(unusedEl);
+                var message = String.format("`%s` is not used", unusedEl.getSimpleName());
+                Diagnostic.Kind kind;
+                if (unusedEl instanceof ExecutableElement || unusedEl instanceof TypeElement) {
+                    kind = Diagnostic.Kind.OTHER;
+                } else {
+                    kind = Diagnostic.Kind.WARNING;
+                }
+                parent.diags.add(new Warning(borrow.task, path, kind, "unused", message));
+            }
+        }
+        // TODO hint fields that could be final
+        // TODO hint unused exception
+
+        return Collections.unmodifiableList(new ArrayList<>(parent.diags));
+    }
+
     public Optional<List<TreePath>> definitions(Element el) {
         LOG.info(String.format("Search for definitions of `%s` in %d files...", el, roots.size()));
 
@@ -169,6 +200,8 @@ public class CompileBatch implements AutoCloseable {
         var map = Map.of(to, list);
         var finder = new FindReferences(borrow.task);
         for (var r : roots) {
+            // TODO jump to scan takes me to a specific method in this file, which is misleading. The actual
+            // implementation is in the super of FindReferences.
             finder.scan(r, map);
         }
         LOG.info(String.format("...found %d references", list.size()));
@@ -1133,6 +1166,7 @@ public class CompileBatch implements AutoCloseable {
 
             @Override
             public Void visitErroneous(ErroneousTree node, Void nothing) {
+                if (node.getErrorTrees() == null) return null;
                 for (var t : node.getErrorTrees()) {
                     scan(t, nothing);
                 }

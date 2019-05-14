@@ -87,10 +87,6 @@ class JavaLanguageServer extends LanguageServer {
             // Check that error is in an open file
             var uri = j.getSource().toUri();
             if (!files.contains(uri)) {
-                LOG.warning(
-                        String.format(
-                                "Skipped error at %s(%d,%d) because that file isn't open",
-                                uri, j.getLineNumber(), j.getColumnNumber()));
                 continue;
             }
             // Find start and end position
@@ -118,7 +114,11 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     void reportErrors(Collection<URI> uris) {
-        var messages = compiler.reportErrors(uris);
+        // TODO only lint the current focus, merging errors/decorations with existing
+        if (uris.isEmpty()) return;
+        var batch = compiler.compileUris(uris);
+        // Report compilation errors
+        var messages = batch.reportErrors();
         publishDiagnostics(uris, messages);
     }
 

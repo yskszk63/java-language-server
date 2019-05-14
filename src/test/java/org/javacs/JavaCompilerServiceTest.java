@@ -214,7 +214,7 @@ public class JavaCompilerServiceTest {
     public void reportErrors() {
         var uri = resourceUri("HasError.java");
         var files = Collections.singleton(uri);
-        var diags = compiler.reportErrors(files);
+        var diags = compiler.compileUris(files).reportErrors();
         assertThat(diags, not(empty()));
     }
 
@@ -236,7 +236,7 @@ public class JavaCompilerServiceTest {
     public void errorProne() {
         var uri = resourceUri("ErrorProne.java");
         var files = Collections.singleton(uri);
-        var diags = compiler.reportErrors(files);
+        var diags = compiler.compileUris(files).reportErrors();
         var strings = errorStrings(diags);
         assertThat(strings, hasItem(containsString("ErrorProne.java(7): [CollectionIncompatibleType]")));
     }
@@ -247,7 +247,7 @@ public class JavaCompilerServiceTest {
     public void unusedVar() {
         var uri = resourceUri("UnusedVar.java");
         var files = Collections.singleton(uri);
-        var diags = compiler.reportErrors(files);
+        var diags = compiler.compileUris(files).reportErrors();
         var strings = errorStrings(diags);
         assertThat(strings, hasItem(containsString("UnusedVar.java(3): [Unused]")));
     }
