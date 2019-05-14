@@ -138,6 +138,7 @@ class JavaLanguageServer extends LanguageServer {
                                     });
                         });
         client.customNotification("java/setDecorations", gson.toJsonTree(decorations));
+        uncheckedChanges = false;
     }
 
     private static final Gson gson = new Gson();
@@ -1007,11 +1008,6 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public CodeLens resolveCodeLens(CodeLens unresolved) {
-        // TODO This is pretty klugey, should happen asynchronously after CodeLenses are shown
-        if (!recentlyOpened.isEmpty()) {
-            lint(recentlyOpened);
-            recentlyOpened.clear();
-        }
         // Unpack data
         var data = unresolved.data;
         var command = data.get(0).getAsString();
@@ -1349,22 +1345,21 @@ class JavaLanguageServer extends LanguageServer {
         throw new RuntimeException("TODO");
     }
 
-    private List<URI> recentlyOpened = new ArrayList<>();
-
     @Override
     public void didOpenTextDocument(DidOpenTextDocumentParams params) {
         FileStore.open(params);
         if (FileStore.isJavaFile(params.textDocument.uri)) {
-            // Lint this document later
-            recentlyOpened.add(params.textDocument.uri);
             // So that subsequent documentSymbol and codeLens requests will be faster
             updateCachedParse(params.textDocument.uri);
+            uncheckedChanges = true;
         }
     }
 
     @Override
     public void didChangeTextDocument(DidChangeTextDocumentParams params) {
         FileStore.change(params);
+        // TODO for some reason linting kills autocomplete performance
+        // uncheckedChanges = true;
     }
 
     @Override
@@ -1380,6 +1375,16 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public void didSaveTextDocument(DidSaveTextDocumentParams params) {
         if (FileStore.isJavaFile(params.textDocument.uri)) {
+            // Re-lint all active documents
+            lint(FileStore.activeDocuments());
+        }
+    }
+
+    private boolean uncheckedChanges = false;
+
+    @Override
+    public void doAsyncWork() {
+        if (uncheckedChanges) {
             // Re-lint all active documents
             lint(FileStore.activeDocuments());
         }
