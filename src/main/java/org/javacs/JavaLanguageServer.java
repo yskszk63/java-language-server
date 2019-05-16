@@ -642,18 +642,23 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public Optional<Hover> hover(TextDocumentPositionParams position) {
-        // Compile entire file
         var uri = position.textDocument.uri;
+        var line = position.position.line + 1;
+        var column = position.position.character + 1;
         if (!FileStore.isJavaFile(uri)) return Optional.empty();
+        // Log start time
+        LOG.info(String.format("Hover over %s(%d,%d) ...", uri.getPath(), line, column));
+        var started = Instant.now();
+        // Compile entire file
         try (var compile = compiler.compileFile(uri)) {
             // Find element under cursor
-            var line = position.position.line + 1;
-            var column = position.position.character + 1;
             var el = compile.element(uri, line, column);
-            if (!el.isPresent()) return Optional.empty();
-
+            if (!el.isPresent()) {
+                LOG.info("...no element under cursor");
+                return Optional.empty();
+            }
+            // Result is combination of docs and code
             var result = new ArrayList<MarkedString>();
-
             // Add docs hover message
             var docs = hoverDocs(el.get());
             docs.filter(Predicate.not(String::isBlank))
@@ -665,6 +670,9 @@ class JavaLanguageServer extends LanguageServer {
             // Add code hover message
             var code = hoverCode(el.get());
             result.add(new MarkedString("java.hover", code));
+            // Log duration
+            var elapsed = Duration.between(started, Instant.now());
+            LOG.info(String.format("...found hover in %d ms", elapsed.toMillis()));
 
             return Optional.of(new Hover(result));
         }
