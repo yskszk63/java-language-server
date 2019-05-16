@@ -98,11 +98,14 @@ class FileStore {
     }
 
     static Instant modified(Path file) {
+        // If file is open, use last in-memory modification time
+        if (activeDocuments.containsKey(file)) {
+            return activeDocuments.get(file).modified;
+        }
         // If we've never checked before, look up modified time on disk
         if (!javaSources.containsKey(file)) {
             readInfoFromDisk(file);
         }
-
         // Look up modified time from cache
         return javaSources.get(file).modified;
     }
@@ -112,7 +115,6 @@ class FileStore {
         if (!javaSources.containsKey(file)) {
             readInfoFromDisk(file);
         }
-
         // Look up modified time from cache
         return javaSources.get(file).packageName;
     }
