@@ -1184,7 +1184,6 @@ public class CompileBatch implements AutoCloseable {
 
     /** Adds syntax coloring that's too complicated to figure out using file-local information. */
     Map<URI, Map<TreePath, ElementKind>> decorations() {
-        LOG.info(String.format("Performing advanced syntax coloring of %d files...", roots.size()));
         var decorations = new HashMap<URI, Map<TreePath, ElementKind>>();
         for (var root : roots) {
             var locals = new HashMap<TreePath, ElementKind>();
@@ -1227,7 +1226,6 @@ public class CompileBatch implements AutoCloseable {
             find.scan(root, null);
             decorations.put(root.getSourceFile().toUri(), locals);
         }
-        LOG.info("...finished syntax coloring");
         return decorations;
     }
 

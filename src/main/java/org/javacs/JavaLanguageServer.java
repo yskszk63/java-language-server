@@ -116,6 +116,8 @@ class JavaLanguageServer extends LanguageServer {
 
     void lint(Collection<URI> uris) {
         // TODO only lint the current focus, merging errors/decorations with existing
+        LOG.info("Lint " + Profiler.describe(uris) + "...");
+        var started = Instant.now();
         if (uris.isEmpty()) return;
         try (var batch = compiler.compileUris(uris)) {
             // Report compilation errors
@@ -140,6 +142,8 @@ class JavaLanguageServer extends LanguageServer {
             client.customNotification("java/setDecorations", gson.toJsonTree(decorations));
             uncheckedChanges = false;
         }
+        var elapsed = Duration.between(started, Instant.now());
+        LOG.info(String.format("...done linting in %d ms", elapsed.toMillis()));
     }
 
     private static final Gson gson = new Gson();
@@ -1350,8 +1354,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public void didChangeTextDocument(DidChangeTextDocumentParams params) {
         FileStore.change(params);
-        // TODO for some reason linting kills autocomplete performance
-        // uncheckedChanges = true;
+        uncheckedChanges = true;
     }
 
     @Override
