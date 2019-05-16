@@ -46,11 +46,8 @@ import com.sun.tools.javac.util.Log;
 import java.io.Writer;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import javax.tools.Diagnostic;
@@ -81,25 +78,12 @@ import javax.tools.JavaFileObject;
  */
 public class TaskPool {
 
+    private static final Logger LOG = Logger.getLogger("main");
     private static final JavacTool systemProvider = JavacTool.create();
 
-    private final int maxPoolSize;
-    private final Map<List<String>, List<ReusableContext>> options2Contexts = new HashMap<>();
-    private int id;
-
-    private int statReused = 0;
-    private int statNew = 0;
-    private int statPolluted = 0;
-    private int statRemoved = 0;
-
-    /**
-     * Creates the pool.
-     *
-     * @param maxPoolSize maximum number of tasks/context that will be kept in the pool.
-     */
-    public TaskPool(int maxPoolSize) {
-        this.maxPoolSize = maxPoolSize;
-    }
+    private List<String> currentOptions = new ArrayList<>();
+    private ReusableContext currentContext;
+    private boolean checkedOut;
 
     /**
      * Creates a new task as if by {@link javax.tools.JavaCompiler#getTask} and runs the provided worker with it. The
@@ -119,52 +103,39 @@ public class TaskPool {
      * @throws IllegalArgumentException if any of the options are invalid, or if any of the given compilation units are
      *     of other kind than {@linkplain JavaFileObject.Kind#SOURCE source}
      */
-    public Borrow getTask(
+    Borrow getTask(
             Writer out,
             JavaFileManager fileManager,
             DiagnosticListener<? super JavaFileObject> diagnosticListener,
             Iterable<String> options,
             Iterable<String> classes,
             Iterable<? extends JavaFileObject> compilationUnits) {
+        if (checkedOut) {
+            throw new RuntimeException("Compiler is already in-use!");
+        }
+        checkedOut = true;
         List<String> opts =
                 StreamSupport.stream(options.spliterator(), false).collect(Collectors.toCollection(ArrayList::new));
-
-        ReusableContext ctx;
-
-        synchronized (this) {
-            List<ReusableContext> cached = options2Contexts.getOrDefault(opts, Collections.emptyList());
-
-            if (cached.isEmpty()) {
-                ctx = new ReusableContext(opts);
-                statNew++;
-            } else {
-                ctx = cached.remove(0);
-                statReused++;
-            }
+        if (!opts.equals(currentOptions)) {
+            LOG.warning(String.format("Options changed from %s to %s, creating new compiler", options, opts));
+            currentOptions = opts;
+            currentContext = new ReusableContext(opts);
         }
-
-        ctx.useCount++;
-
         JavacTaskImpl task =
                 (JavacTaskImpl)
                         systemProvider.getTask(
-                                out, fileManager, diagnosticListener, opts, classes, compilationUnits, ctx);
+                                out, fileManager, diagnosticListener, opts, classes, compilationUnits, currentContext);
 
-        task.addTaskListener(ctx);
+        task.addTaskListener(currentContext);
 
-        return new Borrow(task, ctx);
+        return new Borrow(task, currentContext);
     }
 
-    // where:
-    private long cacheSize() {
-        return options2Contexts.values().stream().flatMap(Collection::stream).count();
-    }
-
-    public class Borrow implements AutoCloseable {
+    class Borrow implements AutoCloseable {
         public final JavacTask task;
         public final ReusableContext ctx;
 
-        public Borrow(JavacTask task, ReusableContext ctx) {
+        Borrow(JavacTask task, ReusableContext ctx) {
             this.task = task;
             this.ctx = ctx;
         }
@@ -174,43 +145,20 @@ public class TaskPool {
             // not returning the context to the pool if task crashes with an exception
             // the task/context may be in a broken state
             ctx.clear();
-            if (ctx.polluted) {
-                statPolluted++;
-            } else {
-                try {
-                    var method = JavacTaskImpl.class.getDeclaredMethod("cleanup");
-                    method.setAccessible(true);
-                    method.invoke(task);
-                } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-                    throw new RuntimeException(e);
-                }
-                synchronized (this) {
-                    while (cacheSize() + 1 > maxPoolSize) {
-                        ReusableContext toRemove =
-                                options2Contexts
-                                        .values()
-                                        .stream()
-                                        .flatMap(Collection::stream)
-                                        .sorted((c1, c2) -> c1.timeStamp < c2.timeStamp ? -1 : 1)
-                                        .findFirst()
-                                        .get();
-                        options2Contexts.get(toRemove.arguments).remove(toRemove);
-                        statRemoved++;
-                    }
-                    options2Contexts.computeIfAbsent(ctx.arguments, x -> new ArrayList<>()).add(ctx);
-                    ctx.timeStamp = id++;
-                }
+            try {
+                var method = JavacTaskImpl.class.getDeclaredMethod("cleanup");
+                method.setAccessible(true);
+                method.invoke(task);
+            } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                throw new RuntimeException(e);
             }
+            checkedOut = false;
         }
     }
 
     static class ReusableContext extends Context implements TaskListener {
 
         List<String> arguments;
-        boolean polluted = false;
-
-        int useCount;
-        long timeStamp;
 
         ReusableContext(List<String> arguments) {
             super();

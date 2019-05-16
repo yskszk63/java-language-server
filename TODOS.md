@@ -19,3 +19,6 @@
 - Deleting file doesn't clear it from javac
 - External delete causes find-references to crash because it's still in FileStore.javaSources()
 - Don't remove imports if there are errors
+
+## Polish
+- Error squigglies should be on method name, not entire method

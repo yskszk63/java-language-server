@@ -117,28 +117,29 @@ class JavaLanguageServer extends LanguageServer {
     void lint(Collection<URI> uris) {
         // TODO only lint the current focus, merging errors/decorations with existing
         if (uris.isEmpty()) return;
-        var batch = compiler.compileUris(uris);
-        // Report compilation errors
-        var messages = batch.reportErrors();
-        publishDiagnostics(uris, messages);
-        // Add tricky syntax coloring
-        var decorations = new DecorationParams();
-        batch.decorations()
-                .forEach(
-                        (uri, paths) -> {
-                            var file = new DecorateFile();
-                            file.version = FileStore.version(uri);
-                            decorations.files.put(uri, file);
+        try (var batch = compiler.compileUris(uris)) {
+            // Report compilation errors
+            var messages = batch.reportErrors();
+            publishDiagnostics(uris, messages);
+            // Add tricky syntax coloring
+            var decorations = new DecorationParams();
+            batch.decorations()
+                    .forEach(
+                            (uri, paths) -> {
+                                var file = new DecorateFile();
+                                file.version = FileStore.version(uri);
+                                decorations.files.put(uri, file);
 
-                            paths.forEach(
-                                    (path, kind) -> {
-                                        if (kind == ElementKind.FIELD) {
-                                            batch.range(path).ifPresent(file.fields::add);
-                                        }
-                                    });
-                        });
-        client.customNotification("java/setDecorations", gson.toJsonTree(decorations));
-        uncheckedChanges = false;
+                                paths.forEach(
+                                        (path, kind) -> {
+                                            if (kind == ElementKind.FIELD) {
+                                                batch.range(path).ifPresent(file.fields::add);
+                                            }
+                                        });
+                            });
+            client.customNotification("java/setDecorations", gson.toJsonTree(decorations));
+            uncheckedChanges = false;
+        }
     }
 
     private static final Gson gson = new Gson();
@@ -635,49 +636,34 @@ class JavaLanguageServer extends LanguageServer {
         return Optional.of(md);
     }
 
-    private CompileBatch cacheCompile;
-    private URI cacheCompileFile = URI.create("file:///NONE");
-    private int cacheCompileVersion = -1;
-
-    // TODO take only URI and invalidate based on version
-    private void updateActiveFile(URI uri) {
-        if (cacheCompile == null || !cacheCompileFile.equals(uri) || cacheCompileVersion != FileStore.version(uri)) {
-            LOG.info("Recompile active file...");
-            if (cacheCompile != null) cacheCompile.close();
-            cacheCompile = compiler.compileFile(uri);
-            cacheCompileFile = uri;
-            cacheCompileVersion = FileStore.version(uri);
-        }
-    }
-
     @Override
     public Optional<Hover> hover(TextDocumentPositionParams position) {
-        // Compile entire file if it's changed since last hover
+        // Compile entire file
         var uri = position.textDocument.uri;
         if (!FileStore.isJavaFile(uri)) return Optional.empty();
-        updateActiveFile(uri);
+        try (var compile = compiler.compileFile(uri)) {
+            // Find element under cursor
+            var line = position.position.line + 1;
+            var column = position.position.character + 1;
+            var el = compile.element(uri, line, column);
+            if (!el.isPresent()) return Optional.empty();
 
-        // Find element undeer cursor
-        var line = position.position.line + 1;
-        var column = position.position.character + 1;
-        var el = cacheCompile.element(uri, line, column);
-        if (!el.isPresent()) return Optional.empty();
+            var result = new ArrayList<MarkedString>();
 
-        var result = new ArrayList<MarkedString>();
+            // Add docs hover message
+            var docs = hoverDocs(el.get());
+            docs.filter(Predicate.not(String::isBlank))
+                    .ifPresent(
+                            doc -> {
+                                result.add(new MarkedString(doc));
+                            });
 
-        // Add docs hover message
-        var docs = hoverDocs(el.get());
-        docs.filter(Predicate.not(String::isBlank))
-                .ifPresent(
-                        doc -> {
-                            result.add(new MarkedString(doc));
-                        });
+            // Add code hover message
+            var code = hoverCode(el.get());
+            result.add(new MarkedString("java.hover", code));
 
-        // Add code hover message
-        var code = hoverCode(el.get());
-        result.add(new MarkedString("java.hover", code));
-
-        return Optional.of(new Hover(result));
+            return Optional.of(new Hover(result));
+        }
     }
 
     private SignatureInformation asSignatureInformation(ExecutableElement e) {
@@ -780,11 +766,13 @@ class JavaLanguageServer extends LanguageServer {
 
         // Compile from-file and identify element under cursor
         LOG.info(String.format("Go-to-def at %s:%d...", fromUri, fromLine));
-        updateActiveFile(fromUri);
-        var toEl = cacheCompile.element(fromUri, fromLine, fromColumn);
-        if (!toEl.isPresent()) {
-            LOG.info(String.format("...no element at cursor"));
-            return Optional.empty();
+        Optional<Element> toEl;
+        try (var compile = compiler.compileFile(fromUri)) {
+            toEl = compile.element(fromUri, fromLine, fromColumn);
+            if (!toEl.isPresent()) {
+                LOG.info(String.format("...no element at cursor"));
+                return Optional.empty();
+            }
         }
 
         // Compile all files that *might* contain definitions of fromEl
@@ -821,11 +809,13 @@ class JavaLanguageServer extends LanguageServer {
 
         // Compile from-file and identify element under cursor
         LOG.warning(String.format("Looking for references to %s(%d,%d)...", toUri.getPath(), toLine, toColumn));
-        updateActiveFile(toUri);
-        var toEl = cacheCompile.element(toUri, toLine, toColumn);
-        if (!toEl.isPresent()) {
-            LOG.warning("...no element under cursor");
-            return Optional.empty();
+        Optional<Element> toEl;
+        try (var compile = compiler.compileFile(toUri)) {
+            toEl = compile.element(toUri, toLine, toColumn);
+            if (!toEl.isPresent()) {
+                LOG.warning("...no element under cursor");
+                return Optional.empty();
+            }
         }
 
         // Compile all files that *might* contain references to toEl
@@ -1065,22 +1055,30 @@ class JavaLanguageServer extends LanguageServer {
             cacheReferencesFile = toUri;
         }
 
-        // Make sure the active file is compiled
-        updateActiveFile(toUri);
+        // TODO this is a bit of a mess
+        Optional<Element> toEl;
+        Ptr toPtr;
+        Set<Ptr> signature;
+        int count;
+        try (var compile = compiler.compileFile(toUri)) {
+            // Find the element we want to count references to
+            toEl = compile.element(toUri, toLine, toColumn);
+            if (!toEl.isPresent()) {
+                LOG.warning("...no element at code lens");
+                return -1;
+            }
+            toPtr = new Ptr(toEl.get());
 
-        // Find the element we want to count references to
-        var toEl = cacheCompile.element(toUri, toLine, toColumn);
-        if (!toEl.isPresent()) {
-            LOG.warning("...no element at code lens");
-            return -1;
-        }
-        var toPtr = new Ptr(toEl.get());
+            // Find the signature of the target file
+            var declarations = compile.declarations(toUri);
+            signature = new HashSet<Ptr>();
+            for (var el : declarations) {
+                signature.add(new Ptr(el));
+            }
 
-        // Find the signature of the target file
-        var declarations = cacheCompile.declarations(toUri);
-        var signature = new HashSet<Ptr>();
-        for (var el : declarations) {
-            signature.add(new Ptr(el));
+            // Always update active file
+            var activeIndex = compile.index(toUri, declarations);
+            count = activeIndex.count(toPtr);
         }
 
         // If the signature has changed, or the from-files contain errors, we need to redo the count
@@ -1106,10 +1104,6 @@ class JavaLanguageServer extends LanguageServer {
         } else {
             LOG.info(String.format("Using cached count references to `%s`", toPtr));
         }
-
-        // Always update active file
-        var activeIndex = cacheCompile.index(toUri, declarations);
-        var count = activeIndex.count(toPtr);
 
         // Count up references out of index
         var fromUris = cacheReferences.get(toPtr);
@@ -1181,27 +1175,27 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public List<TextEdit> formatting(DocumentFormattingParams params) {
-        updateActiveFile(params.textDocument.uri);
-
-        var edits = new ArrayList<TextEdit>();
-        edits.addAll(fixImports());
-        edits.addAll(addOverrides());
-        // TODO replace var with type name when vars are copy-pasted into fields
-        // TODO replace ThisClass.staticMethod() with staticMethod() when ThisClass is useless
-        return edits;
+        try (var compile = compiler.compileFile(params.textDocument.uri)) {
+            var edits = new ArrayList<TextEdit>();
+            edits.addAll(fixImports(compile, params.textDocument.uri));
+            edits.addAll(addOverrides(compile, params.textDocument.uri));
+            // TODO replace var with type name when vars are copy-pasted into fields
+            // TODO replace ThisClass.staticMethod() with staticMethod() when ThisClass is useless
+            return edits;
+        }
     }
 
-    private List<TextEdit> fixImports() {
+    private List<TextEdit> fixImports(CompileBatch compile, URI file) {
         // TODO if imports already match fixed-imports, return empty list
         // TODO preserve comments and other details of existing imports
-        var imports = cacheCompile.fixImports(cacheCompileFile);
-        var pos = cacheCompile.sourcePositions();
-        var lines = cacheCompile.lineMap(cacheCompileFile);
+        var imports = compile.fixImports(file);
+        var pos = compile.sourcePositions();
+        var lines = compile.lineMap(file);
         var edits = new ArrayList<TextEdit>();
         // Delete all existing imports
-        for (var i : cacheCompile.imports(cacheCompileFile)) {
+        for (var i : compile.imports(file)) {
             if (!i.isStatic()) {
-                var offset = pos.getStartPosition(cacheCompile.root(cacheCompileFile), i);
+                var offset = pos.getStartPosition(compile.root(file), i);
                 var line = (int) lines.getLineNumber(offset) - 1;
                 var delete = new TextEdit(new Range(new Position(line, 0), new Position(line + 1, 0)), "");
                 edits.add(delete);
@@ -1212,17 +1206,15 @@ class JavaLanguageServer extends LanguageServer {
         long insertLine = -1;
         var insertText = new StringBuilder();
         // If there are imports, use the start of the first import as the insert position
-        for (var i : cacheCompile.imports(cacheCompileFile)) {
+        for (var i : compile.imports(file)) {
             if (!i.isStatic() && insertLine == -1) {
-                long offset = pos.getStartPosition(cacheCompile.root(cacheCompileFile), i);
+                long offset = pos.getStartPosition(compile.root(file), i);
                 insertLine = lines.getLineNumber(offset) - 1;
             }
         }
         // If there are no imports, insert after the package declaration
-        if (insertLine == -1 && cacheCompile.root(cacheCompileFile).getPackageName() != null) {
-            long offset =
-                    pos.getEndPosition(
-                            cacheCompile.root(cacheCompileFile), cacheCompile.root(cacheCompileFile).getPackageName());
+        if (insertLine == -1 && compile.root(file).getPackageName() != null) {
+            long offset = pos.getEndPosition(compile.root(file), compile.root(file).getPackageName());
             insertLine = lines.getLineNumber(offset);
             insertText.append("\n");
         }
@@ -1241,11 +1233,11 @@ class JavaLanguageServer extends LanguageServer {
         return edits;
     }
 
-    private List<TextEdit> addOverrides() {
+    private List<TextEdit> addOverrides(CompileBatch compile, URI file) {
         var edits = new ArrayList<TextEdit>();
-        var methods = cacheCompile.needsOverrideAnnotation(cacheCompileFile);
-        var pos = cacheCompile.sourcePositions();
-        var lines = cacheCompile.lineMap(cacheCompileFile);
+        var methods = compile.needsOverrideAnnotation(file);
+        var pos = compile.sourcePositions();
+        var lines = compile.lineMap(file);
         for (var t : methods) {
             var methodStart = pos.getStartPosition(t.getCompilationUnit(), t.getLeaf());
             var insertLine = lines.getLineNumber(methodStart);
