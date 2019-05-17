@@ -24,7 +24,7 @@ public class CompileBatch implements AutoCloseable {
     public static final int MAX_COMPLETION_ITEMS = 50;
 
     private final JavaCompilerService parent;
-    private final TaskPool.Borrow borrow;
+    private final ReusableCompiler.Borrow borrow;
     private final Trees trees;
     private final Elements elements;
     private final Types types;
@@ -57,7 +57,8 @@ public class CompileBatch implements AutoCloseable {
         borrow.close();
     }
 
-    private static TaskPool.Borrow batchTask(JavaCompilerService parent, Collection<? extends JavaFileObject> sources) {
+    private static ReusableCompiler.Borrow batchTask(
+            JavaCompilerService parent, Collection<? extends JavaFileObject> sources) {
         parent.diags.clear();
         return parent.compiler.getTask(
                 null,

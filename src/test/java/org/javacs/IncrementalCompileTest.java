@@ -44,7 +44,7 @@ public class IncrementalCompileTest implements TaskListener, DiagnosticListener<
     @Test
     public void taskPool() {
         var fileManager = compiler.getStandardFileManager(this, null, Charset.defaultCharset());
-        var pool = new TaskPool();
+        var pool = new ReusableCompiler();
         for (var i = 0; i < 2; i++) {
             var files = fileManager.getJavaFileObjects(foo);
             LOG.info(String.format("Compile %d...", i));

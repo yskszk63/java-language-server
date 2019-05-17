@@ -17,7 +17,7 @@ import javax.tools.*;
 public class JavaCompilerService {
     // Not modifiable! If you want to edit these, you need to create a new instance
     final Set<Path> classPath, docPath;
-    final TaskPool compiler = new TaskPool();
+    final ReusableCompiler compiler = new ReusableCompiler();
     final Docs docs;
     final Set<String> jdkClasses = Classes.jdkTopLevelClasses(), classPathClasses;
     // Diagnostics from the last compilation task

@@ -76,7 +76,7 @@ import javax.tools.JavaFileObject;
  * <p><b>This is NOT part of any supported API. If you write code that depends on this, you do so at your own risk. This
  * code and its internal interfaces are subject to change or deletion without notice.</b>
  */
-public class TaskPool {
+class ReusableCompiler {
 
     private static final Logger LOG = Logger.getLogger("main");
     private static final JavacTool systemProvider = JavacTool.create();
@@ -133,18 +133,16 @@ public class TaskPool {
 
     class Borrow implements AutoCloseable {
         public final JavacTask task;
-        public final ReusableContext ctx;
 
         Borrow(JavacTask task, ReusableContext ctx) {
             this.task = task;
-            this.ctx = ctx;
         }
 
         @Override
         public void close() {
             // not returning the context to the pool if task crashes with an exception
             // the task/context may be in a broken state
-            ctx.clear();
+            currentContext.clear();
             try {
                 var method = JavacTaskImpl.class.getDeclaredMethod("cleanup");
                 method.setAccessible(true);
