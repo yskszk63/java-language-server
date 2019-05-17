@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.NestingKind;
 import javax.tools.JavaFileObject;
@@ -14,18 +15,25 @@ class SourceFileObject implements JavaFileObject {
     /** contents is the text in this file, or null if we should use the text in FileStore */
     final String contents;
 
+    final Instant modified;
+
+    SourceFileObject(URI uri) {
+        this(Paths.get(uri));
+    }
+
     SourceFileObject(Path path) {
-        this(path, null);
+        this(path, null, Instant.EPOCH);
     }
 
-    SourceFileObject(URI uri, String contents) {
-        this(Paths.get(uri), contents);
+    SourceFileObject(URI uri, String contents, Instant modified) {
+        this(Paths.get(uri), contents, modified);
     }
 
-    SourceFileObject(Path path, String contents) {
+    SourceFileObject(Path path, String contents, Instant modified) {
         if (!FileStore.isJavaFile(path)) throw new RuntimeException(path + " is not a java source");
         this.path = path;
         this.contents = contents;
+        this.modified = modified;
     }
 
     @Override
@@ -112,6 +120,9 @@ class SourceFileObject implements JavaFileObject {
 
     @Override
     public long getLastModified() {
+        if (contents != null) {
+            return modified.toEpochMilli();
+        }
         return FileStore.modified(path).toEpochMilli();
     }
 

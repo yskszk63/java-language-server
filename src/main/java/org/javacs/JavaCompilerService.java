@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.*;
+import java.time.Instant;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -80,9 +81,8 @@ public class JavaCompilerService {
     }
 
     public CompileBatch compileFocus(URI uri, int line, int character) {
-        // TODO consider pruning other files as well to speed up compilation?
         var contents = Pruner.prune(uri, line, character);
-        var file = new SourceFileObject(uri, contents);
+        var file = new SourceFileObject(uri, contents, Instant.now());
         return compileBatch(List.of(file));
     }
 

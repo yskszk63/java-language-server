@@ -7,6 +7,7 @@ import com.sun.source.util.Trees;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.regex.Pattern;
 
 class Pruner {
@@ -22,6 +23,13 @@ class Pruner {
                     if (start <= cursor && cursor <= end) {
                         return true;
                     }
+                }
+                return false;
+            }
+
+            boolean anyContainsCursor(Collection<? extends Tree> nodes) {
+                for (var n : nodes) {
+                    if (containsCursor(n)) return true;
                 }
                 return false;
             }
@@ -63,8 +71,30 @@ class Pruner {
                     var end = start + "static".length();
                     erase(start, end);
                 }
-
                 return super.visitImport(node, null);
+            }
+
+            @Override
+            public Void visitSwitch(SwitchTree node, Void __) {
+                // If cursor is in a case label, for example
+                //   case F|
+                // then erase the entire contents of the switch statement.
+                for (var c : node.getCases()) {
+                    if (containsCursor(c) && !anyContainsCursor(c.getStatements())) {
+                        eraseSwitchContents(node);
+                        erasedAfterCursor = true;
+                        return null;
+                    }
+                }
+                return super.visitSwitch(node, null);
+            }
+
+            private void eraseSwitchContents(SwitchTree node) {
+                for (var c : node.getCases()) {
+                    var start = (int) pos.getStartPosition(root, c);
+                    var end = (int) pos.getEndPosition(root, c);
+                    erase(start, end);
+                }
             }
 
             @Override
@@ -109,8 +139,7 @@ class Pruner {
 
     static String prune(URI file, int line, int character) {
         // Parse file
-        var contents = FileStore.contents(file);
-        var task = Parser.parseTask(new SourceFileObject(file, contents));
+        var task = Parser.parseTask(new SourceFileObject(file));
         CompilationUnitTree root;
         try {
             root = task.parse().iterator().next();
@@ -121,11 +150,20 @@ class Pruner {
         var lines = root.getLineMap();
         var cursor = lines.getPosition(line, character);
         var pos = Trees.instance(task).getSourcePositions();
+        var contents = FileStore.contents(file);
         var buffer = new StringBuilder(contents);
         return prune(root, pos, buffer, new long[] {cursor});
     }
 
     static String prune(URI file, String name) {
+        // Parse file
+        var task = Parser.parseTask(new SourceFileObject(file));
+        CompilationUnitTree root;
+        try {
+            root = task.parse().iterator().next();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         // Find all occurrences of name in contents
         var contents = FileStore.contents(file);
         var list = new ArrayList<Long>();
@@ -137,14 +175,6 @@ class Pruner {
         var offsets = new long[list.size()];
         for (var i = 0; i < list.size(); i++) {
             offsets[i] = list.get(i);
-        }
-        // Parse file
-        var task = Parser.parseTask(new SourceFileObject(file, contents));
-        CompilationUnitTree root;
-        try {
-            root = task.parse().iterator().next();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
         }
         // Erase all blocks that don't contain name
         var buffer = new StringBuilder(contents);

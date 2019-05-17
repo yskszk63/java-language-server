@@ -864,7 +864,7 @@ class JavaLanguageServer extends LanguageServer {
         var sources = new ArrayList<JavaFileObject>();
         for (var f : files) {
             var pruned = Pruner.prune(f, name);
-            sources.add(new SourceFileObject(f, pruned));
+            sources.add(new SourceFileObject(f, pruned, Instant.now()));
         }
         return sources;
     }

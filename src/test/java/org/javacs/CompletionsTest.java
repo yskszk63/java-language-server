@@ -711,11 +711,27 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
+    public void enumConstantFromSourcePathPartial() {
+        var file = "/org/javacs/example/AutocompleteCasePartial.java";
+        var suggestions = insertText(file, 6, 19);
+
+        assertThat("suggests enum options", suggestions, hasItem("Foo"));
+    }
+
+    @Test
     public void enumConstantFromClassPath() {
         var file = "/org/javacs/example/AutocompleteCaseFromClasspath.java";
         var suggestions = insertText(file, 8, 18);
 
         assertThat("suggests enum options", suggestions, containsInAnyOrder("FULL", "LONG", "MEDIUM", "SHORT"));
+    }
+
+    @Test
+    public void enumConstantFromClassPathPartial() {
+        var file = "/org/javacs/example/AutocompleteCaseFromClasspathPartial.java";
+        var suggestions = insertText(file, 8, 19);
+
+        assertThat("suggests enum options", suggestions, hasItem("FULL"));
     }
 
     @Test

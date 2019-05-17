@@ -1,6 +1,7 @@
 package org.javacs;
 
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -23,7 +24,7 @@ public class BenchmarkPruner {
             var file = Paths.get("src/main/java/org/javacs/JavaCompilerService.java").normalize();
             if (prune) {
                 var contents = Pruner.prune(file.toUri(), "isWord");
-                return new SourceFileObject(file, contents);
+                return new SourceFileObject(file, contents, Instant.now());
             } else {
                 return new SourceFileObject(file);
             }

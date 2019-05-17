@@ -5,6 +5,7 @@ import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.io.IOException;
 import java.net.URI;
+import java.time.Instant;
 import java.util.*;
 import java.util.logging.Logger;
 import javax.lang.model.element.*;
@@ -15,7 +16,7 @@ public class ParseFile {
     private static final JavaCompiler COMPILER = ServiceLoader.load(JavaCompiler.class).iterator().next();
 
     /** Create a task that compiles a single file */
-    private static JavacTask singleFileTask(JavaCompilerService parent, URI file, String contents) {
+    private static JavacTask singleFileTask(JavaCompilerService parent, URI file) {
         // TODO could eliminate the connection to parent
         parent.diags.clear();
         return (JavacTask)
@@ -25,7 +26,7 @@ public class ParseFile {
                         parent.diags::add,
                         JavaCompilerService.options(parent.classPath),
                         Collections.emptyList(),
-                        List.of(new SourceFileObject(file, contents)));
+                        List.of(new SourceFileObject(file)));
     }
 
     private final String contents;
@@ -38,7 +39,7 @@ public class ParseFile {
         Objects.requireNonNull(file);
 
         this.contents = FileStore.contents(file);
-        this.task = singleFileTask(parent, file, contents);
+        this.task = singleFileTask(parent, file);
         this.trees = Trees.instance(task);
         var profiler = new Profiler();
         task.addTaskListener(profiler);
@@ -491,7 +492,7 @@ public class ParseFile {
     private static final DocCommentTree EMPTY_DOC = makeEmptyDoc();
 
     private static DocCommentTree makeEmptyDoc() {
-        var file = new SourceFileObject(URI.create("file:///Foo.java"), "/** */ class Foo { }");
+        var file = new SourceFileObject(URI.create("file:///Foo.java"), "/** */ class Foo { }", Instant.now());
         var task = Parser.parseTask(file);
         var docs = DocTrees.instance(task);
         CompilationUnitTree root;
