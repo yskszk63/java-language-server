@@ -1183,10 +1183,10 @@ public class CompileBatch implements AutoCloseable {
     }
 
     /** Adds syntax coloring that's too complicated to figure out using file-local information. */
-    Map<URI, Map<TreePath, ElementKind>> decorations() {
-        var decorations = new HashMap<URI, Map<TreePath, ElementKind>>();
+    Map<URI, Map<TreePath, Element>> decorations() {
+        var decorations = new HashMap<URI, Map<TreePath, Element>>();
         for (var root : roots) {
-            var locals = new HashMap<TreePath, ElementKind>();
+            var locals = new HashMap<TreePath, Element>();
             class FindDecorations extends TreePathScanner<Void, Void> { // TODO < is highlighting
                 private void check() {
                     var path = getCurrentPath();
@@ -1195,7 +1195,7 @@ public class CompileBatch implements AutoCloseable {
                     var kind = el.getKind();
                     switch (kind) {
                         case FIELD:
-                            locals.put(path, kind);
+                            locals.put(path, el);
                             break;
                     }
                 }

@@ -176,7 +176,8 @@ interface DecorationParams {
     files: {
         [uri: string]: {
             version: number;
-            fields: Range[]
+            staticFields: Range[];
+            instanceFields: Range[];
         }
     }
 }
@@ -224,8 +225,12 @@ function createProgressListeners(client: LanguageClient) {
     });
 
     // Use custom notifications to do advanced syntax highlighting
-	const fieldDecorationType = window.createTextEditorDecorationType({
+	const instanceFieldStyle = window.createTextEditorDecorationType({
         color: new ThemeColor('javaFieldColor')
+    });
+	const staticFieldStyle = window.createTextEditorDecorationType({
+        color: new ThemeColor('javaFieldColor'),
+        fontStyle: 'italic'
     });
     // TODO these ranges refer to a particular version of the document that may be out of date
     var fieldDecorations: DecorationParams;
@@ -241,7 +246,8 @@ function createProgressListeners(client: LanguageClient) {
             // Field decorations do not include the open file
             if (file == null) {
                 console.log(`No decorations available for ${editor.document.uri}`);
-                editor.setDecorations(fieldDecorationType, []);
+                editor.setDecorations(instanceFieldStyle, []);
+                editor.setDecorations(staticFieldStyle, []);
                 continue;
             }
             // Field decorations are out-of-date
@@ -249,14 +255,8 @@ function createProgressListeners(client: LanguageClient) {
                 console.log(`Decorations for ${editor.document.uri} refer to version ${file.version} which is < ${editor.document.version}`);
                 continue;
             }
-            const decorations: DecorationOptions[] = [];
-            for (let field of file.fields) {
-                const start = new VS.Position(field.start.line, field.start.character)
-                const end = new VS.Position(field.end.line, field.end.character)
-                const decoration = { range: new VS.Range(start, end) };
-                decorations.push(decoration);
-            }
-            editor.setDecorations(fieldDecorationType, decorations);
+            editor.setDecorations(instanceFieldStyle, file.instanceFields.map(asDecoration));
+            editor.setDecorations(staticFieldStyle, file.staticFields.map(asDecoration));
         }
     }
     window.onDidChangeVisibleTextEditors(updateVisibleDecorations);
@@ -264,6 +264,12 @@ function createProgressListeners(client: LanguageClient) {
         fieldDecorations = event;
         updateVisibleDecorations();
     });
+}
+
+function asDecoration(r: Range): DecorationOptions {
+    const start = new VS.Position(r.start.line, r.start.character)
+    const end = new VS.Position(r.end.line, r.end.character)
+    return { range: new VS.Range(start, end) };
 }
 
 function platformSpecificLauncher(): string[] {

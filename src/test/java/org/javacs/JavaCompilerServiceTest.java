@@ -286,8 +286,8 @@ public class JavaCompilerServiceTest {
         var decorations = compile.decorations().get(uri);
         var strings = new ArrayList<String>();
         decorations.forEach(
-                (key, val) -> {
-                    if (val == ElementKind.FIELD) {
+                (key, el) -> {
+                    if (el.getKind() == ElementKind.FIELD) {
                         strings.add(key.getLeaf().toString());
                     }
                 });
