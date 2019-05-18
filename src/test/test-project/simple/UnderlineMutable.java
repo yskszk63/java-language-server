@@ -4,7 +4,13 @@ class UnderlineMutable {
     void method(int param) {
         param = 2;
         
-        var local = 3;
-        local = 4;
+        var local = 1;
+        local = 2;
+
+        var minus = 1;
+        minus--;
+
+        var plus = 1;
+        plus++;
     }
 }

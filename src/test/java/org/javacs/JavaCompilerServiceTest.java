@@ -310,6 +310,16 @@ public class JavaCompilerServiceTest {
         for (var path : decorations.mutableVariables) {
             strings.add(path.getLeaf().toString());
         }
-        assertThat(strings, containsInAnyOrder("int param", "param", "int local = 3", "local"));
+        assertThat(
+                strings,
+                containsInAnyOrder(
+                        "int param",
+                        "param",
+                        "int local = 1",
+                        "local",
+                        "int minus = 1",
+                        "minus",
+                        "int plus = 1",
+                        "plus"));
     }
 }
