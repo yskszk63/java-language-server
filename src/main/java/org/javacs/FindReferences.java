@@ -2,9 +2,6 @@ package org.javacs;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.lang.model.element.*;
@@ -13,14 +10,6 @@ import javax.lang.model.util.Elements;
 class FindReferences extends TreePathScanner<Void, Map<Element, List<TreePath>>> {
     private final Trees trees;
     private final Elements elements;
-
-    static Map<Element, List<TreePath>> empty(Collection<Element> to) {
-        var refs = new HashMap<Element, List<TreePath>>();
-        for (var el : to) {
-            refs.put(el, new ArrayList<>());
-        }
-        return refs;
-    }
 
     FindReferences(JavacTask task) {
         this.trees = Trees.instance(task);
