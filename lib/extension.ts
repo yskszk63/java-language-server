@@ -179,6 +179,7 @@ interface DecorationParams {
             staticFields: Range[];
             instanceFields: Range[];
             mutableVariables: Range[];
+            enumConstants: Range[];
         }
     }
 }
@@ -236,6 +237,9 @@ function createProgressListeners(client: LanguageClient) {
 	const mutableVariableStyle = window.createTextEditorDecorationType({
         textDecoration: 'underline'
     });
+	const enumConstantStyle = window.createTextEditorDecorationType({
+        fontStyle: 'italic'
+    });
     // TODO these ranges refer to a particular version of the document that may be out of date
     var fieldDecorations: DecorationParams;
     function updateVisibleDecorations() {
@@ -262,6 +266,7 @@ function createProgressListeners(client: LanguageClient) {
             editor.setDecorations(instanceFieldStyle, file.instanceFields.map(asDecoration));
             editor.setDecorations(staticFieldStyle, file.staticFields.map(asDecoration));
             editor.setDecorations(mutableVariableStyle, file.mutableVariables.map(asDecoration));
+            editor.setDecorations(enumConstantStyle, file.enumConstants.map(asDecoration));
         }
     }
     window.onDidChangeVisibleTextEditors(updateVisibleDecorations);

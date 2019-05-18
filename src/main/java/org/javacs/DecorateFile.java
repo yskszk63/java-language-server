@@ -8,5 +8,6 @@ public class DecorateFile {
     public int version;
     public List<Range> staticFields = new ArrayList<>(),
             instanceFields = new ArrayList<>(),
-            mutableVariables = new ArrayList<>();
+            mutableVariables = new ArrayList<>(),
+            enumConstants = new ArrayList<>();
 }

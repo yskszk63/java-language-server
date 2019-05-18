@@ -9,5 +9,6 @@ public class Decorations {
     public URI file;
     public List<TreePath> staticFields = new ArrayList<>(),
             instanceFields = new ArrayList<>(),
-            mutableVariables = new ArrayList<>();
+            mutableVariables = new ArrayList<>(),
+            enumConstants = new ArrayList<>();
 }

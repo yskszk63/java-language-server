@@ -1197,6 +1197,9 @@ public class CompileBatch implements AutoCloseable {
     List<Decorations> decorations() {
         var result = new ArrayList<Decorations>();
         for (var root : roots) {
+            var file = new Decorations();
+            file.file = root.getSourceFile().toUri();
+
             var fields = new HashMap<TreePath, Element>();
             var variableIsModified = new HashMap<Element, Boolean>();
             var variableUsages = new HashMap<Element, List<TreePath>>();
@@ -1222,10 +1225,17 @@ public class CompileBatch implements AutoCloseable {
                     var path = getCurrentPath();
                     var el = trees.getElement(path);
                     if (el == null) return;
-                    if (el.getKind() == ElementKind.FIELD) {
-                        fields.put(path, el);
-                    } else if (variableUsages.containsKey(el)) {
-                        variableUsages.get(el).add(path);
+                    switch (el.getKind()) {
+                        case FIELD:
+                            fields.put(path, el);
+                            return;
+                        case ENUM_CONSTANT:
+                            file.enumConstants.add(path);
+                            return;
+                        default:
+                            if (variableUsages.containsKey(el)) {
+                                variableUsages.get(el).add(path);
+                            }
                     }
                 }
 
@@ -1286,8 +1296,6 @@ public class CompileBatch implements AutoCloseable {
             var find = new FindDecorations();
             find.scan(root, null);
             // Organize results
-            var file = new Decorations();
-            file.file = root.getSourceFile().toUri();
             for (var path : fields.keySet()) {
                 if (fields.get(path).getModifiers().contains(Modifier.STATIC)) {
                     file.staticFields.add(path);

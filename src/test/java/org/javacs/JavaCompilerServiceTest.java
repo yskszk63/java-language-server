@@ -324,4 +324,16 @@ public class JavaCompilerServiceTest {
                         "int plusAssign = 1",
                         "plusAssign"));
     }
+
+    @Test
+    public void italicEnumConst() {
+        var uri = resourceUri("ItalicEnumConst.java");
+        var compile = compiler.compileFile(uri);
+        var decorations = compile.decorations().get(0);
+        var strings = new ArrayList<String>();
+        for (var path : decorations.enumConstants) {
+            strings.add(path.getLeaf().toString());
+        }
+        assertThat(strings, containsInAnyOrder("AccessMode.READ", "WRITE"));
+    }
 }

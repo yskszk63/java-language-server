@@ -131,6 +131,7 @@ class JavaLanguageServer extends LanguageServer {
                 file.instanceFields = batch.ranges(each.instanceFields);
                 file.staticFields = batch.ranges(each.staticFields);
                 file.mutableVariables = batch.ranges(each.mutableVariables);
+                file.enumConstants = batch.ranges(each.enumConstants);
                 result.files.put(each.file, file);
             }
             client.customNotification("java/setDecorations", gson.toJsonTree(result));
