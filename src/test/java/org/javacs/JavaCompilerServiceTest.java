@@ -320,6 +320,8 @@ public class JavaCompilerServiceTest {
                         "int minus = 1",
                         "minus",
                         "int plus = 1",
-                        "plus"));
+                        "plus",
+                        "int plusAssign = 1",
+                        "plusAssign"));
     }
 }

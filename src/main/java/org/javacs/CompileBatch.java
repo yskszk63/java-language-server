@@ -1249,6 +1249,14 @@ public class CompileBatch implements AutoCloseable {
                 }
 
                 @Override
+                public Void visitCompoundAssignment(CompoundAssignmentTree t, Void __) {
+                    var parent = getCurrentPath();
+                    var lhs = new TreePath(parent, t.getVariable());
+                    modifyVariable(lhs);
+                    return super.visitCompoundAssignment(t, null);
+                }
+
+                @Override
                 public Void visitUnary(UnaryTree t, Void __) {
                     switch (t.getKind()) {
                         case PREFIX_INCREMENT:

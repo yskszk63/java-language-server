@@ -12,5 +12,8 @@ class UnderlineMutable {
 
         var plus = 1;
         plus++;
+
+        var plusAssign = 1;
+        plusAssign += 1;
     }
 }
