@@ -15,7 +15,6 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
 import org.junit.Before;
@@ -283,14 +282,14 @@ public class JavaCompilerServiceTest {
     public void decorateFields() {
         var uri = resourceUri("FindFields.java");
         var compile = compiler.compileFile(uri);
-        var decorations = compile.decorations().get(uri);
+        var decorations = compile.decorations().get(0);
         var strings = new ArrayList<String>();
-        decorations.forEach(
-                (key, el) -> {
-                    if (el.getKind() == ElementKind.FIELD) {
-                        strings.add(key.getLeaf().toString());
-                    }
-                });
+        for (var path : decorations.staticFields) {
+            strings.add(path.getLeaf().toString());
+        }
+        for (var path : decorations.instanceFields) {
+            strings.add(path.getLeaf().toString());
+        }
         assertThat(
                 strings,
                 containsInAnyOrder(
@@ -300,5 +299,17 @@ public class JavaCompilerServiceTest {
                         "param.field",
                         "forwardReference",
                         "int forwardReference = 2"));
+    }
+
+    @Test
+    public void underlineMutableVariables() {
+        var uri = resourceUri("UnderlineMutable.java");
+        var compile = compiler.compileFile(uri);
+        var decorations = compile.decorations().get(0);
+        var strings = new ArrayList<String>();
+        for (var path : decorations.mutableVariables) {
+            strings.add(path.getLeaf().toString());
+        }
+        assertThat(strings, containsInAnyOrder("int param", "param", "int local = 3", "local"));
     }
 }

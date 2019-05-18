@@ -1206,10 +1206,9 @@ public class CompileBatch implements AutoCloseable {
                 private void declareVariable() {
                     var path = getCurrentPath();
                     var el = trees.getElement(path);
-                    if (el.getKind() != ElementKind.LOCAL_VARIABLE) return;
+                    if (el.getKind() == ElementKind.FIELD) return;
                     variableIsModified.put(el, false);
                     variableUsages.put(el, new ArrayList<>());
-                    variableUsages.get(el).add(path);
                 }
 
                 private void modifyVariable(TreePath path) {
