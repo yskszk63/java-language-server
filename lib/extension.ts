@@ -178,6 +178,7 @@ interface DecorationParams {
             version: number;
             staticFields: Range[];
             instanceFields: Range[];
+            mutableVariables: Range[];
         }
     }
 }
@@ -232,6 +233,9 @@ function createProgressListeners(client: LanguageClient) {
         color: new ThemeColor('javaFieldColor'),
         fontStyle: 'italic'
     });
+	const mutableVariableStyle = window.createTextEditorDecorationType({
+        textDecoration: 'underline'
+    });
     // TODO these ranges refer to a particular version of the document that may be out of date
     var fieldDecorations: DecorationParams;
     function updateVisibleDecorations() {
@@ -257,6 +261,7 @@ function createProgressListeners(client: LanguageClient) {
             }
             editor.setDecorations(instanceFieldStyle, file.instanceFields.map(asDecoration));
             editor.setDecorations(staticFieldStyle, file.staticFields.map(asDecoration));
+            editor.setDecorations(mutableVariableStyle, file.mutableVariables.map(asDecoration));
         }
     }
     window.onDidChangeVisibleTextEditors(updateVisibleDecorations);

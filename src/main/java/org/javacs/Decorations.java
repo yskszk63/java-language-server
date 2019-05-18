@@ -1,12 +1,13 @@
 package org.javacs;
 
+import com.sun.source.util.TreePath;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-import org.javacs.lsp.Range;
 
-public class DecorateFile {
-    public int version;
-    public List<Range> staticFields = new ArrayList<>(),
+public class Decorations {
+    public URI file;
+    public List<TreePath> staticFields = new ArrayList<>(),
             instanceFields = new ArrayList<>(),
             mutableVariables = new ArrayList<>();
 }

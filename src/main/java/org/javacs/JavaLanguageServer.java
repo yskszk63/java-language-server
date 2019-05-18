@@ -36,7 +36,6 @@ import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.tools.Diagnostic;
@@ -126,21 +125,13 @@ class JavaLanguageServer extends LanguageServer {
             // Add tricky syntax coloring
             var result = new DecorationParams();
             var decorations = batch.decorations();
-            for (var uri : decorations.keySet()) {
-                var paths = decorations.get(uri);
+            for (var each : decorations) {
                 var file = new DecorateFile();
-                file.version = FileStore.version(uri);
-                result.files.put(uri, file);
-                for (var path : paths.keySet()) {
-                    var el = paths.get(path);
-                    var range = batch.range(path);
-                    if (!range.isPresent()) continue;
-                    if (el.getModifiers().contains(Modifier.STATIC)) {
-                        file.staticFields.add(range.get());
-                    } else {
-                        file.instanceFields.add(range.get());
-                    }
-                }
+                file.version = FileStore.version(each.file);
+                file.instanceFields = batch.ranges(each.instanceFields);
+                file.staticFields = batch.ranges(each.staticFields);
+                file.mutableVariables = batch.ranges(each.mutableVariables);
+                result.files.put(each.file, file);
             }
             client.customNotification("java/setDecorations", gson.toJsonTree(result));
             uncheckedChanges = false;

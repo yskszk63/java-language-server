@@ -243,6 +243,16 @@ public class CompileBatch implements AutoCloseable {
         throw new RuntimeException(from + " is not in compiled batch");
     }
 
+    public List<Range> ranges(Collection<TreePath> paths) {
+        var result = new ArrayList<Range>();
+        for (var p : paths) {
+            var r = range(p);
+            if (r.isEmpty()) continue;
+            result.add(r.get());
+        }
+        return result;
+    }
+
     public Optional<Range> range(TreePath path) {
         var uri = path.getCompilationUnit().getSourceFile().toUri();
         var contents = FileStore.contents(uri);
@@ -1184,20 +1194,39 @@ public class CompileBatch implements AutoCloseable {
     }
 
     /** Adds syntax coloring that's too complicated to figure out using file-local information. */
-    Map<URI, Map<TreePath, Element>> decorations() {
-        var decorations = new HashMap<URI, Map<TreePath, Element>>();
+    List<Decorations> decorations() {
+        var result = new ArrayList<Decorations>();
         for (var root : roots) {
-            var locals = new HashMap<TreePath, Element>();
+            var fields = new HashMap<TreePath, Element>();
+            var variableIsModified = new HashMap<Element, Boolean>();
+            var variableUsages = new HashMap<Element, List<TreePath>>();
+
             class FindDecorations extends TreePathScanner<Void, Void> { // TODO < is highlighting
-                private void check() {
+
+                private void declareVariable() {
+                    var path = getCurrentPath();
+                    var el = trees.getElement(path);
+                    if (el.getKind() != ElementKind.LOCAL_VARIABLE) return;
+                    variableIsModified.put(el, false);
+                    variableUsages.put(el, new ArrayList<>());
+                    variableUsages.get(el).add(path);
+                }
+
+                private void modifyVariable(TreePath path) {
+                    var el = trees.getElement(path);
+                    if (variableIsModified.containsKey(el)) {
+                        variableIsModified.put(el, true);
+                    }
+                }
+
+                private void checkUsage() {
                     var path = getCurrentPath();
                     var el = trees.getElement(path);
                     if (el == null) return;
-                    var kind = el.getKind();
-                    switch (kind) {
-                        case FIELD:
-                            locals.put(path, el);
-                            break;
+                    if (el.getKind() == ElementKind.FIELD) {
+                        fields.put(path, el);
+                    } else if (variableUsages.containsKey(el)) {
+                        variableUsages.get(el).add(path);
                     }
                 }
 
@@ -1207,27 +1236,52 @@ public class CompileBatch implements AutoCloseable {
 
                 @Override
                 public Void visitVariable(VariableTree t, Void __) {
-                    check();
+                    declareVariable();
+                    checkUsage();
                     return super.visitVariable(t, null);
                 }
 
                 @Override
+                public Void visitAssignment(AssignmentTree t, Void __) {
+                    var parent = getCurrentPath();
+                    var lhs = new TreePath(parent, t.getVariable());
+                    modifyVariable(lhs);
+                    return super.visitAssignment(t, null);
+                }
+
+                @Override
                 public Void visitMemberSelect(MemberSelectTree t, Void __) {
-                    if (!special(t.getIdentifier())) check();
+                    if (!special(t.getIdentifier())) checkUsage();
                     return super.visitMemberSelect(t, null);
                 }
 
                 @Override
                 public Void visitIdentifier(IdentifierTree t, Void __) {
-                    if (!special(t.getName())) check();
+                    if (!special(t.getName())) checkUsage();
                     return super.visitIdentifier(t, null);
                 }
             }
+            // Scan file
             var find = new FindDecorations();
             find.scan(root, null);
-            decorations.put(root.getSourceFile().toUri(), locals);
+            // Organize results
+            var file = new Decorations();
+            file.file = root.getSourceFile().toUri();
+            for (var path : fields.keySet()) {
+                if (fields.get(path).getModifiers().contains(Modifier.STATIC)) {
+                    file.staticFields.add(path);
+                } else {
+                    file.instanceFields.add(path);
+                }
+            }
+            for (var el : variableIsModified.keySet()) {
+                if (variableIsModified.get(el)) {
+                    file.mutableVariables.addAll(variableUsages.get(el));
+                }
+            }
+            result.add(file);
         }
-        return decorations;
+        return result;
     }
 
     private static final Logger LOG = Logger.getLogger("main");

@@ -457,16 +457,6 @@
 							"begin": "{",
 							"end": "}",
 							"name": "meta.anonymous-class.body.java",
-							"beginCaptures": {
-								"0": {
-									"name": "markup.underline.begin-anonymous-class"
-								}
-							},
-							"endCaptures": {
-								"0": {
-									"name": "markup.underline.end-anonymous-class"
-								}
-							},
 							"patterns": [
 								{
 									"include": "#class-body"
