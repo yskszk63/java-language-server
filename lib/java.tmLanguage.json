@@ -178,10 +178,6 @@
 					"include": "#type-name"
 				},
 				{
-					"match": "[<>,]",
-					"name": "keyword.other"
-				},
-				{
 					"begin": "{",
 					"end": "(?=})",
 					"name": "meta.class.body.java",
