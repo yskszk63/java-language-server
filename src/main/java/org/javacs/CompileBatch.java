@@ -344,10 +344,6 @@ public class CompileBatch implements AutoCloseable {
                 if (id.matches("[A-Z]\\w+")) {
                     unresolved.add(id);
                 } else LOG.warning(id + " doesn't look like a class");
-            } else if (d.getMessage(null).contains("cannot find to")) {
-                var lines = d.getMessage(null).split("\n");
-                var firstLine = lines.length > 0 ? lines[0] : "";
-                LOG.warning(String.format("%s %s doesn't look like to-not-found", d.getCode(), firstLine));
             }
         }
         // Look at imports in other classes to help us guess how to fix imports
@@ -381,17 +377,19 @@ public class CompileBatch implements AutoCloseable {
             }
         }
         new FindUsedImports().scan(root, null);
+        // If `uri` contains errors, don't try to fix imports, it's too inaccurate
+        var hasErrors = hasErrors(uri);
         // Take the intersection of existing imports ^ existing identifiers
         var qualifiedNames = new HashSet<String>();
         for (var i : root.getImports()) {
             var imported = i.getQualifiedIdentifier().toString();
             if (imported.endsWith(".*")) {
                 var packageName = Parser.mostName(imported);
-                var isUsed = references.stream().anyMatch(r -> r.startsWith(packageName));
+                var isUsed = hasErrors || references.stream().anyMatch(r -> r.startsWith(packageName));
                 if (isUsed) qualifiedNames.add(imported);
                 else LOG.warning("There are no references to package " + imported);
             } else {
-                if (references.contains(imported)) qualifiedNames.add(imported);
+                if (hasErrors || references.contains(imported)) qualifiedNames.add(imported);
                 else LOG.warning("There are no references to class " + imported);
             }
         }
@@ -402,6 +400,16 @@ public class CompileBatch implements AutoCloseable {
         sorted.addAll(qualifiedNames);
         Collections.sort(sorted);
         return sorted;
+    }
+
+    private boolean hasErrors(URI uri) {
+        for (var d : parent.diags) {
+            if (d.getKind() != Diagnostic.Kind.ERROR) continue;
+            if (!d.getSource().toUri().equals(uri)) continue;
+            if (d.getCode().equals("compiler.err.cant.resolve.location")) continue;
+            return true;
+        }
+        return false;
     }
 
     /** Find all overloads for the smallest method call that includes the cursor */
