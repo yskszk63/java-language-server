@@ -5,6 +5,10 @@ import static org.junit.Assert.*;
 
 import java.nio.file.Paths;
 import java.util.Collections;
+import org.javacs.lsp.DidChangeTextDocumentParams;
+import org.javacs.lsp.DidCloseTextDocumentParams;
+import org.javacs.lsp.DidOpenTextDocumentParams;
+import org.javacs.lsp.TextDocumentContentChangeEvent;
 import org.junit.Test;
 
 public class ParserTest {
@@ -37,6 +41,31 @@ public class ParserTest {
         var smallFile = Paths.get(FindResource.uri("/org/javacs/example/Goto.java"));
         assertTrue(Parser.containsWordMatching(smallFile, "nonDefaultConstructor"));
         assertFalse(Parser.containsWordMatching(smallFile, "removeMethodBodies"));
+    }
+
+    @Test
+    public void searchOpenFile() {
+        // Open file
+        var smallFile = Paths.get(FindResource.uri("/org/javacs/example/Goto.java"));
+        var open = new DidOpenTextDocumentParams();
+        open.textDocument.uri = smallFile.toUri();
+        FileStore.open(open);
+        // Edit file
+        var change = new DidChangeTextDocumentParams();
+        change.textDocument.uri = smallFile.toUri();
+        var evt = new TextDocumentContentChangeEvent();
+        evt.text = "package org.javacs.example; class Foo { }";
+        change.contentChanges.add(evt);
+        FileStore.change(change);
+        // Check that Parser sees the edits
+        try {
+            assertTrue(Parser.containsWordMatching(smallFile, "Foo"));
+        } finally {
+            // Close file
+            var close = new DidCloseTextDocumentParams();
+            close.textDocument.uri = smallFile.toUri();
+            FileStore.close(close);
+        }
     }
 
     @Test

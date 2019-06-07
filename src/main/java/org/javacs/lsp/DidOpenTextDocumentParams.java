@@ -1,7 +1,7 @@
 package org.javacs.lsp;
 
 public class DidOpenTextDocumentParams {
-    public TextDocumentItem textDocument;
+    public TextDocumentItem textDocument = new TextDocumentItem();
 
     public DidOpenTextDocumentParams() {}
 

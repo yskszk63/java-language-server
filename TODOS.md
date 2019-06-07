@@ -14,6 +14,8 @@
 - `Thing#close()` shows 0 references for `try (thing)`
 
 ## Bugs 
+- Tabs throw off decorations
+- Go-to-def isn't working for package-private classes in a different file
 - Imports MyEnum.* unnecessarily
 - --add-exports arguments don't get inferred
 - Deleting file doesn't clear it from javac

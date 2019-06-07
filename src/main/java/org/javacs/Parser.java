@@ -122,6 +122,10 @@ class Parser {
 
     // TODO cache the progress made by searching shorter queries
     static boolean containsWordMatching(Path java, String query) {
+        if (FileStore.activeDocuments().contains(java)) {
+            var text = FileStore.contents(java);
+            return matchesTitleCase(text, query);
+        }
         try (var channel = FileChannel.open(java)) {
             // Read up to 1 MB of data from file
             var limit = Math.min((int) channel.size(), SEARCH_BUFFER.capacity());
@@ -138,6 +142,10 @@ class Parser {
 
     static boolean containsWord(Path java, String query) {
         var search = new StringSearch(query);
+        if (FileStore.activeDocuments().contains(java)) {
+            var text = FileStore.contents(java).getBytes();
+            return search.nextWord(text) != -1;
+        }
         try (var channel = FileChannel.open(java)) {
             // Read up to 1 MB of data from file
             var limit = Math.min((int) channel.size(), SEARCH_BUFFER.capacity());
