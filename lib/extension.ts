@@ -3,9 +3,11 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as Path from "path";
 import * as FS from "fs";
-import { window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, DecorationOptions, ThemeColor } from 'vscode';
-import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType, Range} from "vscode-languageclient";
-import * as VS from "vscode";
+import {window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, ConfigurationChangeEvent, TextDocumentChangeEvent} from 'vscode';
+import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType} from "vscode-languageclient";
+import { activate as activateTreeSitter } from 'vscode-tree-sitter';
+import { color } from './treeSitter';
+import * as path from 'path';
 
 // If we want to profile using VisualVM, we have to run the language server using regular java, not jlink
 // This is intended to be used in the 'F5' debug-extension mode, where the extension is running against the actual source, not build.vsix
@@ -102,7 +104,34 @@ export function activate(context: ExtensionContext) {
     commands.registerCommand('java.command.findReferences', runFindReferences);
 
 	// When the language client activates, register a progress-listener
-	client.onReady().then(() => createProgressListeners(client));
+    client.onReady().then(() => createProgressListeners(client));
+    
+	// Parse .java files incrementally using tree-sitter
+	const parserPath = path.join(context.extensionPath, 'lib', 'tree-sitter-java.wasm');
+	activateTreeSitter(context, {'java': {wasm: parserPath}}).then(colorAll);
+	function colorAll() {
+		for (const editor of window.visibleTextEditors) {
+			color(editor);
+		}
+	}
+	function colorEdited(evt: TextDocumentChangeEvent) {
+		for (const editor of window.visibleTextEditors) {
+			if (editor.document.uri.toString() === evt.document.uri.toString()) {
+				color(editor);
+			}
+		}
+	}
+	function onChangeConfiguration(event: ConfigurationChangeEvent) {
+		const colorizationNeedsReload: boolean = event.affectsConfiguration('workbench.colorTheme')
+			|| event.affectsConfiguration('editor.tokenColorCustomizations');
+		if (colorizationNeedsReload) {
+			colorAll();
+		}
+	}
+	context.subscriptions.push(workspace.onDidChangeConfiguration(onChangeConfiguration));
+	context.subscriptions.push(window.onDidChangeVisibleTextEditors(colorAll));
+	context.subscriptions.push(window.onDidChangeTextEditorVisibleRanges(change => color(change.textEditor)));
+	context.subscriptions.push(workspace.onDidChangeTextDocument(colorEdited));
 }
 
 // this method is called when your extension is deactivated
@@ -172,18 +201,6 @@ interface ProgressMessage {
     increment: number
 }
 
-interface DecorationParams {
-    files: {
-        [uri: string]: {
-            version: number;
-            staticFields: Range[];
-            instanceFields: Range[];
-            mutableVariables: Range[];
-            enumConstants: Range[];
-        }
-    }
-}
-
 function createProgressListeners(client: LanguageClient) {
 	// Create a "checking files" progress indicator
 	let progressListener = new class {
@@ -225,61 +242,6 @@ function createProgressListeners(client: LanguageClient) {
 	client.onNotification(new NotificationType('java/endProgress'), () => {
 		progressListener.endProgress();
     });
-
-    // Use custom notifications to do advanced syntax highlighting
-	const instanceFieldStyle = window.createTextEditorDecorationType({
-        color: new ThemeColor('javaFieldColor')
-    });
-	const staticFieldStyle = window.createTextEditorDecorationType({
-        color: new ThemeColor('javaFieldColor'),
-        fontStyle: 'italic'
-    });
-	const mutableVariableStyle = window.createTextEditorDecorationType({
-        textDecoration: 'underline'
-    });
-	const enumConstantStyle = window.createTextEditorDecorationType({
-        fontStyle: 'italic'
-    });
-    // TODO these ranges refer to a particular version of the document that may be out of date
-    var fieldDecorations: DecorationParams;
-    function updateVisibleDecorations() {
-        // No field decorations have been received
-        if (fieldDecorations == null) {
-            console.log('No decorations have yet been received');
-            return;
-        }
-        for (let editor of window.visibleTextEditors) {
-            const uri = editor.document.uri.toString();
-            const file = fieldDecorations.files[uri];
-            // Field decorations do not include the open file
-            if (file == null) {
-                console.log(`No decorations available for ${editor.document.uri}`);
-                editor.setDecorations(instanceFieldStyle, []);
-                editor.setDecorations(staticFieldStyle, []);
-                continue;
-            }
-            // Field decorations are out-of-date
-            if (file.version != editor.document.version) {
-                console.log(`Decorations for ${editor.document.uri} refer to version ${file.version} which is < ${editor.document.version}`);
-                continue;
-            }
-            editor.setDecorations(instanceFieldStyle, file.instanceFields.map(asDecoration));
-            editor.setDecorations(staticFieldStyle, file.staticFields.map(asDecoration));
-            editor.setDecorations(mutableVariableStyle, file.mutableVariables.map(asDecoration));
-            editor.setDecorations(enumConstantStyle, file.enumConstants.map(asDecoration));
-        }
-    }
-    window.onDidChangeVisibleTextEditors(updateVisibleDecorations);
-    client.onNotification(new NotificationType('java/setDecorations'), (event: DecorationParams) => {
-        fieldDecorations = event;
-        updateVisibleDecorations();
-    });
-}
-
-function asDecoration(r: Range): DecorationOptions {
-    const start = new VS.Position(r.start.line, r.start.character)
-    const end = new VS.Position(r.end.line, r.end.character)
-    return { range: new VS.Range(start, end) };
 }
 
 function platformSpecificLauncher(): string[] {

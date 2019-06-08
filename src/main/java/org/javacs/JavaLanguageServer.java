@@ -98,19 +98,6 @@ class JavaLanguageServer extends LanguageServer {
             // Report compilation errors
             var messages = batch.reportErrors();
             publishDiagnostics(uris, messages);
-            // Add tricky syntax coloring
-            var result = new DecorationParams();
-            var decorations = batch.decorations();
-            for (var each : decorations) {
-                var file = new DecorateFile();
-                file.version = FileStore.version(each.file);
-                file.instanceFields = batch.ranges(each.instanceFields);
-                file.staticFields = batch.ranges(each.staticFields);
-                file.mutableVariables = batch.ranges(each.mutableVariables);
-                file.enumConstants = batch.ranges(each.enumConstants);
-                result.files.put(each.file, file);
-            }
-            client.customNotification("java/setDecorations", gson.toJsonTree(result));
             uncheckedChanges = false;
         }
         var elapsed = Duration.between(started, Instant.now());

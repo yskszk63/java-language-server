@@ -603,6 +603,18 @@
 					]
 				},
 				{
+					"match": "\\b\\w+(?=\\()",
+					"name": "meta.function"
+				},
+				{
+					"match": "\\b::(\\w+)",
+					"captures": {
+						"1": {
+							"name": "meta.function"
+						}
+					}
+				},
+				{
 					"include": "#keywords"
 				},
 				{
