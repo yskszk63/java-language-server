@@ -751,7 +751,7 @@
 			"patterns": [
 				{
 					"match": "\\b(byte|short|int|long|char|float|double|boolean|void)\\b",
-					"name": "keyword.other.type"
+					"name": "entity.name.type"
 				}
 			]
 		},
