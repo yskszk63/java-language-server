@@ -3,15 +3,18 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as Path from "path";
 import * as FS from "fs";
-import {window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, ConfigurationChangeEvent, TextDocumentChangeEvent} from 'vscode';
+import {window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, ConfigurationChangeEvent, TextDocumentChangeEvent, Hover} from 'vscode';
 import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType} from "vscode-languageclient";
-import { activate as activateTreeSitter } from 'vscode-tree-sitter';
-import { color } from './treeSitter';
+import {tree, activate as activateTreeSitter} from 'vscode-tree-sitter';
+import {color} from './treeSitter';
 import * as path from 'path';
 
 // If we want to profile using VisualVM, we have to run the language server using regular java, not jlink
 // This is intended to be used in the 'F5' debug-extension mode, where the extension is running against the actual source, not build.vsix
 const visualVm = false;
+
+// Show tree-sitter parse tree when you hover over code
+const debugTreeSitter = false;
 
 /** Called when extension is activated */
 export function activate(context: ExtensionContext) {
@@ -131,7 +134,26 @@ export function activate(context: ExtensionContext) {
 	context.subscriptions.push(workspace.onDidChangeConfiguration(onChangeConfiguration));
 	context.subscriptions.push(window.onDidChangeVisibleTextEditors(colorAll));
 	context.subscriptions.push(window.onDidChangeTextEditorVisibleRanges(change => color(change.textEditor)));
-	context.subscriptions.push(workspace.onDidChangeTextDocument(colorEdited));
+    context.subscriptions.push(workspace.onDidChangeTextDocument(colorEdited));
+    if (debugTreeSitter) {
+        languages.registerHoverProvider({language: 'java'}, {
+            provideHover(doc, pos) {
+                const offset = doc.offsetAt(pos);
+                let node = tree(doc.uri).rootNode;
+                recur:
+                while (true) {
+                    for (const child of node.namedChildren) {
+                        if (child.startIndex <= offset && offset <= child.endIndex) {
+                            node = child;
+                            continue recur;
+                        }
+                    }
+                    break;
+                }
+                return new Hover(node.toString());
+            }
+        });
+    }
 }
 
 // this method is called when your extension is deactivated
