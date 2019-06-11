@@ -33,9 +33,32 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 			return this.parent == null;
 		}
 	}
+	function scanProgram(x: Parser.SyntaxNode) {
+		const scope = new Scope(null);
+		for (const child of x.namedChildren) {
+			if (!isVisible(child, visibleRanges)) continue;
+			switch (child.type) {
+				case 'package_declaration':
+				case 'import_declaration':
+					break;
+				case 'class_declaration':
+					scanTopLevelClass(child, scope);
+					break;
+				default:
+					scan(child, scope);
+			}
+		}
+	}
+	function scanTopLevelClass(x: Parser.SyntaxNode, scope: Scope) {
+		for (const child of x.children) {
+			if (!isVisible(child, visibleRanges)) continue;
+			scan(x, scope);
+		}
+	}
 	function scan(x: Parser.SyntaxNode, scope: Scope) {
-		if (!isVisible(x, visibleRanges)) return;
 		switch (x.type) {
+			case 'ERROR':
+				return;
 			case 'class_body':
 			case 'method_body':
 			case 'block':
@@ -117,7 +140,7 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 		if (id[0].toUpperCase() == id[0]) return true;
 		return false;
 	}
-	scan(root, new Scope(null));
+	scanProgram(root);
 	return colors;
 }
 
