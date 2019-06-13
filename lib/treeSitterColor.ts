@@ -67,9 +67,9 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 			case 'field_declaration':
 				scanFieldDeclaration(x, scope);
 				return;
-			case 'formal_parameter':
-			case 'local_variable_declaration':
-				scanLocalDeclaration(x, scope);
+			case 'variable_declarator_id':
+				// Anything which isn't a field, must be a local
+				scope.declareLocal(x.text);
 				return; 
 			case 'type_identifier':
 				if (x.text != 'var') {
@@ -100,22 +100,6 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 		}
 		for (const child of x.namedChildren) {
 			scan(child, scope)
-		}
-	}
-	function scanLocalDeclaration(x: Parser.SyntaxNode, scope: Scope) {
-		switch (x.type) {
-			case 'variable_declarator_id':
-				scope.declareLocal(x.text);
-				break;
-			case 'type_identifier':
-				if (x.text != 'var') {
-					colors['entity.name.type'].push(x);
-				}
-				break;
-			default:
-				for (const child of x.namedChildren) {
-					scanLocalDeclaration(child, scope)
-				}
 		}
 	}
 	function scanFieldDeclaration(x: Parser.SyntaxNode, scope: Scope) {
