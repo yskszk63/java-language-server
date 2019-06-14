@@ -71,6 +71,9 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 				// Anything which isn't a field, must be a local
 				scope.declareLocal(x.text);
 				return; 
+			case 'class_literal':
+				colors['entity.name.type'].push(x.firstChild);
+				return;
 			case 'type_identifier':
 				if (x.text != 'var') {
 					colors['entity.name.type'].push(x);
@@ -89,6 +92,7 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 					case 'method_declarator':
 					case 'class_declaration':
 					case 'method_invocation':
+					case 'method_reference':
 						break;
 					default:
 						if (!looksLikeType(x.text) && !scope.isLocal(x.text)) {
