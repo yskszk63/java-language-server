@@ -62,8 +62,16 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 			case 'class_body':
 			case 'method_body':
 			case 'block':
+			case 'lambda_expression':
 				scope = new Scope(scope);
-				break;
+				for (const child of x.namedChildren) {
+					if (child.equals(x.lastNamedChild)) {
+						scan(child, scope);
+					} else {
+						scanLambdaArgument(child, scope);
+					}
+				}
+				return;
 			case 'field_declaration':
 				scanFieldDeclaration(x, scope);
 				return;
@@ -104,6 +112,22 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 		}
 		for (const child of x.namedChildren) {
 			scan(child, scope)
+		}
+	}
+	function scanLambdaArgument(x: Parser.SyntaxNode, scope: Scope) {
+		switch (x.type) {
+			case 'identifier':
+				scope.declareLocal(x.text);
+				break;
+			case 'type_identifier':
+				if (x.text != 'var') {
+					colors['entity.name.type'].push(x);
+				}
+				break;
+			default:
+				for (const child of x.namedChildren) {
+					scanLambdaArgument(child, scope);
+				}
 		}
 	}
 	function scanFieldDeclaration(x: Parser.SyntaxNode, scope: Scope) {
