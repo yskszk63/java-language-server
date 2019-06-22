@@ -2,7 +2,6 @@
 
 set -e
 
-# Check JAVA_HOME points to correct java version
-./scripts/check_java_home.sh
+JAVA_HOME=`/usr/libexec/java_home -v 11`
 
 mvn test -Dtest=$1#$2

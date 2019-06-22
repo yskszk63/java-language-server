@@ -10,8 +10,6 @@
 - `Thing#close()` shows 0 references for `try (thing)`
 
 ## Bugs 
-- Go-to-def isn't working for package-private classes in a different file
-- Imports MyEnum.* unnecessarily
 - --add-exports arguments don't get inferred
 - Deleting file doesn't clear it from javac
 - External delete causes find-references to crash because it's still in FileStore.javaSources()

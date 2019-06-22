@@ -273,6 +273,13 @@ public class JavaCompilerServiceTest {
     }
 
     @Test
+    public void dontImportEnum() {
+        var uri = resourceUri("DontImportEnum.java");
+        var qualifiedNames = compiler.compileFile(uri).fixImports(uri);
+        assertThat(qualifiedNames, contains("java.nio.file.AccessMode", "java.util.ArrayList"));
+    }
+
+    @Test
     public void matchesPartialName() {
         assertTrue(CompileBatch.matchesPartialName("foobar", "foo"));
         assertFalse(CompileBatch.matchesPartialName("foo", "foobar"));
