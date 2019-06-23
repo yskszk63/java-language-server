@@ -62,6 +62,8 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 			case 'class_body':
 			case 'method_body':
 			case 'block':
+				scope = new Scope(scope);
+				break;
 			case 'lambda_expression':
 				scope = new Scope(scope);
 				for (const child of x.namedChildren) {
@@ -88,9 +90,36 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 				}
 				break;
 			case 'scoped_identifier':
-				colors['variable'].push(x.lastNamedChild!);
+				if (!looksLikeType(x.lastNamedChild!.text)) {
+					colors['variable'].push(x.lastNamedChild!);
+				}
 				scan(x.firstNamedChild!, scope);
 				break;
+			case 'method_invocation':
+			case 'method_reference':
+				const select = [];
+				for (const child of x.namedChildren) {
+					switch (child.type) {
+						case 'type_argument':
+						case 'argument_list':
+							scan(child, scope);
+							break;
+						default:
+							select.push(child);
+					}
+				}
+				if (select.length > 1) {
+					// First id can be anything
+					scan(select[0], scope);
+					// Middle ids are usually fields
+					for (var i = 1; i < select.length - 1; i++) {
+						if (select[i].type == 'identifier' && !looksLikeType(select[i].text)) {
+							colors['variable'].push(select[i]);
+						}
+					}
+					// Last id is method name
+				}
+				return;
 			case 'identifier':
 				switch (x.parent!.type) {
 					case 'class_declaration':
@@ -99,8 +128,6 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 						break;
 					case 'method_declarator':
 					case 'class_declaration':
-					case 'method_invocation':
-					case 'method_reference':
 						break;
 					default:
 						if (!looksLikeType(x.text) && !scope.isLocal(x.text)) {
@@ -148,7 +175,11 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 		}
 	}
 	function looksLikeType(id: string) {
+		// ''
 		if (id.length == 0) return false;
+		// 'FOO'
+		if (id.toUpperCase() == id) return false;
+		// 'Foo'
 		if (id[0].toUpperCase() == id[0]) return true;
 		return false;
 	}
