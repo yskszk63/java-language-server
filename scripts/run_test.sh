@@ -2,6 +2,6 @@
 
 set -e
 
-JAVA_HOME=`/usr/libexec/java_home -v 11`
+./scripts/check_java_home.sh
 
 mvn test -Dtest=$1#$2
