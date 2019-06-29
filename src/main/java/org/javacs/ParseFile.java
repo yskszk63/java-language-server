@@ -92,6 +92,23 @@ public class ParseFile {
         return false;
     }
 
+    public boolean isOverride(TreePath path) {
+        var leaf = path.getLeaf();
+        if (!(leaf instanceof MethodTree)) return false;
+        var method = (MethodTree) leaf;
+        for (var ann : method.getModifiers().getAnnotations()) {
+            var type = ann.getAnnotationType();
+            if (type instanceof IdentifierTree) {
+                var id = (IdentifierTree) type;
+                var name = id.getName();
+                if (name.contentEquals("Override")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     public List<TreePath> declarations() {
         return declarations(root);
     }

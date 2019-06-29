@@ -963,7 +963,7 @@ class JavaLanguageServer extends LanguageServer {
                 var lens = new CodeLens(range.get(), command, null);
                 result.add(lens);
             }
-            if (!cacheParse.isTestMethod(d) && !cacheParse.isTestClass(d)) {
+            if (!cacheParse.isTestMethod(d) && !cacheParse.isTestClass(d) && !cacheParse.isOverride(d)) {
                 // Unresolved "_ references" code lens
                 var start = range.get().start;
                 var line = start.line;
