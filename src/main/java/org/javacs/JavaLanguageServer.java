@@ -22,9 +22,18 @@ class JavaLanguageServer extends LanguageServer {
     // TODO allow multiple workspace roots
     private Path workspaceRoot;
     private final LanguageClient client;
+    private JavaCompilerService cacheCompiler;
+    private JsonObject cacheSettings;
     private JsonObject settings = new JsonObject();
 
-    JavaCompilerService compiler;
+    JavaCompilerService compiler() {
+        if (!settings.equals(cacheSettings)) {
+            LOG.info("Recreating compiler because\n\t" + settings + "\nis different than\n\t" + cacheSettings);
+            cacheCompiler = createCompiler();
+            cacheSettings = settings;
+        }
+        return cacheCompiler;
+    }
 
     private static int severity(Diagnostic.Kind kind) {
         switch (kind) {
@@ -93,7 +102,7 @@ class JavaLanguageServer extends LanguageServer {
         LOG.info("Lint " + Profiler.describe(uris) + "...");
         var started = Instant.now();
         if (uris.isEmpty()) return;
-        try (var batch = compiler.compileUris(uris)) {
+        try (var batch = compiler().compileUris(uris)) {
             // Report compilation errors
             var messages = batch.reportErrors();
             publishDiagnostics(uris, messages);
@@ -211,8 +220,6 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public void initialized() {
-        this.compiler = createCompiler();
-
         // Register for didChangeWatchedFiles notifications
         var options = new JsonObject();
         var watchers = new JsonArray();
@@ -233,7 +240,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public List<SymbolInformation> workspaceSymbols(WorkspaceSymbolParams params) {
         var list = new ArrayList<SymbolInformation>();
-        for (var s : compiler.findSymbols(params.query, 50)) {
+        for (var s : compiler().findSymbols(params.query, 50)) {
             var i = asSymbolInformation(s);
             list.add(i);
         }
@@ -242,11 +249,7 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public void didChangeConfiguration(DidChangeConfigurationParams change) {
-        var changed = !settings.equals(change.settings);
-        settings = change.settings.getAsJsonObject().getAsJsonObject("java");
-        if (changed) {
-            compiler = createCompiler();
-        }
+        settings = change.settings.getAsJsonObject();
     }
 
     @Override
@@ -329,7 +332,7 @@ class JavaLanguageServer extends LanguageServer {
         var column = position.position.character + 1;
         LOG.info(String.format("Complete at %s(%d,%d)", uri.getPath(), line, column));
         // Figure out what kind of completion we want to do
-        var maybeCtx = compiler.parseFile(uri).completionContext(line, column);
+        var maybeCtx = compiler().parseFile(uri).completionContext(line, column);
         // TODO don't complete inside of comments
         if (!maybeCtx.isPresent()) {
             var items = new ArrayList<CompletionItem>();
@@ -346,7 +349,7 @@ class JavaLanguageServer extends LanguageServer {
         var ctx = maybeCtx.get();
         List<Completion> cs;
         boolean isIncomplete;
-        try (var focus = compiler.compileFocus(uri, ctx.line, ctx.character)) {
+        try (var focus = compiler().compileFocus(uri, ctx.line, ctx.character)) {
             // Do a specific type of completion
             switch (ctx.kind) {
                 case MemberSelect:
@@ -439,10 +442,10 @@ class JavaLanguageServer extends LanguageServer {
         LOG.info(String.format("Find docs for `%s`...", ptr));
 
         // Find el in the doc path
-        var file = compiler.docs().find(ptr);
+        var file = compiler().docs().find(ptr);
         if (!file.isPresent()) return Optional.empty();
         // Parse file and find el
-        var parse = compiler.docs().parse(file.get());
+        var parse = compiler().docs().parse(file.get());
         var path = parse.fuzzyFind(ptr);
         if (!path.isPresent()) return Optional.empty();
         // Parse the doctree associated with el
@@ -458,10 +461,10 @@ class JavaLanguageServer extends LanguageServer {
         // TODO find and parse happens twice between findDocs and findMethodDetails
         // Find method in the doc path
         var ptr = new Ptr(method);
-        var file = compiler.docs().find(ptr);
+        var file = compiler().docs().find(ptr);
         if (!file.isPresent()) return Optional.empty();
         // Parse file and find method
-        var parse = compiler.docs().parse(file.get());
+        var parse = compiler().docs().parse(file.get());
         var path = parse.fuzzyFind(ptr);
         if (!path.isPresent()) return Optional.empty();
         // Should be a MethodTree
@@ -599,9 +602,9 @@ class JavaLanguageServer extends LanguageServer {
 
     private Optional<String> hoverDocs(Element e) {
         var ptr = new Ptr(e);
-        var file = compiler.docs().find(ptr);
+        var file = compiler().docs().find(ptr);
         if (!file.isPresent()) return Optional.empty();
-        var parse = compiler.docs().parse(file.get());
+        var parse = compiler().docs().parse(file.get());
         var path = parse.fuzzyFind(ptr);
         if (!path.isPresent()) return Optional.empty();
         var doc = parse.doc(path.get());
@@ -619,7 +622,7 @@ class JavaLanguageServer extends LanguageServer {
         LOG.info(String.format("Hover over %s(%d,%d) ...", uri.getPath(), line, column));
         var started = Instant.now();
         // Compile entire file
-        try (var compile = compiler.compileFile(uri)) {
+        try (var compile = compiler().compileFile(uri)) {
             // Find element under cursor
             var el = compile.element(uri, line, column);
             if (!el.isPresent()) {
@@ -680,9 +683,9 @@ class JavaLanguageServer extends LanguageServer {
 
     private Optional<List<ParameterInformation>> signatureParamsFromDocs(Ptr ptr) {
         // Find the file ptr point to, and parse it
-        var file = compiler.docs().find(ptr);
+        var file = compiler().docs().find(ptr);
         if (!file.isPresent()) return Optional.empty();
-        var parse = compiler.docs().parse(file.get());
+        var parse = compiler().docs().parse(file.get());
         // Find the tree
         var path = parse.fuzzyFind(ptr);
         if (!path.isPresent()) return Optional.empty();
@@ -732,7 +735,7 @@ class JavaLanguageServer extends LanguageServer {
         if (!FileStore.isJavaFile(uri)) return Optional.empty();
         var line = position.position.line + 1;
         var column = position.position.character + 1;
-        try (var focus = compiler.compileFocus(uri, line, column)) {
+        try (var focus = compiler().compileFocus(uri, line, column)) {
             var help = focus.methodInvocation(uri, line, column).map(this::asSignatureHelp);
             return help;
         }
@@ -748,7 +751,7 @@ class JavaLanguageServer extends LanguageServer {
         // Compile from-file and identify element under cursor
         LOG.info(String.format("Go-to-def at %s:%d...", fromUri, fromLine));
         Optional<Element> toEl;
-        try (var compile = compiler.compileFile(fromUri)) {
+        try (var compile = compiler().compileFile(fromUri)) {
             toEl = compile.element(fromUri, fromLine, fromColumn);
             if (!toEl.isPresent()) {
                 LOG.info(String.format("...no element at cursor"));
@@ -757,9 +760,9 @@ class JavaLanguageServer extends LanguageServer {
         }
 
         // Compile all files that *might* contain definitions of fromEl
-        var toFiles = compiler.potentialDefinitions(toEl.get());
+        var toFiles = compiler().potentialDefinitions(toEl.get());
         toFiles.add(fromUri);
-        try (var batch = compiler.compileBatch(pruneWord(toFiles, toEl.get()))) {
+        try (var batch = compiler().compileBatch(pruneWord(toFiles, toEl.get()))) {
             // Find fromEl again, so that we have an Element from the current batch
             var fromElAgain = batch.element(fromUri, fromLine, fromColumn).get();
 
@@ -791,7 +794,7 @@ class JavaLanguageServer extends LanguageServer {
         // Compile from-file and identify element under cursor
         LOG.warning(String.format("Looking for references to %s(%d,%d)...", toUri.getPath(), toLine, toColumn));
         Optional<Element> toEl;
-        try (var compile = compiler.compileFile(toUri)) {
+        try (var compile = compiler().compileFile(toUri)) {
             toEl = compile.element(toUri, toLine, toColumn);
             if (!toEl.isPresent()) {
                 LOG.warning("...no element under cursor");
@@ -800,9 +803,9 @@ class JavaLanguageServer extends LanguageServer {
         }
 
         // Compile all files that *might* contain references to toEl
-        var fromUris = compiler.potentialReferences(toEl.get());
+        var fromUris = compiler().potentialReferences(toEl.get());
         fromUris.add(toUri);
-        try (var batch = compiler.compileBatch(pruneWord(fromUris, toEl.get()))) {
+        try (var batch = compiler().compileBatch(pruneWord(fromUris, toEl.get()))) {
             // Find toEl again, so that we have an Element from the current batch
             var toElAgain = batch.element(toUri, toLine, toColumn).get();
 
@@ -842,7 +845,7 @@ class JavaLanguageServer extends LanguageServer {
     private void updateCachedParse(URI file) {
         if (file.equals(cacheParseFile) && FileStore.version(file) == cacheParseVersion) return;
         LOG.info(String.format("Updating cached parse file to %s", file));
-        cacheParse = compiler.parseFile(file);
+        cacheParse = compiler().parseFile(file);
         cacheParseFile = file;
         cacheParseVersion = FileStore.version(file);
     }
@@ -1041,7 +1044,7 @@ class JavaLanguageServer extends LanguageServer {
         Ptr toPtr;
         Set<Ptr> signature;
         int count;
-        try (var compile = compiler.compileFile(toUri)) {
+        try (var compile = compiler().compileFile(toUri)) {
             // Find the element we want to count references to
             toEl = compile.element(toUri, toLine, toColumn);
             if (!toEl.isPresent()) {
@@ -1067,7 +1070,7 @@ class JavaLanguageServer extends LanguageServer {
             LOG.info(String.format("Count references to `%s`...", toPtr));
 
             // Compile all files that *might* contain references to toEl
-            var fromUris = compiler.potentialReferences(toEl.get());
+            var fromUris = compiler().potentialReferences(toEl.get());
             fromUris.remove(toUri);
 
             // If it's too expensive to compute the code lens
@@ -1128,7 +1131,7 @@ class JavaLanguageServer extends LanguageServer {
         if (!outOfDate.isEmpty()) {
             // Compile all files that need to be updated in a batch
             outOfDate.add(toUri);
-            try (var batch = compiler.compileUris(outOfDate)) {
+            try (var batch = compiler().compileUris(outOfDate)) {
                 // Find all declarations in toFile
                 var toEls = batch.declarations(toUri);
 
@@ -1156,7 +1159,7 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public List<TextEdit> formatting(DocumentFormattingParams params) {
-        try (var compile = compiler.compileFile(params.textDocument.uri)) {
+        try (var compile = compiler().compileFile(params.textDocument.uri)) {
             var edits = new ArrayList<TextEdit>();
             edits.addAll(fixImports(compile, params.textDocument.uri));
             edits.addAll(addOverrides(compile, params.textDocument.uri));

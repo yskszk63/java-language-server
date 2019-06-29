@@ -11,7 +11,7 @@ public class PtrTest {
     static JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
     static String file = "/org/javacs/example/Ptrs.java";
     static URI uri = FindResource.uri(file);
-    static CompileBatch compile = server.compiler.compileFile(uri);
+    static CompileBatch compile = server.compiler().compileFile(uri);
 
     @Test
     public void classPtr() {
