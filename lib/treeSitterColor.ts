@@ -3,6 +3,7 @@ import * as Parser from 'web-tree-sitter';
 export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number, end: number}[]): {[scope: string]: Parser.SyntaxNode[]} {
 	const colors: {[scope: string]: Parser.SyntaxNode[]} = {
 		'entity.name.type': [],
+		'entity.name.function': [],
 		'variable': [],
 	};
 	class Scope {
@@ -128,6 +129,7 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 						break;
 					case 'method_declarator':
 					case 'class_declaration':
+						colors['entity.name.function'].push(x);
 						break;
 					default:
 						if (!looksLikeType(x.text) && !scope.isLocal(x.text)) {
