@@ -16,11 +16,11 @@ public class Docs {
     private final SourceFileManager fileManager = new SourceFileManager();
 
     private static Optional<Path> srcZip() {
-        if (!Lib.SRC_ZIP.isPresent()) {
+        if (!Lib.srcZip().isPresent()) {
             return Optional.empty();
         }
         try {
-            var fs = FileSystems.newFileSystem(Lib.SRC_ZIP.get(), Docs.class.getClassLoader());
+            var fs = FileSystems.newFileSystem(Lib.srcZip().get(), Docs.class.getClassLoader());
             return Optional.of(fs.getPath("/"));
         } catch (IOException e) {
             throw new RuntimeException(e);

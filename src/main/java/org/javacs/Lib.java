@@ -1,29 +1,40 @@
 package org.javacs;
 
-import java.io.File;
-import java.lang.System;
-import java.util.Optional;
-import java.util.Arrays;
 import java.nio.file.*;
+import java.util.Optional;
+import java.util.logging.Logger;
 
 class Lib {
-    static Optional<Path> srcZipPath() {
-        return Optional.ofNullable(System.getenv("JAVA_HOME"))
-            .map(home -> {
-                return Arrays.asList(new Path[]{
-                    Paths.get(home).resolve("lib/src.zip"),
-                    Paths.get(home).resolve("src.zip"),
-                });
-            })
-            .flatMap(paths -> {
-                for (Path path : paths) {
-                    if (path.toFile().exists()) {
-                        return Optional.of(path);
-                    }
-                }
-                return Optional.empty();
-            });
+
+    private static Optional<Path> cacheSrcZip;
+
+    static Optional<Path> srcZip() {
+        if (cacheSrcZip == null) {
+            cacheSrcZip = findSrcZip();
+        }
+        return cacheSrcZip;
     }
 
-    static final Optional<Path> SRC_ZIP = srcZipPath();
+    private static Optional<Path> findSrcZip() {
+        // TODO try something else when JAVA_HOME isn't defined
+        var javaHome = System.getenv("JAVA_HOME");
+        if (javaHome == null) {
+            LOG.warning("Couldn't find src.zip because JAVA_HOME is not defined");
+            return Optional.empty();
+        }
+        String[] locations = {
+            "lib/src.zip", "src.zip",
+        };
+        for (var rel : locations) {
+            var abs = Paths.get(javaHome).resolve(rel);
+            if (Files.exists(abs)) {
+                LOG.info("Found " + abs);
+                return Optional.of(abs);
+            }
+        }
+        LOG.warning("Couldn't find src.zip in " + javaHome);
+        return Optional.empty();
+    }
+
+    private static final Logger LOG = Logger.getLogger("main");
 }
