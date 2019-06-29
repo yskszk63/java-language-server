@@ -107,6 +107,13 @@ public class GotoTest {
     }
 
     @Test
+    public void constructorInOtherFile() {
+        var suggestions = doGoto(file, 24, 17);
+
+        assertThat(suggestions, hasItem("GotoOther.java:12"));
+    }
+
+    @Test
     @Ignore // TODO
     public void typeParam() {
         var suggestions = doGoto(file, 46, 12);
