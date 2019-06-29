@@ -10,7 +10,6 @@
 - `Thing#close()` shows 0 references for `try (thing)`
 
 ## Bugs 
-- --add-exports arguments don't get inferred
 - Deleting file doesn't clear it from javac
 - External delete causes find-references to crash because it's still in FileStore.javaSources()
 

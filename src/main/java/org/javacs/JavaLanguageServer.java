@@ -22,8 +22,7 @@ class JavaLanguageServer extends LanguageServer {
     // TODO allow multiple workspace roots
     private Path workspaceRoot;
     private final LanguageClient client;
-    private Set<String> externalDependencies = Set.of();
-    private Set<Path> classPath = Set.of();
+    private JsonObject settings = new JsonObject();
 
     JavaCompilerService compiler;
 
@@ -124,38 +123,57 @@ class JavaLanguageServer extends LanguageServer {
         javaStartProgress(new JavaStartProgressParams("Configure javac"));
         javaReportProgress(new JavaReportProgressParams("Finding source roots"));
 
+        var externalDependencies = externalDependencies();
+        var classPath = classPath();
+        var addExports = addExports();
         // If classpath is specified by the user, don't infer anything
         if (!classPath.isEmpty()) {
             javaEndProgress();
-            return new JavaCompilerService(classPath, Collections.emptySet());
+            return new JavaCompilerService(classPath, Collections.emptySet(), addExports);
         }
         // Otherwise, combine inference with user-specified external dependencies
         else {
             var infer = new InferConfig(workspaceRoot, externalDependencies);
 
             javaReportProgress(new JavaReportProgressParams("Inferring class path"));
-            var classPath = infer.classPath();
+            classPath = infer.classPath();
 
             javaReportProgress(new JavaReportProgressParams("Inferring doc path"));
             var docPath = infer.buildDocPath();
 
             javaEndProgress();
-            return new JavaCompilerService(classPath, docPath);
+            return new JavaCompilerService(classPath, docPath, addExports);
         }
     }
 
-    void setExternalDependencies(Set<String> externalDependencies) {
-        var changed =
-                this.externalDependencies.isEmpty()
-                        != externalDependencies.isEmpty(); // TODO shouldn't this be any change?
-        this.externalDependencies = externalDependencies;
-        if (changed) this.compiler = createCompiler();
+    private Set<String> externalDependencies() {
+        if (!settings.has("externalDependencies")) return Set.of();
+        var array = settings.getAsJsonArray("externalDependencies");
+        var strings = new HashSet<String>();
+        for (var each : array) {
+            strings.add(each.getAsString());
+        }
+        return strings;
     }
 
-    void setClassPath(Set<Path> classPath) {
-        var changed = this.classPath.isEmpty() != classPath.isEmpty(); // TODO shouldn't this be any change?
-        this.classPath = classPath;
-        if (changed) this.compiler = createCompiler();
+    private Set<Path> classPath() {
+        if (!settings.has("classPath")) return Set.of();
+        var array = settings.getAsJsonArray("classPath");
+        var paths = new HashSet<Path>();
+        for (var each : array) {
+            paths.add(Paths.get(each.getAsString()).toAbsolutePath());
+        }
+        return paths;
+    }
+
+    private Set<String> addExports() {
+        if (!settings.has("addExports")) return Set.of();
+        var array = settings.getAsJsonArray("addExports");
+        var strings = new HashSet<String>();
+        for (var each : array) {
+            strings.add(each.getAsString());
+        }
+        return strings;
     }
 
     @Override
@@ -224,18 +242,11 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public void didChangeConfiguration(DidChangeConfigurationParams change) {
-        var settings = (JsonObject) change.settings;
-        var java = settings.getAsJsonObject("java");
-
-        var externalDependencies = java.getAsJsonArray("externalDependencies");
-        var strings = new HashSet<String>();
-        for (var each : externalDependencies) strings.add(each.getAsString());
-        setExternalDependencies(strings);
-
-        var classPath = java.getAsJsonArray("classPath");
-        var paths = new HashSet<Path>();
-        for (var each : classPath) paths.add(Paths.get(each.getAsString()).toAbsolutePath());
-        setClassPath(paths);
+        var changed = !settings.equals(change.settings);
+        settings = change.settings.getAsJsonObject().getAsJsonObject("java");
+        if (changed) {
+            compiler = createCompiler();
+        }
     }
 
     @Override

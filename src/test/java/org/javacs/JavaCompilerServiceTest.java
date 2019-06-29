@@ -26,7 +26,8 @@ public class JavaCompilerServiceTest {
         Main.setRootFormat();
     }
 
-    private JavaCompilerService compiler = new JavaCompilerService(Collections.emptySet(), Collections.emptySet());
+    private JavaCompilerService compiler =
+            new JavaCompilerService(Collections.emptySet(), Collections.emptySet(), Collections.emptySet());
 
     static Path simpleProjectSrc() {
         return Paths.get("src/test/test-project/simple").normalize();

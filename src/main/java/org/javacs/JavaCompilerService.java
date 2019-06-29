@@ -17,6 +17,7 @@ import javax.tools.*;
 public class JavaCompilerService {
     // Not modifiable! If you want to edit these, you need to create a new instance
     final Set<Path> classPath, docPath;
+    final Set<String> addExports;
     final ReusableCompiler compiler = new ReusableCompiler();
     final Docs docs;
     final Set<String> jdkClasses = Classes.jdkTopLevelClasses(), classPathClasses;
@@ -26,7 +27,7 @@ public class JavaCompilerService {
     // TODO intercept files that aren't in the batch and erase method bodies so compilation is faster
     final SourceFileManager fileManager;
 
-    public JavaCompilerService(Set<Path> classPath, Set<Path> docPath) {
+    public JavaCompilerService(Set<Path> classPath, Set<Path> docPath, Set<String> addExports) {
         System.err.println("Class path:");
         for (var p : classPath) {
             System.err.println("  " + p);
@@ -38,6 +39,7 @@ public class JavaCompilerService {
         // classPath can't actually be modified, because JavaCompiler remembers it from task to task
         this.classPath = Collections.unmodifiableSet(classPath);
         this.docPath = Collections.unmodifiableSet(docPath);
+        this.addExports = Collections.unmodifiableSet(addExports);
         this.docs = new Docs(docPath);
         this.classPathClasses = Classes.classPathTopLevelClasses(classPath);
         this.fileManager = new SourceFileManager();
@@ -48,7 +50,7 @@ public class JavaCompilerService {
         return classOrSourcePath.stream().map(p -> p.toString()).collect(Collectors.joining(File.pathSeparator));
     }
 
-    static List<String> options(Set<Path> classPath) {
+    static List<String> options(Set<Path> classPath, Set<String> addExports) {
         var list = new ArrayList<String>();
 
         Collections.addAll(list, "-classpath", joinPath(classPath));
@@ -68,6 +70,10 @@ public class JavaCompilerService {
                 "-Xlint:unchecked",
                 "-Xlint:varargs",
                 "-Xlint:static");
+        for (var export : addExports) {
+            list.add("--add-exports");
+            list.add(export + "=ALL-UNNAMED");
+        }
 
         return list;
     }

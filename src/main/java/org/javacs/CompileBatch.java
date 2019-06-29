@@ -60,11 +60,12 @@ public class CompileBatch implements AutoCloseable {
     private static ReusableCompiler.Borrow batchTask(
             JavaCompilerService parent, Collection<? extends JavaFileObject> sources) {
         parent.diags.clear();
+
         return parent.compiler.getTask(
                 null,
                 parent.fileManager,
                 parent.diags::add,
-                JavaCompilerService.options(parent.classPath),
+                JavaCompilerService.options(parent.classPath, parent.addExports),
                 Collections.emptyList(),
                 sources);
     }

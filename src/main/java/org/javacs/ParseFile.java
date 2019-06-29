@@ -24,7 +24,7 @@ public class ParseFile {
                         null,
                         parent.fileManager,
                         parent.diags::add,
-                        JavaCompilerService.options(parent.classPath),
+                        JavaCompilerService.options(parent.classPath, parent.addExports),
                         Collections.emptyList(),
                         List.of(new SourceFileObject(file)));
     }

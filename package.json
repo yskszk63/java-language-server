@@ -93,6 +93,13 @@
                     },
                     "description": "Command to run all tests in a class, for example [\"mvn\", \"test\", \"-Dtest=${class}\""
                 },
+                "java.addExports": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of modules to allow access to, for example [\"jdk.compiler/com.sun.tools.javac.api\"]"
+                },
                 "java.trace.server": {
                     "scope": "window",
                     "type": "string",
