@@ -507,25 +507,25 @@ public class CompileBatch implements AutoCloseable {
     public List<Completion> completeAnnotations(URI uri, int line, int character, String partialName) {
         var result = new ArrayList<Completion>();
         // Add @Override ... snippet
-        // TODO this is crashing javac
-        // if ("Override".startsWith(partialName)) {
-        //     // TODO filter out already-implemented methods using thisMethods
-        //     var alreadyShown = new HashSet<String>();
-        //     for (var method : superMethods(uri, line, character)) {
-        //         var mods = method.getModifiers();
-        //         if (mods.contains(Modifier.STATIC) || mods.contains(Modifier.PRIVATE)) continue;
+        if ("Override".startsWith(partialName)) {
+            // TODO filter out already-implemented methods using thisMethods
+            var alreadyShown = new HashSet<String>();
+            for (var method : superMethods(uri, line, character)) {
+                var mods = method.getModifiers();
+                if (mods.contains(Modifier.STATIC) || mods.contains(Modifier.PRIVATE)) continue;
 
-        //         var label = "@Override " + ShortTypePrinter.printMethod(method);
-        //         var snippet = "Override\n" + new TemplatePrinter().printMethod(method) + " {\n    $0\n}";
-        //         var override = Completion.ofSnippet(label, snippet);
-        //         if (!alreadyShown.contains(label)) {
-        //             result.add(override);
-        //             alreadyShown.add(label);
-        //         }
-        //     }
-        // }
+                var label = "@Override " + ShortTypePrinter.printMethod(method);
+                var snippet = "Override\n" + new TemplatePrinter().printMethod(method) + " {\n    $0\n}";
+                var override = Completion.ofSnippet(label, snippet);
+                if (!alreadyShown.contains(label)) {
+                    result.add(override);
+                    alreadyShown.add(label);
+                }
+            }
+        }
         // Add @Override, @Test, other simple class names
-        // completeScopeIdentifiers(uri, line, character, partialName, result);
+        // We use 0 as the column number because if we focus javac on the partial @Annotation it will crash
+        completeScopeIdentifiers(uri, line, 0, partialName, result);
         return result;
     }
 
