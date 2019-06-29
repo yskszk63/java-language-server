@@ -10,7 +10,6 @@ class LruCache<K, V> {
     private final Map<K, V> map;
     private final Function<K, V> loader;
 
-    // TODO this reference is not resolving
     LruCache(int capacity, Function<K, V> loader) {
         this.fifo = new ArrayBlockingQueue<>(capacity);
         this.map = new HashMap<K, V>(capacity);

@@ -234,6 +234,10 @@ public class JavaCompilerService {
                         var id = (IdentifierTree) t;
                         return id.getName().contentEquals(findName);
                     }
+                    if (t instanceof ParameterizedTypeTree) {
+                        var param = (ParameterizedTypeTree) t;
+                        return isName(param.getType());
+                    }
                     return false;
                 }
 
