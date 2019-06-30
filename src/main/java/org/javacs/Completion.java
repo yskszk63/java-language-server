@@ -69,8 +69,4 @@ public class Completion {
             this.snippet = snippet;
         }
     }
-
-    public Ptr ptr() {
-        return new Ptr(element);
-    }
 }
