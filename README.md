@@ -165,6 +165,8 @@ The java service process will output a log file to stderr, which is visible in V
 
 ## Contributing
 
+### Installing
+
 If you have npm and maven installed, you should be able to install locally using 
 
     npm install -g vsce
@@ -172,3 +174,7 @@ If you have npm and maven installed, you should be able to install locally using
     ./scripts/build.sh
 
 At the time of this writing, the build only works on Mac, because of the way it uses JLink. However, it would be straightforward to fix this by changing `scripts/link_mac.sh` to be more like `scripts/link_windows.sh`.
+
+### Editing
+
+Please run ./configure before your first commit to install a pre-commit hook that formats the code.
