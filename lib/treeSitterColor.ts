@@ -60,6 +60,8 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 		switch (x.type) {
 			case 'ERROR':
 				return;
+			case 'constructor_declaration':
+			case 'method_declaration':
 			case 'class_body':
 			case 'method_body':
 			case 'block':
@@ -135,6 +137,7 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 					case 'type_parameter':
 						colors['entity.name.type'].push(x);
 						break;
+					case 'constructor_declarator':
 					case 'method_declarator':
 					case 'class_declaration':
 						colors['entity.name.function'].push(x);
