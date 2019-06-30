@@ -96,6 +96,14 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: {start: number
 				}
 				scan(x.firstNamedChild!, scope);
 				break;
+			case 'field_access':
+				colors['variable'].push(x.lastNamedChild);
+				for (const child of x.namedChildren) {
+					if (!child.equals(x.lastNamedChild)) {
+						scan(child, scope);
+					}
+				}
+				return;
 			case 'method_invocation':
 			case 'method_reference':
 				const select = [];
