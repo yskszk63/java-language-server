@@ -13,7 +13,7 @@ npm install
 ./scripts/link_windows.sh
 
 # Build vsix
-vsce package -o build.vsix
+npm run-script vscode:build
 
 code --install-extension build.vsix --force
 
