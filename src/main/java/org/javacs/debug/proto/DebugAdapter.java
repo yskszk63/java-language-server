@@ -92,7 +92,9 @@ public class DebugAdapter {
 
     private void send(ProtocolMessage message) {
         var jsonText = toJson(message);
-        // LOG.info(jsonText);
+        // if (!(message instanceof OutputEvent)) {
+        //     LOG.info(jsonText);
+        // }
         var messageBytes = jsonText.getBytes(UTF_8);
         var headerText = String.format("Content-Length: %d\r\n\r\n", messageBytes.length);
         var headerBytes = headerText.getBytes(UTF_8);

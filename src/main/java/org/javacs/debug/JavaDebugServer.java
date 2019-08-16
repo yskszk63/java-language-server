@@ -328,7 +328,6 @@ public class JavaDebugServer implements DebugServer {
     }
 
     private void enablePendingBreakpoint(Breakpoint b, ReferenceType type) {
-        LOG.info("Enable breakpoint at " + b.source.path + ":" + b.line);
         try {
             var locations = type.locationsOfLine(b.line);
             for (var line : locations) {
@@ -337,23 +336,26 @@ public class JavaDebugServer implements DebugServer {
                 req.enable();
             }
             if (locations.isEmpty()) {
+                LOG.info("No locations at " + b.source.path + ":" + b.line);
                 var failed = new BreakpointEventBody();
-                failed.reason = "no code";
+                failed.reason = "changed";
                 failed.breakpoint = b;
                 b.verified = false;
                 b.message = b.source.name + ":" + b.line + " could not be found or had no code on it";
                 client.breakpoint(failed);
                 return;
             }
+            LOG.info("Enable breakpoint at " + b.source.path + ":" + b.line);
             var ok = new BreakpointEventBody();
-            ok.reason = "class loaded";
+            ok.reason = "changed";
             ok.breakpoint = b;
             b.verified = true;
             b.message = null;
             client.breakpoint(ok);
         } catch (AbsentInformationException __) {
+            LOG.info("Absent information at " + b.source.path + ":" + b.line);
             var failed = new BreakpointEventBody();
-            failed.reason = "no code";
+            failed.reason = "changed";
             failed.breakpoint = b;
             b.verified = false;
             b.message = b.source.name + ":" + b.line + " could not be found or had no code on it";
@@ -611,7 +613,7 @@ public class JavaDebugServer implements DebugServer {
         var variables = new ArrayList<Variable>();
         for (var v : visible) {
             if (v.isArgument() != argumentScope) continue;
-            Variable w = new Variable();
+            var w = new Variable();
             w.name = v.name();
             w.value = print(values.get(v), thread);
             w.type = v.typeName();
