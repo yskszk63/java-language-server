@@ -47,7 +47,7 @@ class JavaLanguageServer extends LanguageServer {
         LOG.info(String.format("...done linting in %d ms", elapsed.toMillis()));
     }
 
-    private static final Gson gson = new Gson();
+    static final Gson gson = new GsonBuilder().registerTypeAdapter(Ptr.class, new PtrAdapter()).create();
 
     private void javaStartProgress(JavaStartProgressParams params) {
         client.customNotification("java/startProgress", gson.toJsonTree(params));
@@ -319,15 +319,18 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public CompletionItem resolveCompletionItem(CompletionItem unresolved) {
         if (unresolved.data == null) return unresolved;
-        var ptr = new Ptr(unresolved.data.getAsString());
-        var markdown = findDocs(ptr);
+        var data = gson.fromJson(unresolved.data, CompletionData.class);
+        var markdown = findDocs(data.ptr);
         if (markdown.isPresent()) {
             unresolved.documentation = markdown.get();
         }
-        if (ptr.isMethod()) {
-            var details = findMethodDetails(ptr);
+        if (data.ptr.isMethod()) {
+            var details = findMethodDetails(data.ptr);
             if (details.isPresent()) {
                 unresolved.detail = details.get();
+                if (data.plusOverloads != 0) {
+                    unresolved.detail += " (+" + data.plusOverloads + " overloads)";
+                }
             }
         }
         return unresolved;
@@ -877,4 +880,9 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     private static final Logger LOG = Logger.getLogger("main");
+}
+
+class CompletionData {
+    public Ptr ptr;
+    public int plusOverloads;
 }

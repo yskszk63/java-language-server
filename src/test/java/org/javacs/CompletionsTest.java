@@ -785,17 +785,17 @@ public class CompletionsTest extends CompletionsBase {
     @Test
     public void overloadedOnSourcePath() {
         var file = "/org/javacs/example/OverloadedMethod.java";
-        var labels = label(file, 9, 13);
+        var labels = detail(file, 9, 13);
 
-        assertThat("suggests overloads", labels, hasItem("overloaded() (+2 overloads)"));
+        assertThat("suggests overloads", labels, hasItem("void overloaded() (+2 overloads)"));
     }
 
     @Test
     public void overloadedOnClassPath() {
         var file = "/org/javacs/example/OverloadedMethod.java";
-        var labels = label(file, 10, 26);
+        var labels = detail(file, 10, 26);
 
-        assertThat("suggests overloads", labels, hasItem("of() (+11 overloads)"));
+        assertThat("suggests overloads", labels, hasItem("List<E> of() (+11 overloads)"));
     }
 
     @Test

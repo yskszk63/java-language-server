@@ -1,6 +1,6 @@
 package org.javacs;
 
-import com.google.gson.JsonPrimitive;
+import com.google.gson.JsonElement;
 import com.sun.source.doctree.DocTree;
 import com.sun.source.doctree.ParamTree;
 import com.sun.source.tree.*;
@@ -458,6 +458,7 @@ class CompileBatch implements AutoCloseable {
                 // Find all overloads of method
                 LOG.info(String.format("...`%s` is a method invocation", path.getLeaf()));
                 var invoke = (MethodInvocationTree) path.getLeaf();
+                // TODO this is null when a correct overload has not yet been selected
                 var method = trees.getElement(trees.getPath(path.getCompilationUnit(), invoke.getMethodSelect()));
                 var results = new ArrayList<ExecutableElement>();
                 for (var m : method.getEnclosingElement().getEnclosedElements()) {
@@ -1411,7 +1412,7 @@ class CompileBatch implements AutoCloseable {
         i.kind = completionItemKind(e);
         i.detail = ShortTypePrinter.DEFAULT.print(e.asType());
         i.sortText = String.format("%02d%s", varPriority(e, container), i.label);
-        i.data = new JsonPrimitive(new Ptr(e).toString());
+        i.data = data(new Ptr(e), 0);
         return i;
     }
 
@@ -1421,7 +1422,7 @@ class CompileBatch implements AutoCloseable {
         i.kind = completionItemKind(e);
         i.detail = ShortTypePrinter.DEFAULT.print(e.asType());
         i.sortText = String.format("%02d%s", innerClassPriority(e, container), i.label);
-        i.data = new JsonPrimitive(new Ptr(e).toString());
+        i.data = data(new Ptr(e), 0);
         return i;
     }
 
@@ -1429,13 +1430,8 @@ class CompileBatch implements AutoCloseable {
             List<ExecutableElement> methods, boolean addParens, boolean addSemi, TypeMirror container) {
         var first = methods.get(0);
         var i = new CompletionItem();
-        i.label = methodLabel(first);
+        i.label = first.getSimpleName().toString();
         i.kind = completionItemKind(first);
-        // Add (+n overloads)
-        if (methods.size() > 1) {
-            var overloads = methods.size() - 1;
-            i.label += " (+" + overloads + " overloads)";
-        }
         i.filterText = first.getSimpleName().toString();
         i.sortText = String.format("%02d%s", methodPriority(first, container), first.getSimpleName().toString());
         // Try to be as helpful as possible with insertText
@@ -1466,16 +1462,8 @@ class CompileBatch implements AutoCloseable {
             i.insertText = first.getSimpleName().toString();
         }
         // Save pointer for method and class doc resultion
-        i.data = new JsonPrimitive(new Ptr(first).toString());
+        i.data = data(new Ptr(first), methods.size() - 1);
         return i;
-    }
-
-    private String methodLabel(ExecutableElement method) {
-        var args = new StringJoiner(", ");
-        for (var p : method.getParameters()) {
-            args.add(ShortTypePrinter.NO_PACKAGE.print(p.asType()));
-        }
-        return method.getSimpleName() + "(" + args + ")";
     }
 
     private Integer completionItemKind(Element e) {
@@ -1532,7 +1520,7 @@ class CompileBatch implements AutoCloseable {
         i.kind = completionItemKind(member);
         i.detail = member.toString();
         i.sortText = String.format("%02d%s", Priority.PACKAGE_MEMBER, i.label);
-        i.data = new JsonPrimitive(new Ptr(member).toString());
+        i.data = data(new Ptr(member), 0);
         return i;
     }
 
@@ -1551,7 +1539,7 @@ class CompileBatch implements AutoCloseable {
         i.kind = completionItemKind(member);
         i.detail = member.toString();
         i.sortText = String.format("%02d%s", Priority.CASE_LABEL, i.label);
-        i.data = new JsonPrimitive(new Ptr(member).toString());
+        i.data = data(new Ptr(member), 0);
         return i;
     }
 
@@ -1617,6 +1605,13 @@ class CompileBatch implements AutoCloseable {
         static final int KEYWORD = iota++;
         static final int PACKAGE_MEMBER = iota++;
         static final int CASE_LABEL = iota++;
+    }
+
+    private JsonElement data(Ptr ptr, int plusOverloads) {
+        var data = new CompletionData();
+        data.ptr = ptr;
+        data.plusOverloads = plusOverloads;
+        return JavaLanguageServer.gson.toJsonTree(data);
     }
 
     private static final Logger LOG = Logger.getLogger("main");

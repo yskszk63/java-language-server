@@ -1,8 +1,10 @@
 package org.javacs;
 
+import com.google.gson.*;
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -245,4 +247,16 @@ class Ptr {
     }
 
     private static final Logger LOG = Logger.getLogger("main");
+}
+
+class PtrAdapter implements JsonSerializer<Ptr>, JsonDeserializer<Ptr> {
+    @Override
+    public JsonElement serialize(Ptr ptr, Type __, JsonSerializationContext ctx) {
+        return new JsonPrimitive(ptr.toString());
+    }
+
+    @Override
+    public Ptr deserialize(JsonElement string, Type __, JsonDeserializationContext ctx) throws JsonParseException {
+        return new Ptr(string.getAsString());
+    }
 }
