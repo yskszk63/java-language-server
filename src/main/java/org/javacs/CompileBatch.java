@@ -1110,7 +1110,7 @@ class CompileBatch implements AutoCloseable {
                         if (isThisOrSuper(e)) {
                             unwrapThisSuper((VariableElement) e);
                         }
-                        if (tooManyItems(result.size())) return;
+                        if (tooManyItems(result)) return;
                     }
                 } catch (Exception e) {
                     LOG.log(Level.WARNING, "error walking locals in scope", e);
@@ -1122,7 +1122,7 @@ class CompileBatch implements AutoCloseable {
                 for (var s : fastScopes(start)) {
                     walkLocals(s);
                     // Return early?
-                    if (tooManyItems(result.size())) {
+                    if (tooManyItems(result)) {
                         return result;
                     }
                 }
@@ -1144,6 +1144,18 @@ class CompileBatch implements AutoCloseable {
         // imports.
         // https://parent.docs.oracle.com/en/java/javase/11/docs/api/jdk.compiler/com/sun/source/tree/Scope.html
         return scopes.subList(0, scopes.size() - 2);
+    }
+
+    private boolean tooManyItems(List<Element> elements) {
+        var distinctNames = new HashSet<Name>();
+        for (var e : elements) {
+            distinctNames.add(e.getSimpleName());
+        }
+        if (distinctNames.size() >= MAX_COMPLETION_ITEMS) {
+            LOG.warning(String.format("...# of items %d reached max %s", distinctNames.size(), MAX_COMPLETION_ITEMS));
+            return true;
+        }
+        return false;
     }
 
     private boolean tooManyItems(int count) {
@@ -1301,7 +1313,7 @@ class CompileBatch implements AutoCloseable {
                     if (StringSearch.matchesPartialName(member.getSimpleName(), partialName)
                             && member.getModifiers().contains(Modifier.STATIC)) {
                         result.add(member);
-                        if (tooManyItems(result.size())) return result;
+                        if (tooManyItems(result)) return result;
                     }
                 }
             } else {
@@ -1309,7 +1321,7 @@ class CompileBatch implements AutoCloseable {
                     if (StringSearch.matchesPartialName(member.getSimpleName(), partialName)
                             && member.getModifiers().contains(Modifier.STATIC)) {
                         result.add(member);
-                        if (tooManyItems(result.size())) return result;
+                        if (tooManyItems(result)) return result;
                     }
                 }
             }
