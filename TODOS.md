@@ -19,5 +19,3 @@
 ## Polish
 - Error squigglies should be on method name, not entire method
 - Underline vars that are not effectively final
-- Complete parens
-- `_ instanceof Type` should color type

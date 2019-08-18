@@ -700,8 +700,11 @@ class CompileBatch implements AutoCloseable {
             var members = completeTypeMembers(path);
             var result = groupByOverload(members, addParens, addSemi, type);
             result.add(keywordCompletion("class"));
-            result.add(keywordCompletion("this"));
-            result.add(keywordCompletion("super"));
+            var scope = trees.getScope(path);
+            if (isEnclosingClass(type, scope)) {
+                result.add(keywordCompletion("this"));
+                result.add(keywordCompletion("super"));
+            }
             return result;
         } else {
             var members = completeInstanceMembers(path);
@@ -711,6 +714,26 @@ class CompileBatch implements AutoCloseable {
             }
             return result;
         }
+    }
+
+    private boolean isEnclosingClass(TypeMirror type, Scope start) {
+        for (var s : fastScopes(start)) {
+            // If we reach a static method, stop looking
+            var method = s.getEnclosingMethod();
+            if (method != null && method.getModifiers().contains(Modifier.STATIC)) {
+                return false;
+            }
+            // If we find the enclosing class
+            var thisElement = s.getEnclosingClass();
+            if (thisElement != null && thisElement.asType().equals(type)) {
+                return true;
+            }
+            // If the enclosing class is static, stop looking
+            if (thisElement != null && thisElement.getModifiers().contains(Modifier.STATIC)) {
+                return false;
+            }
+        }
+        return false;
     }
 
     List<CompletionItem> completeReferences(URI uri, int line, int character) {
@@ -1096,17 +1119,7 @@ class CompileBatch implements AutoCloseable {
 
             // Walk each enclosing scope, placing its members into `results`
             List<Element> walkScopes() {
-                var scopes = new ArrayList<Scope>();
-                for (var s = start; s != null; s = s.getEnclosingScope()) {
-                    scopes.add(s);
-                }
-                // Scopes may be contained in an enclosing scope.
-                // The outermost scope contains those elements available via "star import" declarations;
-                // the scope within that contains the top level elements of the compilation unit, including any named
-                // imports.
-                // https://parent.docs.oracle.com/en/java/javase/11/docs/api/jdk.compiler/com/sun/source/tree/Scope.html
-                for (var i = 0; i < scopes.size() - 2; i++) {
-                    var s = scopes.get(i);
+                for (var s : fastScopes(start)) {
                     walkLocals(s);
                     // Return early?
                     if (tooManyItems(result.size())) {
@@ -1118,6 +1131,19 @@ class CompileBatch implements AutoCloseable {
             }
         }
         return new Walk().walkScopes();
+    }
+
+    private List<Scope> fastScopes(Scope start) {
+        var scopes = new ArrayList<Scope>();
+        for (var s = start; s != null; s = s.getEnclosingScope()) {
+            scopes.add(s);
+        }
+        // Scopes may be contained in an enclosing scope.
+        // The outermost scope contains those elements available via "star import" declarations;
+        // the scope within that contains the top level elements of the compilation unit, including any named
+        // imports.
+        // https://parent.docs.oracle.com/en/java/javase/11/docs/api/jdk.compiler/com/sun/source/tree/Scope.html
+        return scopes.subList(0, scopes.size() - 2);
     }
 
     private boolean tooManyItems(int count) {

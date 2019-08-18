@@ -5,7 +5,6 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 
 import java.io.IOException;
-import org.junit.Ignore;
 import org.junit.Test;
 
 public class CompletionsScopesTest extends CompletionsBase {
@@ -41,11 +40,9 @@ public class CompletionsScopesTest extends CompletionsBase {
         // StaticSub.this, StaticSub.super
         assertThat(filterText(file, 37, 23), hasItems("this"));
         // AutocompleteScopes.this, AutocompleteScopes.super
-        // TODO this is not accessible
-        // assertThat(filterText(file, 39, 32), not(hasItems("this")));
+        assertThat(filterText(file, 39, 32), not(hasItems("this")));
         // Super.this, Super.super
-        // TODO this is not accessible
-        // assertThat(filterText(file, 41, 19), not(hasItems("this")));
+        assertThat(filterText(file, 41, 19), not(hasItems("this")));
     }
 
     @Test
@@ -80,11 +77,9 @@ public class CompletionsScopesTest extends CompletionsBase {
         // StaticSub.this, StaticSub.super
         assertThat(filterText(file, 67, 31), hasItems("this"));
         // AutocompleteScopes.this, AutocompleteScopes.super
-        // TODO this is not accessible
-        // assertThat(filterText(file, 69, 40), not(hasItems("this")));
+        assertThat(filterText(file, 69, 40), not(hasItems("this")));
         // Super.this, Super.super
-        // TODO this is not accessible
-        // assertThat(filterText(file, 71, 27), not(hasItems("this")));
+        assertThat(filterText(file, 71, 27), not(hasItems("this")));
     }
 
     @Test
@@ -112,8 +107,6 @@ public class CompletionsScopesTest extends CompletionsBase {
         // assertThat(suggestions, not(hasItems("this")));
     }
 
-    // TODO this is not accessible
-    @Ignore
     @Test
     public void staticSubStaticMethodThisSuper() throws IOException {
         var file = "/org/javacs/example/AutocompleteScopes.java";
@@ -153,8 +146,6 @@ public class CompletionsScopesTest extends CompletionsBase {
         assertThat(suggestions, hasItems("this"));
     }
 
-    // TODO this is not accessible
-    @Ignore
     @Test
     public void staticSubStaticMethodInnerThisSuper() throws IOException {
         var file = "/org/javacs/example/AutocompleteScopes.java";
@@ -200,8 +191,7 @@ public class CompletionsScopesTest extends CompletionsBase {
         // AutocompleteScopes.this, AutocompleteScopes.super
         assertThat(filterText(file, 160, 32), hasItems("this"));
         // Super.this, Super.super
-        // TODO this is not accessible
-        // assertThat(filterText(file, 162, 19), not(hasItems("this")));
+        assertThat(filterText(file, 162, 19), not(hasItems("this")));
     }
 
     @Test
@@ -237,7 +227,6 @@ public class CompletionsScopesTest extends CompletionsBase {
         // AutocompleteScopes.this, AutocompleteScopes.super
         assertThat(filterText(file, 183, 40), hasItems("this"));
         // Super.this, Super.super
-        // TODO this is not accessible
-        // assertThat(filterText(file, 185, 27), not(hasItems("this")));
+        assertThat(filterText(file, 185, 27), not(hasItems("this")));
     }
 }
