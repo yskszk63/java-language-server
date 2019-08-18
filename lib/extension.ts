@@ -58,41 +58,7 @@ export function activate(context: ExtensionContext) {
         serverOptions = visualVmConfig(context);
     }
 
-    // Copied from typescript
-    languages.setLanguageConfiguration('java', {
-        indentationRules: {
-            // ^(.*\*/)?\s*\}.*$
-            decreaseIndentPattern: /^((?!.*?\/\*).*\*\/)?\s*[\}\]\)].*$/,
-            // ^.*\{[^}"']*$
-            increaseIndentPattern: /^((?!\/\/).)*(\{[^}"'`]*|\([^)"'`]*|\[[^\]"'`]*)$/,
-            indentNextLinePattern: /^\s*(for|while|if|else)\b(?!.*[;{}]\s*(\/\/.*|\/[*].*[*]\/\s*)?$)/
-        },
-        onEnterRules: [
-            {
-                // e.g. /** | */
-                beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
-                afterText: /^\s*\*\/$/,
-                action: { indentAction: IndentAction.IndentOutdent, appendText: ' * ' }
-            }, {
-                // e.g. /** ...|
-                beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
-                action: { indentAction: IndentAction.None, appendText: ' * ' }
-            }, {
-                // e.g.  * ...|
-                beforeText: /^(\t|(\ \ ))*\ \*(\ ([^\*]|\*(?!\/))*)?$/,
-                action: { indentAction: IndentAction.None, appendText: '* ' }
-            }, {
-                // e.g.  */|
-                beforeText: /^(\t|(\ \ ))*\ \*\/\s*$/,
-                action: { indentAction: IndentAction.None, removeText: 1 }
-            },
-            {
-                // e.g.  *-----*/|
-                beforeText: /^(\t|(\ \ ))*\ \*[^/]*\*\/\s*$/,
-                action: { indentAction: IndentAction.None, removeText: 1 }
-            }
-        ]
-    })
+    enableJavadocSymbols();
 
     // Create the language client and start the client.
     let client = new LanguageClient('java', 'Java Language Server', serverOptions, clientOptions);
@@ -424,4 +390,46 @@ function findJavaExecutableInJavaHome(javaHome: string, binname: string) {
     }
 
     return null;
+}
+
+function enableJavadocSymbols() {
+	// Let's enable Javadoc symbols autocompletion, shamelessly copied from MIT licensed code at
+	// https://github.com/Microsoft/vscode/blob/9d611d4dfd5a4a101b5201b8c9e21af97f06e7a7/extensions/typescript/src/typescriptMain.ts#L186
+	languages.setLanguageConfiguration('java', {
+		indentationRules: {
+			// ^(.*\*/)?\s*\}.*$
+			decreaseIndentPattern: /^(.*\*\/)?\s*\}.*$/,
+			// ^.*\{[^}"']*$
+			increaseIndentPattern: /^.*\{[^}"']*$/
+		},
+		wordPattern: /(-?\d*\.\d\w*)|([^\`\~\!\@\#\%\^\&\*\(\)\-\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\?\s]+)/g,
+		onEnterRules: [
+			{
+				// e.g. /** | */
+				beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
+				afterText: /^\s*\*\/$/,
+				action: { indentAction: IndentAction.IndentOutdent, appendText: ' * ' }
+			},
+			{
+				// e.g. /** ...|
+				beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
+				action: { indentAction: IndentAction.None, appendText: ' * ' }
+			},
+			{
+				// e.g.  * ...|
+				beforeText: /^(\t|(\ \ ))*\ \*(\ ([^\*]|\*(?!\/))*)?$/,
+				action: { indentAction: IndentAction.None, appendText: '* ' }
+			},
+			{
+				// e.g.  */|
+				beforeText: /^(\t|(\ \ ))*\ \*\/\s*$/,
+				action: { indentAction: IndentAction.None, removeText: 1 }
+			},
+			{
+				// e.g.  *-----*/|
+				beforeText: /^(\t|(\ \ ))*\ \*[^/]*\*\/\s*$/,
+				action: { indentAction: IndentAction.None, removeText: 1 }
+			}
+		]
+	});
 }

@@ -35,7 +35,8 @@
                 ],
                 "aliases": [
                     "Java"
-                ]
+                ],
+                "configuration": "./language-configuration.json"
             },
             {
                 "id": "java.hover"
