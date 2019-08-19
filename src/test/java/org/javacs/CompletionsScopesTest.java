@@ -223,4 +223,11 @@ public class CompletionsScopesTest extends CompletionsBase {
         // Super.this, Super.super
         assertThat(filterText(file, 185, 27), not(hasItems("this")));
     }
+
+    @Test
+    public void blockLocal() throws IOException {
+        var file = "/org/javacs/example/AutocompleteScopes.java";
+        var suggestions = filterText(file, 196, 14);
+        assertThat(suggestions, hasItems("testArg", "testMethodLocal", "testBlockLocal"));
+    }
 }

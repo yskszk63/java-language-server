@@ -187,4 +187,13 @@ public class AutocompleteScopes {
             };
         }
     }
+
+    void testBlock(String testArg) {
+        int testMethodLocal = 1;
+
+        {
+            int testBlockLocal = 2;
+            t;
+        }
+    }
 }
