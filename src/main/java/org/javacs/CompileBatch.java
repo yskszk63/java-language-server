@@ -1129,72 +1129,35 @@ class CompileBatch implements AutoCloseable {
 
     /** Find all identifiers in scope at line:character */
     private List<Element> scopeMembers(Scope start, Predicate<CharSequence> test) {
-        List<Element> results = new ArrayList<>();
+        var isStatic = false;
+        var results = new ArrayList<Element>();
         for (var s : fastScopes(start)) {
-            addLocals(start, s, test, results);
+            if (s.getEnclosingMethod() != null) {
+                for (var e : s.getLocalElements()) {
+                    if (!test.test(e.getSimpleName())) continue;
+                    results.add(e);
+                }
+                isStatic = isStatic || s.getEnclosingMethod().getModifiers().contains(Modifier.STATIC);
+            }
+            if (s.getEnclosingClass() != null) {
+                var c = s.getEnclosingClass();
+                var t = (DeclaredType) c.asType();
+                if (!trees.isAccessible(start, c)) continue;
+                var members = elements.getAllMembers(c);
+                for (var e : members) {
+                    if (!test.test(e.getSimpleName())) continue;
+                    if (!trees.isAccessible(start, e, t)) continue;
+                    if (isStatic && !e.getModifiers().contains(Modifier.STATIC)) continue;
+                    results.add(e);
+                }
+                isStatic = isStatic || c.getModifiers().contains(Modifier.STATIC);
+            }
             // Return early?
             if (tooManyItems(results)) {
                 return results;
             }
         }
         return results;
-    }
-
-    private void addLocals(Scope from, Scope to, Predicate<CharSequence> test, List<Element> results) {
-        for (var e : to.getLocalElements()) {
-            if (test.test(e.getSimpleName())) {
-                // TODO would isAccessible cover all these branches?
-                if (e instanceof TypeElement) {
-                    var te = (TypeElement) e;
-                    if (trees.isAccessible(from, te)) results.add(te);
-                } else if (isThisOrSuper(e)) {
-                    if (!isStatic(to)) results.add(e);
-                } else {
-                    results.add(e);
-                }
-            }
-            if (isThisOrSuper(e)) {
-                unwrapThisSuper(from, (VariableElement) e, test, results);
-            }
-            if (tooManyItems(results)) return;
-        }
-    }
-
-    private boolean isStatic(Scope s) {
-        var method = s.getEnclosingMethod();
-        if (method == null) {
-            return false;
-        }
-        return method.getModifiers().contains(Modifier.STATIC);
-    }
-
-    private boolean isStatic(Element e) {
-        return e.getModifiers().contains(Modifier.STATIC);
-    }
-
-    private boolean isThisOrSuper(Element e) {
-        var name = e.getSimpleName();
-        return name.contentEquals("this") || name.contentEquals("super");
-    }
-
-    private void unwrapThisSuper(Scope from, VariableElement ve, Predicate<CharSequence> test, List<Element> results) {
-        var thisType = ve.asType();
-        // `this` and `super` should always be instances of DeclaredType, which we'll use to check accessibility
-        if (!(thisType instanceof DeclaredType)) {
-            LOG.warning(String.format("%s is not a DeclaredType", thisType));
-            return;
-        }
-        var thisDeclaredType = (DeclaredType) thisType;
-        var thisElement = types.asElement(thisDeclaredType);
-        for (var thisMember : thisElement.getEnclosedElements()) {
-            if (isStatic(from) && !isStatic(thisMember)) continue; // TODO is this redundant with isAccessible ?
-            if (thisMember.getSimpleName().contentEquals("<init>")) continue;
-            if (!test.test(thisMember.getSimpleName())) continue;
-            // Check if member is accessible from original scope
-            if (trees.isAccessible(from, thisMember, thisDeclaredType)) {
-                results.add(thisMember);
-            }
-        }
     }
 
     private List<Scope> fastScopes(Scope start) {

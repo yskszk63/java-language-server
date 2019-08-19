@@ -20,3 +20,4 @@
 ## Polish
 - Error squigglies should be on method name, not entire method
 - Underline vars that are not effectively final
+- Not-used warning should hit all unreachable code
