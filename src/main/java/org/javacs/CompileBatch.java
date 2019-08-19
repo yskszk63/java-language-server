@@ -453,60 +453,133 @@ class CompileBatch implements AutoCloseable {
     Optional<SignatureHelp> signatureHelp(URI file, int line, int character) {
         LOG.info(String.format("Find method invocation around %s(%d,%d)...", file, line, character));
         var cursor = findPath(file, line, character);
-        for (var path = cursor; path != null; path = path.getParentPath()) {
-            if (path.getLeaf() instanceof MethodInvocationTree) {
-                // Find all overloads of method
-                LOG.info(String.format("...`%s` is a method invocation", path.getLeaf()));
-                var invoke = (MethodInvocationTree) path.getLeaf();
-                // TODO this is null when a correct overload has not yet been selected
-                var method = trees.getElement(trees.getPath(path.getCompilationUnit(), invoke.getMethodSelect()));
-                var results = new ArrayList<ExecutableElement>();
-                for (var m : method.getEnclosingElement().getEnclosedElements()) {
-                    if (m.getKind() == ElementKind.METHOD && m.getSimpleName().equals(method.getSimpleName())) {
-                        results.add((ExecutableElement) m);
-                    }
-                }
-                // Figure out which parameter is active
-                var activeParameter = invoke.getArguments().indexOf(cursor.getLeaf());
-                LOG.info(String.format("...active parameter `%s` is %d", cursor.getLeaf(), activeParameter));
-                // Figure out which method is active, if possible
-                Optional<ExecutableElement> activeMethod =
-                        method instanceof ExecutableElement
-                                ? Optional.of((ExecutableElement) method)
-                                : Optional.empty();
-                return Optional.of(asSignatureHelp(activeMethod, activeParameter, results));
-            } else if (path.getLeaf() instanceof NewClassTree) {
-                // Find all overloads of method
-                LOG.info(String.format("...`%s` is a constructor invocation", path.getLeaf()));
-                var invoke = (NewClassTree) path.getLeaf();
-                var method = trees.getElement(path);
-                var results = new ArrayList<ExecutableElement>();
-                for (var m : method.getEnclosingElement().getEnclosedElements()) {
-                    if (m.getKind() == ElementKind.CONSTRUCTOR) {
-                        results.add((ExecutableElement) m);
-                    }
-                }
-                // Figure out which parameter is active
-                var activeParameter = invoke.getArguments().indexOf(cursor.getLeaf());
-                LOG.info(String.format("...active parameter `%s` is %d", cursor.getLeaf(), activeParameter));
-                // Figure out which method is active, if possible
-                Optional<ExecutableElement> activeMethod =
-                        method instanceof ExecutableElement
-                                ? Optional.of((ExecutableElement) method)
-                                : Optional.empty();
-                return Optional.of(asSignatureHelp(activeMethod, activeParameter, results));
+        var invokePath = surroundingInvocation(cursor);
+        if (invokePath == null) {
+            return Optional.empty();
+        }
+        if (invokePath.getLeaf() instanceof MethodInvocationTree) {
+            var invokeLeaf = (MethodInvocationTree) invokePath.getLeaf();
+            var overloads = methodOverloads(invokePath);
+            // Figure out which parameter is active
+            var activeParameter = invokeLeaf.getArguments().indexOf(cursor.getLeaf());
+            if (activeParameter == -1) activeParameter = 0;
+            LOG.info(String.format("...active parameter `%s` is %d", cursor.getLeaf(), activeParameter));
+            // Figure out which method is active, if possible
+            var methodSelectPath = trees.getPath(invokePath.getCompilationUnit(), invokeLeaf.getMethodSelect());
+            var methodEl = trees.getElement(methodSelectPath);
+            ExecutableElement activeMethod = null;
+            if (methodEl instanceof ExecutableElement) {
+                activeMethod = (ExecutableElement) methodEl;
             }
+            return Optional.of(asSignatureHelp(activeMethod, activeParameter, overloads));
+        }
+        if (invokePath.getLeaf() instanceof NewClassTree) {
+            var invokeLeaf = (NewClassTree) invokePath.getLeaf();
+            var overloads = constructorOverloads(invokePath);
+            // Figure out which parameter is active
+            var activeParameter = invokeLeaf.getArguments().indexOf(cursor.getLeaf());
+            if (activeParameter == -1) activeParameter = 0;
+            LOG.info(String.format("...active parameter `%s` is %d", cursor.getLeaf(), activeParameter));
+            // Figure out which method is active, if possible
+            var methodEl = trees.getElement(invokePath);
+            ExecutableElement activeMethod = null;
+            if (methodEl instanceof ExecutableElement) {
+                activeMethod = (ExecutableElement) methodEl;
+            }
+            return Optional.of(asSignatureHelp(activeMethod, activeParameter, overloads));
         }
         return Optional.empty();
     }
 
+    private TreePath surroundingInvocation(TreePath cursor) {
+        for (var path = cursor; path != null; path = path.getParentPath()) {
+            if (path.getLeaf() instanceof MethodInvocationTree || path.getLeaf() instanceof NewClassTree) {
+                return path;
+            }
+        }
+        return null;
+    }
+
+    private List<ExecutableElement> methodOverloads(TreePath path) {
+        // Find all overloads of method
+        LOG.info(String.format("...`%s` is a method invocation", path.getLeaf()));
+        var invoke = (MethodInvocationTree) path.getLeaf();
+        var method = invoke.getMethodSelect();
+        var scope = trees.getScope(path);
+        if (method instanceof IdentifierTree) {
+            var id = (IdentifierTree) method;
+            return scopeOverloads(path.getCompilationUnit(), scope, id.getName());
+        } else if (method instanceof MemberSelectTree) {
+            var select = (MemberSelectTree) method;
+            var containerPath = trees.getPath(path.getCompilationUnit(), select.getExpression());
+            var containerEl = trees.getElement(containerPath);
+            if (containerEl instanceof TypeElement) {
+                return typeMemberOverloads(scope, (TypeElement) containerEl, select.getIdentifier());
+            } else {
+                var type = trees.getTypeMirror(containerPath);
+                return instanceMemberOverloads(scope, type, select.getIdentifier());
+            }
+        } else {
+            return List.of();
+        }
+    }
+
+    private List<ExecutableElement> constructorOverloads(TreePath path) {
+        // Find all overloads of method
+        LOG.info(String.format("...`%s` is a constructor invocation", path.getLeaf()));
+        var method = trees.getElement(path);
+        var results = new ArrayList<ExecutableElement>();
+        for (var m : method.getEnclosingElement().getEnclosedElements()) {
+            if (m.getKind() == ElementKind.CONSTRUCTOR) {
+                results.add((ExecutableElement) m);
+            }
+        }
+        return results;
+    }
+
+    private List<ExecutableElement> scopeOverloads(CompilationUnitTree root, Scope scope, Name name) {
+        var ids = identifiers(root, scope, candidate -> candidate.equals(name));
+        var methods = new ArrayList<ExecutableElement>();
+        for (var method : ids) {
+            if (method instanceof ExecutableElement) {
+                methods.add((ExecutableElement) method);
+            }
+        }
+        return methods;
+    }
+
+    private List<ExecutableElement> typeMemberOverloads(Scope scope, TypeElement container, Name name) {
+        var members = typeMembers(scope, container);
+        var methods = new ArrayList<ExecutableElement>();
+        for (var member : members) {
+            if (member instanceof ExecutableElement && member.getSimpleName().equals(name)) {
+                methods.add((ExecutableElement) member);
+            }
+        }
+        return methods;
+    }
+
+    private List<ExecutableElement> instanceMemberOverloads(Scope scope, TypeMirror container, Name name) {
+        var members = instanceMembers(scope, container);
+        var methods = new ArrayList<ExecutableElement>();
+        for (var member : members) {
+            if (member instanceof ExecutableElement && member.getSimpleName().equals(name)) {
+                methods.add((ExecutableElement) member);
+            }
+        }
+        return methods;
+    }
+
     private SignatureHelp asSignatureHelp(
-            Optional<ExecutableElement> activeMethod, int activeParameter, List<ExecutableElement> overloads) {
+            ExecutableElement activeMethod, int activeParameter, List<ExecutableElement> overloads) {
         var sigs = new ArrayList<SignatureInformation>();
         for (var e : overloads) {
             sigs.add(asSignatureInformation(e));
         }
-        var activeSig = activeMethod.map(overloads::indexOf).orElse(0);
+        int activeSig = 0;
+        if (activeMethod != null) {
+            activeSig = overloads.indexOf(activeMethod);
+        }
         return new SignatureHelp(sigs, activeSig, activeParameter);
     }
 
@@ -692,28 +765,31 @@ class CompileBatch implements AutoCloseable {
     /** Find all members of expression ending at line:character */
     List<CompletionItem> completeMembers(URI uri, int line, int character, boolean addParens, boolean addSemi) {
         var path = findPath(uri, line, character);
+        var scope = trees.getScope(path);
         var element = trees.getElement(path);
         var type = trees.getTypeMirror(path);
 
         if (element instanceof PackageElement) {
             return completePackageMembers(path);
         } else if (element instanceof TypeElement) {
-            var members = completeTypeMembers(path);
+            var members = typeMembers(scope, (TypeElement) element);
             var result = groupByOverload(members, addParens, addSemi, type);
             result.add(keywordCompletion("class"));
-            var scope = trees.getScope(path);
             if (isEnclosingClass(type, scope)) {
                 result.add(keywordCompletion("this"));
                 result.add(keywordCompletion("super"));
             }
             return result;
-        } else {
-            var members = completeInstanceMembers(path);
+        } else if (type != null) {
+            var members = instanceMembers(scope, type);
             var result = groupByOverload(members, addParens, addSemi, type);
             if (type instanceof ArrayType) {
                 result.add(keywordCompletion("length"));
             }
             return result;
+        } else {
+            LOG.warning(String.format("`...%s` has no type", path.getLeaf()));
+            return List.of();
         }
     }
 
@@ -741,6 +817,7 @@ class CompileBatch implements AutoCloseable {
         var path = findPath(uri, line, character);
         var scope = trees.getScope(path);
         var element = trees.getElement(path);
+        var type = trees.getTypeMirror(path);
         if (element instanceof TypeElement) {
             var t = (TypeElement) element;
             LOG.info(String.format("...completing static methods of %s", t.getQualifiedName()));
@@ -759,7 +836,7 @@ class CompileBatch implements AutoCloseable {
 
             return result;
         } else {
-            var members = completeInstanceMembers(path);
+            var members = instanceMembers(scope, type);
             var result = groupByOverload(members, false, false, element.asType());
             return result;
         }
@@ -795,36 +872,25 @@ class CompileBatch implements AutoCloseable {
         return result;
     }
 
-    private List<Element> completeTypeMembers(TreePath path) {
-        var result = new ArrayList<Element>();
-        var scope = trees.getScope(path);
-        var element = (TypeElement) trees.getElement(path);
-
+    private List<Element> typeMembers(Scope scope, TypeElement element) {
         LOG.info(String.format("...completing static members of %s", element.getQualifiedName()));
-
-        // Add static members
+        var result = new ArrayList<Element>();
         for (var member : element.getEnclosedElements()) {
             if (member.getModifiers().contains(Modifier.STATIC)
                     && trees.isAccessible(scope, member, (DeclaredType) element.asType())) {
                 result.add(member);
             }
         }
-
         return result;
     }
 
-    private List<Element> completeInstanceMembers(TreePath path) {
-        var scope = trees.getScope(path);
-        var type = trees.getTypeMirror(path);
-        if (type == null) {
-            LOG.warning(String.format("`...%s` has no type", path.getLeaf()));
-            return List.of();
-        }
+    private List<Element> instanceMembers(Scope scope, TypeMirror type) {
         if (!hasMembers(type)) {
             LOG.warning("...don't know how to complete members of type " + type);
             return List.of();
         }
         var result = new ArrayList<Element>();
+        // TODO consider replacing this with elements.getAllMembers(type)
         var ts = supersWithSelf(type);
         var alreadyAdded = new HashSet<String>();
         LOG.info(String.format("...completing virtual members of %s and %d supers", type, ts.size()));
@@ -1051,8 +1117,19 @@ class CompileBatch implements AutoCloseable {
         }
     }
 
+    private List<Element> identifiers(CompilationUnitTree root, Scope scope, Predicate<CharSequence> test) {
+        var locals = scopeMembers(scope, test);
+        LOG.info(String.format("...found %d locals", locals.size()));
+        var statics = staticImports(root, test);
+        LOG.info(String.format("...found %d static imports", statics.size()));
+        var both = new ArrayList<Element>();
+        both.addAll(statics);
+        both.addAll(locals);
+        return both;
+    }
+
     /** Find all identifiers in scope at line:character */
-    private List<Element> scopeMembers(Scope start, String partialName) {
+    private List<Element> scopeMembers(Scope start, Predicate<CharSequence> test) {
         class Walk {
             List<Element> result = new ArrayList<>();
 
@@ -1085,7 +1162,7 @@ class CompileBatch implements AutoCloseable {
                 for (var thisMember : thisElement.getEnclosedElements()) {
                     if (isStatic(start) && !isStatic(thisMember)) continue;
                     if (thisMember.getSimpleName().contentEquals("<init>")) continue;
-                    if (!StringSearch.matchesPartialName(thisMember.getSimpleName(), partialName)) continue;
+                    if (!test.test(thisMember.getSimpleName())) continue;
 
                     // Check if member is accessible from original scope
                     if (trees.isAccessible(start, thisMember, thisDeclaredType)) {
@@ -1098,7 +1175,7 @@ class CompileBatch implements AutoCloseable {
             void walkLocals(Scope s) {
                 try {
                     for (var e : s.getLocalElements()) {
-                        if (StringSearch.matchesPartialName(e.getSimpleName(), partialName)) {
+                        if (test.test(e.getSimpleName())) {
                             if (e instanceof TypeElement) {
                                 var te = (TypeElement) e;
                                 if (trees.isAccessible(start, te)) result.add(te);
@@ -1204,14 +1281,9 @@ class CompileBatch implements AutoCloseable {
             LOG.warning(String.format("No enclosing class at %s(%d)", uri, line));
             return List.of();
         }
+        var ids = identifiers(root, scope, name -> StringSearch.matchesPartialName(name, partialName));
         var container = scope.getEnclosingClass().asType();
-        var locals = scopeMembers(scope, partialName);
-        result.addAll(groupByOverload(locals, addParens, addSemi, container));
-        LOG.info(String.format("...found %d locals", locals.size()));
-        // Add static imports
-        var staticImports = staticImports(uri, partialName);
-        result.addAll(groupByOverload(staticImports, addParens, addSemi, container));
-        LOG.info(String.format("...found %d static imports", staticImports.size()));
+        result.addAll(groupByOverload(ids, addParens, addSemi, container));
         // Add classes
         var startsWithUpperCase = partialName.length() > 0 && Character.isUpperCase(partialName.charAt(0));
         if (startsWithUpperCase) {
@@ -1301,8 +1373,7 @@ class CompileBatch implements AutoCloseable {
         return result;
     }
 
-    private List<Element> staticImports(URI uri, String partialName) {
-        var root = root(uri);
+    private List<Element> staticImports(CompilationUnitTree root, Predicate<CharSequence> test) {
         var result = new ArrayList<Element>();
         for (var i : root.getImports()) {
             if (!i.isStatic()) continue;
@@ -1311,16 +1382,14 @@ class CompileBatch implements AutoCloseable {
             var el = (TypeElement) trees.getElement(path);
             if (id.getIdentifier().contentEquals("*")) {
                 for (var member : el.getEnclosedElements()) {
-                    if (StringSearch.matchesPartialName(member.getSimpleName(), partialName)
-                            && member.getModifiers().contains(Modifier.STATIC)) {
+                    if (test.test(member.getSimpleName()) && member.getModifiers().contains(Modifier.STATIC)) {
                         result.add(member);
                         if (tooManyItems(result)) return result;
                     }
                 }
             } else {
                 for (var member : el.getEnclosedElements()) {
-                    if (StringSearch.matchesPartialName(member.getSimpleName(), partialName)
-                            && member.getModifiers().contains(Modifier.STATIC)) {
+                    if (test.test(member.getSimpleName()) && member.getModifiers().contains(Modifier.STATIC)) {
                         result.add(member);
                         if (tooManyItems(result)) return result;
                     }
