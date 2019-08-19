@@ -12,7 +12,6 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
@@ -1130,85 +1129,72 @@ class CompileBatch implements AutoCloseable {
 
     /** Find all identifiers in scope at line:character */
     private List<Element> scopeMembers(Scope start, Predicate<CharSequence> test) {
-        class Walk {
-            List<Element> result = new ArrayList<>();
-
-            boolean isStatic(Scope s) {
-                var method = s.getEnclosingMethod();
-                if (method != null) {
-                    return method.getModifiers().contains(Modifier.STATIC);
-                } else return false;
-            }
-
-            boolean isStatic(Element e) {
-                return e.getModifiers().contains(Modifier.STATIC);
-            }
-
-            boolean isThisOrSuper(Element e) {
-                var name = e.getSimpleName();
-                return name.contentEquals("this") || name.contentEquals("super");
-            }
-
-            // Place each member of `this` or `super` directly into `results`
-            void unwrapThisSuper(VariableElement ve) {
-                var thisType = ve.asType();
-                // `this` and `super` should always be instances of DeclaredType, which we'll use to check accessibility
-                if (!(thisType instanceof DeclaredType)) {
-                    LOG.warning(String.format("%s is not a DeclaredType", thisType));
-                    return;
-                }
-                var thisDeclaredType = (DeclaredType) thisType;
-                var thisElement = types.asElement(thisDeclaredType);
-                for (var thisMember : thisElement.getEnclosedElements()) {
-                    if (isStatic(start) && !isStatic(thisMember)) continue;
-                    if (thisMember.getSimpleName().contentEquals("<init>")) continue;
-                    if (!test.test(thisMember.getSimpleName())) continue;
-
-                    // Check if member is accessible from original scope
-                    if (trees.isAccessible(start, thisMember, thisDeclaredType)) {
-                        result.add(thisMember);
-                    }
-                }
-            }
-
-            // Place each member of `s` into results, and unwrap `this` and `super`
-            void walkLocals(Scope s) {
-                try {
-                    for (var e : s.getLocalElements()) {
-                        if (test.test(e.getSimpleName())) {
-                            if (e instanceof TypeElement) {
-                                var te = (TypeElement) e;
-                                if (trees.isAccessible(start, te)) result.add(te);
-                            } else if (isThisOrSuper(e)) {
-                                if (!isStatic(s)) result.add(e);
-                            } else {
-                                result.add(e);
-                            }
-                        }
-                        if (isThisOrSuper(e)) {
-                            unwrapThisSuper((VariableElement) e);
-                        }
-                        if (tooManyItems(result)) return;
-                    }
-                } catch (Exception e) {
-                    LOG.log(Level.WARNING, "error walking locals in scope", e);
-                }
-            }
-
-            // Walk each enclosing scope, placing its members into `results`
-            List<Element> walkScopes() {
-                for (var s : fastScopes(start)) {
-                    walkLocals(s);
-                    // Return early?
-                    if (tooManyItems(result)) {
-                        return result;
-                    }
-                }
-
-                return result;
+        List<Element> results = new ArrayList<>();
+        for (var s : fastScopes(start)) {
+            addLocals(start, s, test, results);
+            // Return early?
+            if (tooManyItems(results)) {
+                return results;
             }
         }
-        return new Walk().walkScopes();
+        return results;
+    }
+
+    private void addLocals(Scope from, Scope to, Predicate<CharSequence> test, List<Element> results) {
+        for (var e : to.getLocalElements()) {
+            if (test.test(e.getSimpleName())) {
+                // TODO would isAccessible cover all these branches?
+                if (e instanceof TypeElement) {
+                    var te = (TypeElement) e;
+                    if (trees.isAccessible(from, te)) results.add(te);
+                } else if (isThisOrSuper(e)) {
+                    if (!isStatic(to)) results.add(e);
+                } else {
+                    results.add(e);
+                }
+            }
+            if (isThisOrSuper(e)) {
+                unwrapThisSuper(from, (VariableElement) e, test, results);
+            }
+            if (tooManyItems(results)) return;
+        }
+    }
+
+    private boolean isStatic(Scope s) {
+        var method = s.getEnclosingMethod();
+        if (method == null) {
+            return false;
+        }
+        return method.getModifiers().contains(Modifier.STATIC);
+    }
+
+    private boolean isStatic(Element e) {
+        return e.getModifiers().contains(Modifier.STATIC);
+    }
+
+    private boolean isThisOrSuper(Element e) {
+        var name = e.getSimpleName();
+        return name.contentEquals("this") || name.contentEquals("super");
+    }
+
+    private void unwrapThisSuper(Scope from, VariableElement ve, Predicate<CharSequence> test, List<Element> results) {
+        var thisType = ve.asType();
+        // `this` and `super` should always be instances of DeclaredType, which we'll use to check accessibility
+        if (!(thisType instanceof DeclaredType)) {
+            LOG.warning(String.format("%s is not a DeclaredType", thisType));
+            return;
+        }
+        var thisDeclaredType = (DeclaredType) thisType;
+        var thisElement = types.asElement(thisDeclaredType);
+        for (var thisMember : thisElement.getEnclosedElements()) {
+            if (isStatic(from) && !isStatic(thisMember)) continue; // TODO is this redundant with isAccessible ?
+            if (thisMember.getSimpleName().contentEquals("<init>")) continue;
+            if (!test.test(thisMember.getSimpleName())) continue;
+            // Check if member is accessible from original scope
+            if (trees.isAccessible(from, thisMember, thisDeclaredType)) {
+                results.add(thisMember);
+            }
+        }
     }
 
     private List<Scope> fastScopes(Scope start) {
