@@ -23,8 +23,7 @@ public class CompletionsScopesTest extends CompletionsBase {
         // Virtual methods in enclosing scopes
         assertThat(suggestions, not(hasItems("testInner")));
         assertThat(suggestions, hasItems("test"));
-        // TODO this is not accessible
-        // assertThat(suggestions, not(hasItems("testOuterMethods")));
+        assertThat(suggestions, not(hasItems("testOuterMethods")));
         // Inherited static methods
         assertThat(suggestions, hasItems("testInheritedStaticMethod"));
         // Inherited virtual methods
@@ -60,8 +59,7 @@ public class CompletionsScopesTest extends CompletionsBase {
         // Virtual methods in enclosing scopes
         assertThat(suggestions, hasItems("testInner"));
         assertThat(suggestions, hasItems("test"));
-        // TODO this is not accessible
-        // assertThat(suggestions, not(hasItems("testOuterMethods")));
+        assertThat(suggestions, not(hasItems("testOuterMethods")));
         // Inherited static methods
         assertThat(suggestions, hasItems("testInheritedStaticMethod"));
         // Inherited virtual methods
@@ -103,8 +101,7 @@ public class CompletionsScopesTest extends CompletionsBase {
         // Inherited virtual methods
         assertThat(suggestions, not(hasItems("testInheritedMethods")));
         // this/super in enclosing scopes
-        // TODO this is not accessible
-        // assertThat(suggestions, not(hasItems("this")));
+        assertThat(suggestions, not(hasItems("this")));
     }
 
     @Test
@@ -133,15 +130,12 @@ public class CompletionsScopesTest extends CompletionsBase {
         assertThat(suggestions, hasItems("testOuterStaticMethod"));
         // Virtual methods in enclosing scopes
         assertThat(suggestions, hasItems("testInner"));
-        // TODO this is not accessible
-        // assertThat(suggestions, not(hasItems("test")));
-        // TODO this is not accessible
-        // assertThat(suggestions, not(hasItems("testOuterMethods")));
+        assertThat(suggestions, not(hasItems("test")));
+        assertThat(suggestions, not(hasItems("testOuterMethods")));
         // Inherited static methods
         assertThat(suggestions, hasItems("testInheritedStaticMethod"));
         // Inherited virtual methods
-        // TODO this is not accessible
-        // assertThat(suggestions, not(hasItems("testInheritedMethods")));
+        assertThat(suggestions, not(hasItems("testInheritedMethods")));
         // this/super in enclosing scopes
         assertThat(suggestions, hasItems("this"));
     }

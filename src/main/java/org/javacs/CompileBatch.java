@@ -1133,11 +1133,14 @@ class CompileBatch implements AutoCloseable {
         var results = new ArrayList<Element>();
         for (var s : fastScopes(start)) {
             if (s.getEnclosingMethod() != null) {
+                isStatic = isStatic || s.getEnclosingMethod().getModifiers().contains(Modifier.STATIC);
                 for (var e : s.getLocalElements()) {
-                    if (!test.test(e.getSimpleName())) continue;
+                    var name = e.getSimpleName();
+                    if (!test.test(name)) continue;
+                    if (isStatic && name.contentEquals("this")) continue;
+                    if (isStatic && name.contentEquals("super")) continue;
                     results.add(e);
                 }
-                isStatic = isStatic || s.getEnclosingMethod().getModifiers().contains(Modifier.STATIC);
             }
             if (s.getEnclosingClass() != null) {
                 var c = s.getEnclosingClass();
