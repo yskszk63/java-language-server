@@ -117,6 +117,9 @@ class JavaCompilerService {
      * package-private classes.
      */
     private void warmUpPackages(Collection<? extends JavaFileObject> sources) {
+        // TODO this is really inefficient
+        // Instead, detect "class not found" errors that refer to misnamed package-private classes,
+        // and restart the compilation with the not-found class included
         var needsCompile = new HashSet<Path>();
         for (var source : sources) {
             var uri = source.toUri();
@@ -126,7 +129,7 @@ class JavaCompilerService {
                 LOG.info("...first time compiling sources in package " + pkg);
                 var filesInPackage = FileStore.list(pkg);
                 for (var f : filesInPackage) {
-                    if (containsPackagePrivateClass(f)) {
+                    if (containsMismatchedClassName(f)) {
                         needsCompile.add(f);
                     }
                 }
@@ -142,9 +145,21 @@ class JavaCompilerService {
         batch.close();
     }
 
-    private boolean containsPackagePrivateClass(Path file) {
-        var parse = Parser.parseFile(file.toUri());
-        return parse.containsPackagePrivateClass();
+    private boolean containsMismatchedClassName(Path f) {
+        var parse = Parser.parseFile(f.toUri());
+        var names = parse.packagePrivateClasses();
+        var fileName = f.getFileName().toString();
+        var inferredClassName = fileName.substring(0, fileName.length() - ".java".length());
+        for (var name : names) {
+            if (!inferredClassName.contentEquals(name)) {
+                LOG.info(
+                        String.format(
+                                "...%s contains class %s which does not match file name %s",
+                                fileName, name, inferredClassName));
+                return true;
+            }
+        }
+        return false;
     }
 
     List<SymbolInformation> findSymbols(String query, int limit) {

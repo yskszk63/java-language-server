@@ -185,16 +185,18 @@ class Parser {
         return found;
     }
 
-    boolean containsPackagePrivateClass() {
+    Set<Name> packagePrivateClasses() {
+        var result = new HashSet<Name>();
         for (var t : root.getTypeDecls()) {
             if (t instanceof ClassTree) {
                 var c = (ClassTree) t;
-                if (!c.getModifiers().getFlags().contains(Modifier.PUBLIC)) {
-                    return true;
+                var isPublic = c.getModifiers().getFlags().contains(Modifier.PUBLIC);
+                if (!isPublic) {
+                    result.add(c.getSimpleName());
                 }
             }
         }
-        return false;
+        return result;
     }
 
     Optional<Range> range(TreePath path) {
