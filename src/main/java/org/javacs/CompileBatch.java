@@ -52,6 +52,52 @@ class CompileBatch implements AutoCloseable {
         }
     }
 
+    /**
+     * If the compilation failed because javac didn't find some package-private files in source files with different
+     * names, list those source files.
+     */
+    Set<Path> needsAdditionalSources() {
+        // Check for "class not found errors" that refer to package private classes
+        var addFiles = new HashSet<Path>();
+        for (var err : parent.diags) {
+            if (!err.getCode().equals("compiler.err.cant.resolve.location")) continue;
+            var className = errorText(err);
+            var packageName = packageName(err);
+            var location = findPackagePrivateClass(packageName, className);
+            if (location != NOT_FOUND) {
+                addFiles.add(location);
+            }
+        }
+        return addFiles;
+    }
+
+    private String errorText(javax.tools.Diagnostic<? extends javax.tools.JavaFileObject> err) {
+        var contents = FileStore.contents(err.getSource().toUri());
+        var begin = (int) err.getStartPosition();
+        var end = (int) err.getEndPosition();
+        return contents.substring(begin, end);
+    }
+
+    private String packageName(javax.tools.Diagnostic<? extends javax.tools.JavaFileObject> err) {
+        var uri = err.getSource().toUri();
+        var path = Paths.get(uri);
+        return FileStore.packageName(path);
+    }
+
+    private static final Path NOT_FOUND = Paths.get("");
+
+    private Path findPackagePrivateClass(String packageName, String className) {
+        for (var file : FileStore.list(packageName)) {
+            var parse = Parser.parseFile(file.toUri());
+            for (var candidate : parse.packagePrivateClasses()) {
+                if (candidate.contentEquals(className)) {
+                    return file;
+                }
+            }
+        }
+        return NOT_FOUND;
+    }
+
     @Override
     public void close() {
         borrow.close();

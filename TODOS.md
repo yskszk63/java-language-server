@@ -16,6 +16,7 @@
 - `package |` should auto-complete based on package of other files in same folder, even if folder path doesn't match package path.
 - Restart debug test doesn't work
 - `assertThat` docstring shows `<code>...</code>`
+- Debugger doesn't remove breakpoints
 
 ## Polish
 - Error squigglies should be on method name, not entire method

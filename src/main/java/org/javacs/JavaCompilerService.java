@@ -16,7 +16,6 @@ class JavaCompilerService {
     final Set<Path> classPath, docPath;
     final Set<String> addExports;
     final ReusableCompiler compiler = new ReusableCompiler();
-    final Set<String> warmPackages = new HashSet<>();
     final Docs docs;
     final Set<String> jdkClasses = Classes.jdkTopLevelClasses(), classPathClasses;
     // Diagnostics from the last compilation task
@@ -99,67 +98,19 @@ class JavaCompilerService {
         return compileBatch(sources);
     }
 
-    CompileBatch compilePaths(Collection<Path> paths) {
-        if (paths.isEmpty()) throw new RuntimeException("No source files");
-        var files = new ArrayList<File>();
-        for (var path : paths) files.add(path.toFile());
-        var sources = fileManager.getJavaFileObjectsFromFiles(files);
-        return compileBatch(sources);
-    }
-
     CompileBatch compileBatch(Collection<? extends JavaFileObject> sources) {
-        warmUpPackages(sources);
-        return new CompileBatch(this, sources);
-    }
-
-    /**
-     * The first time we compile a file in a new package, we need to compile all files in that package to discover
-     * package-private classes.
-     */
-    private void warmUpPackages(Collection<? extends JavaFileObject> sources) {
-        // TODO this is really inefficient
-        // Instead, detect "class not found" errors that refer to misnamed package-private classes,
-        // and restart the compilation with the not-found class included
-        var needsCompile = new HashSet<Path>();
-        for (var source : sources) {
-            var uri = source.toUri();
-            var path = Paths.get(uri);
-            var pkg = FileStore.packageName(path);
-            if (!warmPackages.contains(pkg)) {
-                LOG.info("...first time compiling sources in package " + pkg);
-                var filesInPackage = FileStore.list(pkg);
-                for (var f : filesInPackage) {
-                    if (containsMismatchedClassName(f)) {
-                        needsCompile.add(f);
-                    }
-                }
-                warmPackages.add(pkg);
-            }
+        var firstAttempt = new CompileBatch(this, sources);
+        var addFiles = firstAttempt.needsAdditionalSources();
+        if (addFiles.isEmpty()) return firstAttempt;
+        // If the compiler needs additional source files that contain package-private files
+        LOG.info("Need to recompile with " + addFiles);
+        firstAttempt.close();
+        var moreSources = new ArrayList<JavaFileObject>();
+        moreSources.addAll(sources);
+        for (var add : addFiles) {
+            moreSources.add(new SourceFileObject(add));
         }
-        if (needsCompile.isEmpty()) {
-            return;
-        }
-        // TODO consider pruning each source to speed up compile times
-        LOG.info(String.format("...compile %d files that contain package-private classes", needsCompile.size()));
-        var batch = compilePaths(needsCompile);
-        batch.close();
-    }
-
-    private boolean containsMismatchedClassName(Path f) {
-        var parse = Parser.parseFile(f.toUri());
-        var names = parse.packagePrivateClasses();
-        var fileName = f.getFileName().toString();
-        var inferredClassName = fileName.substring(0, fileName.length() - ".java".length());
-        for (var name : names) {
-            if (!inferredClassName.contentEquals(name)) {
-                LOG.info(
-                        String.format(
-                                "...%s contains class %s which does not match file name %s",
-                                fileName, name, inferredClassName));
-                return true;
-            }
-        }
-        return false;
+        return new CompileBatch(this, moreSources);
     }
 
     List<SymbolInformation> findSymbols(String query, int limit) {
