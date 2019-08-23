@@ -8,6 +8,7 @@
 - Test coverage codelens
 - Go-to-implementation for overridden methods
 - `Thing#close()` shows 0 references for `try (thing)`
+- Use package graph to limit search for find-usages/goto-def
 
 ## Bugs 
 - Deleting file doesn't clear it from javac
