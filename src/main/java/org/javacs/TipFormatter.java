@@ -34,12 +34,13 @@ class TipFormatter {
 
     private static void replaceNodes(Document doc, String tagName, Function<String, String> replace) {
         var nodes = doc.getElementsByTagName(tagName);
-        for (var i = 0; i < nodes.getLength(); i++) {
-            var node = nodes.item(i);
+        while (nodes.getLength() > 0) {
+            var node = nodes.item(0);
             var parent = node.getParentNode();
             var text = replace.apply(node.getTextContent());
             var replacement = doc.createTextNode(text);
             parent.replaceChild(replacement, node);
+            nodes = doc.getElementsByTagName(tagName);
         }
     }
 
