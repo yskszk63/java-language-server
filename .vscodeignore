@@ -1,35 +1,23 @@
-# IDE configs
+.circleci/**
 .vscode/**
 .idea/**
 git_hooks/**
+images/**
+jdks/**
+lib/**
+!lib/java.tmLanguage.json
+!lib/java.hover.tmLanguage.json
+!lib/tree-sitter-java.wasm
+modules/**
+scripts/**
+src/**
+out/test/**
+target/**
+
 *.iml
-classpath.txt
 tsconfig.json
 tsd.json
 *.xml
 configure
-
-# Logs
-*.log*
-
-# Sources
-src/**
-test/**
-repo/**
-scripts/**
-lib/**
-images/**
-modules/**
-jdks/**
-!lib/src.zip
-!lib/java.tmLanguage.json
-!lib/java.hover.tmLanguage.json
-!lib/tree-sitter-java.wasm
-
-# Compiler output
-out/test/**
-target/**
-
-# Extensions
 .gitignore
 **/*.map
