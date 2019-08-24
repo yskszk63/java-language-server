@@ -11,7 +11,7 @@
     },
     "license": "MIT",
     "engines": {
-        "vscode": "^1.33.0"
+        "vscode": "^1.37.0"
     },
     "categories": [
         "Debuggers",
@@ -185,7 +185,6 @@
         "vscode:publish": "vsce publish --patch",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
-        "postinstall": "node ./node_modules/vscode/bin/install",
         "test": "npm run compile && node ./node_modules/vscode/bin/test",
         "gen-parser": "tree-sitter build-wasm ./node_modules/tree-sitter-java"
     },
@@ -198,9 +197,10 @@
     "devDependencies": {
         "@types/mocha": "^2.2.42",
         "@types/node": "^10.14.6",
+        "@types/vscode": "^1.37.0",
         "tree-sitter-cli": "^0.15.3",
         "typescript": "^3.5.3",
-        "vscode": "^1.1.33",
+        "vscode-test": "^1.2.0",
         "vscode-debugadapter-testsupport": "^1.35.0",
         "vsce": "^1.66.0"
     }
