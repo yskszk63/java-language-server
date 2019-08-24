@@ -4,7 +4,7 @@
 	"scopeName": "source.java",
 	"patterns": [
 		{
-			"include": "#annotation"
+			"include": "#annotations"
 		},
 		{
 			"include": "#keywords"
@@ -17,10 +17,10 @@
 		}
 	],
 	"repository": {
-		"annotation": {
+		"annotations": {
 			"patterns": [
 				{
-					"begin": "(@[^ (]+)(\\()",
+					"begin": "(@\\s*[^\\s(]+)(\\()",
 					"beginCaptures": {
 						"1": {
 							"name": "punctuation.definition.tag"
@@ -46,15 +46,15 @@
 									"name": "punctuation.definition.tag.assign"
 								}
 							},
-							"match": "(\\w*) *(=)"
+							"match": "(\\w*)\\s*(=)"
 						},
 						{
-							"include": "#code"
+							"include": "#constants"
 						}
 					]
 				},
 				{
-					"match": "@\\w+",
+					"match": "@interface\\s+\\w*|@\\s*\\w+",
 					"name": "punctuation.definition.tag"
 				}
 			]
