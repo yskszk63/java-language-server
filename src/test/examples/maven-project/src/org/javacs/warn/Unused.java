@@ -26,4 +26,20 @@ class Unused {
     private void unusedSelfReference() {
         unusedSelfReference();
     }
+
+    private void unusedMutuallyRecursive1() {
+        unusedMutuallyRecursive2();
+    }
+
+    private void unusedMutuallyRecursive2() {
+        unusedMutuallyRecursive1();
+    }
+
+    private int usedByUnusedVar() {
+        return 1;
+    }
+
+    void referenceUsedByUnusedVar() {
+        var x = usedByUnusedVar();
+    }
 }

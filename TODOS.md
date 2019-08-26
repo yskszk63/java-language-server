@@ -16,6 +16,3 @@
 - `return json.get("name").` doesn't auto-complete
 - Restart debug test doesn't work
 - Debugger doesn't remove breakpoints
-
-## Polish
-- Not-used warning should hit all unreachable code

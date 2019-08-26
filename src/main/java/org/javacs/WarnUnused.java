@@ -8,86 +8,102 @@ import javax.lang.model.element.*;
 class WarnUnused extends TreePathScanner<Void, Void> {
     private final Trees trees;
     // TODO ignore writes when calculating used
-    private final Set<Element> declared = new HashSet<>(), used = new HashSet<>();
+    private final Set<Element> reachable = new HashSet<>(), unused = new HashSet<>();
 
     WarnUnused(JavacTask task) {
         this.trees = Trees.instance(task);
     }
 
     Set<Element> notUsed() {
-        declared.removeAll(used);
-        return declared;
+        unused.removeAll(reachable);
+        return unused;
     }
 
-    private void foundDeclaration() {
-        var el = trees.getElement(getCurrentPath());
-        declared.add(el);
+    private void foundPrivateDeclaration() {
+        unused.add(trees.getElement(getCurrentPath()));
     }
 
     private void foundReference() {
-        var path = getCurrentPath();
-        var file = path.getCompilationUnit();
-        var el = trees.getElement(path);
-        // Check if reference is within declaration
-        var declaration = trees.getTree(el);
-        var reference = path.getLeaf();
-        var pos = trees.getSourcePositions();
-        var startD = pos.getStartPosition(file, declaration);
-        var endD = pos.getEndPosition(file, declaration);
-        var startRef = pos.getStartPosition(file, reference);
-        var endRef = pos.getEndPosition(file, reference);
-        if (startD < startRef && endRef < endD) {
-            return;
+        var fromPath = getCurrentPath();
+        var toEl = trees.getElement(fromPath);
+        var toPath = trees.getPath(toEl);
+        if (toPath == null) return;
+        var fromUri = fromPath.getCompilationUnit().getSourceFile().toUri();
+        var toUri = toPath.getCompilationUnit().getSourceFile().toUri();
+        if (!fromUri.equals(toUri)) return;
+        // TODO: Locals are always reachable, but we need to remember that they were referenced
+        if (!isReachable(toPath)) {
+            reachable.add(toEl);
+            scan(toPath, null);
         }
-        // Otherwise, note that el has been used
-        used.add(el);
     }
 
-    private boolean isPrivate(VariableTree t) {
-        return t.getModifiers().getFlags().contains(Modifier.PRIVATE);
-    }
-
-    private boolean isPrivate(MethodTree t) {
-        return t.getModifiers().getFlags().contains(Modifier.PRIVATE);
-    }
-
-    private boolean isPrivate(ClassTree t) {
-        return t.getModifiers().getFlags().contains(Modifier.PRIVATE);
-    }
-
-    private boolean isLocal(VariableTree t) {
-        var parent = getCurrentPath().getParentPath().getLeaf();
-        return !(parent instanceof ClassTree)
-                && !(parent instanceof MethodTree) // TODO hint for unused parameters
-                && !(parent instanceof LambdaExpressionTree);
-    }
-
-    private boolean isEmptyConstructor(MethodTree t) {
-        return t.getParameters().isEmpty() && t.getReturnType() == null;
+    private boolean isReachable(TreePath path) {
+        // Check if t is reachable because it's public
+        var t = path.getLeaf();
+        if (t instanceof VariableTree) {
+            var v = (VariableTree) t;
+            var isPrivate = v.getModifiers().getFlags().contains(Modifier.PRIVATE);
+            var parent = getCurrentPath().getParentPath().getLeaf();
+            var isLocal =
+                    !(parent instanceof ClassTree)
+                            && !(parent instanceof MethodTree) // TODO hint for unused parameters
+                            && !(parent instanceof LambdaExpressionTree);
+            if (!isPrivate || isLocal) {
+                return true;
+            }
+        }
+        if (t instanceof MethodTree) {
+            var m = (MethodTree) t;
+            var isPrivate = m.getModifiers().getFlags().contains(Modifier.PRIVATE);
+            var isEmptyConstructor = m.getParameters().isEmpty() && m.getReturnType() == null;
+            if (!isPrivate || isEmptyConstructor) {
+                return true;
+            }
+        }
+        if (t instanceof ClassTree) {
+            var c = (ClassTree) t;
+            var isPrivate = c.getModifiers().getFlags().contains(Modifier.PRIVATE);
+            if (!isPrivate) {
+                return true;
+            }
+        }
+        // Check if t has been referenced by a reachable element
+        var el = trees.getElement(path);
+        if (reachable.contains(el)) {
+            return true;
+        }
+        return false;
     }
 
     @Override
     public Void visitVariable(VariableTree t, Void __) {
-        if (isPrivate(t) || isLocal(t)) {
-            foundDeclaration();
+        if (isReachable(getCurrentPath())) {
+            super.visitVariable(t, null);
+        } else {
+            foundPrivateDeclaration();
         }
-        return super.visitVariable(t, null);
+        return null;
     }
 
     @Override
     public Void visitMethod(MethodTree t, Void __) {
-        if (isPrivate(t) && !isEmptyConstructor(t)) {
-            foundDeclaration();
+        if (isReachable(getCurrentPath())) {
+            super.visitMethod(t, null);
+        } else {
+            foundPrivateDeclaration();
         }
-        return super.visitMethod(t, null);
+        return null;
     }
 
     @Override
     public Void visitClass(ClassTree t, Void __) {
-        if (isPrivate(t)) {
-            foundDeclaration();
+        if (isReachable(getCurrentPath())) {
+            super.visitClass(t, null);
+        } else {
+            foundPrivateDeclaration();
         }
-        return super.visitClass(t, null);
+        return null;
     }
 
     @Override
