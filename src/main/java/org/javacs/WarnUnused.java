@@ -31,7 +31,9 @@ class WarnUnused extends TreePathScanner<Void, Void> {
         var fromUri = fromPath.getCompilationUnit().getSourceFile().toUri();
         var toUri = toPath.getCompilationUnit().getSourceFile().toUri();
         if (!fromUri.equals(toUri)) return;
-        // TODO: Locals are always reachable, but we need to remember that they were referenced
+        if (isLocalVariable(toPath)) {
+            reachable.add(toEl);
+        }
         if (!isReachable(toPath)) {
             reachable.add(toEl);
             scan(toPath, null);
@@ -44,12 +46,7 @@ class WarnUnused extends TreePathScanner<Void, Void> {
         if (t instanceof VariableTree) {
             var v = (VariableTree) t;
             var isPrivate = v.getModifiers().getFlags().contains(Modifier.PRIVATE);
-            var parent = getCurrentPath().getParentPath().getLeaf();
-            var isLocal =
-                    !(parent instanceof ClassTree)
-                            && !(parent instanceof MethodTree) // TODO hint for unused parameters
-                            && !(parent instanceof LambdaExpressionTree);
-            if (!isPrivate || isLocal) {
+            if (!isPrivate || isLocalVariable(path)) {
                 return true;
             }
         }
@@ -76,9 +73,22 @@ class WarnUnused extends TreePathScanner<Void, Void> {
         return false;
     }
 
+    private boolean isLocalVariable(TreePath path) {
+        if (path.getLeaf() instanceof VariableTree) {
+            var parent = path.getParentPath().getLeaf();
+            return !(parent instanceof ClassTree)
+                    && !(parent instanceof MethodTree) // TODO hint for unused parameters
+                    && !(parent instanceof LambdaExpressionTree);
+        }
+        return false;
+    }
+
     @Override
     public Void visitVariable(VariableTree t, Void __) {
-        if (isReachable(getCurrentPath())) {
+        if (isLocalVariable(getCurrentPath())) {
+            foundPrivateDeclaration();
+            super.visitVariable(t, null);
+        } else if (isReachable(getCurrentPath())) {
             super.visitVariable(t, null);
         } else {
             foundPrivateDeclaration();
