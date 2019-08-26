@@ -5,7 +5,34 @@ import com.sun.source.util.*;
 import java.util.*;
 import javax.lang.model.element.*;
 
-class WarnUnused extends TreePathScanner<Void, Void> {
+class WarnUnused extends TreeScanner<Void, Void> {
+    // Copied from TreePathScanner
+    // We need to be able to call scan(path, _) recursively
+    private TreePath path;
+
+    public Void scan(TreePath path, Void p) {
+        TreePath prev = this.path;
+        this.path = path;
+        try {
+            return path.getLeaf().accept(this, p);
+        } finally {
+            this.path = prev; // So we can call scan(path, _) recursively
+        }
+    }
+
+    @Override
+    public Void scan(Tree tree, Void p) {
+        if (tree == null) return null;
+
+        TreePath prev = path;
+        path = new TreePath(path, tree);
+        try {
+            return tree.accept(this, p);
+        } finally {
+            path = prev;
+        }
+    }
+
     private final Trees trees;
     // TODO ignore writes when calculating used
     private final Set<Element> reachable = new HashSet<>(), unused = new HashSet<>();
@@ -20,11 +47,11 @@ class WarnUnused extends TreePathScanner<Void, Void> {
     }
 
     private void foundPrivateDeclaration() {
-        unused.add(trees.getElement(getCurrentPath()));
+        unused.add(trees.getElement(path));
     }
 
     private void foundReference() {
-        var fromPath = getCurrentPath();
+        var fromPath = path;
         var toEl = trees.getElement(fromPath);
         var toPath = trees.getPath(toEl);
         if (toPath == null) return;
@@ -85,10 +112,10 @@ class WarnUnused extends TreePathScanner<Void, Void> {
 
     @Override
     public Void visitVariable(VariableTree t, Void __) {
-        if (isLocalVariable(getCurrentPath())) {
+        if (isLocalVariable(path)) {
             foundPrivateDeclaration();
             super.visitVariable(t, null);
-        } else if (isReachable(getCurrentPath())) {
+        } else if (isReachable(path)) {
             super.visitVariable(t, null);
         } else {
             foundPrivateDeclaration();
@@ -98,7 +125,7 @@ class WarnUnused extends TreePathScanner<Void, Void> {
 
     @Override
     public Void visitMethod(MethodTree t, Void __) {
-        if (isReachable(getCurrentPath())) {
+        if (isReachable(path)) {
             super.visitMethod(t, null);
         } else {
             foundPrivateDeclaration();
@@ -108,7 +135,7 @@ class WarnUnused extends TreePathScanner<Void, Void> {
 
     @Override
     public Void visitClass(ClassTree t, Void __) {
-        if (isReachable(getCurrentPath())) {
+        if (isReachable(path)) {
             super.visitClass(t, null);
         } else {
             foundPrivateDeclaration();
