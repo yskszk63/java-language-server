@@ -576,11 +576,10 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public List<CodeLens> codeLens(CodeLensParams params) {
-        // TODO just create a blank code lens on every method, then resolve it async
         var uri = params.textDocument.uri;
         if (!FileStore.isJavaFile(uri)) return List.of();
         updateCachedParse(uri);
-        var declarations = cacheParse.declarations();
+        var declarations = cacheParse.codeLensDeclarations();
         var result = new ArrayList<CodeLens>();
         for (var d : declarations) {
             var range = cacheParse.range(d);

@@ -135,11 +135,7 @@ class Parser {
         return false;
     }
 
-    List<TreePath> declarations() {
-        return declarations(root);
-    }
-
-    static List<TreePath> declarations(CompilationUnitTree root) {
+    List<TreePath> codeLensDeclarations() {
         var found = new ArrayList<TreePath>();
         class FindDeclarations extends TreePathScanner<Void, Void> {
             boolean isClass(Tree t) {
@@ -150,6 +146,10 @@ class Parser {
 
             boolean isPrivate(ModifiersTree t) {
                 return t.getFlags().contains(Modifier.PRIVATE);
+            }
+
+            boolean isStatic(ModifiersTree t) {
+                return t.getFlags().contains(Modifier.STATIC);
             }
 
             @Override
@@ -164,19 +164,18 @@ class Parser {
                 if (isPrivate(t.getModifiers())) return null;
                 var path = getCurrentPath();
                 found.add(path);
-                // Skip code lenses for local classes
                 return null;
             }
 
             @Override
             public Void visitVariable(VariableTree t, Void __) {
                 if (isPrivate(t.getModifiers())) return null;
+                if (!isStatic(t.getModifiers())) return null;
                 var path = getCurrentPath();
                 var parent = path.getParentPath().getLeaf();
                 if (isClass(parent)) {
                     found.add(path);
                 }
-                // Skip code lenses for local classes
                 return null;
             }
         }
@@ -1096,7 +1095,6 @@ class Parser {
         if (isField || isType || isMethod) {
             LOG.info(String.format("...find identifiers named `%s`", findName));
             var allFiles = possibleFiles(to);
-            // TODO this needs to use open text if available
             // Check if the file contains the name of `to`
             var hasWord = containsWord(allFiles, to);
             // You can't reference a TypeElement without importing it
@@ -1110,7 +1108,6 @@ class Parser {
             }
             return matches;
         } else {
-            // Fields, type parameters can only be referenced from within the same file
             LOG.info(String.format("...references to `%s` must be in the same file", to));
             var files = new HashSet<URI>();
             var toFile = declaringFile(to);

@@ -16,3 +16,5 @@
 - `return json.get("name").` doesn't auto-complete
 - Restart debug test doesn't work
 - Debugger doesn't remove breakpoints
+- Find references actions accumulate and slow down responses
+- Javac doesn't find protobuf classes in bazel

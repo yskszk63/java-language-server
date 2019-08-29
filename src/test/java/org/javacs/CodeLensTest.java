@@ -85,6 +85,6 @@ public class CodeLensTest {
         var lenses = lenses("/org/javacs/example/CodeLensField.java");
         var titles = titles(lenses);
         assertThat(titles, hasItem("3:0 references"));
-        assertThat(titles, hasItem("4:0 references"));
+        assertThat(titles, not(hasItem("4:0 references")));
     }
 }
