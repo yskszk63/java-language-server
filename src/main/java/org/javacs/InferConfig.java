@@ -292,39 +292,12 @@ class InferConfig {
         return path;
     }
 
-    private Set<Path> bazelProtos() {
+    private List<Path> bazelProtos() {
         var targets = bazelProtoTargets();
-        // TODO this is a bit hacky, and doesn't work if the user hasn't yet built their protos
-        var jars = new HashSet<Path>();
-        for (var t : targets) {
-            var jar = findBazelProtoJar(t);
-            if (jar != NOT_FOUND) {
-                jars.add(jar);
-            }
-        }
-        return jars;
+        return bazelBuildOutputs(targets);
     }
 
-    private Path findBazelProtoJar(BazelTarget target) {
-        var parent = workspaceRoot.resolve("bazel-bin").resolve(target.path);
-        Iterable<Path> list;
-        try {
-            list = Files.list(parent)::iterator;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        for (var file : list) {
-            var name = file.getFileName().toString();
-            if (name.startsWith("lib") && name.endsWith(".jar") && name.contains(target.name)) {
-                LOG.info("Found proto library " + target + " => " + file);
-                return file;
-            }
-        }
-        LOG.warning("Couldn't find .jar file for " + target + " in " + parent);
-        return NOT_FOUND;
-    }
-
-    private List<BazelTarget> bazelProtoTargets() {
+    private List<String> bazelProtoTargets() {
         try {
             // Find java protos
             String[] command = {"bazel", "query", "kind(java_proto_library, ...)"};
@@ -344,41 +317,49 @@ class InferConfig {
                 return List.of();
             }
             // Read list of targets
-            var targets = new ArrayList<BazelTarget>();
-            for (var line : Files.readAllLines(output)) {
-                var target = findProtoTarget(line);
-                if (target != NO_TARGET) {
-                    targets.add(target);
-                }
-            }
-            return targets;
+            return Files.readAllLines(output);
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private static final Pattern TARGET_PATTERN = Pattern.compile("//(.*):(.*)");
-
-    private BazelTarget findProtoTarget(String line) {
-        var matcher = TARGET_PATTERN.matcher(line);
-        if (!matcher.matches()) {
-            LOG.warning(line + " does not look like a bazel proto target");
-            return NO_TARGET;
+    private List<Path> bazelBuildOutputs(List<String> targets) {
+        if (targets.isEmpty()) {
+            return List.of();
         }
-        var found = new BazelTarget();
-        found.path = matcher.group(1);
-        found.name = matcher.group(2);
-        return found;
-    }
-
-    private static class BazelTarget {
-        String path, name;
-
-        @Override
-        public String toString() {
-            return "//" + path + ":" + name;
+        try {
+            // Find java protos
+            var command = new ArrayList<String>();
+            command.add("bazel");
+            command.add("build");
+            command.addAll(targets);
+            var output = Files.createTempFile("java-language-server-bazel-output", ".txt");
+            LOG.info("Running " + String.join(" ", command) + " ...");
+            var process =
+                    new ProcessBuilder()
+                            .command(command)
+                            .directory(workspaceRoot.toFile())
+                            .redirectError(output.toFile())
+                            .redirectOutput(output.toFile())
+                            .start();
+            // Wait for process to exit
+            var result = process.waitFor();
+            if (result != 0) {
+                LOG.severe("`" + String.join(" ", command) + "` returned " + result);
+                return List.of();
+            }
+            // Read list of jars
+            var jars = new ArrayList<Path>();
+            for (var line : Files.readAllLines(output)) {
+                line = line.trim();
+                if (line.startsWith("bazel-bin/") && line.endsWith(".jar")) {
+                    LOG.info("Found proto jar " + line);
+                    jars.add(workspaceRoot.resolve(line));
+                }
+            }
+            return jars;
+        } catch (InterruptedException | IOException e) {
+            throw new RuntimeException(e);
         }
     }
-
-    private static BazelTarget NO_TARGET = new BazelTarget();
 }
