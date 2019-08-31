@@ -6,9 +6,11 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -72,7 +74,10 @@ class InferConfig {
 
         // Bazel
         if (Files.exists(workspaceRoot.resolve("WORKSPACE"))) {
-            return bazelDeps("jars");
+            var deps = bazelDeps("jars");
+            var protos = bazelProtos();
+            deps.addAll(protos);
+            return deps;
         }
 
         return Collections.emptySet();
@@ -101,6 +106,7 @@ class InferConfig {
         // Bazel
         if (Files.exists(workspaceRoot.resolve("WORKSPACE"))) {
             return bazelDeps("srcjar");
+            // TODO proto source jars
         }
 
         return Collections.emptySet();
@@ -231,11 +237,6 @@ class InferConfig {
         return null;
     }
 
-    // Example:
-    // /private/var/tmp/_bazel_georgefraser/33b8fb8944a241143eca3ae505600d73/external/com_fasterxml_jackson_datatype_jackson_datatype_jdk8/jar/BUILD:6:12: source file @com_fasterxml_jackson_datatype_jackson_datatype_jdk8//jar:jackson-datatype-jdk8-2.9.8.jar
-    private static final Pattern LOCATION = Pattern.compile("(.*):\\d+:\\d+: source file @(.*)//jar:(.*\\.jar)");
-    private static final Path NOT_FOUND = Paths.get("");
-
     private Set<Path> bazelDeps(String labelsFilter) {
         try {
             // Run bazel as a subprocess
@@ -270,6 +271,11 @@ class InferConfig {
         }
     }
 
+    // Example:
+    // /private/var/tmp/_bazel_georgefraser/33b8fb8944a241143eca3ae505600d73/external/com_fasterxml_jackson_datatype_jackson_datatype_jdk8/jar/BUILD:6:12: source file @com_fasterxml_jackson_datatype_jackson_datatype_jdk8//jar:jackson-datatype-jdk8-2.9.8.jar
+    private static final Pattern LOCATION = Pattern.compile("(.*):\\d+:\\d+: source file @(.*)//jar:(.*\\.jar)");
+    private static final Path NOT_FOUND = Paths.get("");
+
     private Path findBazelJar(String line) {
         var matcher = LOCATION.matcher(line);
         if (!matcher.matches()) {
@@ -285,4 +291,94 @@ class InferConfig {
         }
         return path;
     }
+
+    private Set<Path> bazelProtos() {
+        var targets = bazelProtoTargets();
+        // TODO this is a bit hacky, and doesn't work if the user hasn't yet built their protos
+        var jars = new HashSet<Path>();
+        for (var t : targets) {
+            var jar = findBazelProtoJar(t);
+            if (jar != NOT_FOUND) {
+                jars.add(jar);
+            }
+        }
+        return jars;
+    }
+
+    private Path findBazelProtoJar(BazelTarget target) {
+        var parent = workspaceRoot.resolve("bazel-bin").resolve(target.path);
+        Iterable<Path> list;
+        try {
+            list = Files.list(parent)::iterator;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        for (var file : list) {
+            var name = file.getFileName().toString();
+            if (name.startsWith("lib") && name.endsWith(".jar") && name.contains(target.name)) {
+                LOG.info("Found proto library " + target + " => " + file);
+                return file;
+            }
+        }
+        LOG.warning("Couldn't find .jar file for " + target + " in " + parent);
+        return NOT_FOUND;
+    }
+
+    private List<BazelTarget> bazelProtoTargets() {
+        try {
+            // Find java protos
+            String[] command = {"bazel", "query", "kind(java_proto_library, ...)"};
+            var output = Files.createTempFile("java-language-server-bazel-output", ".txt");
+            LOG.info("Running " + String.join(" ", command) + " ...");
+            var process =
+                    new ProcessBuilder()
+                            .command(command)
+                            .directory(workspaceRoot.toFile())
+                            .redirectError(ProcessBuilder.Redirect.INHERIT)
+                            .redirectOutput(output.toFile())
+                            .start();
+            // Wait for process to exit
+            var result = process.waitFor();
+            if (result != 0) {
+                LOG.severe("`" + String.join(" ", command) + "` returned " + result);
+                return List.of();
+            }
+            // Read list of targets
+            var targets = new ArrayList<BazelTarget>();
+            for (var line : Files.readAllLines(output)) {
+                var target = findProtoTarget(line);
+                if (target != NO_TARGET) {
+                    targets.add(target);
+                }
+            }
+            return targets;
+        } catch (InterruptedException | IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static final Pattern TARGET_PATTERN = Pattern.compile("//(.*):(.*)");
+
+    private BazelTarget findProtoTarget(String line) {
+        var matcher = TARGET_PATTERN.matcher(line);
+        if (!matcher.matches()) {
+            LOG.warning(line + " does not look like a bazel proto target");
+            return NO_TARGET;
+        }
+        var found = new BazelTarget();
+        found.path = matcher.group(1);
+        found.name = matcher.group(2);
+        return found;
+    }
+
+    private static class BazelTarget {
+        String path, name;
+
+        @Override
+        public String toString() {
+            return "//" + path + ":" + name;
+        }
+    }
+
+    private static BazelTarget NO_TARGET = new BazelTarget();
 }
