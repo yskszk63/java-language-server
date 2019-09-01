@@ -6,7 +6,7 @@ version: 2
 jobs:
   build:
     machine: true
-    
+
     working_directory: ~/repo
 
     environment:
@@ -31,13 +31,13 @@ jobs:
           key: v1-dependencies-{{ checksum "pom.xml" }}
 
       - run:
-        name: Install Bazel
-        command: |
-          sudo apt-get install pkg-config zip g++ zlib1g-dev unzip python
-          wget https://github.com/bazelbuild/bazel/releases/download/0.25.0/bazel-0.25.0-installer-linux-x86_64.sh
-          chmod +x bazel-0.25.0-installer-linux-x86_64.sh
-          ./bazel-0.25.0-installer-linux-x86_64.sh --user
-          export PATH="$PATH:$HOME/bin"
+          name: Install Bazel
+          command: |
+            sudo apt-get install pkg-config zip g++ zlib1g-dev unzip python
+            wget https://github.com/bazelbuild/bazel/releases/download/0.25.0/bazel-0.25.0-installer-linux-x86_64.sh
+            chmod +x bazel-0.25.0-installer-linux-x86_64.sh
+            ./bazel-0.25.0-installer-linux-x86_64.sh --user
+            export PATH="$PATH:$HOME/bin"
         
       - run: mvn compile test-compile
       - run: ./.circleci/test.sh
