@@ -11,8 +11,14 @@ if [ ! -e node_modules ]; then
 fi
 
 # Build standalone java
+if [ ! -e jdks/linux/jdk-11.0.1 ]; then
+    ./scripts/download_linux_jdk.sh
+fi
 if [ ! -e jdks/windows/jdk-11.0.1 ]; then
     ./scripts/download_windows_jdk.sh
+fi
+if [ ! -e dist/linux/bin/java ]; then
+    ./scripts/link_linux.sh
 fi
 if [ ! -e dist/windows/bin/java.exe ]; then
     ./scripts/link_windows.sh
@@ -23,6 +29,7 @@ fi
 
 # Compile sources
 ./scripts/gen_proto.sh
+./scripts/format.sh
 mvn package -DskipTests
 
 # Build vsix

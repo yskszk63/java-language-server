@@ -2,6 +2,7 @@
 /node_modules
 /target
 /dist/classpath
+/dist/linux
 /dist/mac
 /dist/windows
 /jdks

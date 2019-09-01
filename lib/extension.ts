@@ -281,6 +281,9 @@ function platformSpecificLangServer(): string[] {
 
         case 'darwin':
             return ['dist', 'lang_server_mac.sh'];
+
+        case 'linux':
+            return ['dist', 'lang_server_linux.sh'];
 	}
 
 	throw `unsupported platform: ${process.platform}`;
