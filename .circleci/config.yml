@@ -37,6 +37,7 @@ jobs:
             gunzip -c openjdk-11.0.1_linux-x64_bin.tar.gz | tar xopf -
             export JAVA_HOME=`pwd`/jdk-11.0.1
             export PATH="`pwd`/jdk-11.0.1/bin:$PATH"
+            java -version
       
       - run:
           name: Install Bazel
@@ -46,6 +47,7 @@ jobs:
             chmod +x bazel-0.25.0-installer-linux-x86_64.sh
             ./bazel-0.25.0-installer-linux-x86_64.sh --user
             export PATH="$PATH:$HOME/bin"
+            bazel version
         
       - run: mvn compile test-compile
       - run: ./.circleci/test.sh
