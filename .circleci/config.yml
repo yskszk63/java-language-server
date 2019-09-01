@@ -35,9 +35,8 @@ jobs:
           command: |
             wget https://download.java.net/java/GA/jdk11/13/GPL/openjdk-11.0.1_linux-x64_bin.tar.gz
             gunzip -c openjdk-11.0.1_linux-x64_bin.tar.gz | tar xopf -
-            export JAVA_HOME=`pwd`/jdk-11.0.1
-            export PATH="`pwd`/jdk-11.0.1/bin:$PATH"
-            java -version
+            echo "export JAVA_HOME=`pwd`/jdk-11.0.1" >> $BASH_ENV
+            echo "export PATH=`pwd`/jdk-11.0.1/bin:$PATH" >> $BASH_ENV
       
       - run:
           name: Install Bazel
@@ -46,7 +45,12 @@ jobs:
             wget https://github.com/bazelbuild/bazel/releases/download/0.25.0/bazel-0.25.0-installer-linux-x86_64.sh
             chmod +x bazel-0.25.0-installer-linux-x86_64.sh
             ./bazel-0.25.0-installer-linux-x86_64.sh --user
-            export PATH="$PATH:$HOME/bin"
+            echo "export PATH=$PATH:$HOME/bin" >> $BASH_ENV
+      
+      - run:
+          name: Verify environment
+          command: |
+            java -version
             bazel version
         
       - run: mvn compile test-compile
