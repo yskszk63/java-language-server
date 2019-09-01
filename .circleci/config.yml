@@ -31,6 +31,14 @@ jobs:
           key: v1-dependencies-{{ checksum "pom.xml" }}
 
       - run:
+          name: Install OpenJDK 11
+          command: |
+            wget https://download.java.net/java/GA/jdk11/13/GPL/openjdk-11.0.1_linux-x64_bin.tar.gz
+            gunzip -c openjdk-11.0.1_linux-x64_bin.tar.gz | tar xopf -
+            export JAVA_HOME=`pwd`/jdk-11.0.1
+            export PATH="`pwd`/jdk-11.0.1/bin:$PATH"
+      
+      - run:
           name: Install Bazel
           command: |
             sudo apt-get install pkg-config zip g++ zlib1g-dev unzip python
