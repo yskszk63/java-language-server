@@ -1,19 +1,13 @@
 package org.javacs;
 
+import com.google.devtools.build.lib.analysis.AnalysisProtos;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
@@ -74,10 +68,7 @@ class InferConfig {
 
         // Bazel
         if (Files.exists(workspaceRoot.resolve("WORKSPACE"))) {
-            var deps = bazelDeps("jars");
-            var protos = bazelProtos();
-            deps.addAll(protos);
-            return deps;
+            return bazelClasspath();
         }
 
         return Collections.emptySet();
@@ -237,6 +228,61 @@ class InferConfig {
         return null;
     }
 
+    private Set<Path> bazelClasspath() {
+        try {
+            // Run bazel as a subprocess
+            String[] command = {
+                "bazel",
+                "aquery",
+                "--output=proto",
+                "mnemonic(Javac, kind(java_library, ...) union kind(java_test, ...) union kind(java_binary, ...))"
+            };
+            var output = Files.createTempFile("java-language-server-bazel-output", ".txt");
+            LOG.info("Running " + String.join(" ", command) + " ...");
+            var process =
+                    new ProcessBuilder()
+                            .command(command)
+                            .directory(workspaceRoot.toFile())
+                            .redirectError(ProcessBuilder.Redirect.INHERIT)
+                            .redirectOutput(output.toFile())
+                            .start();
+            // Wait for process to exit
+            var result = process.waitFor();
+            if (result != 0) {
+                LOG.severe("`" + String.join(" ", command) + "` returned " + result);
+                return Set.of();
+            }
+            // Read output
+            var container = AnalysisProtos.ActionGraphContainer.parseFrom(Files.newInputStream(output));
+            var arguments = new HashSet<String>();
+            var outputs = new HashSet<String>();
+            var depsets = new HashMap<String, AnalysisProtos.DepSetOfFiles>();
+            for (var depset : container.getDepSetOfFilesList()) {
+                depsets.put(depset.getId(), depset);
+            }
+            for (var action : container.getActionsList()) {
+                for (var depsetId : action.getInputDepSetIdsList()) {
+                    var depset = depsets.get(depsetId);
+                    arguments.addAll(depset.getDirectArtifactIdsList());
+                    // Skip transitive deps because they're not needed at compile-time
+                }
+                outputs.addAll(action.getOutputIdsList());
+            }
+            var classpath = new HashSet<Path>();
+            for (var artifact : container.getArtifactsList()) {
+                if (arguments.contains(artifact.getId()) && !outputs.contains(artifact.getId())) {
+                    var relative = artifact.getExecPath();
+                    var absolute = workspaceRoot.resolve(relative);
+                    LOG.info("...found bazel dependency " + relative);
+                    classpath.add(absolute);
+                }
+            }
+            return classpath;
+        } catch (InterruptedException | IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private Set<Path> bazelDeps(String labelsFilter) {
         try {
             // Run bazel as a subprocess
@@ -290,76 +336,5 @@ class InferConfig {
             return NOT_FOUND;
         }
         return path;
-    }
-
-    private List<Path> bazelProtos() {
-        var targets = bazelProtoTargets();
-        return bazelBuildOutputs(targets);
-    }
-
-    private List<String> bazelProtoTargets() {
-        try {
-            // Find java protos
-            String[] command = {"bazel", "query", "kind(java_proto_library, ...)"};
-            var output = Files.createTempFile("java-language-server-bazel-output", ".txt");
-            LOG.info("Running " + String.join(" ", command) + " ...");
-            var process =
-                    new ProcessBuilder()
-                            .command(command)
-                            .directory(workspaceRoot.toFile())
-                            .redirectError(ProcessBuilder.Redirect.INHERIT)
-                            .redirectOutput(output.toFile())
-                            .start();
-            // Wait for process to exit
-            var result = process.waitFor();
-            if (result != 0) {
-                LOG.severe("`" + String.join(" ", command) + "` returned " + result);
-                return List.of();
-            }
-            // Read list of targets
-            return Files.readAllLines(output);
-        } catch (InterruptedException | IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private List<Path> bazelBuildOutputs(List<String> targets) {
-        if (targets.isEmpty()) {
-            return List.of();
-        }
-        try {
-            // Find java protos
-            var command = new ArrayList<String>();
-            command.add("bazel");
-            command.add("build");
-            command.addAll(targets);
-            var output = Files.createTempFile("java-language-server-bazel-output", ".txt");
-            LOG.info("Running " + String.join(" ", command) + " ...");
-            var process =
-                    new ProcessBuilder()
-                            .command(command)
-                            .directory(workspaceRoot.toFile())
-                            .redirectError(output.toFile())
-                            .redirectOutput(output.toFile())
-                            .start();
-            // Wait for process to exit
-            var result = process.waitFor();
-            if (result != 0) {
-                LOG.severe("`" + String.join(" ", command) + "` returned " + result);
-                return List.of();
-            }
-            // Read list of jars
-            var jars = new ArrayList<Path>();
-            for (var line : Files.readAllLines(output)) {
-                line = line.trim();
-                if (line.startsWith("bazel-bin/") && line.endsWith(".jar")) {
-                    LOG.info("Found proto jar " + line);
-                    jars.add(workspaceRoot.resolve(line));
-                }
-            }
-            return jars;
-        } catch (InterruptedException | IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 }
