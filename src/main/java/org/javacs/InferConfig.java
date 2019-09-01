@@ -254,28 +254,37 @@ class InferConfig {
             }
             // Read output
             var container = AnalysisProtos.ActionGraphContainer.parseFrom(Files.newInputStream(output));
-            var arguments = new HashSet<String>();
-            var outputs = new HashSet<String>();
-            var depsets = new HashMap<String, AnalysisProtos.DepSetOfFiles>();
-            for (var depset : container.getDepSetOfFilesList()) {
-                depsets.put(depset.getId(), depset);
-            }
+            var argumentPaths = new HashSet<String>();
+            var outputIds = new HashSet<String>();
             for (var action : container.getActionsList()) {
-                for (var depsetId : action.getInputDepSetIdsList()) {
-                    var depset = depsets.get(depsetId);
-                    arguments.addAll(depset.getDirectArtifactIdsList());
-                    // Skip transitive deps because they're not needed at compile-time
+                var isClasspath = false;
+                for (var argument : action.getArgumentsList()) {
+                    if (isClasspath && argument.startsWith("-")) {
+                        isClasspath = false;
+                        continue;
+                    }
+                    if (!isClasspath) {
+                        isClasspath = argument.equals("--classpath");
+                        continue;
+                    }
+                    argumentPaths.add(argument);
                 }
-                outputs.addAll(action.getOutputIdsList());
+                outputIds.addAll(action.getOutputIdsList());
             }
             var classpath = new HashSet<Path>();
             for (var artifact : container.getArtifactsList()) {
-                if (arguments.contains(artifact.getId()) && !outputs.contains(artifact.getId())) {
-                    var relative = artifact.getExecPath();
-                    var absolute = workspaceRoot.resolve(relative);
-                    LOG.info("...found bazel dependency " + relative);
-                    classpath.add(absolute);
+                if (!argumentPaths.contains(artifact.getExecPath())) {
+                    // artifact is not on the classpath
+                    continue;
                 }
+                if (outputIds.contains(artifact.getId())) {
+                    // artifact is the output of another java action
+                    continue;
+                }
+                var relative = artifact.getExecPath();
+                var absolute = workspaceRoot.resolve(relative);
+                LOG.info("...found bazel dependency " + relative);
+                classpath.add(absolute);
             }
             return classpath;
         } catch (InterruptedException | IOException e) {

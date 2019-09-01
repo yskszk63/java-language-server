@@ -1,8 +1,9 @@
 /out
 /node_modules
 /target
-/dist
-/modules/gson.jar
+/dist/classpath
+/dist/mac
+/dist/windows
 /jdks
 
 /dependency-reduced-pom.xml

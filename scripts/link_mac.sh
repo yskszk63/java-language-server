@@ -1,53 +1,16 @@
 #!/bin/bash
-# Links everything into a self-contained executable using jlink.
+# Create self-contained copy of java in dist/mac
 
 set -e
 
 # Check JAVA_HOME points to correct java version
 ./scripts/check_java_home.sh
 
-# Compile sources
-mvn compile
-
-# Patch gson
-if [ ! -e modules/gson.jar ]; then
-  ./scripts/patch_gson.sh
-fi
-
 # Build using jlink
 rm -rf dist/mac
 $JAVA_HOME/bin/jlink \
-  --module-path modules/gson.jar:target/classes \
-  --add-modules gson,javacs \
-  --launcher launcher=javacs/org.javacs.Main \
+  --add-modules java.base,java.compiler,java.logging,java.sql,java.xml,jdk.compiler,jdk.jdi,jdk.unsupported,jdk.zipfs \
   --output dist/mac \
-  --compress 2 
-
-# Restore launcher
-echo '#!/bin/sh
-JLINK_VM_OPTIONS="\
---add-exports jdk.compiler/com.sun.tools.javac.api=javacs \
---add-exports jdk.compiler/com.sun.tools.javac.code=javacs \
---add-exports jdk.compiler/com.sun.tools.javac.comp=javacs \
---add-exports jdk.compiler/com.sun.tools.javac.main=javacs \
---add-exports jdk.compiler/com.sun.tools.javac.tree=javacs \
---add-exports jdk.compiler/com.sun.tools.javac.model=javacs \
---add-exports jdk.compiler/com.sun.tools.javac.util=javacs \
---add-opens jdk.compiler/com.sun.tools.javac.api=javacs"
-DIR=`dirname $0`
-$DIR/java $JLINK_VM_OPTIONS -m javacs/org.javacs.Main $@' > dist/mac/bin/launcher
-chmod +x dist/mac/bin/launcher
-
-echo '#!/bin/sh
-JLINK_VM_OPTIONS="\
---add-exports jdk.compiler/com.sun.tools.javac.api=javacs \
---add-exports jdk.compiler/com.sun.tools.javac.code=javacs \
---add-exports jdk.compiler/com.sun.tools.javac.comp=javacs \
---add-exports jdk.compiler/com.sun.tools.javac.main=javacs \
---add-exports jdk.compiler/com.sun.tools.javac.tree=javacs \
---add-exports jdk.compiler/com.sun.tools.javac.model=javacs \
---add-exports jdk.compiler/com.sun.tools.javac.util=javacs \
---add-opens jdk.compiler/com.sun.tools.javac.api=javacs"
-DIR=`dirname $0`
-$DIR/java $JLINK_VM_OPTIONS -m javacs/org.javacs.debug.JavaDebugServer $@' > dist/mac/bin/debugadapter
-chmod +x dist/mac/bin/debugadapter
+  --no-header-files \
+  --no-man-pages \
+  --compress 2

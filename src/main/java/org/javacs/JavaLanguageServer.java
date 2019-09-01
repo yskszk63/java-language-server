@@ -820,6 +820,9 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public List<FoldingRange> foldingRange(FoldingRangeParams params) {
+        if (!FileStore.isJavaFile(params.textDocument.uri)) {
+            return List.of();
+        }
         updateCachedParse(params.textDocument.uri);
         return cacheParse.foldingRanges();
     }

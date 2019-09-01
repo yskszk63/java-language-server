@@ -6,11 +6,24 @@ set -e
 ./scripts/check_java_home.sh
 
 # Needed once
-npm install
+if [ ! -e node_modules ]; then
+    npm install
+fi
 
-# Build fat jar
-./scripts/link_mac.sh
-./scripts/link_windows.sh
+# Build standalone java
+if [ ! -e jdks/windows/jdk-11.0.1 ]; then
+    ./scripts/download_windows_jdk.sh
+fi
+if [ ! -e dist/windows/bin/java.exe ]; then
+    ./scripts/link_windows.sh
+fi
+if [ ! -e dist/mac/bin/java ]; then
+    ./scripts/link_mac.sh
+fi
+
+# Compile sources
+./scripts/gen_proto.sh
+mvn package -DskipTests
 
 # Build vsix
 npm run-script vscode:build
