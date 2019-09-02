@@ -54,8 +54,11 @@ class InferConfig {
             for (var id : externalDependencies) {
                 var a = Artifact.parse(id);
                 var found = findAnyJar(a, false);
-                if (found.isPresent()) result.add(found.get());
-                else LOG.warning(String.format("Couldn't find jar for %s in %s or %s", a, mavenHome, gradleHome));
+                if (found == NOT_FOUND) {
+                    LOG.warning(String.format("Couldn't find jar for %s in %s or %s", a, mavenHome, gradleHome));
+                    continue;
+                }
+                result.add(found);
             }
             return result;
         }
@@ -82,8 +85,11 @@ class InferConfig {
             for (var id : externalDependencies) {
                 var a = Artifact.parse(id);
                 var found = findAnyJar(a, true);
-                if (found.isPresent()) result.add(found.get());
-                else LOG.warning(String.format("Couldn't find doc jar for %s in %s or %s", a, mavenHome, gradleHome));
+                if (found == NOT_FOUND) {
+                    LOG.warning(String.format("Couldn't find doc jar for %s in %s or %s", a, mavenHome, gradleHome));
+                    continue;
+                }
+                result.add(found);
             }
             return result;
         }
@@ -103,14 +109,15 @@ class InferConfig {
         return Collections.emptySet();
     }
 
-    private Optional<Path> findAnyJar(Artifact artifact, boolean source) {
-        Optional<Path> maven = findMavenJar(artifact, source);
+    private Path findAnyJar(Artifact artifact, boolean source) {
+        Path maven = findMavenJar(artifact, source);
 
-        if (maven.isPresent()) return maven;
-        else return findGradleJar(artifact, source);
+        if (maven != NOT_FOUND) {
+            return maven;
+        } else return findGradleJar(artifact, source);
     }
 
-    Optional<Path> findMavenJar(Artifact artifact, boolean source) {
+    Path findMavenJar(Artifact artifact, boolean source) {
         var jar =
                 mavenHome
                         .resolve("repository")
@@ -118,12 +125,14 @@ class InferConfig {
                         .resolve(artifact.artifactId)
                         .resolve(artifact.version)
                         .resolve(fileName(artifact, source));
-
-        if (Files.exists(jar)) return Optional.of(jar);
-        else return Optional.empty();
+        if (!Files.exists(jar)) {
+            LOG.warning(jar + " does not exist");
+            return NOT_FOUND;
+        }
+        return jar;
     }
 
-    private Optional<Path> findGradleJar(Artifact artifact, boolean source) {
+    private Path findGradleJar(Artifact artifact, boolean source) {
         // Search for caches/modules-*/files-*/groupId/artifactId/version/*/artifactId-version[-sources].jar
         var base = gradleHome.resolve("caches");
         var pattern =
@@ -141,7 +150,7 @@ class InferConfig {
         var match = FileSystems.getDefault().getPathMatcher(pattern);
 
         try {
-            return Files.walk(base, 7).filter(match::matches).findFirst();
+            return Files.walk(base, 7).filter(match::matches).findFirst().orElse(NOT_FOUND);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
