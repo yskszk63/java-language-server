@@ -3,9 +3,9 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as Path from "path";
 import * as FS from "fs";
-import {window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, ConfigurationChangeEvent, TextDocumentChangeEvent, Hover, debug, DebugConfiguration} from 'vscode';
+import {window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, ConfigurationChangeEvent, TextDocumentChangeEvent, Hover, debug, DebugConfiguration, Range, Position} from 'vscode';
 import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType} from "vscode-languageclient";
-import {tree, activate as activateTreeSitter} from 'vscode-tree-sitter';
+import {tree, activate as activateTreeSitter, decoration} from 'vscode-tree-sitter';
 import {color} from './treeSitter';
 import * as path from 'path';
 
@@ -75,6 +75,7 @@ export function activate(context: ExtensionContext) {
 
 	// When the language client activates, register a progress-listener
     client.onReady().then(() => createProgressListeners(client));
+    client.onReady().then(() => createColorsListener(client));
     
 	// Parse .java files incrementally using tree-sitter
 	const parserPath = path.join(context.extensionPath, 'lib', 'tree-sitter-java.wasm');
@@ -271,6 +272,47 @@ function createProgressListeners(client: LanguageClient) {
 	});
 	client.onNotification(new NotificationType('java/endProgress'), () => {
 		progressListener.endProgress();
+    });
+};
+
+interface SemanticColors {
+    uri: string;
+    fields: RangeLike[];
+    statics: RangeLike[];
+}
+
+interface RangeLike {
+    start: PositionLike;
+    end: PositionLike;
+}
+
+interface PositionLike {
+    line: number;
+    character: number;
+}
+
+function asRange(r: RangeLike) {
+    return new Range(asPosition(r.start), asPosition(r.end));
+}
+
+function asPosition(p: PositionLike) {
+    return new Position(p.line-1, p.character-1);
+}
+
+const statics = window.createTextEditorDecorationType({
+    fontStyle: 'italic'
+});
+
+function createColorsListener(client: LanguageClient) {
+    client.onNotification(new NotificationType('java/colors'), (event: SemanticColors) => {
+		for (const editor of window.visibleTextEditors) {
+			if (editor.document.uri.toString() != event.uri) {
+                continue;
+            }
+            const field = decoration('variable');
+            editor.setDecorations(field, event.fields.map(asRange));
+            editor.setDecorations(statics, event.statics.map(asRange));
+		}
     });
 }
 

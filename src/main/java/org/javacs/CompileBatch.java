@@ -1681,5 +1681,15 @@ class CompileBatch implements AutoCloseable {
         return JavaLanguageServer.gson.toJsonTree(data);
     }
 
+    List<SemanticColors> colors() {
+        var result = new ArrayList<SemanticColors>();
+        for (var root : roots) {
+            var colorizer = new Colorizer(borrow.task);
+            colorizer.scan(root, null);
+            result.add(colorizer.colors);
+        }
+        return result;
+    }
+
     private static final Logger LOG = Logger.getLogger("main");
 }

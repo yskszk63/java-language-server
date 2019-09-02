@@ -37,14 +37,27 @@ class JavaLanguageServer extends LanguageServer {
         var started = Instant.now();
         if (uris.isEmpty()) return;
         try (var batch = compiler().compileUris(uris)) {
-            // Report compilation errors
+            var compiled = Instant.now();
+            LOG.info(String.format("...compiled in %d ms", Duration.between(started, compiled).toMillis()));
+            // Publish diagnostics
             for (var ds : batch.reportErrors()) {
                 client.publishDiagnostics(ds);
             }
+            var published = Instant.now();
+            LOG.info(
+                    String.format(
+                            "...published diagnostics in %d ms", Duration.between(compiled, published).toMillis()));
+            // Add semantic colors
+            for (var colors : batch.colors()) {
+                client.customNotification("java/colors", gson.toJsonTree(colors));
+            }
+            var colored = Instant.now();
+            LOG.info(String.format("...colored in %d ms", Duration.between(published, colored).toMillis()));
+            // Done
             uncheckedChanges = false;
         }
-        var elapsed = Duration.between(started, Instant.now());
-        LOG.info(String.format("...done linting in %d ms", elapsed.toMillis()));
+        var done = Instant.now();
+        LOG.info(String.format("...done in %d ms", Duration.between(started, done).toMillis()));
     }
 
     static final Gson gson = new GsonBuilder().registerTypeAdapter(Ptr.class, new PtrAdapter()).create();
