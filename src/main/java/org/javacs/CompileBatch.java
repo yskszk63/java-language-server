@@ -1678,7 +1678,7 @@ class CompileBatch implements AutoCloseable {
         var data = new CompletionData();
         data.ptr = ptr;
         data.plusOverloads = plusOverloads;
-        return JavaLanguageServer.gson.toJsonTree(data);
+        return JavaLanguageServer.GSON.toJsonTree(data);
     }
 
     List<SemanticColors> colors() {

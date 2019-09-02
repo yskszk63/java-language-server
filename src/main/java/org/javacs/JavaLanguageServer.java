@@ -38,21 +38,27 @@ class JavaLanguageServer extends LanguageServer {
         if (uris.isEmpty()) return;
         try (var batch = compiler().compileUris(uris)) {
             var compiled = Instant.now();
-            LOG.info(String.format("...compiled in %d ms", Duration.between(started, compiled).toMillis()));
+            var elapsed = Duration.between(started, compiled).toMillis();
+            LOG.info(String.format("...compiled in %d ms", elapsed));
             // Publish diagnostics
-            for (var ds : batch.reportErrors()) {
+            var errors = batch.reportErrors();
+            var countErrors = 0;
+            for (var ds : errors) {
                 client.publishDiagnostics(ds);
+                countErrors += ds.diagnostics.size();
             }
             var published = Instant.now();
+            elapsed = Duration.between(compiled, published).toMillis();
             LOG.info(
                     String.format(
-                            "...published diagnostics in %d ms", Duration.between(compiled, published).toMillis()));
+                            "...published %d diagnostics in %d files in %d ms", countErrors, errors.size(), elapsed));
             // Add semantic colors
             for (var colors : batch.colors()) {
-                client.customNotification("java/colors", gson.toJsonTree(colors));
+                client.customNotification("java/colors", GSON.toJsonTree(colors));
             }
             var colored = Instant.now();
-            LOG.info(String.format("...colored in %d ms", Duration.between(published, colored).toMillis()));
+            elapsed = Duration.between(published, colored).toMillis();
+            LOG.info(String.format("...colored in %d ms", elapsed));
             // Done
             uncheckedChanges = false;
         }
@@ -60,14 +66,14 @@ class JavaLanguageServer extends LanguageServer {
         LOG.info(String.format("...done in %d ms", Duration.between(started, done).toMillis()));
     }
 
-    static final Gson gson = new GsonBuilder().registerTypeAdapter(Ptr.class, new PtrAdapter()).create();
+    static final Gson GSON = new GsonBuilder().registerTypeAdapter(Ptr.class, new PtrAdapter()).create();
 
     private void javaStartProgress(JavaStartProgressParams params) {
-        client.customNotification("java/startProgress", gson.toJsonTree(params));
+        client.customNotification("java/startProgress", GSON.toJsonTree(params));
     }
 
     private void javaReportProgress(JavaReportProgressParams params) {
-        client.customNotification("java/reportProgress", gson.toJsonTree(params));
+        client.customNotification("java/reportProgress", GSON.toJsonTree(params));
     }
 
     private void javaEndProgress() {
@@ -175,7 +181,7 @@ class JavaLanguageServer extends LanguageServer {
         watchJava.addProperty("globPattern", "**/*.java");
         watchers.add(watchJava);
         options.add("watchers", watchers);
-        client.registerCapability("workspace/didChangeWatchedFiles", gson.toJsonTree(options));
+        client.registerCapability("workspace/didChangeWatchedFiles", GSON.toJsonTree(options));
     }
 
     @Override
@@ -332,7 +338,7 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public CompletionItem resolveCompletionItem(CompletionItem unresolved) {
         if (unresolved.data == null) return unresolved;
-        var data = gson.fromJson(unresolved.data, CompletionData.class);
+        var data = GSON.fromJson(unresolved.data, CompletionData.class);
         var markdown = findDocs(data.ptr);
         if (markdown.isPresent()) {
             unresolved.documentation = markdown.get();
