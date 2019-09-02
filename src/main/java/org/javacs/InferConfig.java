@@ -194,7 +194,8 @@ class InferConfig {
         }
     }
 
-    private static final Pattern DEPENDENCY = Pattern.compile("^\\[INFO\\]\\s+(.*:.*:.*:.*:.*):(/.*)$");
+    private static final Pattern DEPENDENCY =
+            Pattern.compile("^\\[INFO\\]\\s+(.*:.*:.*:.*:.*):(/.*?)( -- module .*)?$");
 
     static Path readDependency(String line) {
         var match = DEPENDENCY.matcher(line);
