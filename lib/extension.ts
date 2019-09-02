@@ -10,7 +10,6 @@ import {color} from './treeSitter';
 import * as path from 'path';
 
 // If we want to profile using VisualVM, we have to run the language server using regular java, not jlink
-// This is intended to be used in the 'F5' debug-extension mode, where the extension is running against the actual source, not build.vsix
 const visualVm = false;
 
 // Show tree-sitter parse tree when you hover over code
@@ -340,13 +339,14 @@ function visualVmConfig(context: ExtensionContext): ServerOptions {
         
         throw "Gave up";
     }
-
-    let classes = Path.resolve(context.extensionPath, "target", "classes");
-    let cpTxt = Path.resolve(context.extensionPath, "target", "cp.txt");
-    let cpContents = FS.readFileSync(cpTxt, "utf-8");
-    
+    const jars = [
+        'gson-2.8.5.jar',
+        'java-language-server.jar',
+        'protobuf-java-3.9.1.jar',
+    ];
+    const classpath = jars.map(jar => Path.resolve(context.extensionPath, "dist", "classpath", jar)).join(':');
     let args = [
-        '-cp', classes + ":" + cpContents, 
+        '-cp', classpath, 
         '-Xverify:none', // helps VisualVM avoid 'error 62'
         '-Xdebug',
         // '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005',
