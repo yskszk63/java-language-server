@@ -1410,8 +1410,8 @@ class CompileBatch implements AutoCloseable {
 
             boolean containsCursor(Tree tree) {
                 long start = pos.getStartPosition(root, tree), end = pos.getEndPosition(root, tree);
-                // If element has no position, give up
-                if (start == -1 || end == -1) return false;
+                // If cursor isn't in tree, return early
+                if (cursor < start || end < cursor) return false;
                 // int x = 1, y = 2, ... requires special handling
                 if (tree instanceof VariableTree) {
                     var v = (VariableTree) tree;
@@ -1423,6 +1423,7 @@ class CompileBatch implements AutoCloseable {
                         throw new RuntimeException(e);
                     }
                     // Find name in contents
+                    // TODO this picks up the `i` in `int` in `int i = 1;`
                     var name = v.getName().toString();
                     start = source.indexOf(name, (int) start);
                     if (start == -1) {
@@ -1430,9 +1431,10 @@ class CompileBatch implements AutoCloseable {
                         return false;
                     }
                     end = start + name.length();
+                    // Check narrowed range
+                    return start <= cursor && cursor <= end;
                 }
-                // Check if `tree` contains line:column
-                return start <= cursor && cursor <= end;
+                return true;
             }
 
             @Override
