@@ -25,16 +25,27 @@ class Colorizer extends TreePathScanner<Void, Void> {
             return;
         }
         if (toEl.getKind() == ElementKind.FIELD) {
+            // Find region containing name
             var pos = trees.getSourcePositions();
             var root = fromPath.getCompilationUnit();
             var leaf = fromPath.getLeaf();
-            var lines = root.getLineMap();
             var start = (int) pos.getStartPosition(root, leaf);
             var end = (int) pos.getEndPosition(root, leaf);
+            // Adjust start to remove LHS of declarations and member selections
+            if (leaf instanceof MemberSelectTree) {
+                var select = (MemberSelectTree) leaf;
+                start = (int) pos.getEndPosition(root, select.getExpression());
+            } else if (leaf instanceof VariableTree) {
+                var declaration = (VariableTree) leaf;
+                start = (int) pos.getEndPosition(root, declaration.getType());
+            }
+            // Find name inside expression
             var contents = FileStore.contents(colors.uri);
             var region = contents.substring(start, end);
-            start += region.lastIndexOf(name.toString());
+            start += region.indexOf(name.toString());
             end = start + name.length();
+            // Convert offset to line:column
+            var lines = root.getLineMap();
             var startLine = (int) lines.getLineNumber(start);
             var startColumn = (int) lines.getColumnNumber(start);
             var endLine = (int) lines.getLineNumber(end);
