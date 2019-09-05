@@ -1648,7 +1648,11 @@ class CompileBatch implements AutoCloseable {
     }
 
     private int innerClassPriority(TypeElement e, TypeMirror container) {
-        var declared = (TypeElement) e.getEnclosingElement();
+        var enclosing = e.getEnclosingElement();
+        if (!(enclosing instanceof TypeElement)) {
+            return Priority.INNER_CLASS;
+        }
+        var declared = (TypeElement) enclosing;
         if (declared.equals(container)) {
             return Priority.INNER_CLASS;
         } else {
