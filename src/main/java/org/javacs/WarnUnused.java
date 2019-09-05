@@ -10,11 +10,11 @@ class WarnUnused extends TreeScanner<Void, Void> {
     // We need to be able to call scan(path, _) recursively
     private TreePath path;
 
-    public Void scan(TreePath path, Void p) {
+    private void scanPath(TreePath path) {
         TreePath prev = this.path;
         this.path = path;
         try {
-            return path.getLeaf().accept(this, p);
+            path.getLeaf().accept(this, null);
         } finally {
             this.path = prev; // So we can call scan(path, _) recursively
         }
@@ -34,36 +34,35 @@ class WarnUnused extends TreeScanner<Void, Void> {
     }
 
     private final Trees trees;
-    // TODO ignore writes when calculating used
-    private final Set<Element> reachable = new HashSet<>(), unused = new HashSet<>();
+    private final Map<Element, TreePath> privateDeclarations = new HashMap<>(), localVariables = new HashMap<>();
+    private final Set<Element> used = new HashSet<>();
 
     WarnUnused(JavacTask task) {
         this.trees = Trees.instance(task);
     }
 
     Set<Element> notUsed() {
-        unused.removeAll(reachable);
+        var unused = new HashSet<Element>();
+        unused.addAll(privateDeclarations.keySet());
+        unused.addAll(localVariables.keySet());
+        unused.removeAll(used);
         return unused;
     }
 
     private void foundPrivateDeclaration() {
-        unused.add(trees.getElement(path));
+        privateDeclarations.put(trees.getElement(path), path);
+    }
+
+    private void foundLocalVariable() {
+        localVariables.put(trees.getElement(path), path);
     }
 
     private void foundReference() {
-        var fromPath = path;
-        var toEl = trees.getElement(fromPath);
-        var toPath = trees.getPath(toEl);
-        if (toPath == null) return;
-        var fromUri = fromPath.getCompilationUnit().getSourceFile().toUri();
-        var toUri = toPath.getCompilationUnit().getSourceFile().toUri();
-        if (!fromUri.equals(toUri)) return;
-        if (isLocalVariable(toPath)) {
-            reachable.add(toEl);
-        }
-        if (!isReachable(toPath)) {
-            reachable.add(toEl);
-            scan(toPath, null);
+        var toEl = trees.getElement(path);
+        var firstUse = used.add(toEl);
+        var notScanned = firstUse && privateDeclarations.containsKey(toEl);
+        if (notScanned) {
+            scanPath(privateDeclarations.get(toEl));
         }
     }
 
@@ -94,10 +93,7 @@ class WarnUnused extends TreeScanner<Void, Void> {
         }
         // Check if t has been referenced by a reachable element
         var el = trees.getElement(path);
-        if (reachable.contains(el)) {
-            return true;
-        }
-        return false;
+        return used.contains(el);
     }
 
     private boolean isLocalVariable(TreePath path) {
@@ -113,7 +109,7 @@ class WarnUnused extends TreeScanner<Void, Void> {
     @Override
     public Void visitVariable(VariableTree t, Void __) {
         if (isLocalVariable(path)) {
-            foundPrivateDeclaration();
+            foundLocalVariable();
             super.visitVariable(t, null);
         } else if (isReachable(path)) {
             super.visitVariable(t, null);
