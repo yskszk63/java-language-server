@@ -81,26 +81,11 @@ class FileStore {
         }
     }
 
-    private static void checkForDeletedFiles() {
-        var notExists = new ArrayList<Path>();
-        for (var file : javaSources.keySet()) {
-            if (!Files.exists(file) && !activeDocuments.containsKey(file.toUri())) {
-                notExists.add(file);
-            }
-        }
-        for (var file : notExists) {
-            LOG.info(file.getFileName() + " no longer exists");
-            javaSources.remove(file);
-        }
-    }
-
     static Collection<Path> all() {
-        checkForDeletedFiles();
         return javaSources.keySet();
     }
 
     static List<Path> list(String packageName) {
-        checkForDeletedFiles();
         var list = new ArrayList<Path>();
         for (var file : javaSources.keySet()) {
             if (javaSources.get(file).packageName.equals(packageName)) {
@@ -111,7 +96,6 @@ class FileStore {
     }
 
     static Set<Path> sourceRoots() {
-        checkForDeletedFiles();
         var roots = new HashSet<Path>();
         for (var file : javaSources.keySet()) {
             var root = sourceRoot(file);
