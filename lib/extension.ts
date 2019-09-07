@@ -74,7 +74,39 @@ export function activate(context: ExtensionContext) {
 
 	// When the language client activates, register a progress-listener
     client.onReady().then(() => createProgressListeners(client));
-    client.onReady().then(() => createColorsListener(client));
+
+    // Apply semantic colors using custom notification
+    function asRange(r: RangeLike) {
+        return new Range(asPosition(r.start), asPosition(r.end));
+    }
+    function asPosition(p: PositionLike) {
+        return new Position(p.line-1, p.character-1);
+    }
+    const statics = window.createTextEditorDecorationType({
+        fontStyle: 'italic'
+    });
+    const colors = new Map<string, SemanticColors>();
+    function applySemanticColors() {
+        for (const editor of window.visibleTextEditors) {
+            const c = colors.get(editor.document.uri.toString());
+            if (c == null) {
+                continue;
+            }
+            const field = decoration('variable');
+            editor.setDecorations(field, c.fields.map(asRange));
+            editor.setDecorations(statics, c.statics.map(asRange));
+        }
+    }
+    client.onReady().then(() => {
+        client.onNotification(new NotificationType('java/colors'), (event: SemanticColorsMessage) => {
+            colors.clear();
+            for (const c of event.files) {
+                colors.set(c.uri, c);
+            }
+            applySemanticColors();
+        });
+        context.subscriptions.push(window.onDidChangeVisibleTextEditors(applySemanticColors));
+    });
     
 	// Parse .java files incrementally using tree-sitter
 	const parserPath = path.join(context.extensionPath, 'lib', 'tree-sitter-java.wasm');
@@ -280,6 +312,10 @@ interface SemanticColors {
     statics: RangeLike[];
 }
 
+interface SemanticColorsMessage {
+    files: SemanticColors[];
+}
+
 interface RangeLike {
     start: PositionLike;
     end: PositionLike;
@@ -288,31 +324,6 @@ interface RangeLike {
 interface PositionLike {
     line: number;
     character: number;
-}
-
-function asRange(r: RangeLike) {
-    return new Range(asPosition(r.start), asPosition(r.end));
-}
-
-function asPosition(p: PositionLike) {
-    return new Position(p.line-1, p.character-1);
-}
-
-const statics = window.createTextEditorDecorationType({
-    fontStyle: 'italic'
-});
-
-function createColorsListener(client: LanguageClient) {
-    client.onNotification(new NotificationType('java/colors'), (event: SemanticColors) => {
-		for (const editor of window.visibleTextEditors) {
-			if (editor.document.uri.toString() != event.uri) {
-                continue;
-            }
-            const field = decoration('variable');
-            editor.setDecorations(field, event.fields.map(asRange));
-            editor.setDecorations(statics, event.statics.map(asRange));
-		}
-    });
 }
 
 function platformSpecificLangServer(): string[] {

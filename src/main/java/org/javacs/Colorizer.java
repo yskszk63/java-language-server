@@ -41,6 +41,7 @@ class Colorizer extends TreePathScanner<Void, Void> {
             }
             // Find name inside expression
             var contents = FileStore.contents(colors.uri);
+            // TODO This is causing StringIndexOutOfBoundsExtension
             var region = contents.substring(start, end);
             start += region.indexOf(name.toString());
             end = start + name.length();
@@ -88,4 +89,8 @@ class Colorizer extends TreePathScanner<Void, Void> {
 class SemanticColors {
     URI uri;
     List<Range> statics = new ArrayList<>(), fields = new ArrayList<>();
+}
+
+class SemanticColorsMessage {
+    List<SemanticColors> files;
 }

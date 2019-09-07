@@ -53,9 +53,9 @@ class JavaLanguageServer extends LanguageServer {
                     String.format(
                             "...published %d diagnostics in %d files in %d ms", countErrors, errors.size(), elapsed));
             // Add semantic colors
-            for (var colors : batch.colors()) {
-                client.customNotification("java/colors", GSON.toJsonTree(colors));
-            }
+            var colors = new SemanticColorsMessage();
+            colors.files = batch.colors();
+            client.customNotification("java/colors", GSON.toJsonTree(colors));
             var colored = Instant.now();
             elapsed = Duration.between(published, colored).toMillis();
             LOG.info(String.format("...colored in %d ms", elapsed));
@@ -693,6 +693,7 @@ class JavaLanguageServer extends LanguageServer {
         Optional<Element> toEl;
         Ptr toPtr;
         int count;
+        // TODO this does compileFile over and over
         try (var compile = compiler().compileFile(toUri)) {
             // Find the element we want to count references to
             toEl = compile.element(toUri, toLine, toColumn);
