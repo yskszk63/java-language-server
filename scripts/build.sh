@@ -28,7 +28,9 @@ if [ ! -e dist/mac/bin/java ]; then
 fi
 
 # Compile sources
-./scripts/gen_proto.sh
+if [ ! -e src/main/java/com/google/devtools/build/lib/analysis/AnalysisProtos.java ]; then
+    ./scripts/gen_proto.sh
+fi
 ./scripts/format.sh
 mvn package -DskipTests
 
