@@ -39,9 +39,12 @@ class Colorizer extends TreePathScanner<Void, Void> {
                 var declaration = (VariableTree) leaf;
                 start = (int) pos.getEndPosition(root, declaration.getType());
             }
+            // If no position, give up
+            if (start == -1 || end == -1) {
+                return;
+            }
             // Find name inside expression
             var contents = FileStore.contents(colors.uri);
-            // TODO This is causing StringIndexOutOfBoundsExtension
             var region = contents.substring(start, end);
             start += region.indexOf(name.toString());
             end = start + name.length();
