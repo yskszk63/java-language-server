@@ -16,7 +16,7 @@ class Colorizer extends TreePathScanner<Void, Void> {
     }
 
     private void check(Name name) {
-        if (name.contentEquals("this") || name.contentEquals("super")) {
+        if (name.contentEquals("this") || name.contentEquals("super") || name.contentEquals("class")) {
             return;
         }
         var fromPath = getCurrentPath();
