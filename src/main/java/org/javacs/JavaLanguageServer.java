@@ -587,7 +587,7 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     private Parser cacheParse;
-    private URI cacheParseFile = URI.create("file:///NONE");;
+    private URI cacheParseFile = URI.create("file:///NONE");
     private int cacheParseVersion = -1;
 
     private void updateCachedParse(URI file) {
@@ -652,11 +652,7 @@ class JavaLanguageServer extends LanguageServer {
                 lens = new CodeLens(range.get(), command, null);
                 result.add(lens);
             }
-            if (!cacheParse.isTestMethod(d)
-                    && !cacheParse.isTestClass(d)
-                    && !cacheParse.isCalledByTestFramework(d)
-                    && !cacheParse.isOverride(d)
-                    && !cacheParse.isMainMethod(d)) {
+            if (cacheParse.showReferencesCodeLens(d)) {
                 // Unresolved "_ references" code lens
                 var t = d.getLeaf();
                 var start = range.get().start;
@@ -688,13 +684,15 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public CodeLens resolveCodeLens(CodeLens unresolved) {
-        // Unpack data
         var data = GSON.fromJson(unresolved.data, CodeLensData.class);
-        var count = countReferences(data);
+        LOG.info(String.format("Count references to `%s`...", data.name));
+        var self = countSelfReferences(data);
+        var cross = countCrossReferences(data);
+        var count = self + cross;
         String title;
         if (count == -1) title = "? references";
         else if (count == 1) title = "1 reference";
-        else if (count == TOO_EXPENSIVE) title = "Find references";
+        else if (cross == TOO_EXPENSIVE) title = "Find references";
         else title = String.format("%d references", count);
         var command = "java.command.findReferences";
         var arguments = new JsonArray();
@@ -706,62 +704,96 @@ class JavaLanguageServer extends LanguageServer {
         return unresolved;
     }
 
+    private Map<String, Integer> cacheSelfReferences = new HashMap<>();
+    private URI cacheSelfReferencesFile = URI.create("file:///NONE");
+    private int cacheSelfReferencesVersion = -1;
+
+    private int countSelfReferences(CodeLensData data) {
+        if (!cacheSelfReferencesFile.equals(data.uri) || cacheSelfReferencesVersion < FileStore.version(data.uri)) {
+            updateCacheSelfReferences(data.uri);
+        }
+        return cacheSelfReferences.get(data.signature);
+    }
+
+    private void updateCacheSelfReferences(URI uri) {
+        LOG.info(String.format("...count all self-references in %s...", uri.getPath()));
+        cacheSelfReferences.clear();
+        updateCachedParse(uri);
+        try (var batch = compiler().compileFile(uri)) {
+            for (var d : cacheParse.codeLensDeclarations()) {
+                if (!cacheParse.showReferencesCodeLens(d)) continue;
+                var range = cacheParse.range(d);
+                if (range.isEmpty()) continue;
+                var start = range.get().start;
+                var fromPaths = batch.references(uri, start.line + 1, start.character + 1).orElse(List.of());
+                var signature = Parser.signature(d);
+                cacheSelfReferences.put(signature, fromPaths.size());
+            }
+        }
+        cacheSelfReferencesFile = uri;
+        cacheSelfReferencesVersion = FileStore.version(uri);
+    }
+
     /** Cache reference counts on Parser.signature(_) */
-    private Cache<String, Integer> cacheCountReferences = new Cache<>();
+    private Cache<String, Integer> cacheCountCrossReferences = new Cache<>();
 
     private static final int TOO_EXPENSIVE = 100;
 
-    private int countReferences(CodeLensData data) {
+    private int countCrossReferences(CodeLensData data) {
+        LOG.info(String.format("...count cross-file references to `%s`...", data.name));
         // Identify all files that *might* contain references to toEl
-        LOG.info(String.format("Count references to `%s`...", data.name));
-        var isType = false;
-        switch (data.kind) {
-            case ANNOTATION_TYPE:
-            case CLASS:
-            case INTERFACE:
-                isType = true;
-        }
-        var fromUris = Parser.potentialReferences(data.uri, data.name, isType, data.flags);
+        var fromUris = Parser.potentialReferences(data.uri, data.name, isType(data.kind), data.flags);
         // If it's too expensive to compute the code lens
         if (fromUris.size() > 100) {
-            LOG.info(
-                    String.format(
-                            "...there are %d potential references, which is too expensive to compile",
-                            fromUris.size()));
+            LOG.info(String.format("...counting %d files is too expensive", fromUris.size()));
             return TOO_EXPENSIVE;
         }
         // Figure out what files need to be updated
         var todo = new HashSet<URI>();
         for (var fromUri : fromUris) {
-            if (cacheCountReferences.needs(Paths.get(fromUri), data.signature)) {
+            if (cacheCountCrossReferences.needs(Paths.get(fromUri), data.signature)) {
                 todo.add(fromUri);
             }
         }
-        todo.add(data.uri);
         // Update the cache
-        LOG.info(String.format("...compile %d files", todo.size()));
-        var eraseCode = pruneWord(todo, data.name);
-        var countByFile = new HashMap<URI, Integer>();
-        try (var batch = compiler().compileBatch(eraseCode)) {
-            var fromPaths = batch.references(data.uri, data.line + 1, data.character + 1).orElse(List.of());
-            for (var fromPath : fromPaths) {
-                var fromUri = fromPath.getCompilationUnit().getSourceFile().toUri();
-                var newCount = countByFile.getOrDefault(fromUri, 0) + 1;
-                countByFile.put(fromUri, newCount);
+        if (!todo.isEmpty()) {
+            todo.add(data.uri);
+            LOG.info(String.format("...compile %d files", todo.size()));
+            var eraseCode = pruneWord(todo, data.name);
+            var countByFile = new HashMap<URI, Integer>();
+            try (var batch = compiler().compileBatch(eraseCode)) {
+                var fromPaths = batch.references(data.uri, data.line + 1, data.character + 1).orElse(List.of());
+                for (var fromPath : fromPaths) {
+                    var fromUri = fromPath.getCompilationUnit().getSourceFile().toUri();
+                    var newCount = countByFile.getOrDefault(fromUri, 0) + 1;
+                    countByFile.put(fromUri, newCount);
+                }
             }
+            for (var fromUri : todo) {
+                var count = countByFile.getOrDefault(fromUri, 0);
+                // TODO consider not caching if fromUri contains errors
+                cacheCountCrossReferences.load(Paths.get(fromUri), data.signature, count);
+            }
+            LOG.info(String.format("...found references in %d files", countByFile.size()));
         }
-        for (var fromUri : todo) {
-            var count = countByFile.getOrDefault(fromUri, 0);
-            // TODO consider not caching if fromUri contains errors
-            cacheCountReferences.load(Paths.get(fromUri), data.signature, count);
-        }
-        LOG.info(String.format("...found references in %d files", countByFile.size()));
         // Sum up the count
         var count = 0;
         for (var fromUri : fromUris) {
-            count += cacheCountReferences.get(Paths.get(fromUri), data.signature);
+            if (fromUri.equals(data.uri)) continue;
+            count += cacheCountCrossReferences.get(Paths.get(fromUri), data.signature);
         }
         return count;
+    }
+
+    private boolean isType(Tree.Kind kind) {
+        switch (kind) {
+            case ANNOTATION_TYPE:
+            case CLASS:
+            case INTERFACE:
+                return true;
+            default:
+                return false;
+        }
     }
 
     @Override

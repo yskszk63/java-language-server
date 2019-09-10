@@ -59,6 +59,14 @@ class Parser {
         return new Parser(file);
     }
 
+    boolean showReferencesCodeLens(TreePath path) {
+        return !isTestMethod(path)
+                && !isTestClass(path)
+                && !isCalledByTestFramework(path)
+                && !isOverride(path)
+                && !isMainMethod(path);
+    }
+
     boolean isTestMethod(TreePath path) {
         var leaf = path.getLeaf();
         if (!(leaf instanceof MethodTree)) return false;
@@ -1079,7 +1087,7 @@ class Parser {
     }
 
     static Set<URI> potentialReferences(URI file, String name, boolean isType, Set<Modifier> flags) {
-        LOG.info(String.format("Find potential references to `%s`...", name));
+        LOG.info(String.format("...find potential references to `%s`...", name));
         var pkg = FileStore.packageName(Paths.get(file));
 
         // If `to` is private, any definitions must be in the same file
