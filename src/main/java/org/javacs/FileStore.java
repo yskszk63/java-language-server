@@ -1,27 +1,11 @@
 package org.javacs;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.StringReader;
-import java.io.StringWriter;
+import java.io.*;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
+import java.nio.file.attribute.*;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.javacs.lsp.DidChangeTextDocumentParams;
@@ -75,7 +59,26 @@ class FileStore {
 
     private static void addFiles(Path root) {
         try {
-            Files.walk(root).filter(FileStore::isJavaFile).forEach(FileStore::readInfoFromDisk);
+            Files.walkFileTree(
+                    root,
+                    new SimpleFileVisitor<Path>() {
+                        @Override
+                        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                            if (attrs.isSymbolicLink()) {
+                                LOG.warning("Don't check " + dir + " for java sources");
+                                return FileVisitResult.SKIP_SUBTREE;
+                            }
+                            return FileVisitResult.CONTINUE;
+                        }
+
+                        @Override
+                        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                            if (isJavaFile(file)) {
+                                readInfoFromDisk(file);
+                            }
+                            return FileVisitResult.CONTINUE;
+                        }
+                    });
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
