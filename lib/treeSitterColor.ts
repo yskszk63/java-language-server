@@ -42,14 +42,6 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: { start: numbe
 				break;
 			case 'identifier':
 				const parent = parents[parents.length-1];
-				// If this identifier is part of a selection or invocation, deal with it when we scan the parent
-				const skip = parent == 'method_invocation' && cursor.currentFieldName() == 'name' || 
-					parent == 'scoped_identifier' || 
-					parent == 'field_access' ||
-					parent == 'method_reference';
-				if (skip) {
-					break;
-				}
 				// If this identifier is the name of a class declaration, or part of a type parameter
 				const isTypeName = parent == 'class_declaration' && cursor.currentFieldName() == 'name'
 					|| parent == 'type_parameter';
