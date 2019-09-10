@@ -7,6 +7,7 @@ import com.sun.source.util.*;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
 import java.util.logging.Logger;
@@ -866,11 +867,11 @@ class Parser {
         return false;
     }
 
-    static CharSequence simpleName(Element e) {
+    static String simpleName(Element e) {
         if (e.getSimpleName().contentEquals("<init>")) {
-            return e.getEnclosingElement().getSimpleName();
+            return e.getEnclosingElement().getSimpleName().toString();
         }
-        return e.getSimpleName();
+        return e.getSimpleName().toString();
     }
 
     private static String prune(
@@ -1055,9 +1056,9 @@ class Parser {
         }
 
         if (to instanceof ExecutableElement) {
-            var allFiles = possibleFiles(to);
+            var allFiles = FileStore.all();
             // Check if the file contains the name of `to`
-            var hasWord = containsWord(allFiles, to);
+            var hasWord = containsWord(allFiles, simpleName(to));
             // Parse each file and check if the syntax tree is consistent with a definition of `to`
             // This produces some false positives, but parsing is much faster than compiling,
             // so it's an effective optimization
@@ -1077,59 +1078,40 @@ class Parser {
         }
     }
 
-    static Set<URI> potentialReferences(Element to) {
-        LOG.info(String.format("Find potential references to `%s`...", to));
+    static Set<URI> potentialReferences(URI file, String name, boolean isType, Set<Modifier> flags) {
+        LOG.info(String.format("Find potential references to `%s`...", name));
+        var pkg = FileStore.packageName(Paths.get(file));
 
         // If `to` is private, any definitions must be in the same file
-        if (to.getModifiers().contains(Modifier.PRIVATE)) {
-            LOG.info(String.format("...`%s` is private", to));
-            var set = new HashSet<URI>();
-            declaringFile(to).ifPresent(set::add);
-            return set;
+        if (flags.contains(Modifier.PRIVATE)) {
+            LOG.info(String.format("...`%s` is private", name));
+            return Set.of(file);
         }
 
-        var findName = simpleName(to);
-        var isField = to instanceof VariableElement && to.getEnclosingElement() instanceof TypeElement;
-        var isType = to instanceof TypeElement;
-        var isMethod = to instanceof ExecutableElement;
-        if (isField || isType || isMethod) {
-            LOG.info(String.format("...find identifiers named `%s`", findName));
-            var allFiles = possibleFiles(to);
-            // Check if the file contains the name of `to`
-            var hasWord = containsWord(allFiles, to);
-            // You can't reference a TypeElement without importing it
-            if (to instanceof TypeElement) {
-                hasWord = containsImport(hasWord, (TypeElement) to);
-            }
-            // Convert Path to URI
-            var matches = new HashSet<URI>();
-            for (var file : hasWord) {
-                matches.add(file.toUri());
-            }
-            return matches;
+        LOG.info(String.format("...find identifiers named `%s`", name));
+        Collection<Path> allFiles;
+        var isPackagePrivate = !flags.contains(Modifier.PUBLIC) && !flags.contains(Modifier.PROTECTED);
+        if (isPackagePrivate) {
+            // If `to` is package-private, only look in my own package
+            allFiles = FileStore.list(pkg);
+            LOG.info(String.format("...check %d files in my own package %s", allFiles.size(), pkg));
         } else {
-            LOG.info(String.format("...references to `%s` must be in the same file", to));
-            var files = new HashSet<URI>();
-            var toFile = declaringFile(to);
-            // If there is no declaring file
-            if (!toFile.isPresent()) {
-                LOG.info("..has no declaring file");
-                return files;
-            }
-            // If the declaring file isn't a normal file, for example if it's in src.zip
-            if (!FileStore.isJavaFile(toFile.get())) {
-                LOG.info(String.format("...%s is not on the source path", toFile.get()));
-                return files;
-            }
-            // Otherwise, jump to the declaring file
-            LOG.info(String.format("...declared in %s", toFile.get().getPath()));
-            files.add(toFile.get());
-            return files;
+            // Otherwise search all files
+            allFiles = FileStore.all();
+            LOG.info(String.format("...check %d files", allFiles.size()));
         }
-    }
-
-    private static boolean isPackagePrivate(Element to) {
-        return !to.getModifiers().contains(Modifier.PROTECTED) && !to.getModifiers().contains(Modifier.PUBLIC);
+        // Check if the file contains the name of `to`
+        var hasWord = containsWord(allFiles, name);
+        // You can't reference a TypeElement without importing it
+        if (isType) {
+            hasWord = containsImport(hasWord, pkg, name);
+        }
+        // Convert Path to URI
+        var matches = new HashSet<URI>();
+        for (var f : hasWord) {
+            matches.add(f.toUri());
+        }
+        return matches;
     }
 
     private static Optional<URI> declaringFile(Element e) {
@@ -1167,28 +1149,9 @@ class Parser {
         return FileStore.findDeclaringFile(name).map(Path::toUri);
     }
 
-    private static Collection<Path> possibleFiles(Element to) {
-        // If `to` is package-private, only look in my own package
-        if (isPackagePrivate(to)) {
-            var myPkg = packageName(to);
-            var allFiles = FileStore.list(myPkg);
-            LOG.info(String.format("...check %d files in my own package %s", allFiles.size(), myPkg));
-            return allFiles;
-        }
-        // Otherwise search all files
-        var allFiles = FileStore.all();
-        LOG.info(String.format("...check %d files", allFiles.size()));
-        return allFiles;
-    }
-
     private static Cache<String, Boolean> cacheContainsWord = new Cache<>();
 
-    private static List<Path> containsWord(Collection<Path> allFiles, Element to) {
-        // Figure out what name we're looking for
-        var name = to.getSimpleName().toString();
-        if (name.equals("<init>")) name = to.getEnclosingElement().getSimpleName().toString();
-        if (!name.matches("\\w*")) throw new RuntimeException(String.format("`%s` is not a word", name));
-
+    private static List<Path> containsWord(Collection<Path> allFiles, String name) {
         // Figure out all files that need to be re-scanned
         var outOfDate = new ArrayList<Path>();
         for (var file : allFiles) {
@@ -1225,11 +1188,9 @@ class Parser {
 
     private static Cache<String, Boolean> cacheContainsImport = new Cache<>();
 
-    private static List<Path> containsImport(Collection<Path> allFiles, TypeElement to) {
+    private static List<Path> containsImport(Collection<Path> allFiles, String toPackage, String toClass) {
         // Figure out which files import `to`, explicitly or implicitly
-        var qName = to.getQualifiedName().toString();
-        var toPackage = packageName(to);
-        var toClass = className(to);
+        var qName = toPackage.isEmpty() ? toClass : toPackage + "." + toClass;
         var hasImport = new ArrayList<Path>();
         for (var file : allFiles) {
             if (cacheContainsImport.needs(file, qName)) {
@@ -1245,28 +1206,6 @@ class Parser {
         return hasImport;
     }
 
-    static String packageName(Element e) {
-        while (e != null) {
-            if (e instanceof PackageElement) {
-                var pkg = (PackageElement) e;
-                return pkg.getQualifiedName().toString();
-            }
-            e = e.getEnclosingElement();
-        }
-        return "";
-    }
-
-    static String className(Element e) {
-        while (e != null) {
-            if (e instanceof TypeElement) {
-                var type = (TypeElement) e;
-                return type.getSimpleName().toString();
-            }
-            e = e.getEnclosingElement();
-        }
-        return "";
-    }
-
     static String className(TreePath t) {
         while (t != null) {
             if (t.getLeaf() instanceof ClassTree) {
@@ -1278,22 +1217,43 @@ class Parser {
         return "";
     }
 
-    static Optional<String> memberName(TreePath t) {
-        while (t != null) {
-            if (t.getLeaf() instanceof ClassTree) {
-                return Optional.empty();
-            } else if (t.getLeaf() instanceof MethodTree) {
-                var method = (MethodTree) t.getLeaf();
-                var name = method.getName().toString();
-                return Optional.of(name);
-            } else if (t.getLeaf() instanceof VariableTree) {
-                var field = (VariableTree) t.getLeaf();
-                var name = field.getName().toString();
-                return Optional.of(name);
+    static String memberName(TreePath t) {
+        if (t.getLeaf() instanceof ClassTree) {
+            return "";
+        } else if (t.getLeaf() instanceof MethodTree) {
+            var method = (MethodTree) t.getLeaf();
+            var name = method.getName().toString();
+            if (name.equals("<init>")) {
+                return className(t);
             }
-            t = t.getParentPath();
+            return name;
+        } else if (t.getLeaf() instanceof VariableTree) {
+            var field = (VariableTree) t.getLeaf();
+            var name = field.getName().toString();
+            return name;
         }
-        return Optional.empty();
+        return "";
+    }
+
+    static String signature(TreePath t) {
+        var uri = t.getCompilationUnit().getSourceFile().toUri();
+        var packageName = FileStore.packageName(Paths.get(uri));
+        var className = className(t);
+        var qualifiedName = packageName.isEmpty() ? className : packageName + "." + className;
+        if (t.getLeaf() instanceof MethodTree) {
+            var memberName = memberName(t);
+            var method = (MethodTree) t.getLeaf();
+            var params = new StringJoiner(", ");
+            for (var param : method.getParameters()) {
+                params.add(param.getType().toString());
+            }
+            return qualifiedName + "#" + memberName + "(" + params + ")";
+        } else if (t.getLeaf() instanceof VariableTree) {
+            var field = (VariableTree) t.getLeaf();
+            return qualifiedName + "#" + field.getName();
+        } else {
+            return qualifiedName;
+        }
     }
 
     static String asMarkdown(List<? extends DocTree> lines) {

@@ -26,3 +26,5 @@
 - Code lens incrementally
     - Cache reference counts from outside the active set
     - Invalidate cache when signature of the active set changes
+- Only use setDecorations for fields that can't be inferred from syntax
+    - `field` not `this.field` or `{ String field; }`

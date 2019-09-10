@@ -1,15 +1,15 @@
 package org.javacs.lsp;
 
-import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 
 public class CodeLens {
     public Range range;
     public Command command;
-    public JsonArray data;
+    public JsonElement data;
 
     public CodeLens() {}
 
-    public CodeLens(Range range, Command command, JsonArray data) {
+    public CodeLens(Range range, Command command, JsonElement data) {
         this.range = range;
         this.command = command;
         this.data = data;
