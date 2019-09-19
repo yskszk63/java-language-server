@@ -16,6 +16,7 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: { start: numbe
 			} else if (cursor.gotoParent()) {
 				parents.pop();
 				visitedChildren = true;
+				continue;
 			} else {
 				break;
 			}
@@ -26,6 +27,7 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: { start: numbe
 				visitedChildren = false;
 			} else {
 				visitedChildren = true;
+				continue;
 			}
 		}
 		// Skip nodes that are not visible
