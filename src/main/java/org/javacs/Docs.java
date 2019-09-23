@@ -7,7 +7,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import javax.tools.*;
 
 public class Docs {
@@ -16,12 +15,14 @@ public class Docs {
     private final SourceFileManager fileManager = new SourceFileManager();
 
     Docs(Set<Path> docPath) {
+        var srcZipPath = srcZip();
         // Path to source .jars + src.zip
-        var sourcePathFiles = docPath.stream().map(Path::toFile).collect(Collectors.toSet());
-
+        var sourcePath = new ArrayList<Path>(docPath);
+        if (srcZipPath != NOT_FOUND) {
+            sourcePath.add(srcZipPath);
+        }
         try {
-            fileManager.setLocation(StandardLocation.SOURCE_PATH, sourcePathFiles);
-            var srcZipPath = srcZip();
+            fileManager.setLocationFromPaths(StandardLocation.SOURCE_PATH, sourcePath);
             if (srcZipPath != NOT_FOUND) {
                 fileManager.setLocationFromPaths(StandardLocation.MODULE_SOURCE_PATH, Set.of(srcZipPath));
             }
