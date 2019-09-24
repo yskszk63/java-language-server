@@ -2,19 +2,16 @@
 
 set -e
 
-# Check JAVA_HOME points to correct java version
-./scripts/check_java_home.sh
-
 # Needed once
 if [ ! -e node_modules ]; then
     npm install
 fi
 
 # Build standalone java
-if [ ! -e jdks/linux/jdk-11.0.1 ]; then
+if [ ! -e jdks/linux/jdk-13 ]; then
     ./scripts/download_linux_jdk.sh
 fi
-if [ ! -e jdks/windows/jdk-11.0.1 ]; then
+if [ ! -e jdks/windows/jdk-13 ]; then
     ./scripts/download_windows_jdk.sh
 fi
 if [ ! -e dist/linux/bin/java ]; then

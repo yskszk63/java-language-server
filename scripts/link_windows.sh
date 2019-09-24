@@ -3,12 +3,9 @@
 
 set -e
 
-# Check JAVA_HOME points to correct java version
-./scripts/check_java_home.sh
-
 # Set env variables to build with mac toolchain but windows target
 REAL_JAVA_HOME=$JAVA_HOME
-JAVA_HOME="./jdks/windows/jdk-11.0.1"
+JAVA_HOME="./jdks/windows/jdk-13"
 
 # Build in dist/windows
 rm -rf dist/windows

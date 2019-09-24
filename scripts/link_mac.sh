@@ -3,9 +3,6 @@
 
 set -e
 
-# Check JAVA_HOME points to correct java version
-./scripts/check_java_home.sh
-
 # Build using jlink
 rm -rf dist/mac
 $JAVA_HOME/bin/jlink \

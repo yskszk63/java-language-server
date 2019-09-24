@@ -1,9 +1,6 @@
 
 #!/bin/bash
 
-# Check JAVA_HOME points to correct java version
-./scripts/check_java_home.sh
-
 # Compile the benchmark
 mvn test-compile
 
