@@ -41,6 +41,14 @@ public class LspTest {
     }
 
     @Test
+    public void writeError() {
+        LSP.error(writer, 1, new ResponseError(-100, "something went wrong", null));
+        var expected =
+                "Content-Length: 79\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-100,\"message\":\"something went wrong\"}}";
+        assertThat(bufferToString(), equalTo(expected));
+    }
+
+    @Test
     public void writeMultibyteCharacters() {
         LSP.respond(writer, 1, "🔥");
         var expected = "Content-Length: 40\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"🔥\"}";

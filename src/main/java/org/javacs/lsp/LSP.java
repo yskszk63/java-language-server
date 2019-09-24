@@ -107,12 +107,21 @@ public class LSP {
     }
 
     static void respond(OutputStream client, int requestId, Object params) {
+        if (params instanceof ResponseError) {
+            throw new RuntimeException("Errors should be sent using LSP.error(...)");
+        }
         if (params instanceof Optional) {
             var option = (Optional) params;
             params = option.orElse(null);
         }
         var jsonText = toJson(params);
         var messageText = String.format("{\"jsonrpc\":\"2.0\",\"id\":%d,\"result\":%s}", requestId, jsonText);
+        writeClient(client, messageText);
+    }
+
+    static void error(OutputStream client, int requestId, ResponseError error) {
+        var jsonText = toJson(error);
+        var messageText = String.format("{\"jsonrpc\":\"2.0\",\"id\":%d,\"error\":%s}", requestId, jsonText);
         writeClient(client, messageText);
     }
 
@@ -438,7 +447,7 @@ public class LSP {
             } catch (Exception e) {
                 LOG.log(Level.SEVERE, e.getMessage(), e);
                 if (r.id != null) {
-                    respond(send, r.id, new ResponseError(ErrorCodes.InternalError, e.getMessage(), null));
+                    error(send, r.id, new ResponseError(ErrorCodes.InternalError, e.getMessage(), null));
                 }
             }
         }
