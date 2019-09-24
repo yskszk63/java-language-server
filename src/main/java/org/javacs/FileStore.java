@@ -196,6 +196,9 @@ class FileStore {
             var time = Files.getLastModifiedTime(file).toInstant();
             var packageName = StringSearch.packageName(file);
             javaSources.put(file, new Info(time, packageName));
+        } catch (NoSuchFileException e) {
+            LOG.warning(e.getMessage());
+            javaSources.remove(file);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -254,6 +257,9 @@ class FileStore {
         try {
             // TODO I think there is a faster path here
             return Files.readAllLines(Paths.get(file)).stream().collect(Collectors.joining("\n"));
+        } catch (NoSuchFileException e) {
+            LOG.warning(e.getMessage());
+            return "";
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -272,6 +278,10 @@ class FileStore {
         }
         try {
             return Files.newInputStream(file);
+        } catch (NoSuchFileException e) {
+            LOG.warning(e.getMessage());
+            byte[] bs = {};
+            return new ByteArrayInputStream(bs);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -285,6 +295,9 @@ class FileStore {
         }
         try {
             return Files.newBufferedReader(file);
+        } catch (NoSuchFileException e) {
+            LOG.warning(e.getMessage());
+            return new BufferedReader(new StringReader(""));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

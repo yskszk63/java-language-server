@@ -5,15 +5,8 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
-import java.nio.file.Path;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.nio.file.*;
+import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -226,6 +219,9 @@ class StringSearch {
             SEARCH_BUFFER.position(0);
             var chars = Charset.forName("UTF-8").decode(SEARCH_BUFFER);
             return matchesTitleCase(chars, query);
+        } catch (NoSuchFileException e) {
+            LOG.warning(e.getMessage());
+            return false;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -245,6 +241,9 @@ class StringSearch {
             channel.read(SEARCH_BUFFER);
             SEARCH_BUFFER.position(0);
             return search.nextWord(SEARCH_BUFFER) != -1;
+        } catch (NoSuchFileException e) {
+            LOG.warning(e.getMessage());
+            return false;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -264,6 +263,9 @@ class StringSearch {
             channel.read(SEARCH_BUFFER);
             SEARCH_BUFFER.position(0);
             return search.next(SEARCH_BUFFER) != -1;
+        } catch (NoSuchFileException e) {
+            LOG.warning(e.getMessage());
+            return false;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
