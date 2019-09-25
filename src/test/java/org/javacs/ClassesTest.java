@@ -15,16 +15,16 @@ public class ClassesTest {
 
     @Test
     public void list() {
-        var jdk = Classes.jdkTopLevelClasses();
+        var jdk = ScanClassPath.jdkTopLevelClasses();
         assertThat(jdk, hasItem("java.util.List"));
 
-        var empty = Classes.classPathTopLevelClasses(Collections.emptySet());
+        var empty = ScanClassPath.classPathTopLevelClasses(Collections.emptySet());
         assertThat(empty, not(hasItem("java.util.List")));
     }
 
     @Test
     public void arrayList() {
-        var jdk = Classes.jdkTopLevelClasses();
+        var jdk = ScanClassPath.jdkTopLevelClasses();
         assertThat(jdk, hasItem("java.util.ArrayList"));
     }
 

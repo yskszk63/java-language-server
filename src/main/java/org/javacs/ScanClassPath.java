@@ -14,10 +14,9 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import org.javacs.guava.ClassPath;
 
-class Classes {
+class ScanClassPath {
 
     /** All exported modules that are present in JDK 10 or 11 */
     static String[] JDK_MODULES = {
@@ -160,7 +159,10 @@ class Classes {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        var classes = scanner.getTopLevelClasses().stream().map(info -> info.getName()).collect(Collectors.toSet());
+        var classes = new HashSet<String>();
+        for (var c : scanner.getTopLevelClasses()) {
+            classes.add(c.getName());
+        }
 
         LOG.info(String.format("Found %d classes in classpath", classes.size()));
 

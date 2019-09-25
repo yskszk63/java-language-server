@@ -44,7 +44,7 @@ public class Docs {
                 LOG.info(String.format("...found %s on source path", fromSourcePath.toUri().getPath()));
                 return Optional.of(fromSourcePath);
             }
-            for (var module : Classes.JDK_MODULES) {
+            for (var module : ScanClassPath.JDK_MODULES) {
                 var moduleLocation = fileManager.getLocationForModule(StandardLocation.MODULE_SOURCE_PATH, module);
                 if (moduleLocation == null) continue;
                 var fromModuleSourcePath =

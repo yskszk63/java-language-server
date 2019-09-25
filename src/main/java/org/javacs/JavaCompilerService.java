@@ -17,7 +17,7 @@ class JavaCompilerService {
     final Set<String> addExports;
     final ReusableCompiler compiler = new ReusableCompiler();
     final Docs docs;
-    final Set<String> jdkClasses = Classes.jdkTopLevelClasses(), classPathClasses;
+    final Set<String> jdkClasses = ScanClassPath.jdkTopLevelClasses(), classPathClasses;
     // Diagnostics from the last compilation task
     final List<Diagnostic<? extends JavaFileObject>> diags = new ArrayList<>();
     // Use the same file manager for multiple tasks, so we don't repeatedly re-compile the same files
@@ -38,7 +38,7 @@ class JavaCompilerService {
         this.docPath = Collections.unmodifiableSet(docPath);
         this.addExports = Collections.unmodifiableSet(addExports);
         this.docs = new Docs(docPath);
-        this.classPathClasses = Classes.classPathTopLevelClasses(classPath);
+        this.classPathClasses = ScanClassPath.classPathTopLevelClasses(classPath);
         this.fileManager = new SourceFileManager();
     }
 
