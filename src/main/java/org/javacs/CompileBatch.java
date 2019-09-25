@@ -249,67 +249,15 @@ class CompileBatch implements AutoCloseable {
 
     Optional<List<TreePath>> definitions(Element el) {
         LOG.info(String.format("Search for definitions of `%s` in %d files...", el, roots.size()));
-
         if (el.asType().getKind() == TypeKind.ERROR) {
             LOG.info(String.format("...`%s` is an error type, giving up", el.asType()));
             return Optional.empty();
         }
-
-        var refs = new ArrayList<TreePath>();
-        class FindDefinitions extends TreePathScanner<Void, Void> {
-            boolean sameSymbol(Element found) {
-                return el.equals(found);
-            }
-
-            boolean isSubMethod(Element found) {
-                if (!(el instanceof ExecutableElement)) return false;
-                if (!(found instanceof ExecutableElement)) return false;
-                var superMethod = (ExecutableElement) el;
-                var subMethod = (ExecutableElement) found;
-                var subType = (TypeElement) subMethod.getEnclosingElement();
-                // TODO need to check if class is compatible as well
-                if (elements.overrides(subMethod, superMethod, subType)) {
-                    // LOG.info(String.format("...`%s.%s` overrides `%s`", subType, subMethod, superMethod));
-                    return true;
-                }
-                return false;
-            }
-
-            void check(TreePath from) {
-                var found = trees.getElement(from);
-                var match = sameSymbol(found) || isSubMethod(found);
-                if (match) refs.add(from);
-            }
-
-            @Override
-            public Void visitClass(ClassTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitClass(t, null);
-            }
-
-            @Override
-            public Void visitMethod(MethodTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitMethod(t, null);
-            }
-
-            @Override
-            public Void visitVariable(VariableTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitVariable(t, null);
-            }
-
-            @Override
-            public Void visitTypeParameter(TypeParameterTree t, Void __) {
-                check(getCurrentPath());
-                return super.visitTypeParameter(t, null);
-            }
-        }
-        var finder = new FindDefinitions();
+        var finder = new FindDefinitions(el, borrow.task);
         for (var r : roots) {
             finder.scan(r, null);
         }
-        return Optional.of(refs);
+        return Optional.of(finder.results);
     }
 
     Optional<List<TreePath>> references(URI toUri, int toLine, int toColumn) {
@@ -353,61 +301,13 @@ class CompileBatch implements AutoCloseable {
         return root(uri).getImports();
     }
 
-    private List<Element> overrides(ExecutableElement method) {
-        var elements = borrow.task.getElements();
-        var types = borrow.task.getTypes();
-        var results = new ArrayList<Element>();
-        var enclosingClass = (TypeElement) method.getEnclosingElement();
-        var enclosingType = enclosingClass.asType();
-        for (var superClass : types.directSupertypes(enclosingType)) {
-            var e = (TypeElement) types.asElement(superClass);
-            for (var other : e.getEnclosedElements()) {
-                if (!(other instanceof ExecutableElement)) continue;
-                if (elements.overrides(method, (ExecutableElement) other, enclosingClass)) {
-                    results.add(other);
-                }
-            }
-        }
-        return results;
-    }
-
-    private boolean hasOverrideAnnotation(ExecutableElement method) {
-        for (var ann : method.getAnnotationMirrors()) {
-            var type = ann.getAnnotationType();
-            var el = type.asElement();
-            var name = el.toString();
-            if (name.equals("java.lang.Override")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /** Find methods that override a method from a superclass but don't have an @Override annotation. */
     List<TreePath> needsOverrideAnnotation(URI uri) {
         LOG.info(String.format("Looking for methods that need an @Override annotation in %s ...", uri.getPath()));
-
         var root = root(uri);
-        var results = new ArrayList<TreePath>();
-        class FindMissingOverride extends TreePathScanner<Void, Void> {
-            @Override
-            public Void visitMethod(MethodTree t, Void __) {
-                var method = (ExecutableElement) trees.getElement(getCurrentPath());
-                var supers = overrides(method);
-                if (!supers.isEmpty() && !hasOverrideAnnotation(method)) {
-                    var overridesMethod = supers.get(0);
-                    var overridesClass = overridesMethod.getEnclosingElement();
-                    LOG.info(
-                            String.format(
-                                    "...`%s` has no @Override annotation but overrides `%s.%s`",
-                                    method, overridesClass, overridesMethod));
-                    results.add(getCurrentPath());
-                }
-                return super.visitMethod(t, null);
-            }
-        }
-        new FindMissingOverride().scan(root, null);
-        return results;
+        var finder = new FindMissingOverride(borrow.task);
+        finder.scan(root, null);
+        return finder.results;
     }
 
     /**
@@ -436,29 +336,8 @@ class CompileBatch implements AutoCloseable {
         classes.addAll(parent.classPathClasses);
         var fixes = StringSearch.resolveSymbols(unresolved, sourcePathImports, classes);
         // Figure out which existing imports are actually used
-        var trees = Trees.instance(borrow.task);
-        var references = new HashSet<String>();
-        class FindUsedImports extends TreePathScanner<Void, Void> {
-            @Override
-            public Void visitIdentifier(IdentifierTree node, Void nothing) {
-                var e = trees.getElement(getCurrentPath());
-                if (e instanceof TypeElement) {
-                    var t = (TypeElement) e;
-                    var qualifiedName = t.getQualifiedName().toString();
-                    var lastDot = qualifiedName.lastIndexOf('.');
-                    var packageName = lastDot == -1 ? "" : qualifiedName.substring(0, lastDot);
-                    var thisPackage = Objects.toString(root.getPackageName(), "");
-                    // java.lang.* and current package are imported by default
-                    if (!packageName.equals("java.lang")
-                            && !packageName.equals(thisPackage)
-                            && !packageName.equals("")) {
-                        references.add(qualifiedName);
-                    }
-                }
-                return null;
-            }
-        }
-        new FindUsedImports().scan(root, null);
+        var finder = new FindUsedImports(borrow.task, root);
+        finder.scan(root, null);
         // If `uri` contains errors, don't try to fix imports, it's too inaccurate
         var hasErrors = hasErrors(uri);
         // Take the intersection of existing imports ^ existing identifiers
@@ -467,11 +346,11 @@ class CompileBatch implements AutoCloseable {
             var imported = i.getQualifiedIdentifier().toString();
             if (imported.endsWith(".*")) {
                 var packageName = StringSearch.mostName(imported);
-                var isUsed = hasErrors || references.stream().anyMatch(r -> r.startsWith(packageName));
+                var isUsed = hasErrors || finder.references.stream().anyMatch(r -> r.startsWith(packageName));
                 if (isUsed) qualifiedNames.add(imported);
                 else LOG.warning("There are no references to package " + imported);
             } else {
-                if (hasErrors || references.contains(imported)) qualifiedNames.add(imported);
+                if (hasErrors || finder.references.contains(imported)) qualifiedNames.add(imported);
                 else LOG.warning("There are no references to class " + imported);
             }
         }
@@ -1400,69 +1279,14 @@ class CompileBatch implements AutoCloseable {
     /** Find the smallest tree that includes the cursor */
     TreePath findPath(URI uri, int line, int character) {
         var root = root(uri);
-        var trees = Trees.instance(borrow.task);
-        var pos = trees.getSourcePositions();
         var cursor = root.getLineMap().getPosition(line, character);
-
-        // Search for the smallest element that encompasses line:column
-        class FindSmallest extends TreePathScanner<Void, Void> {
-            TreePath found = null;
-
-            boolean containsCursor(Tree tree) {
-                long start = pos.getStartPosition(root, tree), end = pos.getEndPosition(root, tree);
-                // If cursor isn't in tree, return early
-                if (cursor < start || end < cursor) return false;
-                // int x = 1, y = 2, ... requires special handling
-                if (tree instanceof VariableTree) {
-                    var v = (VariableTree) tree;
-                    // Get contents of source
-                    String source;
-                    try {
-                        source = root.getSourceFile().getCharContent(true).toString();
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                    // Find name in contents
-                    // TODO this picks up the `i` in `int` in `int i = 1;`
-                    var name = v.getName().toString();
-                    start = source.indexOf(name, (int) start);
-                    if (start == -1) {
-                        LOG.warning(String.format("Can't find name `%s` in variable declaration `%s`", name, v));
-                        return false;
-                    }
-                    end = start + name.length();
-                    // Check narrowed range
-                    return start <= cursor && cursor <= end;
-                }
-                return true;
-            }
-
-            @Override
-            public Void scan(Tree tree, Void nothing) {
-                // This is pre-order traversal, so the deepest element will be the last one remaining in `found`
-                if (containsCursor(tree)) {
-                    found = new TreePath(getCurrentPath(), tree);
-                }
-                super.scan(tree, nothing);
-                return null;
-            }
-
-            @Override
-            public Void visitErroneous(ErroneousTree node, Void nothing) {
-                if (node.getErrorTrees() == null) return null;
-                for (var t : node.getErrorTrees()) {
-                    scan(t, nothing);
-                }
-                return null;
-            }
-        }
-        var find = new FindSmallest();
-        find.scan(root, null);
-        if (find.found == null) {
+        var finder = new FindSmallest(cursor, borrow.task, root);
+        finder.scan(root, null);
+        if (finder.found == null) {
             var message = String.format("No TreePath to %s %d:%d", uri, line, character);
             throw new RuntimeException(message);
         }
-        return find.found;
+        return finder.found;
     }
 
     private CompletionItem snippetCompletion(String label, String snippet) {
