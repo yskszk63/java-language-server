@@ -17,7 +17,7 @@ class FileStore {
 
     private static final Set<Path> workspaceRoots = new HashSet<>();
 
-    private static final Map<URI, VersionedContent> activeDocuments = new HashMap<>();
+    private static final Map<Path, VersionedContent> activeDocuments = new HashMap<>();
 
     /** javaSources[file] is the javaSources time of a .java source file. */
     // TODO organize by package name for speed of list(...)
@@ -205,49 +205,45 @@ class FileStore {
     }
 
     static void open(DidOpenTextDocumentParams params) {
+        if (!isJavaFile(params.textDocument.uri)) return;
         var document = params.textDocument;
-        var uri = document.uri;
-        if (!isJavaFile(uri)) return;
-        activeDocuments.put(uri, new VersionedContent(document.text, document.version));
+        var file = Paths.get(document.uri);
+        activeDocuments.put(file, new VersionedContent(document.text, document.version));
     }
 
     static void change(DidChangeTextDocumentParams params) {
+        if (!isJavaFile(params.textDocument.uri)) return;
         var document = params.textDocument;
-        var uri = document.uri;
-        if (isJavaFile(uri)) {
-            var existing = activeDocuments.get(uri);
-            var newText = existing.content;
-
-            if (document.version > existing.version) {
-                for (var change : params.contentChanges) {
-                    if (change.range == null) newText = change.text;
-                    else newText = patch(newText, change);
-                }
-
-                activeDocuments.put(uri, new VersionedContent(newText, document.version));
-            } else LOG.warning("Ignored change with version " + document.version + " <= " + existing.version);
+        var file = Paths.get(document.uri);
+        var existing = activeDocuments.get(file);
+        if (document.version <= existing.version) {
+            LOG.warning("Ignored change with version " + document.version + " <= " + existing.version);
+            return;
         }
+        var newText = existing.content;
+        for (var change : params.contentChanges) {
+            if (change.range == null) newText = change.text;
+            else newText = patch(newText, change);
+        }
+        activeDocuments.put(file, new VersionedContent(newText, document.version));
     }
 
     static void close(DidCloseTextDocumentParams params) {
-        var document = params.textDocument;
-        var uri = document.uri;
-        if (isJavaFile(uri)) {
-            // Remove from source cache
-            activeDocuments.remove(uri);
-        }
+        if (!isJavaFile(params.textDocument.uri)) return;
+        var file = Paths.get(params.textDocument.uri);
+        activeDocuments.remove(file);
     }
 
-    static Set<URI> activeDocuments() {
+    static Set<Path> activeDocuments() {
         return activeDocuments.keySet();
     }
 
-    static int version(URI file) {
+    static int version(Path file) {
         if (!activeDocuments.containsKey(file)) return -1;
         return activeDocuments.get(file).version;
     }
 
-    static String contents(URI file) {
+    static String contents(Path file) {
         if (!isJavaFile(file)) {
             throw new RuntimeException(file + " is not a java file");
         }
@@ -256,17 +252,13 @@ class FileStore {
         }
         try {
             // TODO I think there is a faster path here
-            return Files.readAllLines(Paths.get(file)).stream().collect(Collectors.joining("\n"));
+            return Files.readAllLines(file).stream().collect(Collectors.joining("\n"));
         } catch (NoSuchFileException e) {
             LOG.warning(e.getMessage());
             return "";
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    static String contents(Path file) {
-        return contents(file.toUri());
     }
 
     static InputStream inputStream(Path file) {

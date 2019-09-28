@@ -3,6 +3,7 @@ package org.javacs;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.net.URI;
+import java.nio.file.Paths;
 import java.util.*;
 import javax.lang.model.element.*;
 import org.javacs.lsp.*;
@@ -44,7 +45,8 @@ class Colorizer extends TreePathScanner<Void, Void> {
                 return;
             }
             // Find name inside expression
-            var contents = FileStore.contents(colors.uri);
+            var file = Paths.get(colors.uri);
+            var contents = FileStore.contents(file);
             var region = contents.substring(start, end);
             start += region.indexOf(name.toString());
             end = start + name.length();

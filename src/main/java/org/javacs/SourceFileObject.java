@@ -3,7 +3,6 @@ package org.javacs;
 import java.io.*;
 import java.net.URI;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.NestingKind;
@@ -17,16 +16,8 @@ class SourceFileObject implements JavaFileObject {
     /** if contents is set, the modified time of contents */
     final Instant modified;
 
-    SourceFileObject(URI uri) {
-        this(Paths.get(uri));
-    }
-
     SourceFileObject(Path path) {
         this(path, null, Instant.EPOCH);
-    }
-
-    SourceFileObject(URI uri, String contents, Instant modified) {
-        this(Paths.get(uri), contents, modified);
     }
 
     SourceFileObject(Path path, String contents, Instant modified) {

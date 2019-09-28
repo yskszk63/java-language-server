@@ -1,7 +1,6 @@
 package org.javacs;
 
 import java.io.File;
-import java.net.URI;
 import java.nio.file.*;
 import java.time.Instant;
 import java.util.*;
@@ -10,7 +9,6 @@ import java.util.stream.Collectors;
 import javax.tools.*;
 import org.javacs.lsp.SymbolInformation;
 
-// TODO eliminate uses of URI in favor of Path
 class JavaCompilerService {
     // Not modifiable! If you want to edit these, you need to create a new instance
     final Set<Path> classPath, docPath;
@@ -80,10 +78,10 @@ class JavaCompilerService {
         return docs;
     }
 
-    CompileBatch compileFocus(URI uri, int line, int character) {
-        var contents = Parser.parseFile(uri).prune(line, character);
-        var file = new SourceFileObject(uri, contents, Instant.now());
-        return compileBatch(List.of(file));
+    CompileBatch compileFocus(Path file, int line, int character) {
+        var contents = Parser.parseFile(file).prune(line, character);
+        var source = new SourceFileObject(file, contents, Instant.now());
+        return compileBatch(List.of(source));
     }
 
     CompileBatch compileBatch(Collection<? extends JavaFileObject> sources) {
@@ -114,7 +112,7 @@ class JavaCompilerService {
             if (!StringSearch.containsWordMatching(file, query)) continue;
             // Parse the file and check class members for matches
             LOG.info(String.format("...%s contains text matches", file.getFileName()));
-            var parse = Parser.parseFile(file.toUri());
+            var parse = Parser.parseFile(file);
             var symbols = parse.findSymbolsMatching(query);
             parsed++;
             // If we confirm matches, add them to the results

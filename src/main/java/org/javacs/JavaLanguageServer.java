@@ -31,14 +31,14 @@ class JavaLanguageServer extends LanguageServer {
         return cacheCompiler;
     }
 
-    void lint(Collection<URI> uris) {
+    void lint(Collection<Path> files) {
         // TODO only lint the current focus, merging errors/decorations with existing
-        LOG.info("Lint " + uris.size() + " files...");
+        LOG.info("Lint " + files.size() + " files...");
         var started = Instant.now();
-        if (uris.isEmpty()) return;
+        if (files.isEmpty()) return;
         var sources = new ArrayList<SourceFileObject>();
-        for (var uri : uris) {
-            var source = new SourceFileObject(uri);
+        for (var file : files) {
+            var source = new SourceFileObject(file);
             sources.add(source);
         }
         try (var batch = compiler().compileBatch(sources)) {
@@ -233,12 +233,13 @@ class JavaLanguageServer extends LanguageServer {
         var started = Instant.now();
         var uri = position.textDocument.uri;
         if (!FileStore.isJavaFile(uri)) return Optional.empty();
+        var file = Paths.get(uri);
         var line = position.position.line + 1;
         var column = position.position.character + 1;
         LOG.info(String.format("Complete at %s(%d,%d)", uri.getPath(), line, column));
         // Figure out what kind of completion we want to do
         // TODO don't complete inside of comments
-        var ctx = Parser.parseFile(uri).completionContext(line, column);
+        var ctx = Parser.parseFile(file).completionContext(line, column);
         if (ctx == CompletionContext.UNKNOWN) {
             var items = new ArrayList<CompletionItem>();
             for (var name : CompileBatch.TOP_LEVEL_KEYWORDS) {
@@ -253,23 +254,23 @@ class JavaLanguageServer extends LanguageServer {
         // Compile again, focusing on a region that depends on what type of completion we want to do
         List<CompletionItem> cs;
         boolean isIncomplete;
-        try (var focus = compiler().compileFocus(uri, ctx.line, ctx.character)) {
+        try (var focus = compiler().compileFocus(file, ctx.line, ctx.character)) {
             var elapsed = Duration.between(started, Instant.now()).toMillis();
             LOG.info(String.format("...compiled focus in %d ms", elapsed));
             // Do a specific type of completion
             switch (ctx.kind) {
                 case MemberSelect:
-                    cs = focus.completeMembers(uri, ctx.line, ctx.character, ctx.addParens, ctx.addSemi);
+                    cs = focus.completeMembers(file, ctx.line, ctx.character, ctx.addParens, ctx.addSemi);
                     isIncomplete = false;
                     break;
                 case MemberReference:
-                    cs = focus.completeReferences(uri, ctx.line, ctx.character);
+                    cs = focus.completeReferences(file, ctx.line, ctx.character);
                     isIncomplete = false;
                     break;
                 case Identifier:
                     cs =
                             focus.completeIdentifiers(
-                                    uri,
+                                    file,
                                     ctx.line,
                                     ctx.character,
                                     ctx.inClass,
@@ -280,11 +281,11 @@ class JavaLanguageServer extends LanguageServer {
                     isIncomplete = cs.size() >= CompileBatch.MAX_COMPLETION_ITEMS;
                     break;
                 case Annotation:
-                    cs = focus.completeAnnotations(uri, ctx.line, ctx.character, ctx.partialName);
+                    cs = focus.completeAnnotations(file, ctx.line, ctx.character, ctx.partialName);
                     isIncomplete = cs.size() >= CompileBatch.MAX_COMPLETION_ITEMS;
                     break;
                 case Case:
-                    cs = focus.completeCases(uri, ctx.line, ctx.character);
+                    cs = focus.completeCases(file, ctx.line, ctx.character);
                     isIncomplete = false;
                     break;
                 default:
@@ -437,14 +438,15 @@ class JavaLanguageServer extends LanguageServer {
         var line = position.position.line + 1;
         var column = position.position.character + 1;
         if (!FileStore.isJavaFile(uri)) return Optional.empty();
+        var file = Paths.get(uri);
         // Log start time
         LOG.info(String.format("Hover over %s(%d,%d) ...", uri.getPath(), line, column));
         var started = Instant.now();
         // Compile entire file
-        var sources = Set.of(new SourceFileObject(uri));
+        var sources = Set.of(new SourceFileObject(file));
         try (var compile = compiler().compileBatch(sources)) {
             // Find element under cursor
-            var el = compile.element(uri, line, column);
+            var el = compile.element(file, line, column);
             if (!el.isPresent()) {
                 LOG.info("...no element under cursor");
                 return Optional.empty();
@@ -474,10 +476,11 @@ class JavaLanguageServer extends LanguageServer {
     public Optional<SignatureHelp> signatureHelp(TextDocumentPositionParams position) {
         var uri = position.textDocument.uri;
         if (!FileStore.isJavaFile(uri)) return Optional.empty();
+        var file = Paths.get(uri);
         var line = position.position.line + 1;
         var column = position.position.character + 1;
-        try (var focus = compiler().compileFocus(uri, line, column)) {
-            return focus.signatureHelp(uri, line, column);
+        try (var focus = compiler().compileFocus(file, line, column)) {
+            return focus.signatureHelp(file, line, column);
         }
     }
 
@@ -485,15 +488,16 @@ class JavaLanguageServer extends LanguageServer {
     public Optional<List<Location>> gotoDefinition(TextDocumentPositionParams position) {
         var fromUri = position.textDocument.uri;
         if (!FileStore.isJavaFile(fromUri)) return Optional.empty();
+        var fromFile = Paths.get(fromUri);
         var fromLine = position.position.line + 1;
         var fromColumn = position.position.character + 1;
 
         // Compile from-file and identify element under cursor
         LOG.info(String.format("Go-to-def at %s:%d...", fromUri, fromLine));
         Optional<Element> toEl;
-        var sources = Set.of(new SourceFileObject(fromUri));
+        var sources = Set.of(new SourceFileObject(fromFile));
         try (var compile = compiler().compileBatch(sources)) {
-            toEl = compile.element(fromUri, fromLine, fromColumn);
+            toEl = compile.element(fromFile, fromLine, fromColumn);
             if (!toEl.isPresent()) {
                 LOG.info(String.format("...no element at cursor"));
                 return Optional.empty();
@@ -502,11 +506,11 @@ class JavaLanguageServer extends LanguageServer {
 
         // Compile all files that *might* contain definitions of fromEl
         var toFiles = Parser.potentialDefinitions(toEl.get());
-        toFiles.add(fromUri);
+        toFiles.add(fromFile);
         var eraseCode = pruneWord(toFiles, Parser.simpleName(toEl.get()));
         try (var batch = compiler().compileBatch(eraseCode)) {
             // Find fromEl again, so that we have an Element from the current batch
-            var fromElAgain = batch.element(fromUri, fromLine, fromColumn).get();
+            var fromElAgain = batch.element(fromFile, fromLine, fromColumn).get();
             // Find all definitions of fromElAgain
             var toTreePaths = batch.definitions(fromElAgain);
             if (!toTreePaths.isPresent()) return Optional.empty();
@@ -529,6 +533,7 @@ class JavaLanguageServer extends LanguageServer {
     public Optional<List<Location>> findReferences(ReferenceParams position) {
         var toUri = position.textDocument.uri;
         if (!FileStore.isJavaFile(toUri)) return Optional.empty();
+        var toFile = Paths.get(toUri);
         var toLine = position.position.line + 1;
         var toColumn = position.position.character + 1;
 
@@ -537,9 +542,9 @@ class JavaLanguageServer extends LanguageServer {
         // Compile from-file and identify element under cursor
         LOG.warning(String.format("Looking for references to %s(%d,%d)...", toUri.getPath(), toLine, toColumn));
         Optional<Element> toEl;
-        var sources = Set.of(new SourceFileObject(toUri));
+        var sources = Set.of(new SourceFileObject(toFile));
         try (var compile = compiler().compileBatch(sources)) {
-            toEl = compile.element(toUri, toLine, toColumn);
+            toEl = compile.element(toFile, toLine, toColumn);
             if (!toEl.isPresent()) {
                 LOG.warning("...no element under cursor");
                 return Optional.empty();
@@ -548,7 +553,7 @@ class JavaLanguageServer extends LanguageServer {
 
         // Compile all files that *might* contain references to toEl
         var name = Parser.simpleName(toEl.get());
-        var fromUris = new HashSet<URI>();
+        var fromFiles = new HashSet<Path>();
         var isLocal =
                 toEl.get() instanceof VariableElement && !(toEl.get().getEnclosingElement() instanceof TypeElement);
         if (!isLocal) {
@@ -560,13 +565,13 @@ class JavaLanguageServer extends LanguageServer {
                     isType = true;
             }
             var flags = toEl.get().getModifiers();
-            var possible = Parser.potentialReferences(toUri, name, isType, flags);
-            fromUris.addAll(possible);
+            var possible = Parser.potentialReferences(toFile, name, isType, flags);
+            fromFiles.addAll(possible);
         }
-        fromUris.add(toUri);
-        var eraseCode = pruneWord(fromUris, name);
+        fromFiles.add(toFile);
+        var eraseCode = pruneWord(fromFiles, name);
         try (var batch = compiler().compileBatch(eraseCode)) {
-            var fromTreePaths = batch.references(toUri, toLine, toColumn);
+            var fromTreePaths = batch.references(toFile, toLine, toColumn);
             LOG.info(String.format("...found %d references", fromTreePaths.map(List::size).orElse(0)));
             if (!fromTreePaths.isPresent()) return Optional.empty();
             var result = new ArrayList<Location>();
@@ -584,7 +589,7 @@ class JavaLanguageServer extends LanguageServer {
         }
     }
 
-    private List<JavaFileObject> pruneWord(Collection<URI> files, String name) {
+    private List<JavaFileObject> pruneWord(Collection<Path> files, String name) {
         LOG.info(String.format("...prune code that doesn't contain `%s`", name));
         var sources = new ArrayList<JavaFileObject>();
         for (var f : files) {
@@ -595,10 +600,10 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     private Parser cacheParse;
-    private URI cacheParseFile = URI.create("file:///NONE");
+    private Path cacheParseFile = Paths.get("/NONE");
     private int cacheParseVersion = -1;
 
-    private void updateCachedParse(URI file) {
+    private void updateCachedParse(Path file) {
         if (file.equals(cacheParseFile) && FileStore.version(file) == cacheParseVersion) return;
         LOG.info(String.format("Updating cached parse file to %s", file));
         cacheParse = Parser.parseFile(file);
@@ -610,7 +615,8 @@ class JavaLanguageServer extends LanguageServer {
     public List<SymbolInformation> documentSymbol(DocumentSymbolParams params) {
         var uri = params.textDocument.uri;
         if (!FileStore.isJavaFile(uri)) return List.of();
-        updateCachedParse(uri);
+        var file = Paths.get(uri);
+        updateCachedParse(file);
         var infos = cacheParse.documentSymbols();
         return infos;
     }
@@ -619,7 +625,8 @@ class JavaLanguageServer extends LanguageServer {
     public List<CodeLens> codeLens(CodeLensParams params) {
         var uri = params.textDocument.uri;
         if (!FileStore.isJavaFile(uri)) return List.of();
-        updateCachedParse(uri);
+        var file = Paths.get(uri);
+        updateCachedParse(file);
         var declarations = cacheParse.codeLensDeclarations();
         var result = new ArrayList<CodeLens>();
         for (var d : declarations) {
@@ -713,34 +720,35 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     private Map<String, Integer> cacheSelfReferences = new HashMap<>();
-    private URI cacheSelfReferencesFile = URI.create("file:///NONE");
+    private Path cacheSelfReferencesFile = Paths.get("/NONE");
     private int cacheSelfReferencesVersion = -1;
 
     private int countSelfReferences(CodeLensData data) {
-        if (!cacheSelfReferencesFile.equals(data.uri) || cacheSelfReferencesVersion < FileStore.version(data.uri)) {
-            updateCacheSelfReferences(data.uri);
+        var file = Paths.get(data.uri);
+        if (!cacheSelfReferencesFile.equals(file) || cacheSelfReferencesVersion < FileStore.version(file)) {
+            updateCacheSelfReferences(file);
         }
         return cacheSelfReferences.get(data.signature);
     }
 
-    private void updateCacheSelfReferences(URI uri) {
-        LOG.info(String.format("...count all self-references in %s...", uri.getPath()));
+    private void updateCacheSelfReferences(Path file) {
+        LOG.info(String.format("...count all self-references in %s...", file));
         cacheSelfReferences.clear();
-        updateCachedParse(uri);
-        var sources = Set.of(new SourceFileObject(uri));
+        updateCachedParse(file);
+        var sources = Set.of(new SourceFileObject(file));
         try (var batch = compiler().compileBatch(sources)) {
             for (var d : cacheParse.codeLensDeclarations()) {
                 if (!cacheParse.showReferencesCodeLens(d)) continue;
                 var range = cacheParse.range(d);
                 if (range.isEmpty()) continue;
                 var start = range.get().start;
-                var fromPaths = batch.references(uri, start.line + 1, start.character + 1).orElse(List.of());
+                var fromPaths = batch.references(file, start.line + 1, start.character + 1).orElse(List.of());
                 var signature = Parser.signature(d);
                 cacheSelfReferences.put(signature, fromPaths.size());
             }
         }
-        cacheSelfReferencesFile = uri;
-        cacheSelfReferencesVersion = FileStore.version(uri);
+        cacheSelfReferencesFile = file;
+        cacheSelfReferencesVersion = FileStore.version(file);
     }
 
     /** Cache reference counts on Parser.signature(_) */
@@ -751,45 +759,46 @@ class JavaLanguageServer extends LanguageServer {
     private int countCrossReferences(CodeLensData data) {
         LOG.info(String.format("...count cross-file references to `%s`...", data.name));
         // Identify all files that *might* contain references to toEl
-        var fromUris = Parser.potentialReferences(data.uri, data.name, isType(data.kind), data.flags);
+        var toFile = Paths.get(data.uri);
+        var fromFiles = Parser.potentialReferences(toFile, data.name, isType(data.kind), data.flags);
         // If it's too expensive to compute the code lens
-        if (fromUris.size() > 100) {
-            LOG.info(String.format("...counting %d files is too expensive", fromUris.size()));
+        if (fromFiles.size() > 100) {
+            LOG.info(String.format("...counting %d files is too expensive", fromFiles.size()));
             return TOO_EXPENSIVE;
         }
         // Figure out what files need to be updated
-        var todo = new HashSet<URI>();
-        for (var fromUri : fromUris) {
-            if (cacheCountCrossReferences.needs(Paths.get(fromUri), data.signature)) {
-                todo.add(fromUri);
+        var todo = new HashSet<Path>();
+        for (var fromFile : fromFiles) {
+            if (cacheCountCrossReferences.needs(fromFile, data.signature)) {
+                todo.add(fromFile);
             }
         }
         // Update the cache
         if (!todo.isEmpty()) {
-            todo.add(data.uri);
+            todo.add(toFile);
             LOG.info(String.format("...compile %d files", todo.size()));
             var eraseCode = pruneWord(todo, data.name);
-            var countByFile = new HashMap<URI, Integer>();
+            var countByFile = new HashMap<Path, Integer>();
             try (var batch = compiler().compileBatch(eraseCode)) {
-                var fromPaths = batch.references(data.uri, data.line + 1, data.character + 1).orElse(List.of());
+                var fromPaths = batch.references(toFile, data.line + 1, data.character + 1).orElse(List.of());
                 for (var fromPath : fromPaths) {
-                    var fromUri = fromPath.getCompilationUnit().getSourceFile().toUri();
-                    var newCount = countByFile.getOrDefault(fromUri, 0) + 1;
-                    countByFile.put(fromUri, newCount);
+                    var fromFile = Paths.get(fromPath.getCompilationUnit().getSourceFile().toUri());
+                    var newCount = countByFile.getOrDefault(fromFile, 0) + 1;
+                    countByFile.put(fromFile, newCount);
                 }
             }
-            for (var fromUri : todo) {
-                var count = countByFile.getOrDefault(fromUri, 0);
+            for (var fromFile : todo) {
+                var count = countByFile.getOrDefault(fromFile, 0);
                 // TODO consider not caching if fromUri contains errors
-                cacheCountCrossReferences.load(Paths.get(fromUri), data.signature, count);
+                cacheCountCrossReferences.load(fromFile, data.signature, count);
             }
             LOG.info(String.format("...found references in %d files", countByFile.size()));
         }
         // Sum up the count
         var count = 0;
-        for (var fromUri : fromUris) {
-            if (fromUri.equals(data.uri)) continue;
-            count += cacheCountCrossReferences.get(Paths.get(fromUri), data.signature);
+        for (var fromFile : fromFiles) {
+            if (fromFile.equals(toFile)) continue;
+            count += cacheCountCrossReferences.get(fromFile, data.signature);
         }
         return count;
     }
@@ -807,18 +816,19 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public List<TextEdit> formatting(DocumentFormattingParams params) {
-        var sources = Set.of(new SourceFileObject(params.textDocument.uri));
+        var file = Paths.get(params.textDocument.uri);
+        var sources = Set.of(new SourceFileObject(file));
         try (var compile = compiler().compileBatch(sources)) {
             var edits = new ArrayList<TextEdit>();
-            edits.addAll(fixImports(compile, params.textDocument.uri));
-            edits.addAll(addOverrides(compile, params.textDocument.uri));
+            edits.addAll(fixImports(compile, file));
+            edits.addAll(addOverrides(compile, file));
             // TODO replace var with type name when vars are copy-pasted into fields
             // TODO replace ThisClass.staticMethod() with staticMethod() when ThisClass is useless
             return edits;
         }
     }
 
-    private List<TextEdit> fixImports(CompileBatch compile, URI file) {
+    private List<TextEdit> fixImports(CompileBatch compile, Path file) {
         // TODO if imports already match fixed-imports, return empty list
         // TODO preserve comments and other details of existing imports
         var imports = compile.fixImports(file);
@@ -866,7 +876,7 @@ class JavaLanguageServer extends LanguageServer {
         return edits;
     }
 
-    private List<TextEdit> addOverrides(CompileBatch compile, URI file) {
+    private List<TextEdit> addOverrides(CompileBatch compile, Path file) {
         var edits = new ArrayList<TextEdit>();
         var methods = compile.needsOverrideAnnotation(file);
         var pos = compile.sourcePositions();
@@ -888,10 +898,9 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public List<FoldingRange> foldingRange(FoldingRangeParams params) {
-        if (!FileStore.isJavaFile(params.textDocument.uri)) {
-            return List.of();
-        }
-        updateCachedParse(params.textDocument.uri);
+        if (!FileStore.isJavaFile(params.textDocument.uri)) return List.of();
+        var file = Paths.get(params.textDocument.uri);
+        updateCachedParse(file);
         return cacheParse.foldingRanges();
     }
 
@@ -908,11 +917,11 @@ class JavaLanguageServer extends LanguageServer {
     @Override
     public void didOpenTextDocument(DidOpenTextDocumentParams params) {
         FileStore.open(params);
-        if (FileStore.isJavaFile(params.textDocument.uri)) {
-            // So that subsequent documentSymbol and codeLens requests will be faster
-            updateCachedParse(params.textDocument.uri);
-            uncheckedChanges = true;
-        }
+        if (!FileStore.isJavaFile(params.textDocument.uri)) return;
+        // So that subsequent documentSymbol and codeLens requests will be faster
+        var file = Paths.get(params.textDocument.uri);
+        updateCachedParse(file);
+        uncheckedChanges = true;
     }
 
     @Override

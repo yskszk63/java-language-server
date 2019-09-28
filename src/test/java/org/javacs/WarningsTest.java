@@ -27,7 +27,7 @@ public class WarningsTest {
 
     @Test
     public void unused() {
-        server.lint(List.of(FindResource.uri("org/javacs/warn/Unused.java")));
+        server.lint(List.of(FindResource.path("org/javacs/warn/Unused.java")));
         assertThat(errors, hasItem("unused(7)")); // int unusedLocal
         assertThat(errors, hasItem("unused(10)")); // int unusedPrivate
         assertThat(errors, hasItem("unused(13)")); // int unusedLocalInLambda
@@ -45,7 +45,7 @@ public class WarningsTest {
 
     @Test
     public void referencePackagePrivateClassInFileWithDifferentName() {
-        server.lint(List.of(FindResource.uri("org/javacs/example/ReferenceGotoPackagePrivate.java")));
+        server.lint(List.of(FindResource.path("org/javacs/example/ReferenceGotoPackagePrivate.java")));
         assertThat(errors, empty());
     }
 

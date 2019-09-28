@@ -72,23 +72,23 @@ class CompileBatch implements AutoCloseable {
     }
 
     private String errorText(javax.tools.Diagnostic<? extends javax.tools.JavaFileObject> err) {
-        var contents = FileStore.contents(err.getSource().toUri());
+        var file = Paths.get(err.getSource().toUri());
+        var contents = FileStore.contents(file);
         var begin = (int) err.getStartPosition();
         var end = (int) err.getEndPosition();
         return contents.substring(begin, end);
     }
 
     private String packageName(javax.tools.Diagnostic<? extends javax.tools.JavaFileObject> err) {
-        var uri = err.getSource().toUri();
-        var path = Paths.get(uri);
-        return FileStore.packageName(path);
+        var file = Paths.get(err.getSource().toUri());
+        return FileStore.packageName(file);
     }
 
     private static final Path NOT_FOUND = Paths.get("");
 
     private Path findPackagePrivateClass(String packageName, String className) {
         for (var file : FileStore.list(packageName)) {
-            var parse = Parser.parseFile(file.toUri());
+            var parse = Parser.parseFile(file);
             for (var candidate : parse.packagePrivateClasses()) {
                 if (candidate.contentEquals(className)) {
                     return file;
@@ -110,18 +110,18 @@ class CompileBatch implements AutoCloseable {
         return parent.compiler.getTask(null, parent.fileManager, parent.diags::add, options, List.of(), sources);
     }
 
-    CompilationUnitTree root(URI uri) {
+    CompilationUnitTree root(Path file) {
         for (var root : roots) {
-            if (root.getSourceFile().toUri().equals(uri)) {
+            if (root.getSourceFile().toUri().equals(file.toUri())) {
                 return root;
             }
         }
-        // Somehow, uri was not in batch
+        // Somehow, file was not in batch
         var names = new StringJoiner(", ");
         for (var r : roots) {
             names.add(StringSearch.fileName(r.getSourceFile().toUri()));
         }
-        throw new RuntimeException("File " + uri + " isn't in batch " + names);
+        throw new RuntimeException("File " + file + " isn't in batch " + names);
     }
 
     private String contents(CompilationUnitTree root) {
@@ -132,8 +132,8 @@ class CompileBatch implements AutoCloseable {
         }
     }
 
-    Optional<Element> element(URI uri, int line, int character) {
-        var path = findPath(uri, line, character);
+    Optional<Element> element(Path file, int line, int character) {
+        var path = findPath(file, line, character);
         var el = trees.getElement(path);
         return Optional.ofNullable(el);
     }
@@ -209,8 +209,8 @@ class CompileBatch implements AutoCloseable {
         var pos = trees.getSourcePositions();
         var start = pos.getStartPosition(root, leaf);
         var end = pos.getEndPosition(root, leaf);
-        var uri = root.getSourceFile().toUri();
-        var contents = FileStore.contents(uri);
+        var file = Paths.get(root.getSourceFile().toUri());
+        var contents = FileStore.contents(file);
         if (leaf instanceof VariableTree) {
             var v = (VariableTree) leaf;
             var name = v.getName().toString();
@@ -234,9 +234,9 @@ class CompileBatch implements AutoCloseable {
 
     private org.javacs.lsp.Diagnostic asDiagnostic(javax.tools.Diagnostic<? extends JavaFileObject> java) {
         // Check that error is in an open file
-        var uri = java.getSource().toUri();
+        var file = Paths.get(java.getSource().toUri());
         // Find start and end position
-        var content = FileStore.contents(uri);
+        var content = FileStore.contents(file);
         var start = position(content, java.getStartPosition());
         var end = position(content, java.getEndPosition());
         var d = new org.javacs.lsp.Diagnostic();
@@ -260,10 +260,10 @@ class CompileBatch implements AutoCloseable {
         return Optional.of(finder.results);
     }
 
-    Optional<List<TreePath>> references(URI toUri, int toLine, int toColumn) {
-        var to = element(toUri, toLine, toColumn);
+    Optional<List<TreePath>> references(Path toFile, int toLine, int toColumn) {
+        var to = element(toFile, toLine, toColumn);
         if (to.isEmpty()) {
-            LOG.info(String.format("...no element at %s(%d, %d), giving up", toUri.getPath(), toLine, toColumn));
+            LOG.info(String.format("...no element at %s(%d, %d), giving up", toFile, toLine, toColumn));
             return Optional.empty();
         }
         // If to is an error, we won't be able to find anything
@@ -284,8 +284,8 @@ class CompileBatch implements AutoCloseable {
     }
 
     Optional<Range> range(TreePath path) {
-        var uri = path.getCompilationUnit().getSourceFile().toUri();
-        var contents = FileStore.contents(uri);
+        var file = Paths.get(path.getCompilationUnit().getSourceFile().toUri());
+        var contents = FileStore.contents(file);
         return Parser.range(borrow.task, contents, path);
     }
 
@@ -293,18 +293,18 @@ class CompileBatch implements AutoCloseable {
         return trees.getSourcePositions();
     }
 
-    LineMap lineMap(URI uri) {
-        return root(uri).getLineMap();
+    LineMap lineMap(Path file) {
+        return root(file).getLineMap();
     }
 
-    List<? extends ImportTree> imports(URI uri) {
-        return root(uri).getImports();
+    List<? extends ImportTree> imports(Path file) {
+        return root(file).getImports();
     }
 
     /** Find methods that override a method from a superclass but don't have an @Override annotation. */
-    List<TreePath> needsOverrideAnnotation(URI uri) {
-        LOG.info(String.format("Looking for methods that need an @Override annotation in %s ...", uri.getPath()));
-        var root = root(uri);
+    List<TreePath> needsOverrideAnnotation(Path file) {
+        LOG.info(String.format("Looking for methods that need an @Override annotation in %s ...", file));
+        var root = root(file);
         var finder = new FindMissingOverride(borrow.task);
         finder.scan(root, null);
         return finder.results;
@@ -314,13 +314,14 @@ class CompileBatch implements AutoCloseable {
      * Figure out what imports this file should have. Star-imports like `import java.util.*` are converted to individual
      * class imports. Missing imports are inferred by looking at imports in other source files.
      */
-    List<String> fixImports(URI uri) {
-        var root = root(uri);
+    List<String> fixImports(Path file) {
+        var root = root(file);
         var contents = contents(root);
         // Check diagnostics for missing imports
         var unresolved = new HashSet<String>();
         for (var d : parent.diags) {
-            if (d.getCode().equals("compiler.err.cant.resolve.location") && d.getSource().toUri().equals(uri)) {
+            if (d.getCode().equals("compiler.err.cant.resolve.location")
+                    && d.getSource().toUri().equals(file.toUri())) {
                 long start = d.getStartPosition(), end = d.getEndPosition();
                 var id = contents.substring((int) start, (int) end);
                 if (id.matches("[A-Z]\\w+")) {
@@ -338,8 +339,8 @@ class CompileBatch implements AutoCloseable {
         // Figure out which existing imports are actually used
         var finder = new FindUsedImports(borrow.task, root);
         finder.scan(root, null);
-        // If `uri` contains errors, don't try to fix imports, it's too inaccurate
-        var hasErrors = hasErrors(uri);
+        // If `file` contains errors, don't try to fix imports, it's too inaccurate
+        var hasErrors = hasErrors(file);
         // Take the intersection of existing imports ^ existing identifiers
         var qualifiedNames = new HashSet<String>();
         for (var i : root.getImports()) {
@@ -363,10 +364,10 @@ class CompileBatch implements AutoCloseable {
         return sorted;
     }
 
-    private boolean hasErrors(URI uri) {
+    private boolean hasErrors(Path file) {
         for (var d : parent.diags) {
             if (d.getKind() != javax.tools.Diagnostic.Kind.ERROR) continue;
-            if (!d.getSource().toUri().equals(uri)) continue;
+            if (!d.getSource().toUri().equals(file.toUri())) continue;
             if (d.getCode().equals("compiler.err.cant.resolve.location")) continue;
             return true;
         }
@@ -374,7 +375,7 @@ class CompileBatch implements AutoCloseable {
     }
 
     /** Find all overloads for the smallest method call that includes the cursor */
-    Optional<SignatureHelp> signatureHelp(URI file, int line, int character) {
+    Optional<SignatureHelp> signatureHelp(Path file, int line, int character) {
         LOG.info(String.format("Find method invocation around %s(%d,%d)...", file, line, character));
         var cursor = findPath(file, line, character);
         var invokePath = surroundingInvocation(cursor);
@@ -578,7 +579,7 @@ class CompileBatch implements AutoCloseable {
     }
 
     List<CompletionItem> completeIdentifiers(
-            URI uri,
+            Path file,
             int line,
             int character,
             boolean insideClass,
@@ -588,14 +589,14 @@ class CompileBatch implements AutoCloseable {
             boolean addSemi) {
         LOG.info(String.format("Completing identifiers starting with `%s`...", partialName));
 
-        var root = root(uri);
+        var root = root(file);
         var result = new ArrayList<CompletionItem>();
 
         // Add snippets
         if (!insideClass) {
             // If no package declaration is present, suggest package [inferred name];
             if (root.getPackage() == null) {
-                var name = FileStore.suggestedPackageName(Paths.get(uri));
+                var name = FileStore.suggestedPackageName(file);
                 result.add(snippetCompletion("package " + name, "package " + name + ";\n\n"));
             }
             // If no class declaration is present, suggest class [file name]
@@ -606,13 +607,13 @@ class CompileBatch implements AutoCloseable {
                 }
             }
             if (!hasClassDeclaration) {
-                var name = Paths.get(uri).getFileName().toString();
+                var name = file.getFileName().toString();
                 name = name.substring(0, name.length() - ".java".length());
                 result.add(snippetCompletion("class " + name, "class " + name + " {\n    $0\n}"));
             }
         }
         // Add identifiers
-        var inScope = completeScopeIdentifiers(uri, line, character, partialName, addParens, addSemi);
+        var inScope = completeScopeIdentifiers(file, line, character, partialName, addParens, addSemi);
         result.addAll(inScope);
         // Add keywords
         if (!insideClass) {
@@ -626,13 +627,13 @@ class CompileBatch implements AutoCloseable {
         return result;
     }
 
-    List<CompletionItem> completeAnnotations(URI uri, int line, int character, String partialName) {
+    List<CompletionItem> completeAnnotations(Path file, int line, int character, String partialName) {
         var result = new ArrayList<CompletionItem>();
         // Add @Override ... snippet
         if ("Override".startsWith(partialName)) {
             // TODO filter out already-implemented methods using thisMethods
             var alreadyShown = new HashSet<String>();
-            for (var method : superMethods(uri, line, character)) {
+            for (var method : superMethods(file, line, character)) {
                 var mods = method.getModifiers();
                 if (mods.contains(Modifier.STATIC) || mods.contains(Modifier.PRIVATE)) continue;
 
@@ -647,14 +648,14 @@ class CompileBatch implements AutoCloseable {
         }
         // Add @Override, @Test, other simple class names
         // We use 0 as the column number because if we focus javac on the partial @Annotation it will crash
-        var inScope = completeScopeIdentifiers(uri, line, 0, partialName, false, false);
+        var inScope = completeScopeIdentifiers(file, line, 0, partialName, false, false);
         result.addAll(inScope);
         return result;
     }
 
     /** Find all case options in the switch expression surrounding line:character */
-    List<CompletionItem> completeCases(URI uri, int line, int character) {
-        var cursor = findPath(uri, line, character);
+    List<CompletionItem> completeCases(Path file, int line, int character) {
+        var cursor = findPath(file, line, character);
         LOG.info(String.format("Complete enum constants following `%s`...", cursor.getLeaf()));
         // Find surrounding switch
         var path = cursor;
@@ -673,7 +674,7 @@ class CompileBatch implements AutoCloseable {
         var definition = types.asElement(type);
         if (definition == null) {
             LOG.info("...type has no definition, completing identifiers instead");
-            return completeIdentifiers(uri, line, character, true, true, "", false, false); // TODO pass partial name
+            return completeIdentifiers(file, line, character, true, true, "", false, false); // TODO pass partial name
         }
         LOG.info(String.format("...switched expression has definition `%s`", definition));
         var result = new ArrayList<CompletionItem>();
@@ -687,8 +688,8 @@ class CompileBatch implements AutoCloseable {
     }
 
     /** Find all members of expression ending at line:character */
-    List<CompletionItem> completeMembers(URI uri, int line, int character, boolean addParens, boolean addSemi) {
-        var path = findPath(uri, line, character);
+    List<CompletionItem> completeMembers(Path file, int line, int character, boolean addParens, boolean addSemi) {
+        var path = findPath(file, line, character);
         var scope = trees.getScope(path);
         var element = trees.getElement(path);
         var type = trees.getTypeMirror(path);
@@ -737,8 +738,8 @@ class CompileBatch implements AutoCloseable {
         return false;
     }
 
-    List<CompletionItem> completeReferences(URI uri, int line, int character) {
-        var path = findPath(uri, line, character);
+    List<CompletionItem> completeReferences(Path file, int line, int character) {
+        var path = findPath(file, line, character);
         var scope = trees.getScope(path);
         var element = trees.getElement(path);
         var type = trees.getTypeMirror(path);
@@ -952,8 +953,8 @@ class CompileBatch implements AutoCloseable {
         return result;
     }
 
-    private TypeMirror enclosingClass(URI uri, int line, int character) {
-        var cursor = findPath(uri, line, character);
+    private TypeMirror enclosingClass(Path file, int line, int character) {
+        var cursor = findPath(file, line, character);
         var path = cursor;
         while (!(path.getLeaf() instanceof ClassTree)) path = path.getParentPath();
         var enclosingClass = trees.getElement(path);
@@ -973,8 +974,8 @@ class CompileBatch implements AutoCloseable {
         }
     }
 
-    private List<ExecutableElement> superMethods(URI uri, int line, int character) {
-        var thisType = enclosingClass(uri, line, character);
+    private List<ExecutableElement> superMethods(Path file, int line, int character) {
+        var thisType = enclosingClass(file, line, character);
         var result = new ArrayList<ExecutableElement>();
 
         collectSuperMethods(thisType, result);
@@ -982,8 +983,8 @@ class CompileBatch implements AutoCloseable {
         return result;
     }
 
-    private boolean isImported(URI uri, String qualifiedName) {
-        var root = root(uri);
+    private boolean isImported(Path file, String qualifiedName) {
+        var root = root(file);
         var packageName = StringSearch.mostName(qualifiedName);
         var className = StringSearch.lastName(qualifiedName);
         for (var i : root.getImports()) {
@@ -1148,14 +1149,14 @@ class CompileBatch implements AutoCloseable {
     }
 
     private List<CompletionItem> completeScopeIdentifiers(
-            URI uri, int line, int character, String partialName, boolean addParens, boolean addSemi) {
+            Path file, int line, int character, String partialName, boolean addParens, boolean addSemi) {
         var result = new ArrayList<CompletionItem>();
-        var root = root(uri);
+        var root = root(file);
         // Add locals
-        var path = findPath(uri, line, character);
+        var path = findPath(file, line, character);
         var scope = trees.getScope(path);
         if (scope.getEnclosingClass() == null) {
-            LOG.warning(String.format("No enclosing class at %s(%d)", uri, line));
+            LOG.warning(String.format("No enclosing class at %s(%d)", file, line));
             return List.of();
         }
         var ids = identifiers(root, scope, name -> StringSearch.matchesPartialName(name, partialName));
@@ -1176,7 +1177,7 @@ class CompileBatch implements AutoCloseable {
                 if (tooManyItems(result.size())) return result;
                 if (!matchesPartialName.test(c)) continue;
                 if (isSamePackage(c, packageName) || isPublicClassFile(c)) {
-                    result.add(classNameCompletion(c, isImported(uri, c)));
+                    result.add(classNameCompletion(c, isImported(file, c)));
                 }
             }
             // Check classpath
@@ -1186,21 +1187,21 @@ class CompileBatch implements AutoCloseable {
                 if (tooManyItems(result.size())) return result;
                 if (!matchesPartialName.test(c)) continue;
                 if (isSamePackage(c, packageName) || isPublicClassFile(c)) {
-                    result.add(classNameCompletion(c, isImported(uri, c)));
+                    result.add(classNameCompletion(c, isImported(file, c)));
                     classPathNames.add(c);
                 }
             }
             // Check sourcepath
             LOG.info("...checking source path");
-            for (var file : FileStore.all()) {
+            for (var toFile : FileStore.all()) {
                 if (tooManyItems(result.size())) return result;
                 // If file is in the same package, any class defined in the file is accessible
-                var otherPackageName = FileStore.packageName(file);
+                var otherPackageName = FileStore.packageName(toFile);
                 var samePackage = otherPackageName.equals(packageName) || otherPackageName.isEmpty();
                 // If file is in a different package, only a class with the same name as the file is accessible
-                var maybePublic = StringSearch.matchesPartialName(file.getFileName().toString(), partialName);
+                var maybePublic = StringSearch.matchesPartialName(toFile.getFileName().toString(), partialName);
                 if (samePackage || maybePublic) {
-                    result.addAll(accessibleClasses(uri, file, partialName, packageName, classPathNames));
+                    result.addAll(accessibleClasses(file, toFile, partialName, packageName, classPathNames));
                 }
             }
         }
@@ -1237,15 +1238,15 @@ class CompileBatch implements AutoCloseable {
     }
 
     private List<CompletionItem> accessibleClasses(
-            URI fromUri, Path toFile, String partialName, String fromPackage, Set<String> skip) {
-        var parse = Parser.parseFile(toFile.toUri());
+            Path fromFile, Path toFile, String partialName, String fromPackage, Set<String> skip) {
+        var parse = Parser.parseFile(toFile);
         var classNames = parse.accessibleClasses(partialName, fromPackage);
         var result = new ArrayList<CompletionItem>();
         for (var name : classNames) {
             // If class was already autocompleted using the classpath, skip it
             if (skip.contains(name)) continue;
             // Otherwise, add this name!
-            result.add(classNameCompletion(name, isImported(fromUri, name)));
+            result.add(classNameCompletion(name, isImported(fromFile, name)));
         }
         return result;
     }
@@ -1277,13 +1278,13 @@ class CompileBatch implements AutoCloseable {
     }
 
     /** Find the smallest tree that includes the cursor */
-    TreePath findPath(URI uri, int line, int character) {
-        var root = root(uri);
+    TreePath findPath(Path file, int line, int character) {
+        var root = root(file);
         var cursor = root.getLineMap().getPosition(line, character);
         var finder = new FindSmallest(cursor, borrow.task, root);
         finder.scan(root, null);
         if (finder.found == null) {
-            var message = String.format("No TreePath to %s %d:%d", uri, line, character);
+            var message = String.format("No TreePath to %s %d:%d", file, line, character);
             throw new RuntimeException(message);
         }
         return finder.found;

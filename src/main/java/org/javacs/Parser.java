@@ -5,7 +5,6 @@ import com.sun.source.doctree.DocTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
@@ -31,7 +30,7 @@ class Parser {
     private final JavacTask task;
     private final CompilationUnitTree root;
 
-    private Parser(URI file) {
+    private Parser(Path file) {
         this(new SourceFileObject(file));
     }
 
@@ -51,7 +50,7 @@ class Parser {
         }
     }
 
-    static Parser parseFile(URI file) {
+    static Parser parseFile(Path file) {
         return new Parser(file);
     }
 
@@ -225,10 +224,7 @@ class Parser {
     }
 
     CompletionContext completionContext(int line, int character) {
-        LOG.info(
-                String.format(
-                        "Finding completion position near %s(%d,%d)...",
-                        root.getSourceFile().toUri().getPath(), line, character));
+        LOG.info(String.format("Finding completion position near %s(%d,%d)...", root.getSourceFile(), line, character));
 
         var trees = Trees.instance(task);
         var pos = trees.getSourcePositions();
@@ -764,7 +760,7 @@ class Parser {
     private static final DocCommentTree EMPTY_DOC = makeEmptyDoc();
 
     private static DocCommentTree makeEmptyDoc() {
-        var file = new SourceFileObject(URI.create("file:///Foo.java"), "/** */ class Foo { }", Instant.now());
+        var file = new SourceFileObject(Paths.get("/Foo.java"), "/** */ class Foo { }", Instant.now());
         var task =
                 (JavacTask)
                         COMPILER.getTask(
@@ -1011,7 +1007,7 @@ class Parser {
 
         var pruned = buffer.toString();
         // For debugging:
-        // var file = Paths.get(root.getSourceFile().toUri());
+        // var file = Paths.get(root.getSourceFile());
         // var out = file.resolveSibling(file.getFileName() + ".pruned");
         // try {
         //     Files.writeString(out, pruned);
@@ -1023,7 +1019,7 @@ class Parser {
 
     String prune(int line, int character) {
         // Erase all blocks that don't include line:character
-        var file = root.getSourceFile().toUri();
+        var file = Paths.get(root.getSourceFile().toUri());
         var lines = root.getLineMap();
         var cursor = lines.getPosition(line, character);
         var pos = Trees.instance(task).getSourcePositions();
@@ -1034,7 +1030,7 @@ class Parser {
 
     String prune(String name) {
         // Find all occurrences of name in contents
-        var file = root.getSourceFile().toUri();
+        var file = Paths.get(root.getSourceFile().toUri());
         var contents = FileStore.contents(file);
         var list = new ArrayList<Long>();
         var pattern = Pattern.compile("\\b" + Pattern.quote(name) + "\\b");
@@ -1052,13 +1048,13 @@ class Parser {
         return prune(root, pos, buffer, offsets, false);
     }
 
-    static Set<URI> potentialDefinitions(Element to) {
+    static Set<Path> potentialDefinitions(Element to) {
         LOG.info(String.format("Find potential definitions of `%s`...", to));
 
         // If `to` is private, any definitions must be in the same file
         if (to.getModifiers().contains(Modifier.PRIVATE)) {
             LOG.info(String.format("...`%s` is private", to));
-            var set = new HashSet<URI>();
+            var set = new HashSet<Path>();
             declaringFile(to).ifPresent(set::add);
             return set;
         }
@@ -1070,25 +1066,25 @@ class Parser {
             // Parse each file and check if the syntax tree is consistent with a definition of `to`
             // This produces some false positives, but parsing is much faster than compiling,
             // so it's an effective optimization
-            var matches = new HashSet<URI>();
+            var matches = new HashSet<Path>();
             for (var file : hasWord) {
-                if (parseFile(file.toUri()).mightContainDefinition(to)) {
-                    matches.add(file.toUri());
+                if (parseFile(file).mightContainDefinition(to)) {
+                    matches.add(file);
                 }
             }
             var findName = simpleName(to);
             LOG.info(String.format("...%d files contain method `%s`", matches.size(), findName));
             return matches;
         } else {
-            var files = new HashSet<URI>();
+            var files = new HashSet<Path>();
             declaringFile(to).ifPresent(files::add);
             return files;
         }
     }
 
-    static Set<URI> potentialReferences(URI file, String name, boolean isType, Set<Modifier> flags) {
+    static Set<Path> potentialReferences(Path file, String name, boolean isType, Set<Modifier> flags) {
         LOG.info(String.format("...find potential references to `%s`...", name));
-        var pkg = FileStore.packageName(Paths.get(file));
+        var pkg = FileStore.packageName(file);
 
         // If `to` is private, any definitions must be in the same file
         if (flags.contains(Modifier.PRIVATE)) {
@@ -1115,14 +1111,14 @@ class Parser {
             hasWord = containsImport(hasWord, pkg, name);
         }
         // Convert Path to URI
-        var matches = new HashSet<URI>();
+        var matches = new HashSet<Path>();
         for (var f : hasWord) {
-            matches.add(f.toUri());
+            matches.add(f);
         }
         return matches;
     }
 
-    private static Optional<URI> declaringFile(Element e) {
+    private static Optional<Path> declaringFile(Element e) {
         // Find top-level type surrounding `to`
         LOG.info(String.format("...looking up declaring file of `%s`...", e));
         var top = topLevelDeclaration(e);
@@ -1152,9 +1148,9 @@ class Parser {
     }
 
     /** Find the file `e` was declared in */
-    private static Optional<URI> findDeclaringFile(TypeElement e) {
+    private static Optional<Path> findDeclaringFile(TypeElement e) {
         var name = e.getQualifiedName().toString();
-        return FileStore.findDeclaringFile(name).map(Path::toUri);
+        return FileStore.findDeclaringFile(name);
     }
 
     private static Cache<String, Boolean> cacheContainsWord = new Cache<>();

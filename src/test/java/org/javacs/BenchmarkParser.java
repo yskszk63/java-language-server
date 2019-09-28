@@ -17,13 +17,13 @@ public class BenchmarkParser {
 
     @Benchmark
     public void parse(CompilerState state) {
-        Parser.parseFile(state.file.toUri());
+        Parser.parseFile(state.file);
     }
 
     public static void main(String[] args) {
         var state = new CompilerState();
         while (true) {
-            Parser.parseFile(state.file.toUri());
+            Parser.parseFile(state.file);
         }
     }
 }
