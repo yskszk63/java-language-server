@@ -897,4 +897,10 @@ public class CompletionsTest extends CompletionsBase {
         var inserts = insertText("/org/javacs/example/DontCompleteParens.java", 5, 19);
         assertThat(inserts, hasItem("returnsString"));
     }
+
+    @Test
+    public void returnChain() {
+        var inserts = filterText("/org/javacs/example/ReturnChain.java", 6, 14);
+        assertThat(inserts, hasItem("concat"));
+    }
 }

@@ -5,8 +5,7 @@ import com.sun.source.doctree.DocTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 import java.time.Instant;
 import java.util.*;
 import java.util.logging.Logger;
@@ -30,10 +29,6 @@ class Parser {
     private final JavacTask task;
     private final CompilationUnitTree root;
 
-    private Parser(Path file) {
-        this(new SourceFileObject(file));
-    }
-
     private Parser(JavaFileObject file) {
         Objects.requireNonNull(file);
 
@@ -51,7 +46,7 @@ class Parser {
     }
 
     static Parser parseFile(Path file) {
-        return new Parser(file);
+        return new Parser(new SourceFileObject(file));
     }
 
     static Parser parseJavaFileObject(JavaFileObject file) {
@@ -1007,13 +1002,15 @@ class Parser {
 
         var pruned = buffer.toString();
         // For debugging:
-        // var file = Paths.get(root.getSourceFile());
-        // var out = file.resolveSibling(file.getFileName() + ".pruned");
-        // try {
-        //     Files.writeString(out, pruned);
-        // } catch (IOException e) {
-        //     throw new RuntimeException(e);
-        // }
+        if (false) {
+            var file = Paths.get(root.getSourceFile().toUri());
+            var out = file.resolveSibling(file.getFileName() + ".pruned");
+            try {
+                Files.writeString(out, pruned);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
         return pruned;
     }
 

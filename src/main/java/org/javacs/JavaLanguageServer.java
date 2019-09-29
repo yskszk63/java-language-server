@@ -239,6 +239,7 @@ class JavaLanguageServer extends LanguageServer {
         LOG.info(String.format("Complete at %s(%d,%d)", uri.getPath(), line, column));
         // Figure out what kind of completion we want to do
         // TODO don't complete inside of comments
+        // TODO java parser has bug for incomplete select statements like { return "foo". }
         var ctx = Parser.parseFile(file).completionContext(line, column);
         if (ctx == CompletionContext.UNKNOWN) {
             var items = new ArrayList<CompletionItem>();

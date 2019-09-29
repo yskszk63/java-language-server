@@ -9,15 +9,12 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Set;
 import java.util.StringJoiner;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.javacs.lsp.*;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class SearchTest {
-    private static final Logger LOG = Logger.getLogger("main");
-
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     @BeforeClass
@@ -28,10 +25,8 @@ public class SearchTest {
             textContent.add(line);
         }
         var document = new TextDocumentItem();
-
         document.uri = uri;
         document.text = textContent.toString();
-
         server.didOpenTextDocument(new DidOpenTextDocumentParams(document));
     }
 

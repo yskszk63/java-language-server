@@ -14,6 +14,7 @@
 - Deleting file doesn't clear it from javac
 - External delete causes find-references to crash because it's still in FileStore.javaSources()
 - `return json.get("name").` doesn't auto-complete
+- `return "foo"\n.` doesn't auto-complete
 - Restart debug test doesn't work
 - Debugger doesn't remove breakpoints
 - Find references actions accumulate and slow down responses

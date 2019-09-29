@@ -79,6 +79,7 @@ class JavaCompilerService {
     }
 
     CompileBatch compileFocus(Path file, int line, int character) {
+        // TODO this has already been parsed in many cases
         var contents = Parser.parseFile(file).prune(line, character);
         var source = new SourceFileObject(file, contents, Instant.now());
         return compileBatch(List.of(source));
