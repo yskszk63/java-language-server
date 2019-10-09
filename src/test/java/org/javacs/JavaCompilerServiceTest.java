@@ -6,7 +6,6 @@ import static org.junit.Assert.*;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
-import java.util.stream.Collectors;
 import org.javacs.lsp.*;
 import org.junit.*;
 
@@ -44,32 +43,6 @@ public class JavaCompilerServiceTest {
     static Path resourceFile(String resourceFile) {
         var root = JavaCompilerServiceTest.simpleProjectSrc();
         return root.resolve(resourceFile);
-    }
-
-    @Test
-    public void element() {
-        var file = resourceFile("HelloWorld.java");
-        var found = compiler.compileFocus(file, 3, 24).element(file, 3, 24).get();
-
-        assertThat(found.getSimpleName(), hasToString(containsString("println")));
-    }
-
-    @Test
-    public void elementWithError() {
-        var file = resourceFile("HelloError.java");
-        var found = compiler.compileFocus(file, 3, 19).element(file, 3, 19);
-
-        assertThat(found, notNullValue());
-    }
-
-    @Test
-    public void overloads() {
-        var file = resourceFile("Overloads.java");
-        var found = compiler.compileFocus(file, 3, 15).signatureHelp(file, 3, 15).get();
-        var strings = found.signatures.stream().map(s -> s.label).collect(Collectors.toList());
-
-        assertThat(strings, hasItem(containsString("print(int i)")));
-        assertThat(strings, hasItem(containsString("print(String s)")));
     }
 
     @Test
@@ -114,14 +87,6 @@ public class JavaCompilerServiceTest {
         var diags = compiler.compileBatch(files).reportErrors();
         var strings = errorStrings(diags);
         assertThat(strings, hasItem(containsString("UnusedVar.java(3): [Unused]")));
-    }
-
-    @Test
-    public void localDoc() {
-        var file = resourceFile("LocalMethodDoc.java");
-        var invocation = compiler.compileFocus(file, 3, 21).signatureHelp(file, 3, 21).get();
-        var method = invocation.signatures.get(invocation.activeSignature);
-        assertThat(method.documentation.value, containsString("A great method"));
     }
 
     @Test

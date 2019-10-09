@@ -2,7 +2,6 @@ package org.javacs;
 
 import java.io.File;
 import java.nio.file.*;
-import java.time.Instant;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -76,14 +75,6 @@ class JavaCompilerService {
 
     Docs docs() {
         return docs;
-    }
-
-    // TODO eliminate this, pruning rules are very case-specific
-    CompileBatch compileFocus(Path file, int line, int character) {
-        // TODO this has already been parsed in many cases
-        var contents = Parser.parseFile(file).prune(line, character);
-        var source = new SourceFileObject(file, contents, Instant.now());
-        return compileBatch(List.of(source));
     }
 
     CompileBatch compileBatch(Collection<? extends JavaFileObject> sources) {

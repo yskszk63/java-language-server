@@ -377,10 +377,7 @@ class CompileBatch implements AutoCloseable {
     }
 
     /** Find all overloads for the smallest method call that includes the cursor */
-    Optional<SignatureHelp> signatureHelp(Path file, int line, int column) {
-        LOG.info(String.format("Find method invocation around %s(%d,%d)...", file, line, column));
-        var root = root(file);
-        var cursor = root.getLineMap().getPosition(line, column);
+    Optional<SignatureHelp> signatureHelp(Path file, int cursor) {
         var path = findPath(file, cursor);
         var invokePath = surroundingInvocation(path);
         if (invokePath == null) {

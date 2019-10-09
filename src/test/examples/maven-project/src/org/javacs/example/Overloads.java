@@ -1,4 +1,6 @@
-class Overloads {
+package org.javacs.example;
+
+public class Overloads {
     void test() {
         print()
     }

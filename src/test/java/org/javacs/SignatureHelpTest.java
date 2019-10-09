@@ -3,20 +3,21 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.javacs.lsp.*;
 import org.junit.Test;
 
 public class SignatureHelpTest {
     @Test
-    public void signatureHelp() throws IOException {
+    public void signatureHelp() {
         var help = doHelp("/org/javacs/example/SignatureHelp.java", 7, 36);
 
         assertThat(help.signatures, hasSize(2));
     }
 
     @Test
-    public void partlyFilledIn() throws IOException {
+    public void partlyFilledIn() {
         var help = doHelp("/org/javacs/example/SignatureHelp.java", 8, 39);
 
         assertThat(help.signatures, hasSize(2));
@@ -25,7 +26,7 @@ public class SignatureHelpTest {
     }
 
     @Test
-    public void constructor() throws IOException {
+    public void constructor() {
         var help = doHelp("/org/javacs/example/SignatureHelp.java", 9, 27);
 
         assertThat(help.signatures, hasSize(1));
@@ -33,7 +34,7 @@ public class SignatureHelpTest {
     }
 
     @Test
-    public void platformConstructor() throws IOException {
+    public void platformConstructor() {
         var help = doHelp("/org/javacs/example/SignatureHelp.java", 10, 26);
 
         assertThat(help.signatures, not(empty()));
@@ -42,23 +43,43 @@ public class SignatureHelpTest {
         // assertThat(help.signatures.get(0).documentation, not(nullValue()));
     }
 
+    @Test
+    public void overloads() {
+        var labels = labels("/org/javacs/example/Overloads.java", 5, 15);
+        assertThat(labels, hasItem(containsString("print(int i)")));
+        assertThat(labels, hasItem(containsString("print(String s)")));
+    }
+
+    @Test
+    public void localDoc() {
+        var help = doHelp("/org/javacs/example/LocalMethodDoc.java", 5, 21);
+        var method = help.signatures.get(help.activeSignature);
+        assertThat(method.documentation.value, containsString("A great method"));
+    }
+
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
-    private SignatureHelp doHelp(String file, int row, int column) throws IOException {
+    private SignatureHelp doHelp(String file, int row, int column) {
         var document = new TextDocumentIdentifier();
-
         document.uri = FindResource.uri(file);
 
         var position = new Position();
-
         position.line = row - 1;
         position.character = column - 1;
 
         var p = new TextDocumentPositionParams();
-
         p.textDocument = document;
         p.position = position;
 
         return server.signatureHelp(p).get();
+    }
+
+    private List<String> labels(String file, int row, int column) {
+        var help = doHelp(file, row, column);
+        var result = new ArrayList<String>();
+        for (var s : help.signatures) {
+            result.add(s.label);
+        }
+        return result;
     }
 }

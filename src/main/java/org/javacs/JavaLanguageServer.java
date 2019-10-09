@@ -624,8 +624,13 @@ class JavaLanguageServer extends LanguageServer {
         var file = Paths.get(uri);
         var line = position.position.line + 1;
         var column = position.position.character + 1;
-        try (var focus = compiler().compileFocus(file, line, column)) {
-            return focus.signatureHelp(file, line, column);
+        LOG.info(String.format("Find signature at at %s(%d,%d)...", file, line, column));
+        var contents = FileStore.contents(file);
+        var cursor = FileStore.offset(contents, line, column);
+        var parse = Parser.parseJavaFileObject(new SourceFileObject(file, contents, Instant.now()));
+        contents = parse.prune(cursor);
+        try (var compile = compiler().compileBatch(List.of(new SourceFileObject(file, contents, Instant.now())))) {
+            return compile.signatureHelp(file, cursor);
         }
     }
 
