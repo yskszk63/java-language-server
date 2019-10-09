@@ -228,6 +228,110 @@ class JavaLanguageServer extends LanguageServer {
         }
     }
 
+    static int isMemberSelect(String contents, int cursor) {
+        // Start at char before cursor
+        cursor--;
+        // Move back until we find a non-identifier char
+        while (cursor > 0 && Character.isJavaIdentifierPart(contents.charAt(cursor))) {
+            cursor--;
+        }
+        if (cursor <= 0 || contents.charAt(cursor) != '.') {
+            return -1;
+        }
+        // Move cursor back until we find a non-whitespace char
+        while (cursor > 0 && Character.isWhitespace(contents.charAt(cursor - 1))) {
+            cursor--;
+        }
+        return cursor;
+    }
+
+    static int isMemberReference(String contents, int cursor) {
+        // Start at char before cursor
+        cursor--;
+        // Move back until we find a non-identifier char
+        while (cursor > 1 && Character.isJavaIdentifierPart(contents.charAt(cursor))) {
+            cursor--;
+        }
+        if (!contents.startsWith("::", cursor - 1)) {
+            return -1;
+        }
+        // Skip first : in ::
+        cursor--;
+        // Move cursor back until we find a non-whitespace char
+        while (cursor > 0 && Character.isWhitespace(contents.charAt(cursor - 1))) {
+            cursor--;
+        }
+        return cursor;
+    }
+
+    private static boolean isQualifiedIdentifierPart(char c) {
+        return Character.isJavaIdentifierPart(c) || c == '.';
+    }
+
+    static int isPartialAnnotation(String contents, int cursor) {
+        // Start at char before cursor
+        cursor--;
+        // Move back until we find a non-identifier char
+        while (cursor > 0 && isQualifiedIdentifierPart(contents.charAt(cursor))) {
+            cursor--;
+        }
+        if (cursor >= 0 && contents.charAt(cursor) == '@') {
+            return cursor;
+        } else {
+            return -1;
+        }
+    }
+
+    static boolean isPartialCase(String contents, int cursor) {
+        // Start at char before cursor
+        cursor--;
+        // Move back until we find a non-identifier char
+        while (cursor > 0 && Character.isJavaIdentifierPart(contents.charAt(cursor))) {
+            cursor--;
+        }
+        // Skip space
+        while (cursor > 0 && Character.isWhitespace(contents.charAt(cursor))) {
+            cursor--;
+        }
+        return contents.startsWith("case", cursor - 3);
+    }
+
+    static String partialName(String contents, int cursor) {
+        // Start at char before cursor
+        var start = cursor - 1;
+        // Move back until we find a non-identifier char
+        while (start >= 0 && Character.isJavaIdentifierPart(contents.charAt(start))) {
+            start--;
+        }
+        return contents.substring(start + 1, cursor);
+    }
+
+    private static String restOfLine(String contents, int cursor) {
+        var endOfLine = contents.indexOf('\n', cursor);
+        if (endOfLine == -1) {
+            return contents.substring(cursor);
+        }
+        return contents.substring(cursor, endOfLine);
+    }
+
+    private static boolean hasParen(String contents, int cursor) {
+        return cursor < contents.length() && contents.charAt(cursor) == '(';
+    }
+
+    private static String eraseRegion(String contents, long start, long end) {
+        var buffer = new StringBuffer(contents);
+        for (int i = (int) start; i < end; i++) {
+            switch (buffer.charAt(i)) {
+                case '\r':
+                case '\n':
+                    break;
+                default:
+                    buffer.setCharAt(i, ' ');
+            }
+        }
+        return buffer.toString();
+    }
+
     @Override
     public Optional<CompletionList> completion(TextDocumentPositionParams position) {
         var started = Instant.now();
@@ -236,69 +340,109 @@ class JavaLanguageServer extends LanguageServer {
         var file = Paths.get(uri);
         var line = position.position.line + 1;
         var column = position.position.character + 1;
-        LOG.info(String.format("Complete at %s(%d,%d)", uri.getPath(), line, column));
+        LOG.info(String.format("Complete at %s(%d,%d)...", file, line, column));
         // Figure out what kind of completion we want to do
-        // TODO don't complete inside of comments
-        // TODO java parser has bug for incomplete select statements like { return "foo". }
-        var ctx = Parser.parseFile(file).completionContext(line, column);
-        if (ctx == CompletionContext.UNKNOWN) {
-            var items = new ArrayList<CompletionItem>();
-            for (var name : CompileBatch.TOP_LEVEL_KEYWORDS) {
-                var i = new CompletionItem();
-                i.label = name;
-                i.kind = CompletionItemKind.Keyword;
-                i.detail = "keyword";
-                items.add(i);
+        var contents = FileStore.contents(file);
+        var cursor = FileStore.offset(contents, line, column);
+        var addParens = !hasParen(contents, cursor);
+        var addSemi = restOfLine(contents, cursor).matches("\\s*");
+        // Complete object. or object.partial
+        var dot = isMemberSelect(contents, cursor);
+        if (dot != -1) {
+            LOG.info("...complete members");
+            // Erase .partial
+            // contents = eraseRegion(contents, dot, cursor);
+            var parse = Parser.parseJavaFileObject(new SourceFileObject(file, contents, Instant.now()));
+            contents = parse.prune(dot);
+            try (var compile = compiler().compileBatch(List.of(new SourceFileObject(file, contents, Instant.now())))) {
+                var list = compile.completeMembers(file, dot, addParens, addSemi);
+                logCompletionTiming(started, list, false);
+                return Optional.of(new CompletionList(false, list));
             }
-            return Optional.of(new CompletionList(true, items));
         }
-        // Compile again, focusing on a region that depends on what type of completion we want to do
-        List<CompletionItem> cs;
-        boolean isIncomplete;
-        try (var focus = compiler().compileFocus(file, ctx.line, ctx.character)) {
-            var elapsed = Duration.between(started, Instant.now()).toMillis();
-            LOG.info(String.format("...compiled focus in %d ms", elapsed));
-            // Do a specific type of completion
-            switch (ctx.kind) {
-                case MemberSelect:
-                    cs = focus.completeMembers(file, ctx.line, ctx.character, ctx.addParens, ctx.addSemi);
-                    isIncomplete = false;
-                    break;
-                case MemberReference:
-                    cs = focus.completeReferences(file, ctx.line, ctx.character);
-                    isIncomplete = false;
-                    break;
-                case Identifier:
-                    cs =
-                            focus.completeIdentifiers(
+        // Complete object:: or object::partial
+        var ref = isMemberReference(contents, cursor);
+        if (ref != -1) {
+            LOG.info("...complete references");
+            // Erase ::partial
+            // contents = eraseRegion(contents, ref, cursor);
+            var parse = Parser.parseJavaFileObject(new SourceFileObject(file, contents, Instant.now()));
+            contents = parse.prune(ref);
+            try (var compile = compiler().compileBatch(List.of(new SourceFileObject(file, contents, Instant.now())))) {
+                var list = compile.completeReferences(file, ref);
+                logCompletionTiming(started, list, false);
+                return Optional.of(new CompletionList(false, list));
+            }
+        }
+        // Complete @Partial
+        var at = isPartialAnnotation(contents, cursor);
+        if (at != -1) {
+            LOG.info("...complete annotations");
+            var partialName = contents.substring(at + 1, cursor);
+            var parse = Parser.parseJavaFileObject(new SourceFileObject(file, contents, Instant.now()));
+            contents = parse.prune(cursor);
+            try (var compile = compiler().compileBatch(List.of(new SourceFileObject(file, contents, Instant.now())))) {
+                var list = compile.completeAnnotations(file, cursor, partialName);
+                var isIncomplete = list.size() >= CompileBatch.MAX_COMPLETION_ITEMS;
+                logCompletionTiming(started, list, isIncomplete);
+                return Optional.of(new CompletionList(isIncomplete, list));
+            }
+        }
+        // Complete case partial
+        if (isPartialCase(contents, cursor)) {
+            LOG.info("...complete members");
+            var parse = Parser.parseJavaFileObject(new SourceFileObject(file, contents, Instant.now()));
+            contents = parse.eraseCase(cursor);
+            parse = Parser.parseJavaFileObject(new SourceFileObject(file, contents, Instant.now()));
+            contents = parse.prune(cursor);
+            try (var compile = compiler().compileBatch(List.of(new SourceFileObject(file, contents, Instant.now())))) {
+                var list = compile.completeCases(file, cursor);
+                logCompletionTiming(started, list, false);
+                return Optional.of(new CompletionList(false, list));
+            }
+        }
+        // Complete partial
+        var looksLikeIdentifier = Character.isJavaIdentifierPart(contents.charAt(cursor - 1));
+        if (looksLikeIdentifier) {
+            var parse = Parser.parseJavaFileObject(new SourceFileObject(file, contents, Instant.now()));
+            if (parse.isIdentifier(cursor)) {
+                LOG.info("...complete identifiers");
+                contents = parse.prune(cursor);
+                parse = Parser.parseJavaFileObject(new SourceFileObject(file, contents, Instant.now()));
+                var path = parse.findPath(cursor);
+                try (var compile =
+                        compiler().compileBatch(List.of(new SourceFileObject(file, contents, Instant.now())))) {
+                    var list =
+                            compile.completeIdentifiers(
                                     file,
-                                    ctx.line,
-                                    ctx.character,
-                                    ctx.inClass,
-                                    ctx.inMethod,
-                                    ctx.partialName,
-                                    ctx.addParens,
-                                    ctx.addSemi);
-                    isIncomplete = cs.size() >= CompileBatch.MAX_COMPLETION_ITEMS;
-                    break;
-                case Annotation:
-                    cs = focus.completeAnnotations(file, ctx.line, ctx.character, ctx.partialName);
-                    isIncomplete = cs.size() >= CompileBatch.MAX_COMPLETION_ITEMS;
-                    break;
-                case Case:
-                    cs = focus.completeCases(file, ctx.line, ctx.character);
-                    isIncomplete = false;
-                    break;
-                default:
-                    throw new RuntimeException("Unexpected completion context " + ctx.kind);
+                                    cursor,
+                                    Parser.inClass(path),
+                                    Parser.inMethod(path),
+                                    partialName(contents, cursor),
+                                    addParens,
+                                    addSemi);
+                    var isIncomplete = list.size() >= CompileBatch.MAX_COMPLETION_ITEMS;
+                    logCompletionTiming(started, list, isIncomplete);
+                    return Optional.of(new CompletionList(isIncomplete, list));
+                }
             }
         }
-        // Log timing
-        var elapsedMs = Duration.between(started, Instant.now()).toMillis();
-        if (isIncomplete) LOG.info(String.format("Found %d items (incomplete) in %,d ms", cs.size(), elapsedMs));
-        else LOG.info(String.format("...found %d items in %,d ms", cs.size(), elapsedMs));
+        LOG.info("...complete keywords");
+        var items = new ArrayList<CompletionItem>();
+        for (var name : CompileBatch.TOP_LEVEL_KEYWORDS) {
+            var i = new CompletionItem();
+            i.label = name;
+            i.kind = CompletionItemKind.Keyword;
+            i.detail = "keyword";
+            items.add(i);
+        }
+        return Optional.of(new CompletionList(true, items));
+    }
 
-        return Optional.of(new CompletionList(isIncomplete, cs));
+    private void logCompletionTiming(Instant started, List<?> list, boolean isIncomplete) {
+        var elapsedMs = Duration.between(started, Instant.now()).toMillis();
+        if (isIncomplete) LOG.info(String.format("Found %d items (incomplete) in %,d ms", list.size(), elapsedMs));
+        else LOG.info(String.format("...found %d items in %,d ms", list.size(), elapsedMs));
     }
 
     private Optional<MarkupContent> findDocs(Ptr ptr) {

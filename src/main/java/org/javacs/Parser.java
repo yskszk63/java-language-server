@@ -210,182 +210,37 @@ class Parser {
         return range(task, contents, path).map(range -> new Location(uri, range));
     }
 
-    private String restOfLine(int cursor) {
-        var endOfLine = contents.indexOf('\n', cursor);
-        if (endOfLine == -1) {
-            return contents.substring(cursor);
+    /** Find the smallest tree that includes the cursor */
+    TreePath findPath(long cursor) {
+        var finder = new FindSmallest(cursor, task, root);
+        finder.scan(root, null);
+        if (finder.found == null) {
+            return new TreePath(root);
         }
-        return contents.substring(cursor, endOfLine);
+        return finder.found;
     }
 
-    CompletionContext completionContext(int line, int character) {
-        LOG.info(String.format("Finding completion position near %s(%d,%d)...", root.getSourceFile(), line, character));
+    boolean isIdentifier(long cursor) {
+        var path = findPath(cursor);
+        return path.getLeaf() instanceof IdentifierTree;
+    }
 
-        var trees = Trees.instance(task);
-        var pos = trees.getSourcePositions();
-        var lines = root.getLineMap();
-        var cursor = (int) lines.getPosition(line, character);
-        var addParens = !(contents.length() > cursor && contents.charAt(cursor) == '(');
-        var afterCursor = restOfLine(cursor);
-        var addSemi = afterCursor.matches("\\s*");
-
-        class FindCompletionPosition extends TreeScanner<Void, Void> {
-            CompletionContext result = null;
-            int insideClass = 0, insideMethod = 0;
-
-            boolean containsCursor(Tree node) {
-                return pos.getStartPosition(root, node) <= cursor && cursor <= pos.getEndPosition(root, node);
-            }
-
-            @Override
-            public Void visitClass(ClassTree node, Void nothing) {
-                insideClass++;
-                super.visitClass(node, null);
-                insideClass--;
-                return null;
-            }
-
-            @Override
-            public Void visitMethod(MethodTree node, Void nothing) {
-                insideMethod++;
-                super.visitMethod(node, null);
-                insideMethod--;
-                return null;
-            }
-
-            @Override
-            public Void visitMemberSelect(MemberSelectTree node, Void nothing) {
-                super.visitMemberSelect(node, nothing);
-
-                if (containsCursor(node) && !containsCursor(node.getExpression()) && result == null) {
-                    LOG.info("...position cursor before '.' in " + node);
-                    long offset = pos.getEndPosition(root, node.getExpression());
-                    int line = (int) lines.getLineNumber(offset), character = (int) lines.getColumnNumber(offset);
-                    var partialName = Objects.toString(node.getIdentifier(), "");
-                    // TODO lots of repetitive code here
-                    result =
-                            new CompletionContext(
-                                    line,
-                                    character,
-                                    insideClass > 0,
-                                    insideMethod > 0,
-                                    CompletionContext.Kind.MemberSelect,
-                                    partialName,
-                                    addParens,
-                                    addSemi);
-                }
-                return null;
-            }
-
-            @Override
-            public Void visitMemberReference(MemberReferenceTree node, Void nothing) {
-                super.visitMemberReference(node, nothing);
-
-                if (containsCursor(node) && !containsCursor(node.getQualifierExpression()) && result == null) {
-                    LOG.info("...position cursor before '::' in " + node);
-                    long offset = pos.getEndPosition(root, node.getQualifierExpression());
-                    int line = (int) lines.getLineNumber(offset), character = (int) lines.getColumnNumber(offset);
-                    var partialName = Objects.toString(node.getName(), "");
-                    result =
-                            new CompletionContext(
-                                    line,
-                                    character,
-                                    insideClass > 0,
-                                    insideMethod > 0,
-                                    CompletionContext.Kind.MemberReference,
-                                    partialName,
-                                    addParens,
-                                    addSemi);
-                }
-                return null;
-            }
-
-            @Override
-            public Void visitCase(CaseTree node, Void nothing) {
-                var containsCursor = containsCursor(node);
-                for (var s : node.getStatements()) {
-                    if (containsCursor(s)) containsCursor = false;
-                }
-
-                if (containsCursor) {
-                    LOG.info("...position cursor after case " + node.getExpression());
-                    long offset = pos.getEndPosition(root, node.getExpression());
-                    int line = (int) lines.getLineNumber(offset), character = (int) lines.getColumnNumber(offset);
-                    var partialName = Objects.toString(node.getExpression(), "");
-                    result =
-                            new CompletionContext(
-                                    line,
-                                    character,
-                                    insideClass > 0,
-                                    insideMethod > 0,
-                                    CompletionContext.Kind.Case,
-                                    partialName,
-                                    addParens,
-                                    addSemi);
-                } else {
-                    super.visitCase(node, nothing);
-                }
-                return null;
-            }
-
-            @Override
-            public Void visitIdentifier(IdentifierTree node, Void nothing) {
-                super.visitIdentifier(node, nothing);
-
-                if (containsCursor(node) && result == null) {
-                    LOG.info("...position cursor after identifier " + node.getName());
-                    var partialName = Objects.toString(node.getName(), "");
-                    result =
-                            new CompletionContext(
-                                    line,
-                                    character,
-                                    insideClass > 0,
-                                    insideMethod > 0,
-                                    CompletionContext.Kind.Identifier,
-                                    partialName,
-                                    addParens,
-                                    addSemi);
-                }
-                return null;
-            }
-
-            @Override
-            public Void visitAnnotation(AnnotationTree node, Void nothing) {
-                if (containsCursor(node.getAnnotationType()) && result == null) {
-                    LOG.info("...position cursor after annotation " + node.getAnnotationType());
-                    var id = (IdentifierTree) node.getAnnotationType();
-                    var partialName = Objects.toString(id.getName(), "");
-                    result =
-                            new CompletionContext(
-                                    line,
-                                    character,
-                                    insideClass > 0,
-                                    insideMethod > 0,
-                                    CompletionContext.Kind.Annotation,
-                                    partialName,
-                                    addParens,
-                                    addSemi);
-                } else {
-                    super.visitAnnotation(node, nothing);
-                }
-                return null;
-            }
-
-            @Override
-            public Void visitErroneous(ErroneousTree node, Void nothing) {
-                for (var t : node.getErrorTrees()) {
-                    t.accept(this, null);
-                }
-                return null;
+    static boolean inClass(TreePath path) {
+        for (var part : path) {
+            if (part instanceof ClassTree) {
+                return true;
             }
         }
-        var find = new FindCompletionPosition();
-        find.scan(root, null);
-        if (find.result == null) {
-            LOG.info("...found nothing near cursor!");
-            return CompletionContext.UNKNOWN;
+        return false;
+    }
+
+    static boolean inMethod(TreePath path) {
+        for (var part : path) {
+            if (part instanceof MethodTree) {
+                return true;
+            }
         }
-        return find.result;
+        return false;
     }
 
     List<FoldingRange> foldingRanges() {
@@ -916,18 +771,6 @@ class Parser {
                 return last;
             }
 
-            void erase(long start, long end) {
-                for (int i = (int) start; i < end; i++) {
-                    switch (buffer.charAt(i)) {
-                        case '\r':
-                        case '\n':
-                            break;
-                        default:
-                            buffer.setCharAt(i, ' ');
-                    }
-                }
-            }
-
             @Override
             public Void visitImport(ImportTree node, Void __) {
                 // Erase 'static' keyword so autocomplete works better
@@ -935,32 +778,18 @@ class Parser {
                     var start = (int) pos.getStartPosition(root, node);
                     start = buffer.indexOf("static", start);
                     var end = start + "static".length();
-                    erase(start, end);
+                    erase(buffer, start, end);
                 }
                 return super.visitImport(node, null);
             }
 
             @Override
             public Void visitSwitch(SwitchTree node, Void __) {
-                // If cursor is in a case label, for example
-                //   case F|
-                // then erase the entire contents of the switch statement.
-                for (var c : node.getCases()) {
-                    if (containsCursor(c) && !anyContainsCursor(c.getStatements())) {
-                        eraseSwitchContents(node);
-                        erasedAfterCursor = true;
-                        return null;
-                    }
+                if (containsCursor(node)) {
+                    // Prevent the enclosing block from erasing the closing } of the switch
+                    erasedAfterCursor = true;
                 }
                 return super.visitSwitch(node, null);
-            }
-
-            private void eraseSwitchContents(SwitchTree node) {
-                for (var c : node.getCases()) {
-                    var start = (int) pos.getStartPosition(root, c);
-                    var end = (int) pos.getEndPosition(root, c);
-                    erase(start, end);
-                }
             }
 
             @Override
@@ -978,7 +807,7 @@ class Parser {
                         // Find the end of the block
                         while (end > start && buffer.charAt((int) end) != '}') end--;
                         // Erase from next line to end of block
-                        erase(start, end - 1);
+                        erase(buffer, start, end - 1);
                         erasedAfterCursor = true;
                     }
                 } else if (!node.getStatements().isEmpty()) {
@@ -987,7 +816,7 @@ class Parser {
                     var start = pos.getStartPosition(root, first);
                     var end = pos.getEndPosition(root, last);
                     if (end >= buffer.length()) end = buffer.length() - 1;
-                    erase(start, end);
+                    erase(buffer, start, end);
                 }
                 return null;
             }
@@ -1014,15 +843,44 @@ class Parser {
         return pruned;
     }
 
+    private static void erase(StringBuilder buffer, long start, long end) {
+        for (int i = (int) start; i < end; i++) {
+            switch (buffer.charAt(i)) {
+                case '\r':
+                case '\n':
+                    break;
+                default:
+                    buffer.setCharAt(i, ' ');
+            }
+        }
+    }
+
     String prune(int line, int character) {
-        // Erase all blocks that don't include line:character
-        var file = Paths.get(root.getSourceFile().toUri());
-        var lines = root.getLineMap();
-        var cursor = lines.getPosition(line, character);
+        var cursor = root.getLineMap().getPosition(line, character);
+        return prune(cursor);
+    }
+
+    String prune(long cursor) {
         var pos = Trees.instance(task).getSourcePositions();
-        var contents = FileStore.contents(file);
         var buffer = new StringBuilder(contents);
         return prune(root, pos, buffer, new long[] {cursor}, true);
+    }
+
+    String eraseCase(long cursor) {
+        var path = findPath(cursor);
+        while (path != null && path.getLeaf().getKind() != Tree.Kind.CASE) {
+            path = path.getParentPath();
+        }
+        if (path == null) {
+            LOG.warning("Found no case around " + path.getLeaf());
+            return contents;
+        }
+        var caseTree = (CaseTree) path.getLeaf();
+        var pos = Trees.instance(task).getSourcePositions();
+        var start = pos.getStartPosition(root, caseTree);
+        var buffer = new StringBuilder(contents);
+        erase(buffer, start, cursor);
+        return buffer.toString();
     }
 
     String prune(String name) {
@@ -1043,6 +901,17 @@ class Parser {
         var buffer = new StringBuilder(contents);
         var pos = Trees.instance(task).getSourcePositions();
         return prune(root, pos, buffer, offsets, false);
+    }
+
+    boolean insideClass(long cursor) {
+        var path = findPath(cursor);
+        while (path != null) {
+            if (path.getLeaf() instanceof ClassTree) {
+                return true;
+            }
+            path = path.getParentPath();
+        }
+        return false;
     }
 
     static Set<Path> potentialDefinitions(Element to) {
@@ -1278,42 +1147,4 @@ class Parser {
     }
 
     private static final Logger LOG = Logger.getLogger("main");
-}
-
-class CompletionContext {
-    static final CompletionContext UNKNOWN = new CompletionContext(-1, -1, false, false, null, null, false, false);
-
-    // 1-based
-    final int line, character;
-    final boolean inClass, inMethod;
-    final Kind kind;
-    final String partialName;
-    final boolean addParens, addSemi;
-
-    CompletionContext(
-            int line,
-            int character,
-            boolean inClass,
-            boolean inMethod,
-            Kind kind,
-            String partialName,
-            boolean addParens,
-            boolean addSemi) {
-        this.line = line;
-        this.character = character;
-        this.inClass = inClass;
-        this.inMethod = inMethod;
-        this.kind = kind;
-        this.partialName = partialName;
-        this.addParens = addParens;
-        this.addSemi = addSemi;
-    }
-
-    enum Kind {
-        MemberSelect,
-        MemberReference,
-        Identifier,
-        Annotation,
-        Case,
-    }
 }

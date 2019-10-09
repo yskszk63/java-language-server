@@ -1,4 +1,6 @@
-class CompleteInMiddle {
+package org.javacs.example;
+
+public class CompleteInMiddle {
     static int completeOuterStatic;
     int completeOuterField;
 

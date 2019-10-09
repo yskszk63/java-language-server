@@ -2,7 +2,7 @@ package org.javacs.example;
 
 public class AutocompleteMember {
     public void test() {
-        this.;
+        this.
     }
 
     public static String testFieldStatic;

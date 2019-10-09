@@ -78,6 +78,7 @@ class JavaCompilerService {
         return docs;
     }
 
+    // TODO eliminate this, pruning rules are very case-specific
     CompileBatch compileFocus(Path file, int line, int character) {
         // TODO this has already been parsed in many cases
         var contents = Parser.parseFile(file).prune(line, character);
@@ -102,7 +103,6 @@ class JavaCompilerService {
 
     List<SymbolInformation> findSymbols(String query, int limit) {
         LOG.info(String.format("Searching for `%s`...", query));
-
         var result = new ArrayList<SymbolInformation>();
         var files = FileStore.all();
         var checked = 0;

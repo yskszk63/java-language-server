@@ -6,7 +6,11 @@ import java.util.stream.Stream;
 import org.javacs.lsp.*;
 
 public class CompletionsBase {
-    protected static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
+    protected static JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
+
+    protected void refreshServer() {
+        server = LanguageServerFixture.getJavaLanguageServer();
+    }
 
     protected Set<String> insertTemplate(String file, int row, int column) {
         var items = items(file, row, column);

@@ -1,4 +1,6 @@
-class CompleteClass {
+package org.javacs.example;
+
+public class CompleteClass {
     void test() {
         CompleteClass.
     }

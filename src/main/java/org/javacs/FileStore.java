@@ -299,6 +299,20 @@ class FileStore {
         return bufferedReader(file);
     }
 
+    /** Convert from line/column (1-based) to offset (0-based) */
+    static int offset(String contents, int line, int column) {
+        line--;
+        column--;
+        int cursor = 0;
+        while (line > 0) {
+            if (contents.charAt(cursor) == '\n') {
+                line--;
+            }
+            cursor++;
+        }
+        return cursor + column;
+    }
+
     private static String patch(String sourceText, TextDocumentContentChangeEvent change) {
         try {
             var range = change.range;

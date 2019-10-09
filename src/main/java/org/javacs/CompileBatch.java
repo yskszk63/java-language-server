@@ -133,7 +133,9 @@ class CompileBatch implements AutoCloseable {
     }
 
     Optional<Element> element(Path file, int line, int character) {
-        var path = findPath(file, line, character);
+        var root = root(file);
+        var cursor = root.getLineMap().getPosition(line, character);
+        var path = findPath(file, cursor);
         var el = trees.getElement(path);
         return Optional.ofNullable(el);
     }
@@ -375,10 +377,12 @@ class CompileBatch implements AutoCloseable {
     }
 
     /** Find all overloads for the smallest method call that includes the cursor */
-    Optional<SignatureHelp> signatureHelp(Path file, int line, int character) {
-        LOG.info(String.format("Find method invocation around %s(%d,%d)...", file, line, character));
-        var cursor = findPath(file, line, character);
-        var invokePath = surroundingInvocation(cursor);
+    Optional<SignatureHelp> signatureHelp(Path file, int line, int column) {
+        LOG.info(String.format("Find method invocation around %s(%d,%d)...", file, line, column));
+        var root = root(file);
+        var cursor = root.getLineMap().getPosition(line, column);
+        var path = findPath(file, cursor);
+        var invokePath = surroundingInvocation(path);
         if (invokePath == null) {
             return Optional.empty();
         }
@@ -386,9 +390,9 @@ class CompileBatch implements AutoCloseable {
             var invokeLeaf = (MethodInvocationTree) invokePath.getLeaf();
             var overloads = methodOverloads(invokePath);
             // Figure out which parameter is active
-            var activeParameter = invokeLeaf.getArguments().indexOf(cursor.getLeaf());
+            var activeParameter = invokeLeaf.getArguments().indexOf(path.getLeaf());
             if (activeParameter == -1) activeParameter = 0;
-            LOG.info(String.format("...active parameter `%s` is %d", cursor.getLeaf(), activeParameter));
+            LOG.info(String.format("...active parameter `%s` is %d", path.getLeaf(), activeParameter));
             // Figure out which method is active, if possible
             var methodSelectPath = trees.getPath(invokePath.getCompilationUnit(), invokeLeaf.getMethodSelect());
             var methodEl = trees.getElement(methodSelectPath);
@@ -402,9 +406,9 @@ class CompileBatch implements AutoCloseable {
             var invokeLeaf = (NewClassTree) invokePath.getLeaf();
             var overloads = constructorOverloads(invokePath);
             // Figure out which parameter is active
-            var activeParameter = invokeLeaf.getArguments().indexOf(cursor.getLeaf());
+            var activeParameter = invokeLeaf.getArguments().indexOf(path.getLeaf());
             if (activeParameter == -1) activeParameter = 0;
-            LOG.info(String.format("...active parameter `%s` is %d", cursor.getLeaf(), activeParameter));
+            LOG.info(String.format("...active parameter `%s` is %d", path.getLeaf(), activeParameter));
             // Figure out which method is active, if possible
             var methodEl = trees.getElement(invokePath);
             ExecutableElement activeMethod = null;
@@ -580,18 +584,15 @@ class CompileBatch implements AutoCloseable {
 
     List<CompletionItem> completeIdentifiers(
             Path file,
-            int line,
-            int character,
+            int cursor,
             boolean insideClass,
             boolean insideMethod,
             String partialName,
             boolean addParens,
             boolean addSemi) {
         LOG.info(String.format("Completing identifiers starting with `%s`...", partialName));
-
         var root = root(file);
         var result = new ArrayList<CompletionItem>();
-
         // Add snippets
         if (!insideClass) {
             // If no package declaration is present, suggest package [inferred name];
@@ -613,7 +614,7 @@ class CompileBatch implements AutoCloseable {
             }
         }
         // Add identifiers
-        var inScope = completeScopeIdentifiers(file, line, character, partialName, addParens, addSemi);
+        var inScope = completeScopeIdentifiers(file, cursor, partialName, addParens, addSemi);
         result.addAll(inScope);
         // Add keywords
         if (!insideClass) {
@@ -627,13 +628,13 @@ class CompileBatch implements AutoCloseable {
         return result;
     }
 
-    List<CompletionItem> completeAnnotations(Path file, int line, int character, String partialName) {
+    List<CompletionItem> completeAnnotations(Path file, int cursor, String partialName) {
         var result = new ArrayList<CompletionItem>();
         // Add @Override ... snippet
         if ("Override".startsWith(partialName)) {
             // TODO filter out already-implemented methods using thisMethods
             var alreadyShown = new HashSet<String>();
-            for (var method : superMethods(file, line, character)) {
+            for (var method : superMethods(file, cursor)) {
                 var mods = method.getModifiers();
                 if (mods.contains(Modifier.STATIC) || mods.contains(Modifier.PRIVATE)) continue;
 
@@ -647,19 +648,18 @@ class CompileBatch implements AutoCloseable {
             }
         }
         // Add @Override, @Test, other simple class names
-        // We use 0 as the column number because if we focus javac on the partial @Annotation it will crash
-        var inScope = completeScopeIdentifiers(file, line, 0, partialName, false, false);
+        var inScope = completeScopeIdentifiers(file, cursor, partialName, false, false);
         result.addAll(inScope);
         return result;
     }
 
     /** Find all case options in the switch expression surrounding line:character */
-    List<CompletionItem> completeCases(Path file, int line, int character) {
-        var cursor = findPath(file, line, character);
-        LOG.info(String.format("Complete enum constants following `%s`...", cursor.getLeaf()));
+    List<CompletionItem> completeCases(Path file, int cursor) {
+        var path = findPath(file, cursor);
         // Find surrounding switch
-        var path = cursor;
-        while (!(path.getLeaf() instanceof SwitchTree)) path = path.getParentPath();
+        while (!(path.getLeaf() instanceof SwitchTree)) {
+            path = path.getParentPath();
+        }
         var leaf = (SwitchTree) path.getLeaf();
         path = new TreePath(path, leaf.getExpression());
         LOG.info(String.format("...found switch expression `%s`", leaf.getExpression()));
@@ -674,7 +674,7 @@ class CompileBatch implements AutoCloseable {
         var definition = types.asElement(type);
         if (definition == null) {
             LOG.info("...type has no definition, completing identifiers instead");
-            return completeIdentifiers(file, line, character, true, true, "", false, false); // TODO pass partial name
+            return completeIdentifiers(file, cursor, true, true, "", false, false); // TODO pass partial name
         }
         LOG.info(String.format("...switched expression has definition `%s`", definition));
         var result = new ArrayList<CompletionItem>();
@@ -687,9 +687,9 @@ class CompileBatch implements AutoCloseable {
         return result;
     }
 
-    /** Find all members of expression ending at line:character */
-    List<CompletionItem> completeMembers(Path file, int line, int character, boolean addParens, boolean addSemi) {
-        var path = findPath(file, line, character);
+    /** Find all members of expression ending at cursor */
+    List<CompletionItem> completeMembers(Path file, int cursor, boolean addParens, boolean addSemi) {
+        var path = findPath(file, cursor);
         var scope = trees.getScope(path);
         var element = trees.getElement(path);
         var type = trees.getTypeMirror(path);
@@ -738,8 +738,8 @@ class CompileBatch implements AutoCloseable {
         return false;
     }
 
-    List<CompletionItem> completeReferences(Path file, int line, int character) {
-        var path = findPath(file, line, character);
+    List<CompletionItem> completeReferences(Path file, int cursor) {
+        var path = findPath(file, cursor);
         var scope = trees.getScope(path);
         var element = trees.getElement(path);
         var type = trees.getTypeMirror(path);
@@ -953,13 +953,12 @@ class CompileBatch implements AutoCloseable {
         return result;
     }
 
-    private TypeMirror enclosingClass(Path file, int line, int character) {
-        var cursor = findPath(file, line, character);
-        var path = cursor;
-        while (!(path.getLeaf() instanceof ClassTree)) path = path.getParentPath();
-        var enclosingClass = trees.getElement(path);
-
-        return enclosingClass.asType();
+    private TypeMirror enclosingClass(Path file, int cursor) {
+        var path = findPath(file, cursor);
+        while (!(path.getLeaf() instanceof ClassTree)) {
+            path = path.getParentPath();
+        }
+        return trees.getElement(path).asType();
     }
 
     private void collectSuperMethods(TypeMirror thisType, List<ExecutableElement> result) {
@@ -974,8 +973,8 @@ class CompileBatch implements AutoCloseable {
         }
     }
 
-    private List<ExecutableElement> superMethods(Path file, int line, int character) {
-        var thisType = enclosingClass(file, line, character);
+    private List<ExecutableElement> superMethods(Path file, int cursor) {
+        var thisType = enclosingClass(file, cursor);
         var result = new ArrayList<ExecutableElement>();
 
         collectSuperMethods(thisType, result);
@@ -1149,13 +1148,14 @@ class CompileBatch implements AutoCloseable {
     }
 
     private List<CompletionItem> completeScopeIdentifiers(
-            Path file, int line, int character, String partialName, boolean addParens, boolean addSemi) {
+            Path file, int cursor, String partialName, boolean addParens, boolean addSemi) {
         var result = new ArrayList<CompletionItem>();
         var root = root(file);
         // Add locals
-        var path = findPath(file, line, character);
+        var path = findPath(file, cursor);
         var scope = trees.getScope(path);
         if (scope.getEnclosingClass() == null) {
+            var line = root.getLineMap().getLineNumber(cursor);
             LOG.warning(String.format("No enclosing class at %s(%d)", file, line));
             return List.of();
         }
@@ -1278,14 +1278,12 @@ class CompileBatch implements AutoCloseable {
     }
 
     /** Find the smallest tree that includes the cursor */
-    TreePath findPath(Path file, int line, int character) {
+    TreePath findPath(Path file, long cursor) {
         var root = root(file);
-        var cursor = root.getLineMap().getPosition(line, character);
         var finder = new FindSmallest(cursor, borrow.task, root);
         finder.scan(root, null);
         if (finder.found == null) {
-            var message = String.format("No TreePath to %s %d:%d", file, line, character);
-            throw new RuntimeException(message);
+            return new TreePath(root);
         }
         return finder.found;
     }

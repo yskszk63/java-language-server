@@ -4,20 +4,11 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
-import java.util.StringJoiner;
+import java.nio.file.*;
+import java.util.*;
 import java.util.stream.Collectors;
 import org.javacs.lsp.*;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.*;
 
 public class JavaCompilerServiceTest {
     static {
@@ -65,162 +56,10 @@ public class JavaCompilerServiceTest {
 
     @Test
     public void elementWithError() {
-        var file = resourceFile("CompleteMembers.java");
-        var found = compiler.compileFocus(file, 3, 12).element(file, 3, 12);
+        var file = resourceFile("HelloError.java");
+        var found = compiler.compileFocus(file, 3, 19).element(file, 3, 19);
 
         assertThat(found, notNullValue());
-    }
-
-    private List<String> filterText(List<CompletionItem> found) {
-        var result = new ArrayList<String>();
-        for (var c : found) {
-            if (c.filterText != null) {
-                result.add(c.filterText);
-            } else {
-                result.add(c.label);
-            }
-        }
-        return result;
-    }
-
-    @Test
-    public void identifiers() {
-        var file = resourceFile("CompleteIdentifiers.java");
-        var ctx = Parser.parseFile(file).completionContext(13, 21);
-        var focus = compiler.compileFocus(file, ctx.line, ctx.character);
-        var found =
-                focus.completeIdentifiers(
-                        file,
-                        ctx.line,
-                        ctx.character,
-                        ctx.inClass,
-                        ctx.inMethod,
-                        ctx.partialName,
-                        ctx.addParens,
-                        ctx.addSemi);
-        var names = filterText(found);
-        assertThat(names, hasItem("completeLocal"));
-        assertThat(names, hasItem("completeParam"));
-        //        assertThat(names, hasItem("super"));
-        //        assertThat(names, hasItem("this"));
-        assertThat(names, hasItem("completeOtherMethod"));
-        assertThat(names, hasItem("completeInnerField"));
-        assertThat(names, hasItem("completeOuterField"));
-        assertThat(names, hasItem("completeOuterStatic"));
-        // assertThat(names, hasItem("CompleteIdentifiers"));
-    }
-
-    @Test
-    public void identifiersInMiddle() {
-        var file = resourceFile("CompleteInMiddle.java");
-        var ctx = Parser.parseFile(file).completionContext(13, 21);
-        var focus = compiler.compileFocus(file, ctx.line, ctx.character);
-        var found =
-                focus.completeIdentifiers(
-                        file,
-                        ctx.line,
-                        ctx.character,
-                        ctx.inClass,
-                        ctx.inMethod,
-                        ctx.partialName,
-                        ctx.addParens,
-                        ctx.addSemi);
-        var names = filterText(found);
-        assertThat(names, hasItem("completeLocal"));
-        assertThat(names, hasItem("completeParam"));
-        //        assertThat(names, hasItem("super"));
-        //        assertThat(names, hasItem("this"));
-        assertThat(names, hasItem("completeOtherMethod"));
-        assertThat(names, hasItem("completeInnerField"));
-        assertThat(names, hasItem("completeOuterField"));
-        assertThat(names, hasItem("completeOuterStatic"));
-        // assertThat(names, hasItem("CompleteInMiddle"));
-    }
-
-    @Test
-    public void completeIdentifiers() {
-        var file = resourceFile("CompleteIdentifiers.java");
-        var ctx = Parser.parseFile(file).completionContext(13, 21);
-        var focus = compiler.compileFocus(file, ctx.line, ctx.character);
-        var found =
-                focus.completeIdentifiers(
-                        file,
-                        ctx.line,
-                        ctx.character,
-                        ctx.inClass,
-                        ctx.inMethod,
-                        ctx.partialName,
-                        ctx.addParens,
-                        ctx.addSemi);
-        var names = filterText(found);
-        assertThat(names, hasItem("completeLocal"));
-        assertThat(names, hasItem("completeParam"));
-        //        assertThat(names, hasItem("super"));
-        //        assertThat(names, hasItem("this"));
-        assertThat(names, hasItem("completeOtherMethod"));
-        assertThat(names, hasItem("completeInnerField"));
-        assertThat(names, hasItem("completeOuterField"));
-        assertThat(names, hasItem("completeOuterStatic"));
-        //        assertThat(names, hasItem("CompleteIdentifiers"));
-    }
-
-    @Test
-    public void members() {
-        var file = resourceFile("CompleteMembers.java");
-        var focus = compiler.compileFocus(file, 3, 14);
-        var found = focus.completeMembers(file, 3, 14, true, true);
-        var names = filterText(found);
-        assertThat(names, hasItem("subMethod"));
-        assertThat(names, hasItem("superMethod"));
-        assertThat(names, hasItem("equals"));
-    }
-
-    @Test
-    public void completeMembers() {
-        var file = resourceFile("CompleteMembers.java");
-        var ctx = Parser.parseFile(file).completionContext(3, 15);
-        var focus = compiler.compileFocus(file, ctx.line, ctx.character);
-        var found = focus.completeMembers(file, ctx.line, ctx.character, ctx.addParens, ctx.addSemi);
-        var names = filterText(found);
-        assertThat(names, hasItem("subMethod"));
-        assertThat(names, hasItem("superMethod"));
-        assertThat(names, hasItem("equals"));
-    }
-
-    @Test
-    public void completeExpression() {
-        var file = resourceFile("CompleteExpression.java");
-        var ctx = Parser.parseFile(file).completionContext(3, 37);
-        var focus = compiler.compileFocus(file, ctx.line, ctx.character);
-        var found = focus.completeMembers(file, ctx.line, ctx.character, ctx.addParens, ctx.addSemi);
-        var names = filterText(found);
-        assertThat(names, hasItem("instanceMethod"));
-        assertThat(names, not(hasItem("create")));
-        assertThat(names, hasItem("equals"));
-    }
-
-    @Test
-    public void completeClass() {
-        var file = resourceFile("CompleteClass.java");
-        var ctx = Parser.parseFile(file).completionContext(3, 23);
-        var focus = compiler.compileFocus(file, ctx.line, ctx.character);
-        var found = focus.completeMembers(file, ctx.line, ctx.character, ctx.addParens, ctx.addSemi);
-        var names = filterText(found);
-        assertThat(names, hasItems("staticMethod", "staticField"));
-        assertThat(names, hasItems("class"));
-        assertThat(names, not(hasItem("instanceMethod")));
-        assertThat(names, not(hasItem("instanceField")));
-    }
-
-    @Test
-    public void completeImports() {
-        var file = resourceFile("CompleteImports.java");
-        var ctx = Parser.parseFile(file).completionContext(1, 18);
-        var focus = compiler.compileFocus(file, ctx.line, ctx.character);
-        var found = focus.completeMembers(file, ctx.line, ctx.character, ctx.addParens, ctx.addSemi);
-        var names = filterText(found);
-        assertThat(names, hasItem("List"));
-        assertThat(names, hasItem("concurrent"));
     }
 
     @Test

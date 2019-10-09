@@ -17,6 +17,66 @@ public class CompletionsTest extends CompletionsBase {
     // TODO rename Autocomplete Complete because Autocomplete is long and ugly
 
     @Test
+    public void completeClass() {
+        refreshServer(); // TODO figure out how to get rid of this
+        var file = "/org/javacs/example/CompleteClass.java";
+        var suggestions = filterText(file, 5, 23);
+        assertThat(suggestions, hasItems("staticMethod", "staticField", "class"));
+        String[] not = {"instanceMethod", "instanceField"};
+        for (var n : not) {
+            assertThat(suggestions, not(hasItem(n)));
+        }
+    }
+
+    @Test
+    public void identifiers() {
+        var file = "/org/javacs/example/CompleteIdentifiers.java";
+        var suggestions = filterText(file, 15, 21);
+        String[] expect = {
+            "completeLocal",
+            "completeParam",
+            "completeOtherMethod",
+            "completeInnerField",
+            "completeOuterField",
+            "completeOuterStatic",
+        };
+        assertThat(suggestions, hasItems(expect));
+    }
+
+    @Test
+    public void identifiersInMiddle() {
+        var file = "/org/javacs/example/CompleteInMiddle.java";
+        var suggestions = filterText(file, 15, 21);
+        String[] expect = {
+            "completeLocal",
+            "completeParam",
+            "completeOtherMethod",
+            "completeInnerField",
+            "completeOuterField",
+            "completeOuterStatic",
+        };
+        assertThat(suggestions, hasItems(expect));
+    }
+
+    @Test
+    public void expression() {
+        var file = "/org/javacs/example/CompleteExpression.java";
+        var suggestions = filterText(file, 5, 37);
+        assertThat(suggestions, hasItems("instanceMethod", "equals"));
+        assertThat(suggestions, not(hasItem("create")));
+    }
+
+    @Test
+    public void imports() {
+        var file = "/org/javacs/example/CompleteImports.java";
+        var suggestions = filterText(file, 3, 18);
+        assertThat(suggestions, hasItem("List"));
+        assertThat(suggestions, hasItem("concurrent"));
+    }
+
+    // TODO not(hasItems(_)) only fails if *all* items are missing
+
+    @Test
     public void staticMember() {
         var file = "/org/javacs/example/AutocompleteStaticMember.java";
 
@@ -44,45 +104,47 @@ public class CompletionsTest extends CompletionsBase {
 
         // Virtual testMethods
         var suggestions = filterText(file, 5, 14);
-
-        assertThat(
-                "excludes static members",
-                suggestions,
-                not(
-                        hasItems(
-                                "testFieldStatic",
-                                "testMethodStatic",
-                                "testFieldStaticPrivate",
-                                "testMethodStaticPrivate",
-                                "class",
-                                "AutocompleteMember")));
-        assertThat(
-                "includes non-static members",
-                suggestions,
-                hasItems("testFields", "testMethods", "testFieldsPrivate", "testMethodsPrivate", "getClass"));
+        String[] statics = {
+            "testFieldStatic",
+            "testMethodStatic",
+            "testFieldStaticPrivate",
+            "testMethodStaticPrivate",
+            "class",
+            "AutocompleteMember"
+        };
+        assertThat("excludes static members", suggestions, not(hasItems(statics)));
+        String[] virtuals = {"testFields", "testMethods", "testFieldsPrivate", "testMethodsPrivate", "getClass"};
+        assertThat("includes non-static members", suggestions, hasItems(virtuals));
         assertThat("excludes constructors", suggestions, not(hasItem(startsWith("AutocompleteMember"))));
+    }
+
+    @Test
+    public void inheritedMembers() {
+        var file = "/org/javacs/example/CompleteInheritedMembers.java";
+        var suggestions = filterText(file, 5, 15);
+        assertThat(suggestions, hasItems("superMethod", "subMethod"));
     }
 
     @Test
     public void enumMapMembers() {
         var suggestions = filterText("/org/javacs/example/CompleteEnumMap.java", 9, 13);
-        assertThat(
-                suggestions,
-                hasItems(
-                        "clear",
-                        "clone",
-                        "containsKey",
-                        "containsValue",
-                        "entrySet",
-                        "equals",
-                        "get",
-                        "hashCode",
-                        "keySet",
-                        "put",
-                        "putAll",
-                        "remove",
-                        "size",
-                        "values"));
+        String[] expect = {
+            "clear",
+            "clone",
+            "containsKey",
+            "containsValue",
+            "entrySet",
+            "equals",
+            "get",
+            "hashCode",
+            "keySet",
+            "put",
+            "putAll",
+            "remove",
+            "size",
+            "values"
+        };
+        assertThat(suggestions, hasItems(expect));
     }
 
     @Test
@@ -436,7 +498,7 @@ public class CompletionsTest extends CompletionsBase {
         var file = "/org/javacs/example/AutocompleteFromClasspath.java";
 
         // Static methods
-        var suggestions = filterText(file, 8, 17);
+        var suggestions = filterText(file, 9, 18);
 
         assertThat(suggestions, hasItems("add", "addAll"));
     }
@@ -899,8 +961,8 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void returnChain() {
-        var inserts = filterText("/org/javacs/example/ReturnChain.java", 6, 14);
+    public void multilineChain() {
+        var inserts = filterText("/org/javacs/example/MultilineChain.java", 6, 14);
         assertThat(inserts, hasItem("concat"));
     }
 }

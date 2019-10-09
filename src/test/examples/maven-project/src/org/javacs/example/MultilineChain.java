@@ -1,8 +1,8 @@
 package org.javacs.example;
 
-class ReturnChain {
+public class MultilineChain {
     void test() {
-        return "foo"
+        "foo"
             .
     }
 }

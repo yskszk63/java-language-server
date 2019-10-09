@@ -1,4 +1,6 @@
-class CompleteMembers {
+package org.javacs.example;
+
+public class CompleteMembers {
     void test(Sub param) {
         param.
     }

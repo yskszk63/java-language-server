@@ -1,4 +1,6 @@
-class CompleteIdentifiers {
+package org.javacs.example;
+
+public class CompleteIdentifiers {
     static int completeOuterStatic;
     int completeOuterField;
 
