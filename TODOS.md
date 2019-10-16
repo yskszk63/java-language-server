@@ -21,6 +21,7 @@
 - Javac doesn't find protobuf classes in bazel
 - Replace <a href=...>text</a> with text in docs, see List.copyOf for example.
 - When no overload is matched, go-to all definitions of method name
+- Show 'not used' warnings for non-@Override package-private methods of private classes, because they can only be accessed from same file
 
 ## Features
 - Lint unused args when method isn't overloading something

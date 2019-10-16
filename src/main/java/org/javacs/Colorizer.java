@@ -10,7 +10,7 @@ import org.javacs.lsp.*;
 
 class Colorizer extends TreePathScanner<Void, Void> {
     private final Trees trees;
-    final SemanticColors colors = new SemanticColors();
+    final ColorsHolder colors = new ColorsHolder();
 
     Colorizer(JavacTask task) {
         trees = Trees.instance(task);
@@ -45,23 +45,15 @@ class Colorizer extends TreePathScanner<Void, Void> {
                 return;
             }
             // Find name inside expression
-            var file = Paths.get(colors.uri);
+            var file = Paths.get(root.getSourceFile().toUri());
             var contents = FileStore.contents(file);
             var region = contents.substring(start, end);
             start += region.indexOf(name.toString());
             end = start + name.length();
-            // Convert offset to line:column
-            var lines = root.getLineMap();
-            var startLine = (int) lines.getLineNumber(start);
-            var startColumn = (int) lines.getColumnNumber(start);
-            var endLine = (int) lines.getLineNumber(end);
-            var endColumn = (int) lines.getColumnNumber(end);
-            var startPos = new Position(startLine, startColumn);
-            var endPos = new Position(endLine, endColumn);
-            var range = new Range(startPos, endPos);
-            colors.fields.add(range);
+            var span = new Span(start, end);
+            colors.fields.add(span);
             if (toEl.getModifiers().contains(Modifier.STATIC)) {
-                colors.statics.add(range);
+                colors.statics.add(span);
             }
         }
     }
@@ -86,9 +78,12 @@ class Colorizer extends TreePathScanner<Void, Void> {
 
     @Override
     public Void visitCompilationUnit(CompilationUnitTree t, Void __) {
-        colors.uri = t.getSourceFile().toUri();
         return super.visitCompilationUnit(t, null);
     }
+}
+
+class ColorsHolder {
+    List<Span> statics = new ArrayList<>(), fields = new ArrayList<>();
 }
 
 class SemanticColors {
@@ -97,5 +92,5 @@ class SemanticColors {
 }
 
 class SemanticColorsMessage {
-    List<SemanticColors> files;
+    List<SemanticColors> files = new ArrayList<>();
 }

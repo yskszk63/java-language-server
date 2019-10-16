@@ -6,7 +6,6 @@ import com.sun.source.doctree.ParamTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -144,109 +143,63 @@ class CompileBatch implements AutoCloseable {
         return name.charAt(0) == '_'; // TODO quick fix
     }
 
-    Collection<PublishDiagnosticsParams> reportErrors() {
+    Map<Path, List<DiagnosticHolder>> reportErrors() {
         // Construct empty lists
-        var byUri = new HashMap<URI, PublishDiagnosticsParams>();
+        var byPath = new HashMap<Path, List<DiagnosticHolder>>();
         for (var r : roots) {
-            var params = new PublishDiagnosticsParams();
-            params.uri = r.getSourceFile().toUri();
-            byUri.put(params.uri, params);
+            var path = Paths.get(r.getSourceFile().toUri());
+            byPath.put(path, new ArrayList<>());
         }
         // Convert diags
         for (var d : parent.diags) {
             var source = d.getSource();
             if (source == null) continue;
-            var uri = source.toUri();
-            if (!byUri.containsKey(uri)) continue;
-            var convert = asDiagnostic(d);
-            byUri.get(uri).diagnostics.add(convert);
+            var path = Paths.get(source.toUri());
+            if (!byPath.containsKey(path)) continue;
+            byPath.get(path).add(DiagnosticHolder.wrap(d));
         }
         // Check for unused privates
         for (var r : roots) {
-            var uri = r.getSourceFile().toUri();
+            var path = Paths.get(r.getSourceFile().toUri());
             var warnUnused = new WarnUnused(borrow.task);
             warnUnused.scan(r, null);
             for (var unusedEl : warnUnused.notUsed()) {
                 if (okUnused(unusedEl.getSimpleName())) continue;
                 var warn = warnUnused(unusedEl);
-                byUri.get(uri).diagnostics.add(warn);
+                byPath.get(path).add(warn);
             }
         }
         // TODO hint fields that could be final
         // TODO hint unused exception
 
-        return byUri.values();
+        return byPath;
     }
 
-    private static int severity(javax.tools.Diagnostic.Kind kind) {
-        switch (kind) {
-            case ERROR:
-                return DiagnosticSeverity.Error;
-            case WARNING:
-            case MANDATORY_WARNING:
-                return DiagnosticSeverity.Warning;
-            case NOTE:
-                return DiagnosticSeverity.Information;
-            case OTHER:
-            default:
-                return DiagnosticSeverity.Hint;
-        }
-    }
-
-    private static Position position(String content, long offset) {
-        int line = 0, column = 0;
-        for (int i = 0; i < offset; i++) {
-            if (content.charAt(i) == '\n') {
-                line++;
-                column = 0;
-            } else column++;
-        }
-        return new Position(line, column);
-    }
-
-    private org.javacs.lsp.Diagnostic warnUnused(Element unusedEl) {
+    private DiagnosticHolder warnUnused(Element unusedEl) {
         var path = trees.getPath(unusedEl);
         var root = path.getCompilationUnit();
         var leaf = path.getLeaf();
         var pos = trees.getSourcePositions();
-        var start = pos.getStartPosition(root, leaf);
-        var end = pos.getEndPosition(root, leaf);
-        var file = Paths.get(root.getSourceFile().toUri());
-        var contents = FileStore.contents(file);
+        var start = (int) pos.getStartPosition(root, leaf);
+        var end = (int) pos.getEndPosition(root, leaf);
         if (leaf instanceof VariableTree) {
+            var file = Paths.get(root.getSourceFile().toUri());
+            var contents = FileStore.contents(file);
             var v = (VariableTree) leaf;
             var name = v.getName().toString();
-            var offset = pos.getEndPosition(root, v.getType());
+            var offset = (int) pos.getEndPosition(root, v.getType());
             if (offset == -1) offset = start;
-            offset = contents.indexOf(name, (int) offset);
+            offset = contents.indexOf(name, offset);
             end = offset + name.length();
         }
-        var d = new org.javacs.lsp.Diagnostic();
-        d.range = new Range(position(contents, start), position(contents, end));
-        d.message = String.format("`%s` is not used", unusedEl.getSimpleName());
-        d.code = "unused";
+        var message = String.format("`%s` is not used", unusedEl.getSimpleName());
+        int severity;
         if (unusedEl instanceof ExecutableElement || unusedEl instanceof TypeElement) {
-            d.severity = DiagnosticSeverity.Hint;
+            severity = DiagnosticSeverity.Hint;
         } else {
-            d.severity = DiagnosticSeverity.Information;
+            severity = DiagnosticSeverity.Information;
         }
-        d.tags = List.of(DiagnosticTag.Unnecessary);
-        return d;
-    }
-
-    private org.javacs.lsp.Diagnostic asDiagnostic(javax.tools.Diagnostic<? extends JavaFileObject> java) {
-        // Check that error is in an open file
-        var file = Paths.get(java.getSource().toUri());
-        // Find start and end position
-        var content = FileStore.contents(file);
-        var start = position(content, java.getStartPosition());
-        var end = position(content, java.getEndPosition());
-        var d = new org.javacs.lsp.Diagnostic();
-        d.severity = severity(java.getKind());
-        d.range = new Range(start, end);
-        d.code = java.getCode();
-        d.message = java.getMessage(null);
-        return d;
+        return DiagnosticHolder.warnUnused(severity, message, start, end);
     }
 
     Optional<List<TreePath>> definitions(Element el) {
@@ -1507,12 +1460,13 @@ class CompileBatch implements AutoCloseable {
         return JavaLanguageServer.GSON.toJsonTree(data);
     }
 
-    List<SemanticColors> colors() {
-        var result = new ArrayList<SemanticColors>();
+    Map<Path, ColorsHolder> colors() {
+        var result = new HashMap<Path, ColorsHolder>();
         for (var root : roots) {
+            var path = Paths.get(root.getSourceFile().toUri());
             var colorizer = new Colorizer(borrow.task);
             colorizer.scan(root, null);
-            result.add(colorizer.colors);
+            result.put(path, colorizer.colors);
         }
         return result;
     }

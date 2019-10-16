@@ -32,7 +32,6 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     void lint(Collection<Path> files) {
-        // TODO only lint the current focus, merging errors/decorations with existing
         LOG.info("Lint " + files.size() + " files...");
         var started = Instant.now();
         if (files.isEmpty()) return;
@@ -45,30 +44,38 @@ class JavaLanguageServer extends LanguageServer {
             var compiled = Instant.now();
             var elapsed = Duration.between(started, compiled).toMillis();
             LOG.info(String.format("...compiled in %d ms", elapsed));
-            // Publish diagnostics
+            // Update cache and publish
             var errors = batch.reportErrors();
-            var countErrors = 0;
-            for (var ds : errors) {
-                client.publishDiagnostics(ds);
-                countErrors += ds.diagnostics.size();
+            var colors = batch.colors();
+            var allColors = new SemanticColorsMessage();
+            for (var file : files) {
+                var lines = batch.root(file).getLineMap();
+                // Publish errors
+                var publishErrors = new PublishDiagnosticsParams();
+                publishErrors.uri = file.toUri();
+                for (var e : errors.get(file)) {
+                    publishErrors.diagnostics.add(e.lspDiagnostic(lines));
+                }
+                client.publishDiagnostics(publishErrors);
+                // Publish colors
+                var publishColors = new SemanticColors();
+                publishColors.uri = file.toUri();
+                for (var f : colors.get(file).fields) {
+                    publishColors.fields.add(f.asRange(lines));
+                }
+                for (var s : colors.get(file).statics) {
+                    publishColors.statics.add(s.asRange(lines));
+                }
+                allColors.files.add(publishColors);
             }
-            var published = Instant.now();
-            elapsed = Duration.between(compiled, published).toMillis();
-            LOG.info(
-                    String.format(
-                            "...published %d diagnostics in %d files in %d ms", countErrors, errors.size(), elapsed));
-            // Add semantic colors
-            var colors = new SemanticColorsMessage();
-            colors.files = batch.colors();
-            client.customNotification("java/colors", GSON.toJsonTree(colors));
-            var colored = Instant.now();
-            elapsed = Duration.between(published, colored).toMillis();
-            LOG.info(String.format("...colored in %d ms", elapsed));
+            client.customNotification("java/colors", GSON.toJsonTree(allColors));
             // Done
             uncheckedChanges = false;
         }
+        // Log timing
         var done = Instant.now();
-        LOG.info(String.format("...done in %d ms", Duration.between(started, done).toMillis()));
+        var elapsed = Duration.between(started, done).toMillis();
+        LOG.info(String.format("...linted in %d ms", elapsed));
     }
 
     static final Gson GSON = new GsonBuilder().registerTypeAdapter(Ptr.class, new PtrAdapter()).create();

@@ -6,7 +6,6 @@ import static org.junit.Assert.*;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
-import org.javacs.lsp.*;
 import org.junit.*;
 
 public class JavaCompilerServiceTest {
@@ -50,43 +49,7 @@ public class JavaCompilerServiceTest {
         var file = resourceFile("HasError.java");
         var files = Collections.singleton(new SourceFileObject(file));
         var diags = compiler.compileBatch(files).reportErrors();
-        assertThat(diags, not(empty()));
-    }
-
-    private static List<String> errorStrings(Collection<PublishDiagnosticsParams> list) {
-        var strings = new ArrayList<String>();
-        for (var group : list) {
-            for (var d : group.diagnostics) {
-                var file = StringSearch.fileName(group.uri);
-                var line = d.range.start.line;
-                var msg = d.message;
-                var string = String.format("%s(%d): %s", file, line, msg);
-                strings.add(string);
-            }
-        }
-        return strings;
-    }
-
-    // TODO get these back somehow
-    @Test
-    @Ignore
-    public void errorProne() {
-        var file = resourceFile("ErrorProne.java");
-        var files = Collections.singleton(new SourceFileObject(file));
-        var diags = compiler.compileBatch(files).reportErrors();
-        var strings = errorStrings(diags);
-        assertThat(strings, hasItem(containsString("ErrorProne.java(7): [CollectionIncompatibleType]")));
-    }
-
-    // TODO get these back somehow
-    @Test
-    @Ignore
-    public void unusedVar() {
-        var file = resourceFile("UnusedVar.java");
-        var files = Collections.singleton(new SourceFileObject(file));
-        var diags = compiler.compileBatch(files).reportErrors();
-        var strings = errorStrings(diags);
-        assertThat(strings, hasItem(containsString("UnusedVar.java(3): [Unused]")));
+        assertThat(diags.get(file), not(empty()));
     }
 
     @Test

@@ -80,7 +80,7 @@ export function activate(context: ExtensionContext) {
         return new Range(asPosition(r.start), asPosition(r.end));
     }
     function asPosition(p: PositionLike) {
-        return new Position(p.line-1, p.character-1);
+        return new Position(p.line, p.character);
     }
     const statics = window.createTextEditorDecorationType({
         fontStyle: 'italic'

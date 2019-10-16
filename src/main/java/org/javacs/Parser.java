@@ -25,9 +25,9 @@ class Parser {
                 COMPILER.getTask(null, FILE_MANAGER, Parser::ignoreError, List.of(), List.of(), List.of(file));
     }
 
-    private final String contents;
+    final String contents;
     private final JavacTask task;
-    private final CompilationUnitTree root;
+    final CompilationUnitTree root;
 
     private Parser(JavaFileObject file) {
         Objects.requireNonNull(file);
@@ -863,7 +863,15 @@ class Parser {
     String prune(long cursor) {
         var pos = Trees.instance(task).getSourcePositions();
         var buffer = new StringBuilder(contents);
-        return prune(root, pos, buffer, new long[] {cursor}, true);
+        long[] cursors = {cursor};
+        return prune(root, pos, buffer, cursors, true);
+    }
+
+    String prune(Span block) {
+        var pos = Trees.instance(task).getSourcePositions();
+        var buffer = new StringBuilder(contents);
+        long[] cursors = {block.start + 1, block.until - 1};
+        return prune(root, pos, buffer, cursors, false);
     }
 
     String eraseCase(long cursor) {
@@ -903,15 +911,25 @@ class Parser {
         return prune(root, pos, buffer, offsets, false);
     }
 
-    boolean insideClass(long cursor) {
-        var path = findPath(cursor);
-        while (path != null) {
-            if (path.getLeaf() instanceof ClassTree) {
-                return true;
+    Span enclosingMethod(int start, int end) {
+        var pos = Trees.instance(task).getSourcePositions();
+        class FindEnclosingMethod extends TreeScanner<Void, Void> {
+            Span found = Span.INVALID;
+
+            @Override
+            public Void visitMethod(MethodTree method, Void __) {
+                var body = method.getBody();
+                var startBody = (int) pos.getStartPosition(root, body);
+                var endBody = (int) pos.getEndPosition(root, body);
+                if (startBody < start && end < endBody) {
+                    found = new Span(startBody, endBody);
+                }
+                return super.visitMethod(method, null);
             }
-            path = path.getParentPath();
         }
-        return false;
+        var find = new FindEnclosingMethod();
+        find.scan(root, null);
+        return find.found;
     }
 
     static Set<Path> potentialDefinitions(Element to) {
