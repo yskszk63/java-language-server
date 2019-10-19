@@ -7,7 +7,6 @@ import java.nio.file.attribute.*;
 import java.time.Instant;
 import java.util.*;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import org.javacs.lsp.DidChangeTextDocumentParams;
 import org.javacs.lsp.DidCloseTextDocumentParams;
 import org.javacs.lsp.DidOpenTextDocumentParams;
@@ -251,8 +250,7 @@ class FileStore {
             return activeDocuments.get(file).content;
         }
         try {
-            // TODO I think there is a faster path here
-            return Files.readAllLines(file).stream().collect(Collectors.joining("\n"));
+            return Files.readString(file);
         } catch (NoSuchFileException e) {
             LOG.warning(e.getMessage());
             return "";
