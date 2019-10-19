@@ -90,7 +90,3 @@ class SemanticColors {
     URI uri;
     List<Range> statics = new ArrayList<>(), fields = new ArrayList<>();
 }
-
-class SemanticColorsMessage {
-    List<SemanticColors> files = new ArrayList<>();
-}

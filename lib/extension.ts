@@ -3,7 +3,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as Path from "path";
 import * as FS from "fs";
-import {window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, ConfigurationChangeEvent, TextDocumentChangeEvent, Hover, debug, DebugConfiguration, Range, Position} from 'vscode';
+import {window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, ConfigurationChangeEvent, TextDocumentChangeEvent, Hover, debug, DebugConfiguration, Range, Position, TextDocument} from 'vscode';
 import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType} from "vscode-languageclient";
 import {tree, activate as activateTreeSitter, decoration} from 'vscode-tree-sitter';
 import {color} from './treeSitter';
@@ -84,10 +84,15 @@ export function activate(context: ExtensionContext) {
         fontStyle: 'italic'
     });
     const colors = new Map<string, SemanticColors>();
+    function cacheSemanticColors(event: SemanticColors) {
+        colors.set(event.uri, event);
+        applySemanticColors();
+    }
     function applySemanticColors() {
         for (const editor of window.visibleTextEditors) {
             const c = colors.get(editor.document.uri.toString());
             if (c == null) {
+                console.warn('No semantic colors for ' + editor.document.uri)
                 continue;
             }
             const field = decoration('variable');
@@ -95,15 +100,13 @@ export function activate(context: ExtensionContext) {
             editor.setDecorations(statics, c.statics.map(asRange));
         }
     }
+    function forgetSemanticColors(doc: TextDocument) {
+        colors.delete(doc.uri.toString());
+    }
     client.onReady().then(() => {
-        client.onNotification(new NotificationType('java/colors'), (event: SemanticColorsMessage) => {
-            colors.clear();
-            for (const c of event.files) {
-                colors.set(c.uri, c);
-            }
-            applySemanticColors();
-        });
+        client.onNotification(new NotificationType('java/colors'), cacheSemanticColors);
         context.subscriptions.push(window.onDidChangeVisibleTextEditors(applySemanticColors));
+        workspace.onDidCloseTextDocument(forgetSemanticColors);
     });
     
 	// Parse .java files incrementally using tree-sitter
@@ -308,10 +311,6 @@ interface SemanticColors {
     uri: string;
     fields: RangeLike[];
     statics: RangeLike[];
-}
-
-interface SemanticColorsMessage {
-    files: SemanticColors[];
 }
 
 interface RangeLike {

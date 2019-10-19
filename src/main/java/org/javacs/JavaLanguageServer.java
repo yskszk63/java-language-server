@@ -62,6 +62,10 @@ class JavaLanguageServer extends LanguageServer {
                 sources.add(source);
             }
         }
+        if (sources.isEmpty()) {
+            LOG.info("...nothing has changed, skipping lint");
+            return;
+        }
         // Compile mixed list
         try (var batch = compiler().compileBatch(sources)) {
             var compiled = Instant.now();
@@ -70,15 +74,13 @@ class JavaLanguageServer extends LanguageServer {
             // Update cache and publish
             var errors = batch.reportErrors();
             var colors = batch.colors();
-            var allColors = new SemanticColorsMessage();
             for (var source : sources) {
                 var cached = lintCache.get(source.path);
                 var span = cached.edited();
                 cached.update(span, errors.get(source.path), colors.get(source.path));
                 client.publishDiagnostics(cached.lspDiagnostics());
-                allColors.files.add(cached.lspColors());
+                client.customNotification("java/colors", GSON.toJsonTree(cached.lspColors()));
             }
-            client.customNotification("java/colors", GSON.toJsonTree(allColors));
             // Done
             uncheckedChanges = false;
         }
