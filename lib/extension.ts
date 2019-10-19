@@ -44,8 +44,6 @@ export function activate(context: ExtensionContext) {
     let launcherPath = [context.extensionPath].concat(launcherRelativePath);
     let launcher = Path.resolve(...launcherPath);
     
-    console.log(launcher);
-    
     // Start the child java process
     let serverOptions: ServerOptions = {
         command: launcher,

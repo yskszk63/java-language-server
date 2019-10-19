@@ -3,9 +3,10 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import org.javacs.lsp.Diagnostic;
+import org.javacs.lsp.*;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -23,6 +24,56 @@ public class WarningsTest {
     @Before
     public void setup() {
         errors.clear();
+    }
+
+    @Test
+    public void wrongType() {
+        var file = FindResource.path("org/javacs/err/WrongType.java");
+        server.lint(List.of(file));
+        assertThat(errors, hasItem("compiler.err.prob.found.req(5)"));
+    }
+
+    @Test
+    public void clearErrorIncrementally() {
+        var file = FindResource.path("org/javacs/err/ClearErrorIncrementally.java");
+        open(file);
+        server.lint(List.of(file));
+        assertThat(errors, containsInAnyOrder("compiler.err.prob.found.req(5)", "unused(5)"));
+        // Change 1 to "1"
+        var newContents =
+                "package org.javacs.err;\n\npublic class ClearErrorIncrementally {\n    void test() {\n        String x = \"1\";\n    }\n}";
+        edit(file, newContents);
+        errors.clear();
+        server.lint(List.of(file));
+        assertThat(errors, contains("unused(5)"));
+        // Delete line `String x = "1";`
+        newContents =
+                "package org.javacs.err;\n\npublic class ClearErrorIncrementally {\n    void test() {\n        }\n}";
+        edit(file, newContents);
+        errors.clear();
+        server.lint(List.of(file));
+        assertThat(errors, empty());
+    }
+
+    private static int editVersion = 1;
+
+    private void open(Path file) {
+        var open = new DidOpenTextDocumentParams();
+        open.textDocument.uri = file.toUri();
+        open.textDocument.text = FileStore.contents(file);
+        open.textDocument.version = editVersion++;
+        open.textDocument.languageId = "java";
+        server.didOpenTextDocument(open);
+    }
+
+    private void edit(Path file, String contents) {
+        var change = new DidChangeTextDocumentParams();
+        change.textDocument.uri = file.toUri();
+        change.textDocument.version = editVersion++;
+        var evt = new TextDocumentContentChangeEvent();
+        evt.text = contents;
+        change.contentChanges.add(evt);
+        server.didChangeTextDocument(change);
     }
 
     @Test

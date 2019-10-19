@@ -31,15 +31,38 @@ class JavaLanguageServer extends LanguageServer {
         return cacheCompiler;
     }
 
+    private final Map<Path, CachedLint> lintCache = new HashMap<>();
+
     void lint(Collection<Path> files) {
         LOG.info("Lint " + files.size() + " files...");
         var started = Instant.now();
         if (files.isEmpty()) return;
+        // Update cache
+        lintCache.keySet().retainAll(files);
+        for (var file : files) {
+            if (!lintCache.containsKey(file)) {
+                lintCache.put(file, new CachedLint(file));
+            }
+        }
+        // Construct todo list, using fast lint when possible
         var sources = new ArrayList<SourceFileObject>();
         for (var file : files) {
-            var source = new SourceFileObject(file);
-            sources.add(source);
+            var cached = lintCache.get(file);
+            var span = cached.edited();
+            if (span == Span.INVALID) {
+                LOG.info(String.format("...re-lint all of %s", file.getFileName()));
+                var source = new SourceFileObject(file);
+                sources.add(source);
+            } else if (span == Span.EMPTY) {
+                LOG.info(String.format("...skip linting %s", file.getFileName()));
+            } else {
+                LOG.info(String.format("...re-lint %s %d-%d", file.getFileName(), span.start, span.until));
+                var contents = cached.pruneNewContents(span);
+                var source = new SourceFileObject(file, contents, Instant.now());
+                sources.add(source);
+            }
         }
+        // Compile mixed list
         try (var batch = compiler().compileBatch(sources)) {
             var compiled = Instant.now();
             var elapsed = Duration.between(started, compiled).toMillis();
@@ -48,25 +71,12 @@ class JavaLanguageServer extends LanguageServer {
             var errors = batch.reportErrors();
             var colors = batch.colors();
             var allColors = new SemanticColorsMessage();
-            for (var file : files) {
-                var lines = batch.root(file).getLineMap();
-                // Publish errors
-                var publishErrors = new PublishDiagnosticsParams();
-                publishErrors.uri = file.toUri();
-                for (var e : errors.get(file)) {
-                    publishErrors.diagnostics.add(e.lspDiagnostic(lines));
-                }
-                client.publishDiagnostics(publishErrors);
-                // Publish colors
-                var publishColors = new SemanticColors();
-                publishColors.uri = file.toUri();
-                for (var f : colors.get(file).fields) {
-                    publishColors.fields.add(f.asRange(lines));
-                }
-                for (var s : colors.get(file).statics) {
-                    publishColors.statics.add(s.asRange(lines));
-                }
-                allColors.files.add(publishColors);
+            for (var source : sources) {
+                var cached = lintCache.get(source.path);
+                var span = cached.edited();
+                cached.update(span, errors.get(source.path), colors.get(source.path));
+                client.publishDiagnostics(cached.lspDiagnostics());
+                allColors.files.add(cached.lspColors());
             }
             client.customNotification("java/colors", GSON.toJsonTree(allColors));
             // Done
@@ -762,7 +772,6 @@ class JavaLanguageServer extends LanguageServer {
 
     private void updateCachedParse(Path file) {
         if (file.equals(cacheParseFile) && FileStore.version(file) == cacheParseVersion) return;
-        LOG.info(String.format("Updating cached parse file to %s", file));
         cacheParse = Parser.parseFile(file);
         cacheParseFile = file;
         cacheParseVersion = FileStore.version(file);

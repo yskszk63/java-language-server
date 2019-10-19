@@ -22,6 +22,7 @@
 - Replace <a href=...>text</a> with text in docs, see List.copyOf for example.
 - When no overload is matched, go-to all definitions of method name
 - Show 'not used' warnings for non-@Override package-private methods of private classes, because they can only be accessed from same file
+- Package template of new package which is sibling of existing package shows sibling + leaf, not parent + leaf.
 
 ## Features
 - Lint unused args when method isn't overloading something

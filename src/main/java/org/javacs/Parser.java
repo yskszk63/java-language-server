@@ -868,8 +868,18 @@ class Parser {
     }
 
     String prune(Span block) {
+        if (block == Span.EMPTY || block == Span.INVALID) return contents;
         var pos = Trees.instance(task).getSourcePositions();
         var buffer = new StringBuilder(contents);
+        /*
+        TODO: This will erase inner blocks like
+        void test() {
+            foo.|
+            {
+                innerBlock();
+            }
+        }
+        */
         long[] cursors = {block.start + 1, block.until - 1};
         return prune(root, pos, buffer, cursors, false);
     }
