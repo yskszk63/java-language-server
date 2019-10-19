@@ -69,6 +69,14 @@ class CachedLint {
 
     void update(Span edited, List<DiagnosticHolder> newErrors, ColorsHolder newColors) {
         var newContents = FileStore.contents(file);
+        if (edited == Span.INVALID) {
+            contents = newContents;
+            parse = Parser.parseJavaFileObject(new SourceFileObject(file, contents, Instant.now()));
+            errors = newErrors;
+            fields = newColors.fields;
+            statics = newColors.statics;
+            return;
+        }
         var shift = newContents.length() - contents.length();
         // Update diagnostics
         var oldErrors = shiftOldDiagnostics(errors, edited, shift);
