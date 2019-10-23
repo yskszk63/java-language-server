@@ -14,6 +14,7 @@ export async function activateTreeSitter(context: ExtensionContext) {
         if (javaParser == null) {
             const absolute = path.join(context.extensionPath, 'lib', 'tree-sitter-java.wasm');
 			const wasm = path.relative(process.cwd(), absolute)
+			// @ts-ignore https://github.com/tree-sitter/tree-sitter/pull/471
 			const lang = await Parser.Language.load(wasm)
 			javaParser = new Parser()
 			javaParser.setLanguage(lang)
