@@ -55,6 +55,8 @@ class DiagnosticHolder {
      * version of the file.
      */
     org.javacs.lsp.Diagnostic lspDiagnostic(LineMap lines) {
+        assert start >= 0 : "start " + start + " < 0";
+        assert end >= 0 : "end " + end + " < 0";
         var result = new org.javacs.lsp.Diagnostic();
         result.severity = severity;
         result.code = code;
