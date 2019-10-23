@@ -3,184 +3,17 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as Path from "path";
 import * as FS from "fs";
-import {window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, ConfigurationChangeEvent, TextDocumentChangeEvent, debug, DebugConfiguration, Range, Position, TextDocument, TextEditor, TextEditorDecorationType, DecorationRangeBehavior, DecorationRenderOptions} from 'vscode';
+import {window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, debug, DebugConfiguration, Range, Position, TextDocument} from 'vscode';
 import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType} from "vscode-languageclient";
-import * as path from 'path';
-import * as scopes from './scopes'
-import Parser = require("web-tree-sitter");
-import { colorJava, Range as ColorRange } from "./treeSitterColor";
+import {activateTreeSitter} from './treeSitter';
+import {decoration} from './textMate';
 
 // If we want to profile using VisualVM, we have to run the language server using regular java, not jlink
 const visualVm = false;
 
-// Create decoration types from scopes lazily
-const decorationCache = new Map<string, TextEditorDecorationType>()
-function decoration(scope: string): TextEditorDecorationType|undefined {
-	// If we've already created a decoration for `scope`, use it
-	if (decorationCache.has(scope)) {
-		return decorationCache.get(scope)
-	}
-	// If `scope` is defined in the current theme, create a decoration for it
-	const textmate = scopes.find(scope)
-	if (textmate) {
-		const decoration = createDecorationFromTextmate(textmate)
-		decorationCache.set(scope, decoration)
-		return decoration
-	}
-	// Otherwise, give up, there is no color available for this scope
-	return undefined
-}
-function createDecorationFromTextmate(themeStyle: scopes.TextMateRuleSettings): TextEditorDecorationType {
-	let options: DecorationRenderOptions = {}
-	options.rangeBehavior = DecorationRangeBehavior.OpenOpen
-	if (themeStyle.foreground) {
-		options.color = themeStyle.foreground
-	}
-	if (themeStyle.background) {
-		options.backgroundColor = themeStyle.background
-	}
-	if (themeStyle.fontStyle) {
-		let parts: string[] = themeStyle.fontStyle.split(" ")
-		parts.forEach((part) => {
-			switch (part) {
-				case "italic":
-					options.fontStyle = "italic"
-					break
-				case "bold":
-					options.fontWeight = "bold"
-					break
-				case "underline":
-					options.textDecoration = "underline"
-					break
-				default:
-					break
-			}
-		})
-	}
-	return window.createTextEditorDecorationType(options)
-}
-
-// Load styles from the current active theme
-async function loadStyles() {
-	await scopes.load()
-	// Clear old styles
-	for (const style of decorationCache.values()) {
-		style.dispose()
-	}
-	decorationCache.clear()
-}
-
-// For some reason this crashes if we put it inside activate
-const initParser = Parser.init() // TODO this isn't a field, suppress package member coloring like Go
-
-var javaParser: Parser = null
-
 /** Called when extension is activated */
 export function activate(context: ExtensionContext) {
     console.log('Activating Java');
-
-	// Parse of all visible documents
-	const trees: {[uri: string]: Parser.Tree} = {}
-	async function open(editor: TextEditor) {
-        if (editor.document.languageId != 'java') return
-        if (javaParser == null) {
-            const absolute = path.join(context.extensionPath, 'lib', 'tree-sitter-java.wasm');
-			const wasm = path.relative(process.cwd(), absolute)
-			const lang = await Parser.Language.load(wasm)
-			javaParser = new Parser()
-			javaParser.setLanguage(lang)
-		}
-		const t = javaParser.parse(editor.document.getText()) // TODO don't use getText, use Parser.Input
-		trees[editor.document.uri.toString()] = t
-		colorUri(editor.document.uri)
-	}
-	// NOTE: if you make this an async function, it seems to cause edit anomalies
-	function edit(edit: TextDocumentChangeEvent) {
-        if (edit.document.languageId != 'java') return
-		updateTree(javaParser, edit)
-		colorUri(edit.document.uri)
-	}
-	function updateTree(parser: Parser, edit: TextDocumentChangeEvent) {
-		if (edit.contentChanges.length == 0) return
-		const old = trees[edit.document.uri.toString()]
-		for (const e of edit.contentChanges) {
-			const startIndex = e.rangeOffset
-			const oldEndIndex = e.rangeOffset + e.rangeLength
-			const newEndIndex = e.rangeOffset + e.text.length
-			const startPos = edit.document.positionAt(startIndex)
-			const oldEndPos = edit.document.positionAt(oldEndIndex)
-			const newEndPos = edit.document.positionAt(newEndIndex)
-			const startPosition = asPoint(startPos)
-			const oldEndPosition = asPoint(oldEndPos)
-			const newEndPosition = asPoint(newEndPos)
-			const delta = {startIndex, oldEndIndex, newEndIndex, startPosition, oldEndPosition, newEndPosition}
-			old.edit(delta)
-		}
-		const t = parser.parse(edit.document.getText(), old) // TODO don't use getText, use Parser.Input
-		trees[edit.document.uri.toString()] = t
-	}
-	function asPoint(pos: Position): Parser.Point {
-		return {row: pos.line, column: pos.character}
-	}
-	function close(doc: TextDocument) {
-		delete trees[doc.uri.toString()]
-	}
-	function colorUri(uri: Uri) {
-		for (const editor of window.visibleTextEditors) {
-			if (editor.document.uri == uri) {
-				colorEditor(editor)
-			}
-		}
-	}
-	const warnedScopes = new Set<string>()
-	function colorEditor(editor: TextEditor) {
-		const t = trees[editor.document.uri.toString()]
-		if (t == null) return
-		if (editor.document.languageId != 'java') return;
-		const scopes = colorJava(t.rootNode, visibleLines(editor))
-		for (const scope of scopes.keys()) {
-			const dec = decoration(scope)
-			if (dec) {
-				const ranges = scopes.get(scope)!.map(range)
-				editor.setDecorations(dec, ranges)
-			} else if (!warnedScopes.has(scope)) {
-				console.warn(scope, 'was not found in the current theme')
-				warnedScopes.add(scope)
-			}
-		}
-		for (const scope of decorationCache.keys()) {
-			if (!scopes.has(scope)) {
-				const dec = decorationCache.get(scope)!
-				editor.setDecorations(dec, [])
-			}
-		}
-	}
-	async function colorAllOpen() {
-		for (const editor of window.visibleTextEditors) {
-			await open(editor)
-		}
-	}
-	// Load active color theme
-	async function onChangeConfiguration(event: ConfigurationChangeEvent) {
-        let colorizationNeedsReload: boolean = event.affectsConfiguration("workbench.colorTheme")
-			|| event.affectsConfiguration("editor.tokenColorCustomizations")
-		if (colorizationNeedsReload) {
-			await loadStyles()
-			colorAllOpen()
-		}
-	}
-    context.subscriptions.push(workspace.onDidChangeConfiguration(onChangeConfiguration))
-	context.subscriptions.push(window.onDidChangeVisibleTextEditors(colorAllOpen))
-	context.subscriptions.push(workspace.onDidChangeTextDocument(edit))
-	context.subscriptions.push(workspace.onDidCloseTextDocument(close))
-	context.subscriptions.push(window.onDidChangeTextEditorVisibleRanges(change => colorEditor(change.textEditor)))
-	// Don't wait for the initial color, it takes too long to inspect the themes and causes VSCode extension host to hang
-	async function activateLazily() {
-		await loadStyles()
-		await initParser
-		colorAllOpen()
-	}
-	activateLazily()
     
     // Options to control the language client
     let clientOptions: LanguageClientOptions = {
@@ -253,6 +86,7 @@ export function activate(context: ExtensionContext) {
     }
     function applySemanticColors() {
         for (const editor of window.visibleTextEditors) {
+            if (editor.document.languageId != 'java') continue;
             const c = colors.get(editor.document.uri.toString());
             if (c == null) {
                 console.warn('No semantic colors for ' + editor.document.uri)
@@ -271,6 +105,8 @@ export function activate(context: ExtensionContext) {
         context.subscriptions.push(window.onDidChangeVisibleTextEditors(applySemanticColors));
         workspace.onDidCloseTextDocument(forgetSemanticColors);
     });
+	
+	activateTreeSitter(context);
 }
 
 // this method is called when your extension is deactivated
@@ -421,7 +257,7 @@ function createProgressListeners(client: LanguageClient) {
 	});
 	client.onNotification(new NotificationType('java/endProgress'), () => {
 		progressListener.endProgress();
-    });
+	});
 };
 
 interface SemanticColors {
@@ -602,16 +438,4 @@ function enableJavadocSymbols() {
 			}
 		]
 	});
-}
-
-function range(x: ColorRange): Range {
-	return new Range(x.start.row, x.start.column, x.end.row, x.end.column)
-}
-
-function visibleLines(editor: TextEditor) {
-	return editor.visibleRanges.map(range => {
-		const start = range.start.line
-		const end = range.end.line
-		return {start, end}
-	})
 }
