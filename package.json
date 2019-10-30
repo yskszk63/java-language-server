@@ -199,6 +199,7 @@
         "@types/node": "^10.14.6",
         "@types/vscode": "^1.37.0",
         "tree-sitter-cli": "^0.15.3",
+        "tree-sitter-java": "^0.13.0",
         "typescript": "^3.5.3",
         "vscode-test": "^1.2.0",
         "vscode-debugadapter-testsupport": "^1.35.0",
