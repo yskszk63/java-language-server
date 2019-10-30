@@ -2,7 +2,6 @@ package org.javacs;
 
 import com.google.gson.*;
 import com.sun.source.tree.*;
-import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -189,7 +188,6 @@ class JavaLanguageServer extends LanguageServer {
         c.addProperty("documentSymbolProvider", true);
         c.addProperty("documentFormattingProvider", true);
         var codeLensOptions = new JsonObject();
-        codeLensOptions.addProperty("resolveProvider", true);
         c.add("codeLensProvider", codeLensOptions);
         c.addProperty("foldingRangeProvider", true);
 
@@ -835,151 +833,13 @@ class JavaLanguageServer extends LanguageServer {
                 lens = new CodeLens(range.get(), command, null);
                 result.add(lens);
             }
-            if (cacheParse.showReferencesCodeLens(d)) {
-                // Unresolved "_ references" code lens
-                var t = d.getLeaf();
-                var start = range.get().start;
-                var line = start.line;
-                var character = start.character;
-                var data = new CodeLensData();
-                data.uri = uri;
-                data.line = line;
-                data.character = character;
-                data.name = memberName.isEmpty() ? className : memberName;
-                data.signature = Parser.signature(d);
-                data.kind = t.getKind();
-                if (t instanceof MethodTree) {
-                    var method = (MethodTree) t;
-                    data.flags = method.getModifiers().getFlags();
-                } else if (t instanceof ClassTree) {
-                    var type = (ClassTree) t;
-                    data.flags = type.getModifiers().getFlags();
-                } else if (t instanceof VariableTree) {
-                    var field = (VariableTree) t;
-                    data.flags = field.getModifiers().getFlags();
-                }
-                var lens = new CodeLens(range.get(), null, GSON.toJsonTree(data));
-                result.add(lens);
-            }
         }
         return result;
     }
 
     @Override
     public CodeLens resolveCodeLens(CodeLens unresolved) {
-        var data = GSON.fromJson(unresolved.data, CodeLensData.class);
-        LOG.info(String.format("Count references to `%s`...", data.name));
-        var self = countSelfReferences(data);
-        var cross = countCrossReferences(data);
-        var count = self + cross;
-        String title;
-        if (count == -1) title = "? references";
-        else if (count == 1) title = "1 reference";
-        else if (cross == TOO_EXPENSIVE) title = "Find references";
-        else title = String.format("%d references", count);
-        var command = "java.command.findReferences";
-        var arguments = new JsonArray();
-        arguments.add(data.uri.toString());
-        arguments.add(data.line);
-        arguments.add(data.character);
-        unresolved.command = new Command(title, command, arguments);
-
-        return unresolved;
-    }
-
-    private Map<String, Integer> cacheSelfReferences = new HashMap<>();
-    private Path cacheSelfReferencesFile = Paths.get("/NONE");
-    private int cacheSelfReferencesVersion = -1;
-
-    private int countSelfReferences(CodeLensData data) {
-        var file = Paths.get(data.uri);
-        if (!cacheSelfReferencesFile.equals(file) || cacheSelfReferencesVersion < FileStore.version(file)) {
-            updateCacheSelfReferences(file);
-        }
-        return cacheSelfReferences.get(data.signature);
-    }
-
-    private void updateCacheSelfReferences(Path file) {
-        LOG.info(String.format("...count all self-references in %s...", file));
-        cacheSelfReferences.clear();
-        updateCachedParse(file);
-        var sources = Set.of(new SourceFileObject(file));
-        try (var batch = compiler().compileBatch(sources)) {
-            for (var d : cacheParse.codeLensDeclarations()) {
-                if (!cacheParse.showReferencesCodeLens(d)) continue;
-                var range = cacheParse.range(d);
-                if (range.isEmpty()) continue;
-                var start = range.get().start;
-                var fromPaths = batch.references(file, start.line + 1, start.character + 1).orElse(List.of());
-                var signature = Parser.signature(d);
-                cacheSelfReferences.put(signature, fromPaths.size());
-            }
-        }
-        cacheSelfReferencesFile = file;
-        cacheSelfReferencesVersion = FileStore.version(file);
-    }
-
-    /** Cache reference counts on Parser.signature(_) */
-    private Cache<String, Integer> cacheCountCrossReferences = new Cache<>();
-
-    private static final int TOO_EXPENSIVE = 100;
-
-    private int countCrossReferences(CodeLensData data) {
-        LOG.info(String.format("...count cross-file references to `%s`...", data.name));
-        // Identify all files that *might* contain references to toEl
-        var toFile = Paths.get(data.uri);
-        var fromFiles = Parser.potentialReferences(toFile, data.name, isType(data.kind), data.flags);
-        // If it's too expensive to compute the code lens
-        if (fromFiles.size() > 100) {
-            LOG.info(String.format("...counting %d files is too expensive", fromFiles.size()));
-            return TOO_EXPENSIVE;
-        }
-        // Figure out what files need to be updated
-        var todo = new HashSet<Path>();
-        for (var fromFile : fromFiles) {
-            if (cacheCountCrossReferences.needs(fromFile, data.signature)) {
-                todo.add(fromFile);
-            }
-        }
-        // Update the cache
-        if (!todo.isEmpty()) {
-            todo.add(toFile);
-            LOG.info(String.format("...compile %d files", todo.size()));
-            var eraseCode = pruneWord(todo, data.name);
-            var countByFile = new HashMap<Path, Integer>();
-            try (var batch = compiler().compileBatch(eraseCode)) {
-                var fromPaths = batch.references(toFile, data.line + 1, data.character + 1).orElse(List.of());
-                for (var fromPath : fromPaths) {
-                    var fromFile = Paths.get(fromPath.getCompilationUnit().getSourceFile().toUri());
-                    var newCount = countByFile.getOrDefault(fromFile, 0) + 1;
-                    countByFile.put(fromFile, newCount);
-                }
-            }
-            for (var fromFile : todo) {
-                var count = countByFile.getOrDefault(fromFile, 0);
-                // TODO consider not caching if fromUri contains errors
-                cacheCountCrossReferences.load(fromFile, data.signature, count);
-            }
-            LOG.info(String.format("...found references in %d files", countByFile.size()));
-        }
-        // Sum up the count
-        var count = 0;
-        for (var fromFile : fromFiles) {
-            if (fromFile.equals(toFile)) continue;
-            count += cacheCountCrossReferences.get(fromFile, data.signature);
-        }
-        return count;
-    }
-
-    private boolean isType(Tree.Kind kind) {
-        switch (kind) {
-            case ANNOTATION_TYPE:
-            case CLASS:
-            case INTERFACE:
-                return true;
-            default:
-                return false;
-        }
+        return null;
     }
 
     @Override
@@ -1132,12 +992,4 @@ class JavaLanguageServer extends LanguageServer {
 class CompletionData {
     public Ptr ptr;
     public int plusOverloads;
-}
-
-class CodeLensData {
-    URI uri;
-    int line, character;
-    String name, signature;
-    Tree.Kind kind;
-    Set<Modifier> flags;
 }

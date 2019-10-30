@@ -53,14 +53,6 @@ class Parser {
         return new Parser(file);
     }
 
-    boolean showReferencesCodeLens(TreePath path) {
-        return !isTestMethod(path)
-                && !isTestClass(path)
-                && !isCalledByTestFramework(path)
-                && !isOverride(path)
-                && !isMainMethod(path);
-    }
-
     boolean isTestMethod(TreePath path) {
         var leaf = path.getLeaf();
         if (!(leaf instanceof MethodTree)) return false;
