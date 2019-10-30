@@ -7,7 +7,7 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: { start: numbe
 	const types: Range[] = []
 	let visitedChildren = false;
 	let cursor = root.walk();
-	let parents = [cursor.nodeType];
+	let parents = [];
 	while (true) {
 		// Advance cursor
 		if (visitedChildren) {
@@ -45,7 +45,8 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: { start: numbe
 			case 'identifier':
 				const parent = parents[parents.length-1];
 				// If this identifier is the name of a class declaration, or part of a type parameter
-				const isTypeName = parent == 'class_declaration' && cursor.currentFieldName() == 'name'
+				const field = cursor.currentFieldName();
+				const isTypeName = parent == 'class_declaration' && field == 'name'
 					|| parent == 'type_parameter';
 				if (isTypeName) {
 					types.push({start: cursor.startPosition, end: cursor.endPosition})
