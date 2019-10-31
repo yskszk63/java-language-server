@@ -540,7 +540,7 @@ class CompileBatch implements AutoCloseable {
             String partialName,
             boolean addParens,
             boolean addSemi) {
-        LOG.info(String.format("Completing identifiers starting with `%s`...", partialName));
+        LOG.info(String.format("...completing identifiers starting with `%s`...", partialName));
         var root = root(file);
         var result = new ArrayList<CompletionItem>();
         // Add snippets
