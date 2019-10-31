@@ -11,7 +11,9 @@ public class Main {
     public static void setRootFormat() {
         var root = Logger.getLogger("");
 
-        for (var h : root.getHandlers()) h.setFormatter(new LogFormat());
+        for (var h : root.getHandlers()) {
+            h.setFormatter(new LogFormat());
+        }
     }
 
     public static void main(String[] args) {

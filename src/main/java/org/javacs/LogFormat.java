@@ -8,14 +8,14 @@ import java.util.logging.LogRecord;
 
 public class LogFormat extends Formatter {
     private final String format = "%1$tT.%1$tL\t%4$s\t%2$s\t%5$s%6$s%n";
-    private final Date dat = new Date();
+    private final Date date = new Date();
 
     @Override
     public synchronized String format(LogRecord record) {
-        dat.setTime(record.getMillis());
+        date.setTime(record.getMillis());
         String source;
         if (record.getSourceClassName() != null) {
-            source = record.getSourceClassName();
+            source = last(record.getSourceClassName());
             if (record.getSourceMethodName() != null) {
                 source += " " + record.getSourceMethodName();
             }
@@ -33,6 +33,14 @@ public class LogFormat extends Formatter {
             throwable = sw.toString();
         }
         return String.format(
-                format, dat, source, record.getLoggerName(), record.getLevel().getLocalizedName(), message, throwable);
+                format, date, source, record.getLoggerName(), record.getLevel().getLocalizedName(), message, throwable);
+    }
+
+    private String last(String className) {
+        var dot = className.lastIndexOf('.');
+        if (dot == -1) {
+            return className;
+        }
+        return className.substring(dot + 1);
     }
 }
