@@ -51,7 +51,7 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: { start: numbe
 					break;
 				}
 				// If this identifier is the name in a method or constructor declaration
-				const isMethodName = parent == 'method_declarator' || parent == 'constructor_declarator';
+				const isMethodName = parent == 'method_declaration' || parent == 'constructor_declaration';
 				if (isMethodName) {
 					functions.push({start: cursor.startPosition, end: cursor.endPosition})
 					break;
