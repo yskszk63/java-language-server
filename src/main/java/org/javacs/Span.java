@@ -13,6 +13,9 @@ class Span {
     }
 
     Range asRange(LineMap lines) {
+        if (start == -1 || until == -1) {
+            throw new RuntimeException(String.format("Range %d-%d is invalid", start, until));
+        }
         var startLine = (int) lines.getLineNumber(start) - 1;
         var startColumn = (int) lines.getColumnNumber(start) - 1;
         var start = new Position(startLine, startColumn);

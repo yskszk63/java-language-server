@@ -106,7 +106,9 @@ class CachedLint {
         var result = new PublishDiagnosticsParams();
         result.uri = file.toUri();
         for (var e : errors) {
-            result.diagnostics.add(e.lspDiagnostic(lines));
+            if (e.validRange()) {
+                result.diagnostics.add(e.lspDiagnostic(lines));
+            }
         }
         return result;
     }

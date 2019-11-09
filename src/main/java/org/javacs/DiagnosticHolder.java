@@ -50,13 +50,15 @@ class DiagnosticHolder {
         }
     }
 
+    boolean validRange() {
+        return start >= 0 && end >= 0;
+    }
+
     /**
      * lspDiagnostic() converts javaDiagnostic to LSP format, with its position shifted appropriately for the latest
      * version of the file.
      */
     org.javacs.lsp.Diagnostic lspDiagnostic(LineMap lines) {
-        assert start >= 0 : "start " + start + " < 0";
-        assert end >= 0 : "end " + end + " < 0";
         var result = new org.javacs.lsp.Diagnostic();
         result.severity = severity;
         result.code = code;
