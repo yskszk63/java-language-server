@@ -32,35 +32,12 @@ class JavaLanguageServer extends LanguageServer {
 
     private final Map<Path, CachedLint> lintCache = new HashMap<>();
 
+    // TODO consider putting edits into some kind of queue instead of linting synchronously
+    // TODO measure the benefit of limiting linting; is it worth the added complexity?
     void lint(Collection<Path> files) {
         LOG.info("Lint " + files.size() + " files...");
         var started = Instant.now();
-        if (files.isEmpty()) return;
-        // Update cache
-        lintCache.keySet().retainAll(files);
-        for (var file : files) {
-            if (!lintCache.containsKey(file)) {
-                lintCache.put(file, new CachedLint(file));
-            }
-        }
-        // Construct todo list, using fast lint when possible
-        var sources = new ArrayList<SourceFileObject>();
-        for (var file : files) {
-            var cached = lintCache.get(file);
-            var span = cached.edited();
-            if (span == Span.INVALID) {
-                LOG.info(String.format("...re-lint all of %s", file.getFileName()));
-                var source = new SourceFileObject(file);
-                sources.add(source);
-            } else if (span == Span.EMPTY) {
-                LOG.info(String.format("...skip linting %s", file.getFileName()));
-            } else {
-                LOG.info(String.format("...re-lint %s %d-%d", file.getFileName(), span.start, span.until));
-                var contents = cached.pruneNewContents(span);
-                var source = new SourceFileObject(file, contents, Instant.now());
-                sources.add(source);
-            }
-        }
+        var sources = pruneLint(files);
         if (sources.isEmpty()) {
             LOG.info("...nothing has changed, skipping lint");
             return;
@@ -87,6 +64,43 @@ class JavaLanguageServer extends LanguageServer {
         var done = Instant.now();
         var elapsed = Duration.between(started, done).toMillis();
         LOG.info(String.format("...linted in %d ms", elapsed));
+    }
+
+    private List<SourceFileObject> pruneLint(Collection<Path> files) {
+        // Update cache
+        lintCache.keySet().retainAll(files);
+        for (var file : files) {
+            if (!lintCache.containsKey(file)) {
+                lintCache.put(file, new CachedLint(file));
+            }
+        }
+        // Construct todo list, using fast lint when possible
+        var sources = new ArrayList<SourceFileObject>();
+        for (var file : files) {
+            var cached = lintCache.get(file);
+            var span = cached.edited();
+            if (span == Span.INVALID) {
+                // OPTIMIZATION: If the signature is unchanged, linting the entire file is sufficient
+                LOG.info(String.format("...edits escape method in %s", file.getFileName()));
+                return lintAll(files);
+            } else if (span == Span.EMPTY) {
+                LOG.info(String.format("...skip linting %s", file.getFileName()));
+            } else {
+                LOG.info(String.format("...re-lint %s %d-%d", file.getFileName(), span.start, span.until));
+                var contents = cached.pruneNewContents(span);
+                var source = new SourceFileObject(file, contents, Instant.now());
+                sources.add(source);
+            }
+        }
+        return sources;
+    }
+
+    private List<SourceFileObject> lintAll(Collection<Path> files) {
+        var sources = new ArrayList<SourceFileObject>();
+        for (var file : files) {
+            sources.add(new SourceFileObject(file));
+        }
+        return sources;
     }
 
     static final Gson GSON = new GsonBuilder().registerTypeAdapter(Ptr.class, new PtrAdapter()).create();
