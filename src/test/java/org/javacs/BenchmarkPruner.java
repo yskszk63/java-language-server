@@ -21,9 +21,9 @@ public class BenchmarkPruner {
         public JavaCompilerService compiler = createCompiler();
 
         private SourceFileObject file(boolean prune) {
-            var file = Paths.get("src/main/java/org/javacs/JavaCompilerService.java").normalize();
+            var file = Paths.get("src/main/java/org/javacs/CompileBatch.java").normalize();
             if (prune) {
-                var contents = Parser.parseFile(file).prune("isWord");
+                var contents = Parser.parseFile(file).prune(275, 9);
                 return new SourceFileObject(file, contents, Instant.now());
             } else {
                 return new SourceFileObject(file);
@@ -41,12 +41,17 @@ public class BenchmarkPruner {
     }
 
     @Benchmark
-    public void pruned(CompilerState state) {
+    public void parsePlain(CompilerState state) {
+        Parser.parseJavaFileObject(state.file);
+    }
+
+    @Benchmark
+    public void compilePruned(CompilerState state) {
         state.compiler.compileBatch(List.of(state.pruned)).close();
     }
 
     @Benchmark
-    public void plain(CompilerState state) {
+    public void compilePlain(CompilerState state) {
         state.compiler.compileBatch(List.of(state.file)).close();
     }
 

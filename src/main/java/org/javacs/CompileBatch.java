@@ -143,39 +143,65 @@ class CompileBatch implements AutoCloseable {
         return name.charAt(0) == '_'; // TODO quick fix
     }
 
-    Map<Path, List<DiagnosticHolder>> reportErrors() {
-        // Construct empty lists
-        var byPath = new HashMap<Path, List<DiagnosticHolder>>();
-        for (var r : roots) {
-            var path = Paths.get(r.getSourceFile().toUri());
-            byPath.put(path, new ArrayList<>());
-        }
+    List<org.javacs.lsp.Diagnostic> reportErrors(Path file) {
+        var root = root(file);
+        var diags = new ArrayList<org.javacs.lsp.Diagnostic>();
         // Convert diags
         for (var d : parent.diags) {
             var source = d.getSource();
             if (source == null) continue;
             var path = Paths.get(source.toUri());
-            if (!byPath.containsKey(path)) continue;
-            byPath.get(path).add(DiagnosticHolder.wrap(d));
+            if (!file.equals(path)) continue;
+            diags.add(lspDiagnostic(d, root.getLineMap()));
         }
         // Check for unused privates
-        for (var r : roots) {
-            var path = Paths.get(r.getSourceFile().toUri());
-            var warnUnused = new WarnUnused(borrow.task);
-            warnUnused.scan(r, null);
-            for (var unusedEl : warnUnused.notUsed()) {
-                if (okUnused(unusedEl.getSimpleName())) continue;
-                var warn = warnUnused(unusedEl);
-                byPath.get(path).add(warn);
-            }
+        var warnUnused = new WarnUnused(borrow.task);
+        warnUnused.scan(root, null);
+        for (var unusedEl : warnUnused.notUsed()) {
+            if (okUnused(unusedEl.getSimpleName())) continue;
+            var warn = warnUnused(unusedEl);
+            diags.add(warn);
         }
         // TODO hint fields that could be final
         // TODO hint unused exception
 
-        return byPath;
+        return diags;
     }
 
-    private DiagnosticHolder warnUnused(Element unusedEl) {
+    /**
+     * lspDiagnostic(d, lines) converts d to LSP format, with its position shifted appropriately for the latest version
+     * of the file.
+     */
+    private org.javacs.lsp.Diagnostic lspDiagnostic(javax.tools.Diagnostic<? extends JavaFileObject> d, LineMap lines) {
+        var start = (int) d.getStartPosition();
+        var end = (int) d.getEndPosition();
+        var severity = severity(d.getKind());
+        var code = d.getCode();
+        var message = d.getMessage(null);
+        var result = new org.javacs.lsp.Diagnostic();
+        result.severity = severity;
+        result.code = code;
+        result.message = message;
+        result.range = new Span(start, end).asRange(lines);
+        return result;
+    }
+
+    private int severity(javax.tools.Diagnostic.Kind kind) {
+        switch (kind) {
+            case ERROR:
+                return DiagnosticSeverity.Error;
+            case WARNING:
+            case MANDATORY_WARNING:
+                return DiagnosticSeverity.Warning;
+            case NOTE:
+                return DiagnosticSeverity.Information;
+            case OTHER:
+            default:
+                return DiagnosticSeverity.Hint;
+        }
+    }
+
+    private org.javacs.lsp.Diagnostic warnUnused(Element unusedEl) {
         var path = trees.getPath(unusedEl);
         var root = path.getCompilationUnit();
         var leaf = path.getLeaf();
@@ -199,7 +225,17 @@ class CompileBatch implements AutoCloseable {
         } else {
             severity = DiagnosticSeverity.Information;
         }
-        return DiagnosticHolder.warnUnused(severity, message, start, end);
+        return lspWarnUnused(severity, message, start, end, root.getLineMap());
+    }
+
+    static org.javacs.lsp.Diagnostic lspWarnUnused(int severity, String message, int start, int end, LineMap lines) {
+        var result = new org.javacs.lsp.Diagnostic();
+        result.severity = severity;
+        result.code = "unused";
+        result.message = message;
+        result.tags = List.of(DiagnosticTag.Unnecessary);
+        result.range = new Span(start, end).asRange(lines);
+        return result;
     }
 
     public static final List<TreePath> CODE_NOT_FOUND = List.of();
@@ -1462,15 +1498,11 @@ class CompileBatch implements AutoCloseable {
         return JavaLanguageServer.GSON.toJsonTree(data);
     }
 
-    Map<Path, ColorsHolder> colors() {
-        var result = new HashMap<Path, ColorsHolder>();
-        for (var root : roots) {
-            var path = Paths.get(root.getSourceFile().toUri());
-            var colorizer = new Colorizer(borrow.task);
-            colorizer.scan(root, null);
-            result.put(path, colorizer.colors);
-        }
-        return result;
+    SemanticColors colors(Path file) {
+        var root = root(file);
+        var colorizer = new Colorizer(borrow.task);
+        colorizer.scan(root, null);
+        return colorizer.colors.lspSemanticColors(file, root.getLineMap());
     }
 
     private static final Logger LOG = Logger.getLogger("main");

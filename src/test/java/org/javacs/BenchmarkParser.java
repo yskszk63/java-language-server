@@ -12,7 +12,7 @@ public class BenchmarkParser {
 
     @State(Scope.Benchmark)
     public static class CompilerState {
-        public Path file = Paths.get("src/main/java/org/javacs/Artifact.java").normalize();
+        public Path file = Paths.get("src/main/java/org/javacs/JavaLanguageServer.java").normalize();
     }
 
     @Benchmark

@@ -26,9 +26,4 @@
 - Lint unused args when method isn't overloading something
 
 ## Optimizations
-- Lint incrementally
-    - Erase outside changes + places that already contain errors
-- Code lens incrementally
-    - Cache reference counts from outside the active set
-    - Invalidate cache when signature of the active set changes
 - Compilation is very slow in the presence of lots of errors

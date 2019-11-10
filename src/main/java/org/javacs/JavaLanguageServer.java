@@ -29,32 +29,29 @@ class JavaLanguageServer extends LanguageServer {
         return cacheCompiler;
     }
 
-    private final Map<Path, CachedLint> lintCache = new HashMap<>();
-
-    // TODO consider putting edits into some kind of queue instead of linting synchronously
-    // TODO measure the benefit of limiting linting; is it worth the added complexity?
+    // TODO split into fastLint, which lints the active file and is called by doAsyncWork,
+    // and slowLint, which lints all open files and is called by didSaveTextDocument
     void lint(Collection<Path> files) {
+        if (files.isEmpty()) {
+            return;
+        }
         LOG.info("Lint " + files.size() + " files...");
         var started = Instant.now();
-        var sources = pruneLint(files);
-        if (sources.isEmpty()) {
-            LOG.info("...nothing has changed, skipping lint");
-            return;
+        var sources = new ArrayList<SourceFileObject>();
+        for (var f : files) {
+            sources.add(new SourceFileObject(f, FileStore.contents(f), FileStore.modified(f)));
         }
         // Compile mixed list
         try (var batch = compiler().compileBatch(sources)) {
             var compiled = Instant.now();
             var elapsed = Duration.between(started, compiled).toMillis();
             LOG.info(String.format("...compiled in %d ms", elapsed));
-            // Update cache and publish
-            var errors = batch.reportErrors();
-            var colors = batch.colors();
-            for (var source : sources) {
-                var cached = lintCache.get(source.path);
-                var span = cached.edited();
-                cached.update(span, errors.get(source.path), colors.get(source.path));
-                client.publishDiagnostics(cached.lspDiagnostics());
-                client.customNotification("java/colors", GSON.toJsonTree(cached.lspColors()));
+            // Publish changes
+            for (var f : files) {
+                var errors = batch.reportErrors(f);
+                var colors = batch.colors(f);
+                client.publishDiagnostics(new PublishDiagnosticsParams(f.toUri(), errors));
+                client.customNotification("java/colors", GSON.toJsonTree(colors));
             }
             // Done
             uncheckedChanges = false;
@@ -63,43 +60,6 @@ class JavaLanguageServer extends LanguageServer {
         var done = Instant.now();
         var elapsed = Duration.between(started, done).toMillis();
         LOG.info(String.format("...linted in %d ms", elapsed));
-    }
-
-    private List<SourceFileObject> pruneLint(Collection<Path> files) {
-        // Update cache
-        lintCache.keySet().retainAll(files);
-        for (var file : files) {
-            if (!lintCache.containsKey(file)) {
-                lintCache.put(file, new CachedLint(file));
-            }
-        }
-        // Construct todo list, using fast lint when possible
-        var sources = new ArrayList<SourceFileObject>();
-        for (var file : files) {
-            var cached = lintCache.get(file);
-            var span = cached.edited();
-            if (span == Span.INVALID) {
-                // OPTIMIZATION: If the signature is unchanged, linting the entire file is sufficient
-                LOG.info(String.format("...edits escape method in %s", file.getFileName()));
-                return lintAll(files);
-            } else if (span == Span.EMPTY) {
-                LOG.info(String.format("...skip linting %s", file.getFileName()));
-            } else {
-                LOG.info(String.format("...re-lint %s %d-%d", file.getFileName(), span.start, span.until));
-                var contents = cached.pruneNewContents(span);
-                var source = new SourceFileObject(file, contents, Instant.now());
-                sources.add(source);
-            }
-        }
-        return sources;
-    }
-
-    private List<SourceFileObject> lintAll(Collection<Path> files) {
-        var sources = new ArrayList<SourceFileObject>();
-        for (var file : files) {
-            sources.add(new SourceFileObject(file));
-        }
-        return sources;
     }
 
     static final Gson GSON = new GsonBuilder().registerTypeAdapter(Ptr.class, new PtrAdapter()).create();

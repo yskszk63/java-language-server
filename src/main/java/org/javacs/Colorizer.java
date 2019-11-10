@@ -2,11 +2,11 @@ package org.javacs;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
-import java.net.URI;
+import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import javax.lang.model.element.*;
-import org.javacs.lsp.*;
 
 class Colorizer extends TreePathScanner<Void, Void> {
     private final Trees trees;
@@ -84,9 +84,16 @@ class Colorizer extends TreePathScanner<Void, Void> {
 
 class ColorsHolder {
     List<Span> statics = new ArrayList<>(), fields = new ArrayList<>();
-}
 
-class SemanticColors {
-    URI uri;
-    List<Range> statics = new ArrayList<>(), fields = new ArrayList<>();
+    SemanticColors lspSemanticColors(Path file, LineMap lines) {
+        var colors = new SemanticColors();
+        colors.uri = file.toUri();
+        for (var span : statics) {
+            colors.statics.add(span.asRange(lines));
+        }
+        for (var span : fields) {
+            colors.fields.add(span.asRange(lines));
+        }
+        return colors;
+    }
 }

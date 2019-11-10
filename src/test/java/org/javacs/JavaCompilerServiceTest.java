@@ -48,8 +48,8 @@ public class JavaCompilerServiceTest {
     public void reportErrors() {
         var file = resourceFile("HasError.java");
         var files = Collections.singleton(new SourceFileObject(file));
-        var diags = compiler.compileBatch(files).reportErrors();
-        assertThat(diags.get(file), not(empty()));
+        var diags = compiler.compileBatch(files).reportErrors(file);
+        assertThat(diags, not(empty()));
     }
 
     @Test
