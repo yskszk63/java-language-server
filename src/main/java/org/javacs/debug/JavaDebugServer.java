@@ -76,18 +76,18 @@ public class JavaDebugServer implements DebugServer {
                 enablePendingBreakpointsIn(type);
                 vm.resume();
             } else if (event instanceof com.sun.jdi.event.BreakpointEvent) {
-                var breakpoint = (com.sun.jdi.event.BreakpointEvent) event;
+                var b = (com.sun.jdi.event.BreakpointEvent) event;
                 var evt = new StoppedEventBody();
                 evt.reason = "breakpoint";
-                evt.threadId = breakpoint.thread().uniqueID();
-                evt.allThreadsStopped = breakpoint.request().suspendPolicy() == EventRequest.SUSPEND_ALL;
+                evt.threadId = b.thread().uniqueID();
+                evt.allThreadsStopped = b.request().suspendPolicy() == EventRequest.SUSPEND_ALL;
                 client.stopped(evt);
             } else if (event instanceof StepEvent) {
-                var breakpoint = (StepEvent) event;
+                var b = (StepEvent) event;
                 var evt = new StoppedEventBody();
                 evt.reason = "step";
-                evt.threadId = breakpoint.thread().uniqueID();
-                evt.allThreadsStopped = breakpoint.request().suspendPolicy() == EventRequest.SUSPEND_ALL;
+                evt.threadId = b.thread().uniqueID();
+                evt.allThreadsStopped = b.request().suspendPolicy() == EventRequest.SUSPEND_ALL;
                 client.stopped(evt);
                 // Disable event so we can create new step events
                 event.request().disable();
@@ -150,33 +150,33 @@ public class JavaDebugServer implements DebugServer {
         }
     }
 
-    private Breakpoint enableBreakpoint(Source source, SourceBreakpoint breakpoint) {
+    private Breakpoint enableBreakpoint(Source source, SourceBreakpoint b) {
         // Check for breakpoint in disabled breakpoints
-        for (var b : vm.eventRequestManager().breakpointRequests()) {
-            if (matchesFile(b, source) && matchesLine(b, breakpoint.line)) {
-                return enableDisabledBreakpoint(source, b);
+        for (var req : vm.eventRequestManager().breakpointRequests()) {
+            if (matchesFile(req, source) && matchesLine(req, b.line)) {
+                return enableDisabledBreakpoint(source, req);
             }
         }
         // Check for breakpoint in loaded classes
         for (var type : loadedTypesMatching(source.path)) {
-            return enableBreakpointImmediately(source, breakpoint, type);
+            return enableBreakpointImmediately(source, b, type);
         }
         // If class hasn't been loaded, add breakpoint to pending list
-        return enableBreakpointLater(source, breakpoint);
+        return enableBreakpointLater(source, b);
     }
 
-    private boolean matchesFile(BreakpointRequest breakpoint, Source source) {
+    private boolean matchesFile(BreakpointRequest b, Source source) {
         try {
-            var relativePath = breakpoint.location().sourcePath(vm.getDefaultStratum());
+            var relativePath = b.location().sourcePath(vm.getDefaultStratum());
             return source.path.endsWith(relativePath);
         } catch (AbsentInformationException __) {
-            LOG.warning("No source information for " + breakpoint.location());
+            LOG.warning("No source information for " + b.location());
             return false;
         }
     }
 
-    private boolean matchesLine(BreakpointRequest breakpoint, int line) {
-        return line == breakpoint.location().lineNumber(vm.getDefaultStratum());
+    private boolean matchesLine(BreakpointRequest b, int line) {
+        return line == b.location().lineNumber(vm.getDefaultStratum());
     }
 
     private List<ReferenceType> loadedTypesMatching(String absolutePath) {
@@ -190,60 +190,55 @@ public class JavaDebugServer implements DebugServer {
         return matches;
     }
 
-    private Breakpoint enableDisabledBreakpoint(Source source, BreakpointRequest breakpoint) {
-        LOG.info(String.format("Enable disabled breakpoint %s:%d", source.path, breakpoint.location().lineNumber()));
-        breakpoint.enable();
+    private Breakpoint enableDisabledBreakpoint(Source source, BreakpointRequest b) {
+        LOG.info(String.format("Enable disabled breakpoint %s:%d", source.path, b.location().lineNumber()));
+        b.enable();
         var ok = new Breakpoint();
         ok.verified = true;
         ok.source = source;
-        ok.line = breakpoint.location().lineNumber(vm.getDefaultStratum());
+        ok.line = b.location().lineNumber(vm.getDefaultStratum());
         return ok;
     }
 
-    private Breakpoint enableBreakpointImmediately(Source source, SourceBreakpoint breakpoint, ReferenceType type) {
-        try {
-            var locations = type.locationsOfLine(breakpoint.line);
-            for (var line : locations) {
-                LOG.info(
-                        String.format(
-                                "Create breakpoint %s:%d for %s:%d",
-                                line.sourcePath(), line.lineNumber(), source.path, breakpoint.line));
-                var req = vm.eventRequestManager().createBreakpointRequest(line);
-                req.setSuspendPolicy(EventRequest.SUSPEND_ALL);
-                req.enable();
-            }
-            if (locations.isEmpty()) {
-                LOG.info(
-                        String.format(
-                                "No locations in %s for breakpoint %s:%d",
-                                relativePath(type), source.path, breakpoint.line));
-                var failed = new Breakpoint();
-                failed.verified = false;
-                failed.message = source.name + ":" + breakpoint.line + " could not be found or had no code on it";
-                return failed;
-            }
-            var ok = new Breakpoint();
-            ok.verified = true;
-            ok.source = source;
-            ok.line = breakpoint.line;
-            ok.column = breakpoint.column;
-            return ok;
-        } catch (AbsentInformationException __) {
+    private Breakpoint enableBreakpointImmediately(Source source, SourceBreakpoint b, ReferenceType type) {
+        if (!tryEnableBreakpointImmediately(source, b, type)) {
             var failed = new Breakpoint();
             failed.verified = false;
-            failed.message = source.name + ":" + breakpoint.line + " could not be found or had no code on it";
+            failed.message = source.name + ":" + b.line + " could not be found or had no code on it";
             return failed;
         }
+        var ok = new Breakpoint();
+        ok.verified = true;
+        ok.source = source;
+        ok.line = b.line;
+        return ok;
     }
 
-    private Breakpoint enableBreakpointLater(Source source, SourceBreakpoint breakpoint) {
-        LOG.info(String.format("Enable %s:%d later", source.path, breakpoint.line));
+    private boolean tryEnableBreakpointImmediately(Source source, SourceBreakpoint b, ReferenceType type) {
+        List<Location> locations;
+        try {
+            locations = type.locationsOfLine(b.line);
+        } catch (AbsentInformationException __) {
+            LOG.info(String.format("No locations in %s for breakpoint %s:%d", type.name(), source.path, b.line));
+            return false;
+        }
+        for (var l : locations) {
+            LOG.info(String.format("Create breakpoint %s:%d", source.path, l.lineNumber()));
+            var req = vm.eventRequestManager().createBreakpointRequest(l);
+            req.setSuspendPolicy(EventRequest.SUSPEND_ALL);
+            req.enable();
+        }
+        return true;
+    }
+
+    private Breakpoint enableBreakpointLater(Source source, SourceBreakpoint b) {
+        LOG.info(String.format("Enable %s:%d later", source.path, b.line));
         var pending = new Breakpoint();
         pending.id = breakPointCounter++;
         pending.source = new Source();
         pending.source.path = source.path;
-        pending.line = breakpoint.line;
-        pending.column = breakpoint.column;
+        pending.line = b.line;
+        pending.column = b.column;
         pending.verified = false;
         pending.message = source.name + " is not yet loaded";
         pendingBreakpoints.add(pending);
