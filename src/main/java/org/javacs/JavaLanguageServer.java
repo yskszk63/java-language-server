@@ -625,7 +625,7 @@ class JavaLanguageServer extends LanguageServer {
 
             // Add code hover message
             var code = hoverCode(el.get());
-            result.add(new MarkedString("java.hover", code));
+            result.add(new MarkedString("java", code));
             // Log duration
             var elapsed = Duration.between(started, Instant.now());
             LOG.info(String.format("...found hover in %d ms", elapsed.toMillis()));

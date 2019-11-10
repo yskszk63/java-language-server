@@ -45,7 +45,7 @@ export function colorJava(root: Parser.SyntaxNode, visibleRanges: { start: numbe
 			case 'identifier':
 				const parent = parents[parents.length-1];
 				// If this identifier is the name of a class declaration, or part of a type parameter
-				const isTypeName = parent == 'class_declaration' || parent == 'type_parameter';
+				const isTypeName = parent == 'class_declaration' || parent == 'type_parameter' || parent == 'class_literal';
 				if (isTypeName) {
 					types.push({start: cursor.startPosition, end: cursor.endPosition})
 					break;

@@ -49,6 +49,12 @@
 							"match": "(\\w*)\\s*(=)"
 						},
 						{
+							"include": "#keywords"
+						},
+						{
+							"include": "#comments"
+						},
+						{
 							"include": "#constants"
 						}
 					]
