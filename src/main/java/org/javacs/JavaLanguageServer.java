@@ -349,20 +349,6 @@ class JavaLanguageServer extends LanguageServer {
         return cursor < contents.length() && contents.charAt(cursor) == '(';
     }
 
-    private static String eraseRegion(String contents, long start, long end) {
-        var buffer = new StringBuffer(contents);
-        for (int i = (int) start; i < end; i++) {
-            switch (buffer.charAt(i)) {
-                case '\r':
-                case '\n':
-                    break;
-                default:
-                    buffer.setCharAt(i, ' ');
-            }
-        }
-        return buffer.toString();
-    }
-
     @Override
     public Optional<CompletionList> completion(TextDocumentPositionParams position) {
         var started = Instant.now();
