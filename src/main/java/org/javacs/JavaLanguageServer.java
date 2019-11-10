@@ -29,37 +29,39 @@ class JavaLanguageServer extends LanguageServer {
         return cacheCompiler;
     }
 
-    // TODO split into fastLint, which lints the active file and is called by doAsyncWork,
-    // and slowLint, which lints all open files and is called by didSaveTextDocument
     void lint(Collection<Path> files) {
         if (files.isEmpty()) {
             return;
         }
         LOG.info("Lint " + files.size() + " files...");
         var started = Instant.now();
+        var sources = asSourceFiles(files);
+        try (var batch = compiler().compileBatch(sources)) {
+            LOG.info(String.format("...compiled in %d ms", elapsed(started)));
+            publishDiagnostics(files, batch);
+        }
+        LOG.info(String.format("...linted in %d ms", elapsed(started)));
+    }
+
+    private List<SourceFileObject> asSourceFiles(Collection<Path> files) {
         var sources = new ArrayList<SourceFileObject>();
         for (var f : files) {
             sources.add(new SourceFileObject(f, FileStore.contents(f), FileStore.modified(f)));
         }
-        // Compile mixed list
-        try (var batch = compiler().compileBatch(sources)) {
-            var compiled = Instant.now();
-            var elapsed = Duration.between(started, compiled).toMillis();
-            LOG.info(String.format("...compiled in %d ms", elapsed));
-            // Publish changes
-            for (var f : files) {
-                var errors = batch.reportErrors(f);
-                var colors = batch.colors(f);
-                client.publishDiagnostics(new PublishDiagnosticsParams(f.toUri(), errors));
-                client.customNotification("java/colors", GSON.toJsonTree(colors));
-            }
-            // Done
-            uncheckedChanges = false;
+        return sources;
+    }
+
+    private void publishDiagnostics(Collection<Path> files, CompileBatch batch) {
+        for (var f : files) {
+            var errors = batch.reportErrors(f);
+            var colors = batch.colors(f);
+            client.publishDiagnostics(new PublishDiagnosticsParams(f.toUri(), errors));
+            client.customNotification("java/colors", GSON.toJsonTree(colors));
         }
-        // Log timing
-        var done = Instant.now();
-        var elapsed = Duration.between(started, done).toMillis();
-        LOG.info(String.format("...linted in %d ms", elapsed));
+    }
+
+    private long elapsed(Instant since) {
+        return Duration.between(since, Instant.now()).toMillis();
     }
 
     static final Gson GSON = new GsonBuilder().registerTypeAdapter(Ptr.class, new PtrAdapter()).create();
@@ -899,6 +901,9 @@ class JavaLanguageServer extends LanguageServer {
         throw new RuntimeException("TODO");
     }
 
+    private boolean uncheckedChanges = false;
+    private Path lastEdited = Paths.get("");
+
     @Override
     public void didOpenTextDocument(DidOpenTextDocumentParams params) {
         FileStore.open(params);
@@ -906,12 +911,14 @@ class JavaLanguageServer extends LanguageServer {
         // So that subsequent documentSymbol and codeLens requests will be faster
         var file = Paths.get(params.textDocument.uri);
         updateCachedParse(file);
+        lastEdited = file;
         uncheckedChanges = true;
     }
 
     @Override
     public void didChangeTextDocument(DidChangeTextDocumentParams params) {
         FileStore.change(params);
+        lastEdited = Paths.get(params.textDocument.uri);
         uncheckedChanges = true;
     }
 
@@ -933,13 +940,11 @@ class JavaLanguageServer extends LanguageServer {
         }
     }
 
-    private boolean uncheckedChanges = false;
-
     @Override
     public void doAsyncWork() {
-        if (uncheckedChanges) {
-            // Re-lint all active documents
-            lint(FileStore.activeDocuments());
+        if (uncheckedChanges && FileStore.activeDocuments().contains(lastEdited)) {
+            lint(List.of(lastEdited));
+            uncheckedChanges = false;
         }
     }
 
