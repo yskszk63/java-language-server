@@ -16,8 +16,6 @@
 - `return json.get("name").` doesn't auto-complete
 - `return "foo"\n.` doesn't auto-complete
 - Restart debug test doesn't work
-- Debugger doesn't remove breakpoints
-- Find references actions accumulate and slow down responses
 - Javac doesn't find protobuf classes in bazel
 - Replace <a href=...>text</a> with text in docs, see List.copyOf for example.
 - When no overload is matched, go-to all definitions of method name

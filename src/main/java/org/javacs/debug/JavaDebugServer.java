@@ -4,6 +4,7 @@ import com.sun.jdi.*;
 import com.sun.jdi.connect.AttachingConnector;
 import com.sun.jdi.connect.IllegalConnectorArgumentsException;
 import com.sun.jdi.event.*;
+import com.sun.jdi.request.BreakpointRequest;
 import com.sun.jdi.request.EventRequest;
 import com.sun.jdi.request.StepRequest;
 import java.io.IOException;
@@ -71,7 +72,7 @@ public class JavaDebugServer implements DebugServer {
             if (event instanceof ClassPrepareEvent) {
                 var prepare = (ClassPrepareEvent) event;
                 var type = prepare.referenceType();
-                LOG.info("ClassPrepareRequest for class " + type.name() + " in source " + path(type));
+                LOG.info("ClassPrepareRequest for class " + type.name() + " in source " + relativePath(type));
                 enablePendingBreakpointsIn(type);
                 vm.resume();
             } else if (event instanceof com.sun.jdi.event.BreakpointEvent) {
@@ -129,36 +130,74 @@ public class JavaDebugServer implements DebugServer {
 
     @Override
     public SetBreakpointsResponseBody setBreakpoints(SetBreakpointsArguments req) {
-        LOG.info("Received " + req.breakpoints.length + " breakpoints");
+        LOG.info("Received " + req.breakpoints.length + " breakpoints in " + req.source.path);
+        disableBreakpoints(req.source);
         // Add these breakpoints to the pending set
         var resp = new SetBreakpointsResponseBody();
         resp.breakpoints = new Breakpoint[req.breakpoints.length];
         for (var i = 0; i < req.breakpoints.length; i++) {
-            resp.breakpoints[i] = tryEnableBreakpoint(req.source, req.breakpoints[i]);
+            resp.breakpoints[i] = enableBreakpoint(req.source, req.breakpoints[i]);
         }
         return resp;
     }
 
-    private Breakpoint tryEnableBreakpoint(Source source, SourceBreakpoint breakpoint) {
-        // Check for breakpoint in loaded classes
-        for (var type : vm.allClasses()) {
-            var path = path(type);
-            if (path != null && source.path.endsWith(path)) {
-                return enableBreakpointImmediately(source, breakpoint, type);
+    private void disableBreakpoints(Source source) {
+        for (var b : vm.eventRequestManager().breakpointRequests()) {
+            if (matchesFile(b, source)) {
+                LOG.info(String.format("Disable breakpoint %s:%d", source.path, b.location().lineNumber()));
+                b.disable();
             }
         }
+    }
+
+    private Breakpoint enableBreakpoint(Source source, SourceBreakpoint breakpoint) {
+        // Check for breakpoint in disabled breakpoints
+        for (var b : vm.eventRequestManager().breakpointRequests()) {
+            if (matchesFile(b, source) && matchesLine(b, breakpoint.line)) {
+                return enableDisabledBreakpoint(source, b);
+            }
+        }
+        // Check for breakpoint in loaded classes
+        for (var type : loadedTypesMatching(source.path)) {
+            return enableBreakpointImmediately(source, breakpoint, type);
+        }
         // If class hasn't been loaded, add breakpoint to pending list
-        LOG.info(String.format("Enable %s:%d later", source.path, breakpoint.line));
-        var pending = new Breakpoint();
-        pending.id = breakPointCounter++;
-        pending.source = new Source();
-        pending.source.path = source.path;
-        pending.line = breakpoint.line;
-        pending.column = breakpoint.column;
-        pending.verified = false;
-        pending.message = source.name + " is not yet loaded";
-        pendingBreakpoints.add(pending);
-        return pending;
+        return enableBreakpointLater(source, breakpoint);
+    }
+
+    private boolean matchesFile(BreakpointRequest breakpoint, Source source) {
+        try {
+            var relativePath = breakpoint.location().sourcePath(vm.getDefaultStratum());
+            return source.path.endsWith(relativePath);
+        } catch (AbsentInformationException __) {
+            LOG.warning("No source information for " + breakpoint.location());
+            return false;
+        }
+    }
+
+    private boolean matchesLine(BreakpointRequest breakpoint, int line) {
+        return line == breakpoint.location().lineNumber(vm.getDefaultStratum());
+    }
+
+    private List<ReferenceType> loadedTypesMatching(String absolutePath) {
+        var matches = new ArrayList<ReferenceType>();
+        for (var type : vm.allClasses()) {
+            var path = relativePath(type);
+            if (!path.isEmpty() && absolutePath.endsWith(path)) {
+                matches.add(type);
+            }
+        }
+        return matches;
+    }
+
+    private Breakpoint enableDisabledBreakpoint(Source source, BreakpointRequest breakpoint) {
+        LOG.info(String.format("Enable disabled breakpoint %s:%d", source.path, breakpoint.location().lineNumber()));
+        breakpoint.enable();
+        var ok = new Breakpoint();
+        ok.verified = true;
+        ok.source = source;
+        ok.line = breakpoint.location().lineNumber(vm.getDefaultStratum());
+        return ok;
     }
 
     private Breakpoint enableBreakpointImmediately(Source source, SourceBreakpoint breakpoint, ReferenceType type) {
@@ -176,7 +215,8 @@ public class JavaDebugServer implements DebugServer {
             if (locations.isEmpty()) {
                 LOG.info(
                         String.format(
-                                "No locations in %s for breakpoint %s:%d", path(type), source.path, breakpoint.line));
+                                "No locations in %s for breakpoint %s:%d",
+                                relativePath(type), source.path, breakpoint.line));
                 var failed = new Breakpoint();
                 failed.verified = false;
                 failed.message = source.name + ":" + breakpoint.line + " could not be found or had no code on it";
@@ -194,6 +234,20 @@ public class JavaDebugServer implements DebugServer {
             failed.message = source.name + ":" + breakpoint.line + " could not be found or had no code on it";
             return failed;
         }
+    }
+
+    private Breakpoint enableBreakpointLater(Source source, SourceBreakpoint breakpoint) {
+        LOG.info(String.format("Enable %s:%d later", source.path, breakpoint.line));
+        var pending = new Breakpoint();
+        pending.id = breakPointCounter++;
+        pending.source = new Source();
+        pending.source.path = source.path;
+        pending.line = breakpoint.line;
+        pending.column = breakpoint.column;
+        pending.verified = false;
+        pending.message = source.name + " is not yet loaded";
+        pendingBreakpoints.add(pending);
+        return pending;
     }
 
     @Override
@@ -314,8 +368,8 @@ public class JavaDebugServer implements DebugServer {
 
     private void enablePendingBreakpointsIn(ReferenceType type) {
         // Check that class has source information
-        var path = path(type);
-        if (path == null) return;
+        var path = relativePath(type);
+        if (path.isEmpty()) return;
         // Look for pending breakpoints that can be enabled
         var enabled = new ArrayList<Breakpoint>();
         for (var b : pendingBreakpoints) {
@@ -363,14 +417,14 @@ public class JavaDebugServer implements DebugServer {
         }
     }
 
-    private String path(ReferenceType type) {
+    private String relativePath(ReferenceType type) {
         try {
             for (var path : type.sourcePaths(vm.getDefaultStratum())) {
                 return path;
             }
-            return null;
+            return "";
         } catch (AbsentInformationException __) {
-            return null;
+            return "";
         }
     }
 
@@ -514,7 +568,7 @@ public class JavaDebugServer implements DebugServer {
             return src;
         } catch (AbsentInformationException __) {
             var src = new Source();
-            src.path = path(l.declaringType());
+            src.path = relativePath(l.declaringType());
             src.name = l.declaringType().name();
             src.presentationHint = "deemphasize";
             return src;
