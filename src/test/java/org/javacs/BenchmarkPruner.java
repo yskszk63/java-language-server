@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import org.openjdk.jmh.annotations.*;
 
-@Warmup(iterations = 20, time = 1, timeUnit = TimeUnit.SECONDS)
+@Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
 public class BenchmarkPruner {
@@ -23,7 +23,7 @@ public class BenchmarkPruner {
         private SourceFileObject file(boolean prune) {
             var file = Paths.get("src/main/java/org/javacs/CompileBatch.java").normalize();
             if (prune) {
-                var contents = Parser.parseFile(file).prune(275, 9);
+                var contents = Parser.parseFile(file).prune(276, 9);
                 return new SourceFileObject(file, contents, Instant.now());
             } else {
                 return new SourceFileObject(file);
