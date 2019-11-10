@@ -9,4 +9,6 @@ public class Range {
         this.start = start;
         this.end = end;
     }
+
+    public static final Range NONE = new Range(Position.NONE, Position.NONE);
 }

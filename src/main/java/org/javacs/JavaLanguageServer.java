@@ -7,7 +7,6 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.lang.model.element.*;
 import javax.tools.JavaFileObject;
@@ -582,16 +581,16 @@ class JavaLanguageServer extends LanguageServer {
         }
     }
 
-    private Optional<String> hoverDocs(Element e) {
+    private String hoverDocs(Element e) {
         var ptr = new Ptr(e);
         var file = compiler().docs().find(ptr);
-        if (!file.isPresent()) return Optional.empty();
+        if (!file.isPresent()) return "";
         var parse = Parser.parseJavaFileObject(file.get());
         var path = parse.fuzzyFind(ptr);
-        if (!path.isPresent()) return Optional.empty();
+        if (!path.isPresent()) return "";
         var doc = parse.doc(path.get());
         var md = Parser.asMarkdown(doc);
-        return Optional.of(md);
+        return md;
     }
 
     @Override
@@ -617,11 +616,9 @@ class JavaLanguageServer extends LanguageServer {
             var result = new ArrayList<MarkedString>();
             // Add docs hover message
             var docs = hoverDocs(el.get());
-            docs.filter(Predicate.not(String::isBlank))
-                    .ifPresent(
-                            doc -> {
-                                result.add(new MarkedString(doc));
-                            });
+            if (!docs.isBlank()) {
+                result.add(new MarkedString(docs));
+            }
 
             // Add code hover message
             var code = hoverCode(el.get());
@@ -680,16 +677,16 @@ class JavaLanguageServer extends LanguageServer {
             var fromElAgain = batch.element(fromFile, fromLine, fromColumn).get();
             // Find all definitions of fromElAgain
             var toTreePaths = batch.definitions(fromElAgain);
-            if (!toTreePaths.isPresent()) return Optional.empty();
+            if (toTreePaths == CompileBatch.CODE_NOT_FOUND) return Optional.empty();
             var result = new ArrayList<Location>();
-            for (var path : toTreePaths.get()) {
+            for (var path : toTreePaths) {
                 var toUri = path.getCompilationUnit().getSourceFile().toUri();
                 var toRange = batch.range(path);
-                if (!toRange.isPresent()) {
+                if (toRange == Range.NONE) {
                     LOG.warning(String.format("Couldn't locate `%s`", path.getLeaf()));
                     continue;
                 }
-                var from = new Location(toUri, toRange.get());
+                var from = new Location(toUri, toRange);
                 result.add(from);
             }
             return Optional.of(result);
@@ -739,17 +736,17 @@ class JavaLanguageServer extends LanguageServer {
         var eraseCode = pruneWord(fromFiles, name);
         try (var batch = compiler().compileBatch(eraseCode)) {
             var fromTreePaths = batch.references(toFile, toLine, toColumn);
-            LOG.info(String.format("...found %d references", fromTreePaths.map(List::size).orElse(0)));
-            if (!fromTreePaths.isPresent()) return Optional.empty();
+            LOG.info(String.format("...found %d references", fromTreePaths.size()));
+            if (fromTreePaths == CompileBatch.CODE_NOT_FOUND) return Optional.empty();
             var result = new ArrayList<Location>();
-            for (var path : fromTreePaths.get()) {
+            for (var path : fromTreePaths) {
                 var fromUri = path.getCompilationUnit().getSourceFile().toUri();
                 var fromRange = batch.range(path);
-                if (!fromRange.isPresent()) {
+                if (fromRange == Range.NONE) {
                     LOG.warning(String.format("...couldn't locate `%s`", path.getLeaf()));
                     continue;
                 }
-                var from = new Location(fromUri, fromRange.get());
+                var from = new Location(fromUri, fromRange);
                 result.add(from);
             }
             return Optional.of(result);
@@ -797,7 +794,7 @@ class JavaLanguageServer extends LanguageServer {
         var result = new ArrayList<CodeLens>();
         for (var d : declarations) {
             var range = cacheParse.range(d);
-            if (!range.isPresent()) continue;
+            if (range == Range.NONE) continue;
             var className = Parser.className(d);
             var memberName = Parser.memberName(d);
             // If test class or method, add "Run Test" code lens
@@ -807,7 +804,7 @@ class JavaLanguageServer extends LanguageServer {
                 arguments.add(className);
                 arguments.add(JsonNull.INSTANCE);
                 var command = new Command("Run All Tests", "java.command.test.run", arguments);
-                var lens = new CodeLens(range.get(), command, null);
+                var lens = new CodeLens(range, command, null);
                 result.add(lens);
                 // TODO run all tests in file
                 // TODO run all tests in package
@@ -820,7 +817,7 @@ class JavaLanguageServer extends LanguageServer {
                 else arguments.add(JsonNull.INSTANCE);
                 // 'Run Test' code lens
                 var command = new Command("Run Test", "java.command.test.run", arguments);
-                var lens = new CodeLens(range.get(), command, null);
+                var lens = new CodeLens(range, command, null);
                 result.add(lens);
                 // 'Debug Test' code lens
                 // TODO this could be a CPU hot spot
@@ -830,7 +827,7 @@ class JavaLanguageServer extends LanguageServer {
                 }
                 arguments.add(sourceRoots);
                 command = new Command("Debug Test", "java.command.test.debug", arguments);
-                lens = new CodeLens(range.get(), command, null);
+                lens = new CodeLens(range, command, null);
                 result.add(lens);
             }
         }

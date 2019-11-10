@@ -12,4 +12,6 @@ public class Location {
         this.uri = uri;
         this.range = range;
     }
+
+    public static final Location NONE = new Location(null, Range.NONE);
 }

@@ -193,13 +193,15 @@ class Parser {
         return result;
     }
 
-    Optional<Range> range(TreePath path) {
+    Range range(TreePath path) {
         return range(task, contents, path);
     }
 
-    Optional<Location> location(TreePath path) {
+    Location location(TreePath path) {
         var uri = root.getSourceFile().toUri();
-        return range(task, contents, path).map(range -> new Location(uri, range));
+        var range = range(task, contents, path);
+        if (range == Range.NONE) return Location.NONE;
+        return new Location(uri, range);
     }
 
     /** Find the smallest tree that includes the cursor */
@@ -391,7 +393,7 @@ class Parser {
         return doc;
     }
 
-    static Optional<Range> range(JavacTask task, String contents, TreePath path) {
+    static Range range(JavacTask task, String contents, TreePath path) {
         // Find start position
         var trees = Trees.instance(task);
         var pos = trees.getSourcePositions();
@@ -403,7 +405,7 @@ class Parser {
         // If start is -1, give up
         if (start == -1) {
             LOG.warning(String.format("Couldn't locate `%s`", path.getLeaf()));
-            return Optional.empty();
+            return Range.NONE;
         }
         // If end is bad, guess based on start
         if (end == -1) {
@@ -422,7 +424,7 @@ class Parser {
             start = indexOf(contents, name, start);
             if (start == -1) {
                 LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", name, path.getLeaf()));
-                return Optional.empty();
+                return Range.NONE;
             }
             end = start + name.length();
         }
@@ -441,7 +443,7 @@ class Parser {
             start = indexOf(contents, name, start);
             if (start == -1) {
                 LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", name, path.getLeaf()));
-                return Optional.empty();
+                return Range.NONE;
             }
             end = start + name.length();
         }
@@ -457,7 +459,7 @@ class Parser {
             start = indexOf(contents, name, start);
             if (start == -1) {
                 LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", name, path.getLeaf()));
-                return Optional.empty();
+                return Range.NONE;
             }
             end = start + name.length();
         }
@@ -467,7 +469,7 @@ class Parser {
             start = indexOf(contents, name, start);
             if (start == -1) {
                 LOG.warning(String.format("Couldn't find identifier `%s` in `%s`", name, path.getLeaf()));
-                return Optional.empty();
+                return Range.NONE;
             }
             end = start + name.length();
         }
@@ -477,7 +479,7 @@ class Parser {
         var endCol = (int) lines.getColumnNumber(end);
         var range = new Range(new Position(startLine - 1, startCol - 1), new Position(endLine - 1, endCol - 1));
 
-        return Optional.of(range);
+        return range;
     }
 
     private static int indexOf(String contents, String name, int start) {
@@ -534,13 +536,13 @@ class Parser {
 
     private void asSymbolInformation(TreePath path, List<SymbolInformation> acc) {
         var l = location(path);
-        if (l.isEmpty()) return;
+        if (l == Location.NONE) return;
         var i = new SymbolInformation();
         var t = path.getLeaf();
         i.kind = asSymbolKind(t.getKind());
         i.name = symbolName(t);
         i.containerName = containerName(path);
-        i.location = l.get();
+        i.location = l;
         acc.add(i);
     }
 

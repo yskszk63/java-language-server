@@ -10,4 +10,6 @@ public class Position {
         this.line = line;
         this.character = character;
     }
+
+    public static final Position NONE = new Position(-1, -1);
 }

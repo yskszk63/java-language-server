@@ -63,7 +63,7 @@ class CompileBatch implements AutoCloseable {
             var className = errorText(err);
             var packageName = packageName(err);
             var location = findPackagePrivateClass(packageName, className);
-            if (location != NOT_FOUND) {
+            if (location != FILE_NOT_FOUND) {
                 addFiles.add(location);
             }
         }
@@ -83,7 +83,7 @@ class CompileBatch implements AutoCloseable {
         return FileStore.packageName(file);
     }
 
-    private static final Path NOT_FOUND = Paths.get("");
+    private static final Path FILE_NOT_FOUND = Paths.get("");
 
     private Path findPackagePrivateClass(String packageName, String className) {
         for (var file : FileStore.list(packageName)) {
@@ -94,7 +94,7 @@ class CompileBatch implements AutoCloseable {
                 }
             }
         }
-        return NOT_FOUND;
+        return FILE_NOT_FOUND;
     }
 
     @Override
@@ -202,29 +202,31 @@ class CompileBatch implements AutoCloseable {
         return DiagnosticHolder.warnUnused(severity, message, start, end);
     }
 
-    Optional<List<TreePath>> definitions(Element el) {
+    public static final List<TreePath> CODE_NOT_FOUND = List.of();
+
+    List<TreePath> definitions(Element el) {
         LOG.info(String.format("Search for definitions of `%s` in %d files...", el, roots.size()));
         if (el.asType().getKind() == TypeKind.ERROR) {
             LOG.info(String.format("...`%s` is an error type, giving up", el.asType()));
-            return Optional.empty();
+            return CODE_NOT_FOUND;
         }
         var finder = new FindDefinitions(el, borrow.task);
         for (var r : roots) {
             finder.scan(r, null);
         }
-        return Optional.of(finder.results);
+        return finder.results;
     }
 
-    Optional<List<TreePath>> references(Path toFile, int toLine, int toColumn) {
+    List<TreePath> references(Path toFile, int toLine, int toColumn) {
         var to = element(toFile, toLine, toColumn);
         if (to.isEmpty()) {
             LOG.info(String.format("...no element at %s(%d, %d), giving up", toFile, toLine, toColumn));
-            return Optional.empty();
+            return CODE_NOT_FOUND;
         }
         // If to is an error, we won't be able to find anything
         if (to.get().asType().getKind() == TypeKind.ERROR) {
             LOG.info(String.format("...`%s` is an error type, giving up", to.get().asType()));
-            return Optional.empty();
+            return CODE_NOT_FOUND;
         }
         // Otherwise, scan roots for references
         List<TreePath> list = new ArrayList<TreePath>();
@@ -235,10 +237,10 @@ class CompileBatch implements AutoCloseable {
             // implementation is in the super of FindReferences.
             finder.scan(r, map);
         }
-        return Optional.of(list);
+        return list;
     }
 
-    Optional<Range> range(TreePath path) {
+    Range range(TreePath path) {
         var file = Paths.get(path.getCompilationUnit().getSourceFile().toUri());
         var contents = FileStore.contents(file);
         return Parser.range(borrow.task, contents, path);
