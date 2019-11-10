@@ -54,37 +54,4 @@ public class CodeLensTest {
         assertThat(commands, hasItem(containsString("\"HasTest\",\"testMethod\"")));
         assertThat(commands, hasItem(containsString("\"HasTest\",\"otherTestMethod\"")));
     }
-
-    @Test
-    public void constructorReferences() {
-        var lenses = lenses("/org/javacs/example/ConstructorRefs.java");
-        assertThat(lenses, not(empty()));
-
-        var titles = titles(lenses);
-        assertThat(titles, hasItem("4:1 reference"));
-        assertThat(titles, hasItem("6:1 reference"));
-    }
-
-    @Test
-    public void enumConstants() {
-        var lenses = lenses("/org/javacs/example/DontShowEnumConstRefs.java");
-        var titles = titles(lenses);
-        assertThat(titles, not(hasItem("4:0 references")));
-    }
-
-    @Test
-    public void placement() {
-        var lenses = lenses("/org/javacs/example/CodeLensPlacement.java");
-        var titles = titles(lenses);
-        assertThat(titles, hasItem("4:0 references"));
-        assertThat(titles, hasItem("6:0 references"));
-    }
-
-    @Test
-    public void field() {
-        var lenses = lenses("/org/javacs/example/CodeLensField.java");
-        var titles = titles(lenses);
-        assertThat(titles, hasItem("3:0 references"));
-        assertThat(titles, not(hasItem("4:0 references")));
-    }
 }
