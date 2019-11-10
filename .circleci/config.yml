@@ -31,12 +31,12 @@ jobs:
           key: v1-dependencies-{{ checksum "pom.xml" }}
 
       - run:
-          name: Install OpenJDK 11
+          name: Install OpenJDK 13
           command: |
-            wget https://download.java.net/java/GA/jdk11/13/GPL/openjdk-11.0.1_linux-x64_bin.tar.gz
-            gunzip -c openjdk-11.0.1_linux-x64_bin.tar.gz | tar xopf -
-            echo "export JAVA_HOME=`pwd`/jdk-11.0.1" >> $BASH_ENV
-            echo "export PATH=`pwd`/jdk-11.0.1/bin:$PATH" >> $BASH_ENV
+            wget https://download.java.net/java/GA/jdk13.0.1/cec27d702aa74d5a8630c65ae61e4305/9/GPL/openjdk-13.0.1_linux-x64_bin.tar.gz
+            gunzip -c openjdk-13.0.1_linux-x64_bin.tar.gz | tar xopf -
+            echo "export JAVA_HOME=`pwd`/jdk-13.0.1" >> $BASH_ENV
+            echo "export PATH=`pwd`/jdk-13.0.1/bin:$PATH" >> $BASH_ENV
       
       - run:
           name: Install Bazel
