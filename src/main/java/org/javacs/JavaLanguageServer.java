@@ -21,14 +21,26 @@ class JavaLanguageServer extends LanguageServer {
     private JavaCompilerService cacheCompiler;
     private JsonObject cacheSettings;
     private JsonObject settings = new JsonObject();
+    private boolean modifiedBuild = true;
 
     JavaCompilerService compiler() {
-        if (!settings.equals(cacheSettings)) {
-            LOG.info("Recreating compiler because\n\t" + settings + "\nis different than\n\t" + cacheSettings);
+        if (needsCompiler()) {
             cacheCompiler = createCompiler();
             cacheSettings = settings;
+            modifiedBuild = false;
         }
         return cacheCompiler;
+    }
+
+    private boolean needsCompiler() {
+        if (modifiedBuild) {
+            return true;
+        }
+        if (!settings.equals(cacheSettings)) {
+            LOG.info("Settings\n\t" + settings + "\nis different than\n\t" + cacheSettings);
+            return true;
+        }
+        return false;
     }
 
     void lint(Collection<Path> files) {
@@ -172,16 +184,25 @@ class JavaLanguageServer extends LanguageServer {
         return new InitializeResult(c);
     }
 
+    private static final String[] watchFiles = {
+        "**/*.java", "**/pom.xml", "**/BUILD",
+    };
+
     @Override
     public void initialized() {
-        // Register for didChangeWatchedFiles notifications
+        client.registerCapability("workspace/didChangeWatchedFiles", watchFiles(watchFiles));
+    }
+
+    private JsonObject watchFiles(String... globPatterns) {
         var options = new JsonObject();
         var watchers = new JsonArray();
-        var watchJava = new JsonObject();
-        watchJava.addProperty("globPattern", "**/*.java");
-        watchers.add(watchJava);
+        for (var p : globPatterns) {
+            var config = new JsonObject();
+            config.addProperty("globPattern", p);
+            watchers.add(config);
+        }
         options.add("watchers", watchers);
-        client.registerCapability("workspace/didChangeWatchedFiles", GSON.toJsonTree(options));
+        return options;
     }
 
     @Override
@@ -205,20 +226,28 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
-        // TODO update config when pom.xml changes
         for (var c : params.changes) {
-            if (!FileStore.isJavaFile(c.uri)) continue;
             var file = Paths.get(c.uri);
-            switch (c.type) {
-                case FileChangeType.Created:
-                    FileStore.externalCreate(file);
-                    break;
-                case FileChangeType.Changed:
-                    FileStore.externalChange(file);
-                    break;
-                case FileChangeType.Deleted:
-                    FileStore.externalDelete(file);
-                    break;
+            if (FileStore.isJavaFile(file)) {
+                switch (c.type) {
+                    case FileChangeType.Created:
+                        FileStore.externalCreate(file);
+                        break;
+                    case FileChangeType.Changed:
+                        FileStore.externalChange(file);
+                        break;
+                    case FileChangeType.Deleted:
+                        FileStore.externalDelete(file);
+                        break;
+                }
+                return;
+            }
+            var name = file.getFileName().toString();
+            switch (name) {
+                case "BUILD":
+                case "pom.xml":
+                    LOG.info("Compiler needs to be re-created because " + file + "has changed");
+                    modifiedBuild = true;
             }
         }
     }
