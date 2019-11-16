@@ -949,10 +949,9 @@ class JavaLanguageServer extends LanguageServer {
 
     private CodeAction fixUnusedCommand(URI file, Diagnostic d) {
         var from = extractUnusedName(d.message);
-        var to = "_" + from;
         var a = new CodeAction();
         a.kind = CodeActionKind.QuickFix;
-        a.title = String.format("Rename %s to %s", from, to); // TODO why is from blue?
+        a.title = String.format("Prefix '%s' with an underscore", from);
         a.edit = new WorkspaceEdit();
         a.edit.changes = Map.of(file, List.of(fixUnusedEdit(d.range, from)));
         return a;
