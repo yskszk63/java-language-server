@@ -26,9 +26,9 @@ class CompileBatch implements AutoCloseable {
 
     private final JavaCompilerService parent;
     private final ReusableCompiler.Borrow borrow;
-    private final Trees trees;
-    private final Elements elements;
-    private final Types types;
+    final Trees trees;
+    final Elements elements;
+    final Types types;
     private final List<CompilationUnitTree> roots;
 
     CompileBatch(JavaCompilerService parent, Collection<? extends JavaFileObject> files) {
@@ -131,11 +131,14 @@ class CompileBatch implements AutoCloseable {
         }
     }
 
-    Optional<Element> element(Path file, int line, int character) {
+    TreePath tree(Path file, int line, int character) {
         var root = root(file);
         var cursor = root.getLineMap().getPosition(line, character);
-        var path = findPath(file, cursor);
-        var el = trees.getElement(path);
+        return findPath(file, cursor);
+    }
+
+    Optional<Element> element(TreePath tree) {
+        var el = trees.getElement(tree);
         return Optional.ofNullable(el);
     }
 
@@ -240,25 +243,8 @@ class CompileBatch implements AutoCloseable {
 
     public static final List<TreePath> CODE_NOT_FOUND = List.of();
 
-    List<TreePath> definitions(Element el) {
-        if (roots.size() == 1) {
-            LOG.info(String.format("Search for `%s` in %s", el, roots.get(0).getSourceFile().getName()));
-        } else {
-            LOG.info(String.format("Search for `%s` in %d files...", el, roots.size()));
-        }
-        if (el.asType().getKind() == TypeKind.ERROR) {
-            LOG.info(String.format("...`%s` is an error type, giving up", el.asType()));
-            return CODE_NOT_FOUND;
-        }
-        var finder = new FindDefinitions(el, borrow.task);
-        for (var r : roots) {
-            finder.scan(r, null);
-        }
-        return finder.results;
-    }
-
     List<TreePath> references(Path toFile, int toLine, int toColumn) {
-        var to = element(toFile, toLine, toColumn);
+        var to = element(tree(toFile, toLine, toColumn));
         if (to.isEmpty()) {
             LOG.info(String.format("...no element at %s(%d, %d), giving up", toFile, toLine, toColumn));
             return CODE_NOT_FOUND;
@@ -278,6 +264,15 @@ class CompileBatch implements AutoCloseable {
             finder.scan(r, map);
         }
         return list;
+    }
+
+    Location location(TreePath path) {
+        var uri = path.getCompilationUnit().getSourceFile().toUri();
+        var range = range(path);
+        if (range == Range.NONE) {
+            return Location.NONE;
+        }
+        return new Location(uri, range);
     }
 
     Range range(TreePath path) {

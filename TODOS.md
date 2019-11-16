@@ -12,11 +12,26 @@
 - Package template of new package which is sibling of existing package shows sibling + leaf, not parent + leaf.
 - `Thing#close()` shows 0 references for `try (thing)`
 - Changing `class Foo {}` to `static class Foo {}` doesn't fix "non-static variables this" in `static void test() { new Foo() }`
-
-## Features
-- Lint unused args when method isn't overloading something
-- When no overload is matched, go-to all definitions of method name
+- Fields don't show up in debugger
 
 ## Optimizations
 - Compilation is very slow in the presence of lots of errors
 - Use package graph to limit search for find-usages/goto-def
+
+## Refactorings
+- Quick fixes
+    - Remove parameter
+    - Prepend _ to parameter name
+    - Delete LHS of variable declaration
+    - Delete unused tree
+    - Fix imports
+    - Create method
+- Selection
+    - Extract constant
+    - Extract variable
+    - Extract method
+    - Change package
+    - Add parameter
+    - Inline
+- Code lens
+    - Inherited methods

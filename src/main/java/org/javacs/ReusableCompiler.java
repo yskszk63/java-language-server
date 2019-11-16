@@ -133,6 +133,7 @@ class ReusableCompiler {
 
     class Borrow implements AutoCloseable {
         public final JavacTask task;
+        private boolean closed;
 
         Borrow(JavacTask task, ReusableContext ctx) {
             this.task = task;
@@ -140,6 +141,7 @@ class ReusableCompiler {
 
         @Override
         public void close() {
+            if (closed) return;
             // not returning the context to the pool if task crashes with an exception
             // the task/context may be in a broken state
             currentContext.clear();
@@ -151,6 +153,7 @@ class ReusableCompiler {
                 throw new RuntimeException(e);
             }
             checkedOut = false;
+            closed = true;
         }
     }
 

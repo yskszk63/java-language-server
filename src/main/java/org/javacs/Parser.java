@@ -635,7 +635,7 @@ class Parser {
         return Objects.requireNonNull(find.found);
     }
 
-    private static void ignoreError(javax.tools.Diagnostic<? extends JavaFileObject> err) {
+    private static void ignoreError(javax.tools.Diagnostic<? extends JavaFileObject> __) {
         // Too noisy, this only comes up in parse tasks which tend to be less important
         // LOG.warning(err.getMessage(Locale.getDefault()));
     }
@@ -936,40 +936,6 @@ class Parser {
         return find.found;
     }
 
-    static Set<Path> potentialDefinitions(Element to) {
-        LOG.info(String.format("Find potential definitions of `%s`...", to));
-
-        // If `to` is private, any definitions must be in the same file
-        if (to.getModifiers().contains(Modifier.PRIVATE)) {
-            LOG.info(String.format("...`%s` is private", to));
-            var set = new HashSet<Path>();
-            declaringFile(to).ifPresent(set::add);
-            return set;
-        }
-
-        if (to instanceof ExecutableElement) {
-            var allFiles = FileStore.all();
-            // Check if the file contains the name of `to`
-            var hasWord = containsWord(allFiles, simpleName(to));
-            // Parse each file and check if the syntax tree is consistent with a definition of `to`
-            // This produces some false positives, but parsing is much faster than compiling,
-            // so it's an effective optimization
-            var matches = new HashSet<Path>();
-            for (var file : hasWord) {
-                if (parseFile(file).mightContainDefinition(to)) {
-                    matches.add(file);
-                }
-            }
-            var findName = simpleName(to);
-            LOG.info(String.format("...%d files contain method `%s`", matches.size(), findName));
-            return matches;
-        } else {
-            var files = new HashSet<Path>();
-            declaringFile(to).ifPresent(files::add);
-            return files;
-        }
-    }
-
     static Set<Path> potentialReferences(Path file, String name, boolean isType, Set<Modifier> flags) {
         LOG.info(String.format("...find potential references to `%s`...", name));
         var pkg = FileStore.packageName(file);
@@ -1006,7 +972,7 @@ class Parser {
         return matches;
     }
 
-    private static Optional<Path> declaringFile(Element e) {
+    static Optional<Path> declaringFile(Element e) {
         // Find top-level type surrounding `to`
         LOG.info(String.format("...looking up declaring file of `%s`...", e));
         var top = topLevelDeclaration(e);

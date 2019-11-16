@@ -15,7 +15,7 @@ public class PtrTest {
 
     @Test
     public void classPtr() {
-        var el = compile.element(file, 3, 15).get();
+        var el = compile.element(compile.tree(file, 3, 15)).get();
         var ptr = new Ptr(el);
         assertThat(ptr.toString(), equalTo("org.javacs.example/Ptrs"));
 
@@ -25,7 +25,7 @@ public class PtrTest {
 
     @Test
     public void fieldPtr() {
-        var el = compile.element(file, 4, 20).get();
+        var el = compile.element(compile.tree(file, 4, 20)).get();
         var ptr = new Ptr(el);
         assertThat(ptr.toString(), equalTo("org.javacs.example/Ptrs#field"));
 
@@ -35,7 +35,7 @@ public class PtrTest {
 
     @Test
     public void emptyMethodPtr() {
-        var el = compile.element(file, 6, 20).get();
+        var el = compile.element(compile.tree(file, 6, 20)).get();
         var ptr = new Ptr(el);
         assertThat(ptr.toString(), equalTo("org.javacs.example/Ptrs#method()"));
 
@@ -45,7 +45,7 @@ public class PtrTest {
 
     @Test
     public void intMethodPtr() {
-        var el = compile.element(file, 8, 20).get();
+        var el = compile.element(compile.tree(file, 8, 20)).get();
         var ptr = new Ptr(el);
         assertThat(ptr.toString(), equalTo("org.javacs.example/Ptrs#method(int)"));
 
@@ -55,7 +55,7 @@ public class PtrTest {
 
     @Test
     public void stringMethodPtr() {
-        var el = compile.element(file, 10, 20).get();
+        var el = compile.element(compile.tree(file, 10, 20)).get();
         var ptr = new Ptr(el);
         assertThat(ptr.toString(), equalTo("org.javacs.example/Ptrs#method(java.lang.String)"));
 
@@ -65,7 +65,7 @@ public class PtrTest {
 
     @Test
     public void constructorPtr() {
-        var el = compile.element(file, 12, 13).get();
+        var el = compile.element(compile.tree(file, 12, 13)).get();
         var ptr = new Ptr(el);
         assertThat(ptr.toString(), equalTo("org.javacs.example/Ptrs#<init>(int)"));
 
@@ -75,7 +75,7 @@ public class PtrTest {
 
     @Test
     public void innerClassPtr() {
-        var el = compile.element(file, 14, 20).get();
+        var el = compile.element(compile.tree(file, 14, 20)).get();
         var ptr = new Ptr(el);
         assertThat(ptr.toString(), equalTo("org.javacs.example/Ptrs.InnerClass"));
 
@@ -85,7 +85,7 @@ public class PtrTest {
 
     @Test
     public void innerFieldPtr() {
-        var el = compile.element(file, 15, 20).get();
+        var el = compile.element(compile.tree(file, 15, 20)).get();
         var ptr = new Ptr(el);
         assertThat(ptr.toString(), equalTo("org.javacs.example/Ptrs.InnerClass#innerField"));
 
@@ -95,7 +95,7 @@ public class PtrTest {
 
     @Test
     public void innerEmptyMethodPtr() {
-        var el = compile.element(file, 17, 25).get();
+        var el = compile.element(compile.tree(file, 17, 25)).get();
         var ptr = new Ptr(el);
         assertThat(ptr.toString(), equalTo("org.javacs.example/Ptrs.InnerClass#innerMethod()"));
 
@@ -105,7 +105,7 @@ public class PtrTest {
 
     @Test
     public void innerConstructorPtr() {
-        var el = compile.element(file, 19, 21).get();
+        var el = compile.element(compile.tree(file, 19, 21)).get();
         var ptr = new Ptr(el);
         assertThat(ptr.toString(), equalTo("org.javacs.example/Ptrs.InnerClass#<init>()"));
 

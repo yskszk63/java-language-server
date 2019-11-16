@@ -86,8 +86,8 @@ public class WarningsTest {
         assertThat(errors, hasItem("unused(22)")); // private Unused(int i) { }
         assertThat(errors, hasItem("unused(24)")); // private class UnusedClass { }
         assertThat(errors, hasItem("unused(26)")); // void unusedSelfReference() { ... }
-        assertThat(errors, not(hasItem("unused(6)"))); // test(int unusedParam)
-        assertThat(errors, not(hasItem("unused(12)"))); // unusedLambdaParam -> {};
+        assertThat(errors, not("unused(6)")); // test(int unusedParam)
+        assertThat(errors, not("unused(12)")); // unusedLambdaParam -> {};
         assertThat(errors, not(hasItem("unused(20)"))); // private Unused() { }
         assertThat(errors, hasItem("unused(30)")); // private void unusedMutuallyRecursive1() { ... }
         assertThat(errors, hasItem("unused(34)")); // private void unusedMutuallyRecursive2() { ... }

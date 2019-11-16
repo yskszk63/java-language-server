@@ -11,6 +11,7 @@ import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import javax.lang.model.element.*;
+import javax.lang.model.type.TypeKind;
 import javax.tools.JavaFileObject;
 import org.javacs.lsp.*;
 
@@ -601,7 +602,7 @@ class JavaLanguageServer extends LanguageServer {
         var sources = Set.of(new SourceFileObject(file));
         try (var compile = compiler().compileBatch(sources)) {
             // Find element under cursor
-            var el = compile.element(file, line, column);
+            var el = compile.element(compile.tree(file, line, column));
             if (!el.isPresent()) {
                 LOG.info("...no element under cursor");
                 return Optional.empty();
@@ -652,38 +653,94 @@ class JavaLanguageServer extends LanguageServer {
 
         // Compile from-file and identify element under cursor
         LOG.info(String.format("Go-to-def at %s:%d...", fromUri, fromLine));
-        Optional<Element> toEl;
         var sources = Set.of(new SourceFileObject(fromFile));
-        try (var compile = compiler().compileBatch(sources)) {
-            toEl = compile.element(fromFile, fromLine, fromColumn);
+        try (var batch = compiler().compileBatch(sources)) {
+            var fromTree = batch.tree(fromFile, fromLine, fromColumn);
+            var toEl = batch.element(fromTree);
             if (!toEl.isPresent()) {
                 LOG.info(String.format("...no element at cursor"));
                 return Optional.empty();
             }
+            if (toEl.get().asType().getKind() == TypeKind.ERROR) {
+                return gotoErrorDefinition(batch, toEl.get());
+            }
+            var toFile = Parser.declaringFile(toEl.get());
+            if (toFile.isEmpty()) {
+                LOG.info(String.format("...no file for %s", toEl.get()));
+                return Optional.empty();
+            }
+            batch.close();
+            return resolveGotoDefinition(fromFile, fromLine, fromColumn, toFile.get());
+        }
+    }
+
+    private Optional<List<Location>> resolveGotoDefinition(Path fromFile, int fromLine, int fromColumn, Path toFile) {
+        var sources = new HashSet<SourceFileObject>();
+        sources.add(new SourceFileObject(fromFile));
+        sources.add(new SourceFileObject(toFile));
+        try (var batch = compiler().compileBatch(sources)) {
+            var fromTree = batch.tree(fromFile, fromLine, fromColumn);
+            var toEl = batch.element(fromTree).get();
+            var toPath = batch.trees.getPath(toEl);
+            if (toPath == null) {
+                LOG.info(String.format("...no location for element %s", toEl));
+                return Optional.empty();
+            }
+            var location = batch.location(toPath);
+            if (location == Location.NONE) {
+                LOG.info(String.format("...no location for tree %s", toPath.getLeaf()));
+                return Optional.empty();
+            }
+            return Optional.of(List.of(location));
+        }
+    }
+
+    private Optional<List<Location>> gotoErrorDefinition(CompileBatch batch, Element toEl) {
+        var name = toEl.getSimpleName();
+        if (name == null) {
+            LOG.info(String.format("...%s has no name", toEl));
+            return Optional.empty();
+        }
+        var parent = toEl.getEnclosingElement();
+        if (!(parent instanceof TypeElement)) {
+            LOG.info(String.format("...%s is not a type", parent));
+            return Optional.empty();
         }
 
-        // Compile all files that *might* contain definitions of fromEl
-        var toFiles = Parser.potentialDefinitions(toEl.get());
-        toFiles.add(fromFile);
-        var eraseCode = pruneWord(toFiles, Parser.simpleName(toEl.get()));
-        try (var batch = compiler().compileBatch(eraseCode)) {
-            // Find fromEl again, so that we have an Element from the current batch
-            var fromElAgain = batch.element(fromFile, fromLine, fromColumn).get();
-            // Find all definitions of fromElAgain
-            var toTreePaths = batch.definitions(fromElAgain);
-            if (toTreePaths == CompileBatch.CODE_NOT_FOUND) return Optional.empty();
-            var result = new ArrayList<Location>();
-            for (var path : toTreePaths) {
-                var toUri = path.getCompilationUnit().getSourceFile().toUri();
-                var toRange = batch.range(path);
-                if (toRange == Range.NONE) {
-                    LOG.warning(String.format("Couldn't locate `%s`", path.getLeaf()));
+        var type = (TypeElement) parent;
+        var toFile = Parser.declaringFile(type);
+        if (toFile.isEmpty()) {
+            LOG.info(String.format("...no file for %s", type));
+            return Optional.empty();
+        }
+        batch.close();
+        return gotoAllMembers(type.getQualifiedName().toString(), name.toString(), toFile.get());
+    }
+
+    private Optional<List<Location>> gotoAllMembers(String typeName, String memberName, Path inFile) {
+        LOG.info(String.format("...go to members of %s named %s", typeName, memberName));
+        try (var batch = compiler().compileBatch(List.of(new SourceFileObject(inFile)))) {
+            var type = batch.elements.getTypeElement(typeName);
+            if (type == null) {
+                LOG.info(String.format("...no type named %s in %s", typeName, inFile.getFileName()));
+                return Optional.empty();
+            }
+            var matches = new ArrayList<Location>();
+            for (var member : batch.elements.getAllMembers(type)) {
+                if (!member.getSimpleName().contentEquals(memberName)) continue;
+                var path = batch.trees.getPath(member);
+                if (path == null) {
+                    LOG.info(String.format("...no path for %s in %s", member, inFile.getFileName()));
                     continue;
                 }
-                var from = new Location(toUri, toRange);
-                result.add(from);
+                var location = batch.location(path);
+                if (location == Location.NONE) {
+                    LOG.info(String.format("...no location for %s in %s", path.getLeaf(), inFile.getFileName()));
+                    continue;
+                }
+                matches.add(location);
             }
-            return Optional.of(result);
+            return Optional.of(matches);
         }
     }
 
@@ -699,30 +756,30 @@ class JavaLanguageServer extends LanguageServer {
 
         // Compile from-file and identify element under cursor
         LOG.warning(String.format("Looking for references to %s(%d,%d)...", toUri.getPath(), toLine, toColumn));
-        Optional<Element> toEl;
+        Element toEl;
         var sources = Set.of(new SourceFileObject(toFile));
-        try (var compile = compiler().compileBatch(sources)) {
-            toEl = compile.element(toFile, toLine, toColumn);
-            if (!toEl.isPresent()) {
+        try (var batch = compiler().compileBatch(sources)) {
+            var maybe = batch.element(batch.tree(toFile, toLine, toColumn));
+            if (!maybe.isPresent()) {
                 LOG.warning("...no element under cursor");
                 return Optional.empty();
             }
+            toEl = maybe.get();
         }
 
         // Compile all files that *might* contain references to toEl
-        var name = Parser.simpleName(toEl.get());
+        var name = Parser.simpleName(toEl);
         var fromFiles = new HashSet<Path>();
-        var isLocal =
-                toEl.get() instanceof VariableElement && !(toEl.get().getEnclosingElement() instanceof TypeElement);
+        var isLocal = toEl instanceof VariableElement && !(toEl.getEnclosingElement() instanceof TypeElement);
         if (!isLocal) {
             var isType = false;
-            switch (toEl.get().getKind()) {
+            switch (toEl.getKind()) {
                 case ANNOTATION_TYPE:
                 case CLASS:
                 case INTERFACE:
                     isType = true;
             }
-            var flags = toEl.get().getModifiers();
+            var flags = toEl.getModifiers();
             var possible = Parser.potentialReferences(toFile, name, isType, flags);
             fromFiles.addAll(possible);
         }
