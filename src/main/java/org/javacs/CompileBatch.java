@@ -336,6 +336,7 @@ class CompileBatch implements AutoCloseable {
         // Take the intersection of existing imports ^ existing identifiers
         var qualifiedNames = new HashSet<String>();
         for (var i : root.getImports()) {
+            if (i.isStatic()) continue;
             var imported = i.getQualifiedIdentifier().toString();
             if (imported.endsWith(".*")) {
                 var packageName = StringSearch.mostName(imported);

@@ -60,6 +60,13 @@ public class JavaCompilerServiceTest {
     }
 
     @Test
+    public void ignoreStaticImport() {
+        var file = resourceFile("StaticImport.java");
+        var qualifiedNames = compiler.compileBatch(Set.of(new SourceFileObject(file))).fixImports(file);
+        assertThat(qualifiedNames, not(hasItem("java.util.Arrays.asList")));
+    }
+
+    @Test
     public void dontImportEnum() {
         var file = resourceFile("DontImportEnum.java");
         var qualifiedNames = compiler.compileBatch(Set.of(new SourceFileObject(file))).fixImports(file);
