@@ -329,7 +329,7 @@ class StringSearch {
     static boolean containsType(Path file, TypeElement el) {
         switch (el.getKind()) {
             case INTERFACE:
-            return containsInterface(file, el.getSimpleName().toString());
+                return containsInterface(file, el.getSimpleName().toString());
             case CLASS:
                 return containsClass(file, el.getSimpleName().toString());
             default:

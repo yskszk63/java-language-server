@@ -97,13 +97,21 @@ class WarnUnused extends TreeScanner<Void, Void> {
     }
 
     private boolean isLocalVariable(TreePath path) {
-        if (path.getLeaf() instanceof VariableTree) {
-            var parent = path.getParentPath().getLeaf();
-            return !(parent instanceof ClassTree)
-                    && !(parent instanceof MethodTree) // TODO hint for unused parameters
-                    && !(parent instanceof LambdaExpressionTree);
+        var kind = path.getLeaf().getKind();
+        if (kind != Tree.Kind.VARIABLE) {
+            return false;
         }
-        return false;
+        var parent = path.getParentPath().getLeaf().getKind();
+        if (parent == Tree.Kind.CLASS) {
+            return false;
+        }
+        if (parent == Tree.Kind.METHOD) {
+            var method = (MethodTree) path.getParentPath().getLeaf();
+            if (method.getBody() == null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
