@@ -155,6 +155,7 @@ class CompileBatch implements AutoCloseable {
             if (source == null) continue;
             var path = Paths.get(source.toUri());
             if (!file.equals(path)) continue;
+            if (!isValid(d)) continue;
             diags.add(lspDiagnostic(d, root.getLineMap()));
         }
         // Check for unused privates
@@ -169,6 +170,10 @@ class CompileBatch implements AutoCloseable {
         // TODO hint unused exception
 
         return diags;
+    }
+
+    private boolean isValid(javax.tools.Diagnostic<? extends JavaFileObject> d) {
+        return d.getStartPosition() >= 0 && d.getEndPosition() >= 0;
     }
 
     /**
