@@ -991,8 +991,3 @@ class JavaLanguageServer extends LanguageServer {
 
     private static final Logger LOG = Logger.getLogger("main");
 }
-
-class CompletionData {
-    public Ptr ptr;
-    public int plusOverloads;
-}
