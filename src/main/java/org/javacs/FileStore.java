@@ -59,28 +59,28 @@ class FileStore {
 
     private static void addFiles(Path root) {
         try {
-            Files.walkFileTree(
-                    root,
-                    new SimpleFileVisitor<Path>() {
-                        @Override
-                        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                            if (attrs.isSymbolicLink()) {
-                                LOG.warning("Don't check " + dir + " for java sources");
-                                return FileVisitResult.SKIP_SUBTREE;
-                            }
-                            return FileVisitResult.CONTINUE;
-                        }
-
-                        @Override
-                        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                            if (isJavaFile(file)) {
-                                readInfoFromDisk(file);
-                            }
-                            return FileVisitResult.CONTINUE;
-                        }
-                    });
+            Files.walkFileTree(root, new FindJavaSources());
         } catch (IOException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    static class FindJavaSources extends SimpleFileVisitor<Path> {
+        @Override
+        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+            if (attrs.isSymbolicLink()) {
+                LOG.warning("Don't check " + dir + " for java sources");
+                return FileVisitResult.SKIP_SUBTREE;
+            }
+            return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes _attrs) {
+            if (isJavaFile(file)) {
+                readInfoFromDisk(file);
+            }
+            return FileVisitResult.CONTINUE;
         }
     }
 
