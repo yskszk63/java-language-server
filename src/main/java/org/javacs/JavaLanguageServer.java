@@ -800,7 +800,7 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     @Override
-    public CodeLens resolveCodeLens(CodeLens unresolved) {
+    public CodeLens resolveCodeLens(CodeLens _unresolved) {
         return null;
     }
 
@@ -895,12 +895,12 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     @Override
-    public Optional<RenameResponse> prepareRename(TextDocumentPositionParams params) {
+    public Optional<RenameResponse> prepareRename(TextDocumentPositionParams _params) {
         throw new RuntimeException("TODO");
     }
 
     @Override
-    public WorkspaceEdit rename(RenameParams params) {
+    public WorkspaceEdit rename(RenameParams _params) {
         throw new RuntimeException("TODO");
     }
 
