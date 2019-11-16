@@ -140,7 +140,7 @@ class CompileBatch implements AutoCloseable {
     }
 
     private boolean okUnused(Name name) {
-        return name.charAt(0) == '_'; // TODO quick fix
+        return name.charAt(0) == '_';
     }
 
     List<org.javacs.lsp.Diagnostic> reportErrors(Path file) {

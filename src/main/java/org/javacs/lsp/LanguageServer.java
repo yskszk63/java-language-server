@@ -80,7 +80,7 @@ public class LanguageServer {
         throw new RuntimeException("Unimplemented");
     }
 
-    public List<Command> codeAction(CodeActionParams params) {
+    public List<CodeAction> codeAction(CodeActionParams params) {
         throw new RuntimeException("Unimplemented");
     }
 

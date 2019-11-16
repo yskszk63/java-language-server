@@ -2,12 +2,14 @@ package org.javacs;
 
 import com.google.gson.*;
 import com.sun.source.tree.*;
+import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import javax.lang.model.element.*;
 import javax.tools.JavaFileObject;
 import org.javacs.lsp.*;
@@ -165,6 +167,7 @@ class JavaLanguageServer extends LanguageServer {
         var codeLensOptions = new JsonObject();
         c.add("codeLensProvider", codeLensOptions);
         c.addProperty("foldingRangeProvider", true);
+        c.addProperty("codeActionProvider", true);
 
         return new InitializeResult(c);
     }
@@ -930,6 +933,45 @@ class JavaLanguageServer extends LanguageServer {
             // Clear diagnostics
             client.publishDiagnostics(new PublishDiagnosticsParams(params.textDocument.uri, List.of()));
         }
+    }
+
+    @Override
+    public List<CodeAction> codeAction(CodeActionParams params) {
+        var actions = new ArrayList<CodeAction>();
+        for (var d : params.context.diagnostics) {
+            if (d.code.equals("unused")
+                    && d.severity == DiagnosticSeverity.Information) { // TODO why isn't this italic and blue?
+                actions.add(fixUnusedCommand(params.textDocument.uri, d));
+            }
+        }
+        return actions;
+    }
+
+    private CodeAction fixUnusedCommand(URI file, Diagnostic d) {
+        var from = extractUnusedName(d.message);
+        var to = "_" + from;
+        var a = new CodeAction();
+        a.kind = CodeActionKind.QuickFix;
+        a.title = String.format("Rename %s to %s", from, to); // TODO why is from blue?
+        a.edit = new WorkspaceEdit();
+        a.edit.changes = Map.of(file, List.of(fixUnusedEdit(d.range, from)));
+        return a;
+    }
+
+    private static final Pattern NOT_USED = Pattern.compile("`(\\w+)` is not used");
+
+    private String extractUnusedName(String message) {
+        var matcher = NOT_USED.matcher(message);
+        if (!matcher.matches()) {
+            throw new RuntimeException(message);
+        }
+        return matcher.group(1);
+    }
+
+    private TextEdit fixUnusedEdit(Range range, String from) {
+        var end = range.end;
+        var start = new Position(end.line, end.character - from.length());
+        return new TextEdit(new Range(start, end), "_" + from);
     }
 
     @Override
