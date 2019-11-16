@@ -1016,7 +1016,7 @@ class Parser {
         }
         // Find file by looking at package and class name
         LOG.info(String.format("...top-level type is %s", top.get()));
-        var file = findDeclaringFile(top.get());
+        var file = FileStore.findDeclaringFile(top.get());
         if (!file.isPresent()) {
             LOG.info(String.format("...couldn't find declaring file for type"));
             return Optional.empty();
@@ -1033,12 +1033,6 @@ class Parser {
             parent = parent.getEnclosingElement();
         }
         return Optional.ofNullable(result);
-    }
-
-    /** Find the file `e` was declared in */
-    private static Optional<Path> findDeclaringFile(TypeElement e) {
-        var name = e.getQualifiedName().toString();
-        return FileStore.findDeclaringFile(name);
     }
 
     private static Cache<String, Boolean> cacheContainsWord = new Cache<>();

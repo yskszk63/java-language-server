@@ -7,6 +7,7 @@ import java.nio.file.attribute.*;
 import java.time.Instant;
 import java.util.*;
 import java.util.logging.Logger;
+import javax.lang.model.element.TypeElement;
 import org.javacs.lsp.DidChangeTextDocumentParams;
 import org.javacs.lsp.DidCloseTextDocumentParams;
 import org.javacs.lsp.DidOpenTextDocumentParams;
@@ -363,18 +364,19 @@ class FileStore {
         return uri.getScheme().equals("file") && isJavaFile(Paths.get(uri));
     }
 
-    static Optional<Path> findDeclaringFile(String qualifiedName) {
+    static Optional<Path> findDeclaringFile(TypeElement el) {
+        var qualifiedName = el.getQualifiedName().toString();
         var packageName = StringSearch.mostName(qualifiedName);
         var className = StringSearch.lastName(qualifiedName);
         // Fast path: look for text `class Foo` in file Foo.java
         for (var f : list(packageName)) {
-            if (f.getFileName().toString().equals(className) && StringSearch.containsClass(f, className)) {
+            if (f.getFileName().toString().equals(className) && StringSearch.containsType(f, el)) {
                 return Optional.of(f);
             }
         }
         // Slow path: look for text `class Foo` in any file in package
         for (var f : list(packageName)) {
-            if (StringSearch.containsClass(f, className)) {
+            if (StringSearch.containsType(f, el)) {
                 return Optional.of(f);
             }
         }

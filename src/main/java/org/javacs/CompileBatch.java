@@ -241,7 +241,11 @@ class CompileBatch implements AutoCloseable {
     public static final List<TreePath> CODE_NOT_FOUND = List.of();
 
     List<TreePath> definitions(Element el) {
-        LOG.info(String.format("Search for definitions of `%s` in %d files...", el, roots.size()));
+        if (roots.size() == 1) {
+            LOG.info(String.format("Search for `%s` in %s", el, roots.get(0).getSourceFile().getName()));
+        } else {
+            LOG.info(String.format("Search for `%s` in %d files...", el, roots.size()));
+        }
         if (el.asType().getKind() == TypeKind.ERROR) {
             LOG.info(String.format("...`%s` is an error type, giving up", el.asType()));
             return CODE_NOT_FOUND;

@@ -10,6 +10,7 @@ import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.lang.model.element.TypeElement;
 
 // Translated from https://golang.org/src/strings/search.go
 
@@ -325,6 +326,17 @@ class StringSearch {
         return Character.isAlphabetic(c) || Character.isDigit(c) || c == '_' || c == '$';
     }
 
+    static boolean containsType(Path file, TypeElement el) {
+        switch (el.getKind()) {
+            case INTERFACE:
+            return containsInterface(file, el.getSimpleName().toString());
+            case CLASS:
+                return containsClass(file, el.getSimpleName().toString());
+            default:
+                throw new RuntimeException("Don't know what to do with " + el.getKind());
+        }
+    }
+
     static Cache<String, Boolean> cacheContainsClass = new Cache<>();
 
     static boolean containsClass(Path file, String simpleName) {
@@ -333,6 +345,16 @@ class StringSearch {
             // TODO verify this by actually parsing the file
         }
         return cacheContainsClass.get(file, simpleName);
+    }
+
+    static Cache<String, Boolean> cacheContainsInterface = new Cache<>();
+
+    static boolean containsInterface(Path file, String simpleName) {
+        if (cacheContainsInterface.needs(file, simpleName)) {
+            cacheContainsInterface.load(file, simpleName, containsString(file, "interface " + simpleName));
+            // TODO verify this by actually parsing the file
+        }
+        return cacheContainsInterface.get(file, simpleName);
     }
 
     static boolean containsImport(Path file, String toPackage, String toClass) {
