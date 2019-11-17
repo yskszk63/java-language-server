@@ -6,7 +6,6 @@
 - `return json.get("name").` doesn't auto-complete
 - `return "foo"\n.` doesn't auto-complete
 - Restart debug test doesn't work
-- Javac doesn't find protobuf classes in bazel
 - Replace <a href=...>text</a> with text in docs, see List.copyOf for example.
 - Show 'not used' warnings for non-@Override package-private methods of private classes, because they can only be accessed from same file
 - Package template of new package which is sibling of existing package shows sibling + leaf, not parent + leaf.

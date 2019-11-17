@@ -2,14 +2,12 @@ package org.javacs;
 
 import com.google.gson.*;
 import com.sun.source.tree.*;
-import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeKind;
 import javax.tools.JavaFileObject;
@@ -1027,36 +1025,10 @@ class JavaLanguageServer extends LanguageServer {
         for (var d : params.context.diagnostics) {
             if (d.code.equals("unused")
                     && d.severity == DiagnosticSeverity.Information) { // TODO why isn't this italic and blue?
-                actions.add(fixUnusedCommand(params.textDocument.uri, d));
+                actions.add(new Refactor(compiler()).prependUnderscore(params.textDocument.uri, d.range));
             }
         }
         return actions;
-    }
-
-    private CodeAction fixUnusedCommand(URI file, Diagnostic d) {
-        var from = extractUnusedName(d.message);
-        var a = new CodeAction();
-        a.kind = CodeActionKind.QuickFix;
-        a.title = String.format("Prefix '%s' with an underscore", from);
-        a.edit = new WorkspaceEdit();
-        a.edit.changes = Map.of(file, List.of(fixUnusedEdit(d.range, from)));
-        return a;
-    }
-
-    private static final Pattern NOT_USED = Pattern.compile("`(\\w+)` is not used");
-
-    private String extractUnusedName(String message) {
-        var matcher = NOT_USED.matcher(message);
-        if (!matcher.matches()) {
-            throw new RuntimeException(message);
-        }
-        return matcher.group(1);
-    }
-
-    private TextEdit fixUnusedEdit(Range range, String from) {
-        var end = range.end;
-        var start = new Position(end.line, end.character - from.length());
-        return new TextEdit(new Range(start, end), "_" + from);
     }
 
     @Override

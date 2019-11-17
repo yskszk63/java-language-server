@@ -12,6 +12,7 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
@@ -60,6 +61,7 @@ class CompileBatch implements AutoCloseable {
         var addFiles = new HashSet<Path>();
         for (var err : parent.diags) {
             if (!err.getCode().equals("compiler.err.cant.resolve.location")) continue;
+            if (!isValid(err)) continue;
             var className = errorText(err);
             var packageName = packageName(err);
             var location = findPackagePrivateClass(packageName, className);
@@ -217,23 +219,27 @@ class CompileBatch implements AutoCloseable {
         var start = (int) pos.getStartPosition(root, leaf);
         var end = (int) pos.getEndPosition(root, leaf);
         if (leaf instanceof VariableTree) {
-            var file = Paths.get(root.getSourceFile().toUri());
-            var contents = FileStore.contents(file);
             var v = (VariableTree) leaf;
-            var name = v.getName().toString();
             var offset = (int) pos.getEndPosition(root, v.getType());
-            if (offset == -1) offset = start;
-            offset = contents.indexOf(name, offset);
-            end = offset + name.length();
+            if (offset != -1) {
+                start = offset;
+            }
         }
-        var message = String.format("`%s` is not used", unusedEl.getSimpleName());
-        int severity;
-        if (unusedEl instanceof ExecutableElement || unusedEl instanceof TypeElement) {
-            severity = DiagnosticSeverity.Hint;
-        } else {
-            severity = DiagnosticSeverity.Information;
+        var file = Paths.get(root.getSourceFile().toUri());
+        var contents = FileStore.contents(file);
+        var name = unusedEl.getSimpleName();
+        if (name.contentEquals("<init>")) {
+            name = unusedEl.getEnclosingElement().getSimpleName();
         }
-        return lspWarnUnused(severity, message, start, end, root.getLineMap());
+        var region = contents.subSequence(start, end);
+        var matcher = Pattern.compile("\\b" + name + "\\b").matcher(region);
+        if (matcher.find()) {
+            start += matcher.start();
+            end = start + name.length();
+        }
+        var message = String.format("`%s` is not used", name);
+        // TODO create an additional warning with severity Hint that fades methods and classes
+        return lspWarnUnused(DiagnosticSeverity.Information, message, start, end, root.getLineMap());
     }
 
     static org.javacs.lsp.Diagnostic lspWarnUnused(int severity, String message, int start, int end, LineMap lines) {
