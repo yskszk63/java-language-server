@@ -6,11 +6,17 @@ import static org.junit.Assert.*;
 import java.util.ArrayList;
 import java.util.List;
 import org.javacs.lsp.*;
+import org.junit.Before;
 import org.junit.Test;
 
 public class CodeActionTest {
     private static List<Diagnostic> errors = new ArrayList<>();
     protected static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer(errors::add);
+
+    @Before
+    public void clearErrors() {
+        errors.clear();
+    }
 
     @Test
     public void testCantConvertToStatement() {
