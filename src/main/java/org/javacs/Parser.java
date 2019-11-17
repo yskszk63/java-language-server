@@ -28,6 +28,7 @@ class Parser {
     final String contents;
     private final JavacTask task;
     final CompilationUnitTree root;
+    final Trees trees;
 
     private Parser(JavaFileObject file) {
         Objects.requireNonNull(file);
@@ -43,6 +44,7 @@ class Parser {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        this.trees = Trees.instance(task);
     }
 
     static Parser parseFile(Path file) {
@@ -207,6 +209,17 @@ class Parser {
     /** Find the smallest tree that includes the cursor */
     TreePath findPath(long cursor) {
         var finder = new FindSmallest(cursor, task, root);
+        finder.scan(root, null);
+        if (finder.found == null) {
+            return new TreePath(root);
+        }
+        return finder.found;
+    }
+
+    TreePath findPath(Range range) {
+        var start = root.getLineMap().getPosition(range.start.line + 1, range.start.character + 1);
+        var end = root.getLineMap().getPosition(range.end.line + 1, range.end.character + 1);
+        var finder = new FindRange(start, end, task, root);
         finder.scan(root, null);
         if (finder.found == null) {
             return new TreePath(root);

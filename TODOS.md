@@ -25,6 +25,8 @@
     - Delete unused tree
     - Fix imports
     - Create method
+    - Implement abstract methods
+    - static, final are redundant in interfaces inners
 - Selection
     - Extract constant
     - Extract variable

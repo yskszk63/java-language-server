@@ -1023,8 +1023,13 @@ class JavaLanguageServer extends LanguageServer {
     public List<CodeAction> codeAction(CodeActionParams params) {
         var actions = new ArrayList<CodeAction>();
         for (var d : params.context.diagnostics) {
-            if (Refactor.canPrependUnderscore(d)) {
-                actions.add(Refactor.prependUnderscore(params.textDocument.uri, d.range));
+            for (var rule : Refactor.RULES) {
+                if (!rule.canRefactor(d)) continue;
+                var parse = Parser.parseFile(Paths.get(params.textDocument.uri));
+                var error = parse.findPath(d.range);
+                var action = rule.refactor(parse, error);
+                if (action == CodeAction.NONE) continue;
+                actions.add(action);
             }
         }
         return actions;

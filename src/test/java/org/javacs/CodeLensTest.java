@@ -34,16 +34,6 @@ public class CodeLensTest {
         return commands;
     }
 
-    private List<String> titles(List<? extends CodeLens> lenses) {
-        var titles = new ArrayList<String>();
-        for (var lens : lenses) {
-            var line = lens.range.start.line + 1;
-            var title = lens.command.title;
-            titles.add(line + ":" + title);
-        }
-        return titles;
-    }
-
     @Test
     public void testMethods() {
         var lenses = lenses("/org/javacs/example/HasTest.java");

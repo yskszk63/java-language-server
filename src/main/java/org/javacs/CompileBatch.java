@@ -238,14 +238,27 @@ class CompileBatch implements AutoCloseable {
             end = start + name.length();
         }
         var message = String.format("`%s` is not used", name);
+        String code;
+        if (leaf instanceof VariableTree) {
+            if (path.getParentPath().getLeaf() instanceof MethodTree) {
+                code = "unused_param";
+            } else if (path.getParentPath().getLeaf() instanceof BlockTree) {
+                code = "unused_local";
+            } else {
+                code = "unused_field";
+            }
+        } else {
+            code = "unused_other";
+        }
+        return lspWarnUnused(DiagnosticSeverity.Information, code, message, start, end, root.getLineMap());
         // TODO create an additional warning with severity Hint that fades methods and classes
-        return lspWarnUnused(DiagnosticSeverity.Information, message, start, end, root.getLineMap());
     }
 
-    static org.javacs.lsp.Diagnostic lspWarnUnused(int severity, String message, int start, int end, LineMap lines) {
+    static org.javacs.lsp.Diagnostic lspWarnUnused(
+            int severity, String code, String message, int start, int end, LineMap lines) {
         var result = new org.javacs.lsp.Diagnostic();
         result.severity = severity;
-        result.code = "unused";
+        result.code = code;
         result.message = message;
         result.tags = List.of(DiagnosticTag.Unnecessary);
         result.range = new Span(start, end).asRange(lines);
