@@ -14,29 +14,8 @@ interface Refactor {
     CodeAction refactor(Parser parse, TreePath error);
 
     Refactor[] RULES = { // TODO this is used!
-        new PrependUnderscore(), new ConvertToStatement(), new ConvertToBlock(),
+        new ConvertToStatement(), new ConvertToBlock(),
     };
-
-    class PrependUnderscore implements Refactor {
-        @Override
-        public boolean canRefactor(Diagnostic d) {
-            return d.code.equals("unused_param");
-        }
-
-        @Override
-        public CodeAction refactor(Parser parse, TreePath error) {
-            var file = error.getCompilationUnit().getSourceFile().toUri();
-            var range = parse.range(error);
-            var insert = new Range(range.start, range.start);
-            var edit = new TextEdit(insert, "_");
-            var a = new CodeAction();
-            a.kind = CodeActionKind.QuickFix;
-            a.title = "Prefix with underscore";
-            a.edit = new WorkspaceEdit();
-            a.edit.changes = Map.of(file, List.of(edit));
-            return a;
-        }
-    }
 
     class ConvertToStatement implements Refactor {
         @Override

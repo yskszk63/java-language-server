@@ -144,10 +144,6 @@ class CompileBatch implements AutoCloseable {
         return Optional.ofNullable(el);
     }
 
-    private boolean okUnused(Name name) {
-        return name.charAt(0) == '_';
-    }
-
     List<org.javacs.lsp.Diagnostic> reportErrors(Path file) {
         var root = root(file);
         var diags = new ArrayList<org.javacs.lsp.Diagnostic>();
@@ -164,7 +160,6 @@ class CompileBatch implements AutoCloseable {
         var warnUnused = new WarnUnused(borrow.task);
         warnUnused.scan(root, null);
         for (var unusedEl : warnUnused.notUsed()) {
-            if (okUnused(unusedEl.getSimpleName())) continue;
             var warn = warnUnused(unusedEl);
             diags.add(warn);
         }
@@ -237,20 +232,28 @@ class CompileBatch implements AutoCloseable {
             start += matcher.start();
             end = start + name.length();
         }
-        var message = String.format("`%s` is not used", name);
+        var message = String.format("'%s' is not used", name);
         String code;
+        int severity;
         if (leaf instanceof VariableTree) {
             if (path.getParentPath().getLeaf() instanceof MethodTree) {
                 code = "unused_param";
+                severity = DiagnosticSeverity.Hint;
             } else if (path.getParentPath().getLeaf() instanceof BlockTree) {
                 code = "unused_local";
+                severity = DiagnosticSeverity.Information;
             } else {
                 code = "unused_field";
+                severity = DiagnosticSeverity.Information;
             }
+        } else if (leaf instanceof MethodTree) {
+            code = "unused_method";
+            severity = DiagnosticSeverity.Information;
         } else {
             code = "unused_other";
+            severity = DiagnosticSeverity.Hint;
         }
-        return lspWarnUnused(DiagnosticSeverity.Information, code, message, start, end, root.getLineMap());
+        return lspWarnUnused(severity, code, message, start, end, root.getLineMap());
         // TODO create an additional warning with severity Hint that fades methods and classes
     }
 

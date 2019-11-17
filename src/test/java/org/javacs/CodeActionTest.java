@@ -15,7 +15,6 @@ public class CodeActionTest {
         {"org/javacs/action/TestCantConvertToStatement.java"},
         {"org/javacs/action/TestConvertToStatement.java", "Convert to statement"},
         {"org/javacs/action/TestConvertToBlock.java", "Convert to block"},
-        {"org/javacs/action/TestPrefixParam.java", "Prefix with underscore"},
     };
 
     @Test

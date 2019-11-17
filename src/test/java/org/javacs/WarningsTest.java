@@ -82,16 +82,16 @@ public class WarningsTest {
         assertThat(errors, hasItem("unused_local(7)")); // int unusedLocal
         assertThat(errors, hasItem("unused_field(10)")); // int unusedPrivate
         assertThat(errors, hasItem("unused_local(13)")); // int unusedLocalInLambda
-        assertThat(errors, hasItem("unused_other(16)")); // int unusedMethod() { ... }
-        assertThat(errors, hasItem("unused_other(22)")); // private Unused(int i) { }
+        assertThat(errors, hasItem("unused_method(16)")); // int unusedMethod() { ... }
+        assertThat(errors, hasItem("unused_method(22)")); // private Unused(int i) { }
         assertThat(errors, hasItem("unused_other(24)")); // private class UnusedClass { }
-        assertThat(errors, hasItem("unused_other(26)")); // void unusedSelfReference() { ... }
+        assertThat(errors, hasItem("unused_method(26)")); // void unusedSelfReference() { ... }
         assertThat(errors, not("unused_param(6)")); // test(int unusedParam)
         assertThat(errors, not("unused_param(12)")); // unusedLambdaParam -> {};
-        assertThat(errors, not(hasItem("unused_other(20)"))); // private Unused() { }
-        assertThat(errors, hasItem("unused_other(30)")); // private void unusedMutuallyRecursive1() { ... }
-        assertThat(errors, hasItem("unused_other(34)")); // private void unusedMutuallyRecursive2() { ... }
-        assertThat(errors, not(hasItem("unused_other(38)"))); // private int usedByUnusedVar() { ... }
+        assertThat(errors, not(hasItem("unused_method(20)"))); // private Unused() { }
+        assertThat(errors, hasItem("unused_method(30)")); // private void unusedMutuallyRecursive1() { ... }
+        assertThat(errors, hasItem("unused_method(34)")); // private void unusedMutuallyRecursive2() { ... }
+        assertThat(errors, not(hasItem("unused_method(38)"))); // private int usedByUnusedVar() { ... }
     }
 
     @Test
