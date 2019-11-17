@@ -42,6 +42,11 @@ public class CodeActionTest {
         check("org/javacs/action/TestSuppressWarning.java", "Suppress 'unchecked' warning");
     }
 
+    @Test
+    public void testAddThrows() {
+        check("org/javacs/action/TestAddThrows.java", "Add 'throws'");
+    }
+
     public void check(String testFile, String... expect) {
         var file = FindResource.path(testFile);
         server.lint(List.of(file));

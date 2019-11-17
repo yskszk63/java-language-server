@@ -1027,7 +1027,7 @@ class JavaLanguageServer extends LanguageServer {
                 if (!rule.canRefactor(d)) continue;
                 var parse = Parser.parseFile(Paths.get(params.textDocument.uri));
                 var error = parse.findPath(d.range);
-                var action = rule.refactor(parse, error);
+                var action = rule.refactor(parse, error, d.message);
                 if (action == CodeAction.NONE) continue;
                 actions.add(action);
             }

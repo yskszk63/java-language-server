@@ -6,16 +6,18 @@ import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreePath;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import javax.lang.model.element.Modifier;
 import org.javacs.lsp.*;
 
 interface Refactor {
     boolean canRefactor(Diagnostic d);
 
-    CodeAction refactor(Parser parse, TreePath error);
+    CodeAction refactor(Parser parse, TreePath error, String message);
 
     Refactor[] RULES = { // TODO this is used!
-        new ConvertToStatement(), new ConvertToBlock(), new RemoveDeclaration(), new SuppressWarning(),
+        new ConvertToStatement(), new ConvertToBlock(), new RemoveDeclaration(), new SuppressWarning(), new AddThrows(),
     };
 
     class ConvertToStatement implements Refactor {
@@ -41,7 +43,7 @@ interface Refactor {
         }
 
         @Override
-        public CodeAction refactor(Parser parse, TreePath error) {
+        public CodeAction refactor(Parser parse, TreePath error, String message) {
             if (!(error.getLeaf() instanceof VariableTree)) {
                 return CodeAction.NONE;
             }
@@ -72,7 +74,7 @@ interface Refactor {
         }
 
         @Override
-        public CodeAction refactor(Parser parse, TreePath error) {
+        public CodeAction refactor(Parser parse, TreePath error, String message) {
             if (!(error.getLeaf() instanceof VariableTree)) {
                 return CodeAction.NONE;
             }
@@ -112,7 +114,7 @@ interface Refactor {
         }
 
         @Override
-        public CodeAction refactor(Parser parse, TreePath error) {
+        public CodeAction refactor(Parser parse, TreePath error, String message) {
             var file = error.getCompilationUnit().getSourceFile().toUri();
             var pos = parse.trees.getSourcePositions();
             var start = (int) pos.getStartPosition(error.getCompilationUnit(), error.getLeaf());
@@ -135,7 +137,7 @@ interface Refactor {
         }
 
         @Override
-        public CodeAction refactor(Parser parse, TreePath error) {
+        public CodeAction refactor(Parser parse, TreePath error, String message) {
             while (!(error.getLeaf() instanceof MethodTree)) {
                 error = error.getParentPath();
                 if (error == null) return CodeAction.NONE;
@@ -158,4 +160,56 @@ interface Refactor {
             return a;
         }
     }
+
+    class AddThrows implements Refactor {
+        @Override
+        public boolean canRefactor(Diagnostic d) {
+            return d.code.equals("compiler.err.unreported.exception.need.to.catch.or.throw");
+        }
+
+        private static final Pattern unreported = Pattern.compile("unreported exception ((\\w+\\.)*\\w+)");
+
+        private String extractExceptionName(String message) {
+            var matcher = unreported.matcher(message);
+            if (!matcher.find()) {
+                LOG.warning(String.format("`%s` doesn't match `%s`", message, unreported));
+                return "";
+            }
+            return matcher.group(1);
+        }
+
+        @Override
+        public CodeAction refactor(Parser parse, TreePath error, String message) {
+            var qualifiedName = extractExceptionName(message);
+            var packageName = StringSearch.mostName(qualifiedName); // TODO add import
+            var simpleName = StringSearch.lastName(qualifiedName);
+            if (qualifiedName.isEmpty()) {
+                return CodeAction.NONE;
+            }
+            while (!(error.getLeaf() instanceof MethodTree)) {
+                error = error.getParentPath();
+                if (error == null) return CodeAction.NONE;
+            }
+            var method = (MethodTree) error.getLeaf();
+            var pos = parse.trees.getSourcePositions();
+            var startBody = (int) pos.getStartPosition(error.getCompilationUnit(), method.getBody());
+            var insertPoint = new Span(startBody, startBody).asRange(parse.root.getLineMap());
+            String insertText;
+            if (method.getThrows().isEmpty()) {
+                insertText = "throws " + simpleName + " ";
+            } else {
+                insertText = ", " + simpleName + " ";
+            }
+            var insert = new TextEdit(insertPoint, insertText);
+            var file = error.getCompilationUnit().getSourceFile().toUri();
+            var a = new CodeAction();
+            a.kind = CodeActionKind.QuickFix;
+            a.title = "Add 'throws'";
+            a.edit = new WorkspaceEdit();
+            a.edit.changes = Map.of(file, List.of(insert));
+            return a;
+        }
+    }
+
+    final Logger LOG = Logger.getLogger("main");
 }

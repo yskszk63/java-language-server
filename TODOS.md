@@ -17,6 +17,9 @@
 - Compilation is very slow in the presence of lots of errors
 - Use package graph to limit search for find-usages/goto-def
 
+# Features
+- Autocomplete new method name based on "no such method" errors.
+
 ## Refactorings
 - Quick fixes
     - Remove parameter
