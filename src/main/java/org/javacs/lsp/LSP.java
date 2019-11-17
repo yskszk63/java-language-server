@@ -109,6 +109,7 @@ public class LSP {
         return gson.toJson(message);
     }
 
+    @SuppressWarnings("unchecked")
     static void respond(OutputStream client, int requestId, Object params) {
         if (params instanceof ResponseError) {
             throw new RuntimeException("Errors should be sent using LSP.error(...)");
@@ -128,6 +129,7 @@ public class LSP {
         writeClient(client, messageText);
     }
 
+    @SuppressWarnings("unchecked")
     private static void notifyClient(OutputStream client, String method, Object params) {
         if (params instanceof Optional) {
             var option = (Optional) params;
