@@ -4,6 +4,7 @@ import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.util.*;
 import javax.lang.model.element.*;
+import javax.lang.model.type.TypeKind;
 
 class WarnUnused extends TreeScanner<Void, Void> {
     // Copied from TreePathScanner
@@ -59,6 +60,31 @@ class WarnUnused extends TreeScanner<Void, Void> {
 
     private void foundReference() {
         var toEl = trees.getElement(path);
+        if (toEl == null) {
+            return;
+        }
+        if (toEl.asType().getKind() == TypeKind.ERROR) {
+            foundPseudoReference(toEl);
+            return;
+        }
+        sweep(toEl);
+    }
+
+    private void foundPseudoReference(Element toEl) {
+        var parent = toEl.getEnclosingElement();
+        if (!(parent instanceof TypeElement)) {
+            return;
+        }
+        var memberName = toEl.getSimpleName();
+        var type = (TypeElement) parent;
+        for (var member : type.getEnclosedElements()) {
+            if (member.getSimpleName().contentEquals(memberName)) {
+                sweep(member);
+            }
+        }
+    }
+
+    private void sweep(Element toEl) {
         var firstUse = used.add(toEl);
         var notScanned = firstUse && privateDeclarations.containsKey(toEl);
         if (notScanned) {

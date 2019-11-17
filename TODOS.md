@@ -23,7 +23,6 @@
 ## Refactorings
 - Quick fixes
     - Remove parameter
-    - Delete unused tree
     - Fix imports
     - Create method
     - Implement abstract methods
