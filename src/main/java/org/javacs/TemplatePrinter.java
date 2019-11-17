@@ -26,7 +26,7 @@ class TemplatePrinter extends AbstractTypeVisitor8<String, Void> {
     }
 
     @Override
-    public String visitIntersection(IntersectionType t, Void aVoid) {
+    public String visitIntersection(IntersectionType t, Void __) {
         var types = new StringJoiner(" & ");
         for (var b : t.getBounds()) {
             types.add(print(b));
@@ -35,27 +35,27 @@ class TemplatePrinter extends AbstractTypeVisitor8<String, Void> {
     }
 
     @Override
-    public String visitUnion(UnionType t, Void aVoid) {
+    public String visitUnion(UnionType t, Void __) {
         return "UNION";
     }
 
     @Override
-    public String visitPrimitive(PrimitiveType t, Void aVoid) {
+    public String visitPrimitive(PrimitiveType t, Void __) {
         return t.toString();
     }
 
     @Override
-    public String visitNull(NullType t, Void aVoid) {
+    public String visitNull(NullType t, Void __) {
         return "NULL";
     }
 
     @Override
-    public String visitArray(ArrayType t, Void aVoid) {
+    public String visitArray(ArrayType t, Void __) {
         return print(t.getComponentType()) + "[]";
     }
 
     @Override
-    public String visitDeclared(DeclaredType t, Void aVoid) {
+    public String visitDeclared(DeclaredType t, Void __) {
         var result = t.asElement().getSimpleName().toString();
 
         if (!t.getTypeArguments().isEmpty()) {
@@ -70,27 +70,27 @@ class TemplatePrinter extends AbstractTypeVisitor8<String, Void> {
     }
 
     @Override
-    public String visitError(ErrorType t, Void aVoid) {
+    public String visitError(ErrorType t, Void __) {
         return "ERROR";
     }
 
     @Override
-    public String visitTypeVariable(TypeVariable t, Void aVoid) {
+    public String visitTypeVariable(TypeVariable t, Void __) {
         return "$" + parameter(t);
     }
 
     @Override
-    public String visitWildcard(WildcardType t, Void aVoid) {
+    public String visitWildcard(WildcardType t, Void __) {
         return "?";
     }
 
     @Override
-    public String visitExecutable(ExecutableType t, Void aVoid) {
+    public String visitExecutable(ExecutableType t, Void __) {
         return "EXECUTABLE";
     }
 
     @Override
-    public String visitNoType(NoType t, Void aVoid) {
+    public String visitNoType(NoType t, Void __) {
         return "void";
     }
 

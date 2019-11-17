@@ -26,7 +26,9 @@ interface Refactor {
         @Override
         public CodeAction refactor(Parser parse, TreePath error) {
             var file = error.getCompilationUnit().getSourceFile().toUri();
-            var edit = new TextEdit(parse.range(error), "_");
+            var range = parse.range(error);
+            var insert = new Range(range.start, range.start);
+            var edit = new TextEdit(insert, "_");
             var a = new CodeAction();
             a.kind = CodeActionKind.QuickFix;
             a.title = "Prefix with underscore";

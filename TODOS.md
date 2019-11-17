@@ -20,8 +20,6 @@
 ## Refactorings
 - Quick fixes
     - Remove parameter
-    - Prepend _ to parameter name
-    - Delete LHS of variable declaration
     - Delete unused tree
     - Fix imports
     - Create method
