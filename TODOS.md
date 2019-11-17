@@ -25,7 +25,6 @@
     - Create method
     - Implement abstract methods
     - static, final are redundant in interfaces inners
-    - Ignore unchecked
 - Selection
     - Extract constant
     - Extract variable

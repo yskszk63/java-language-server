@@ -4,9 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import java.io.*;
 import java.nio.charset.Charset;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayDeque;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -201,36 +198,20 @@ public class LSP {
                 }
             }
 
-            ArrayDeque<Instant> errors = new ArrayDeque<Instant>(3);
-
-            private void recordError(Exception e) {
-                LOG.log(Level.SEVERE, e.getMessage(), e);
-                errors.add(Instant.now());
-                if (errors.size() > 5) {
-                    var head = errors.remove();
-                    var elapsed = Duration.between(head, Instant.now());
-                    var max = Duration.ofMinutes(5);
-                    if (elapsed.compareTo(max) > 0) {
-                        LOG.severe("Received 5 errors in < 5 minutes, exiting");
-                        System.exit(-1);
-                    }
-                }
-            }
-
             @Override
             public void run() {
                 LOG.info("Placing incoming messages on queue...");
+
                 while (true) {
                     try {
                         var token = nextToken(receive);
                         var message = parseMessage(token);
                         peek(message);
                         pending.put(message);
-                    } catch (EndOfStream e) {
+                    } catch (EndOfStream __) {
                         if (kill()) return;
-                        recordError(e);
                     } catch (Exception e) {
-                        recordError(e);
+                        LOG.log(Level.SEVERE, e.getMessage(), e);
                     }
                 }
             }
