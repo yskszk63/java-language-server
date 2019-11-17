@@ -14,7 +14,7 @@ interface Refactor {
     CodeAction refactor(Parser parse, TreePath error);
 
     Refactor[] RULES = { // TODO this is used!
-        new ConvertToStatement(), new ConvertToBlock(),
+        new ConvertToStatement(), new ConvertToBlock(), new RemoveDeclaration(),
     };
 
     class ConvertToStatement implements Refactor {
@@ -100,6 +100,40 @@ interface Refactor {
             a.title = "Convert to block";
             a.edit = new WorkspaceEdit();
             a.edit.changes = Map.of(file, List.of(fixLhs, fixRhs));
+            return a;
+        }
+    }
+
+    class RemoveDeclaration implements Refactor {
+        @Override
+        public boolean canRefactor(Diagnostic d) {
+            return d.code.equals("unused_other") || d.code.equals("unused_method");
+        }
+
+        private boolean isDeclaration(Tree t) {
+            switch (t.getKind()) {
+                case CLASS:
+                case INTERFACE:
+                case METHOD:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        @Override
+        public CodeAction refactor(Parser parse, TreePath error) {
+            var file = error.getCompilationUnit().getSourceFile().toUri();
+            var pos = parse.trees.getSourcePositions();
+            var start = (int) pos.getStartPosition(error.getCompilationUnit(), error.getLeaf());
+            var end = (int) pos.getEndPosition(error.getCompilationUnit(), error.getLeaf());
+            var range = new Span(start, end).asRange(parse.root.getLineMap());
+            var delete = new TextEdit(range, "");
+            var a = new CodeAction();
+            a.kind = CodeActionKind.QuickFix;
+            a.title = "Remove declaration";
+            a.edit = new WorkspaceEdit();
+            a.edit.changes = Map.of(file, List.of(delete));
             return a;
         }
     }
