@@ -236,18 +236,25 @@ class CompileBatch implements AutoCloseable {
         String code;
         int severity;
         if (leaf instanceof VariableTree) {
-            if (path.getParentPath().getLeaf() instanceof MethodTree) {
+            var parent = path.getParentPath().getLeaf();
+            if (parent instanceof MethodTree) {
                 code = "unused_param";
                 severity = DiagnosticSeverity.Hint;
-            } else if (path.getParentPath().getLeaf() instanceof BlockTree) {
+            } else if (parent instanceof BlockTree) {
                 code = "unused_local";
                 severity = DiagnosticSeverity.Information;
-            } else {
+            } else if (parent instanceof ClassTree) {
                 code = "unused_field";
                 severity = DiagnosticSeverity.Information;
+            } else {
+                code = "unused_other";
+                severity = DiagnosticSeverity.Hint;
             }
         } else if (leaf instanceof MethodTree) {
             code = "unused_method";
+            severity = DiagnosticSeverity.Information;
+        } else if (leaf instanceof ClassTree) {
+            code = "unused_class";
             severity = DiagnosticSeverity.Information;
         } else {
             code = "unused_other";

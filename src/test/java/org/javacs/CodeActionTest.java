@@ -11,30 +11,42 @@ import org.junit.Test;
 public class CodeActionTest {
     private static List<Diagnostic> errors = new ArrayList<>();
     protected static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer(errors::add);
-    private static final String[][] cases = {
-        {"org/javacs/action/TestCantConvertToStatement.java"},
-        {"org/javacs/action/TestConvertToStatement.java", "Convert to statement"},
-        {"org/javacs/action/TestConvertToBlock.java", "Convert to block"},
-        {"org/javacs/action/TestRemoveDeclaration.java", "Remove declaration"},
-    };
 
     @Test
-    public void testCodeActions() {
-        for (var c : cases) {
-            var file = FindResource.path(c[0]);
-            server.lint(List.of(file));
-            var params = new CodeActionParams();
-            params.textDocument = new TextDocumentIdentifier(file.toUri());
-            params.context = new CodeActionContext();
-            params.context.diagnostics = errors;
-            var actions = server.codeAction(params);
-            var titles = titles(actions);
-            var expect = new String[c.length - 1];
-            for (int i = 1; i < c.length; i++) {
-                expect[i - 1] = c[i];
-            }
-            assertThat(titles, hasItems(expect));
-        }
+    public void testCantConvertToStatement() {
+        check("org/javacs/action/TestCantConvertToStatement.java");
+    }
+
+    @Test
+    public void testConvertToStatement() {
+        check("org/javacs/action/TestConvertToStatement.java", "Convert to statement");
+    }
+
+    @Test
+    public void testConvertToBlock() {
+        check("org/javacs/action/TestConvertToBlock.java", "Convert to block");
+    }
+
+    @Test
+    public void testRemoveDeclaration() {
+        check("org/javacs/action/TestRemoveDeclaration.java", "Remove declaration");
+    }
+
+    @Test
+    public void testUnusedException() {
+        check("org/javacs/action/TestUnusedException.java");
+    }
+
+    public void check(String testFile, String... expect) {
+        var file = FindResource.path(testFile);
+        server.lint(List.of(file));
+        var params = new CodeActionParams();
+        params.textDocument = new TextDocumentIdentifier(file.toUri());
+        params.context = new CodeActionContext();
+        params.context.diagnostics = errors;
+        var actions = server.codeAction(params);
+        var titles = titles(actions);
+        assertThat(titles, containsInAnyOrder(expect));
     }
 
     private List<String> titles(List<CodeAction> actions) {

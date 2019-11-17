@@ -84,7 +84,7 @@ public class WarningsTest {
         assertThat(errors, hasItem("unused_local(13)")); // int unusedLocalInLambda
         assertThat(errors, hasItem("unused_method(16)")); // int unusedMethod() { ... }
         assertThat(errors, hasItem("unused_method(22)")); // private Unused(int i) { }
-        assertThat(errors, hasItem("unused_other(24)")); // private class UnusedClass { }
+        assertThat(errors, hasItem("unused_class(24)")); // private class UnusedClass { }
         assertThat(errors, hasItem("unused_method(26)")); // void unusedSelfReference() { ... }
         assertThat(errors, not("unused_param(6)")); // test(int unusedParam)
         assertThat(errors, not("unused_param(12)")); // unusedLambdaParam -> {};

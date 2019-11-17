@@ -107,18 +107,7 @@ interface Refactor {
     class RemoveDeclaration implements Refactor {
         @Override
         public boolean canRefactor(Diagnostic d) {
-            return d.code.equals("unused_other") || d.code.equals("unused_method");
-        }
-
-        private boolean isDeclaration(Tree t) {
-            switch (t.getKind()) {
-                case CLASS:
-                case INTERFACE:
-                case METHOD:
-                    return true;
-                default:
-                    return false;
-            }
+            return d.code.equals("unused_class") || d.code.equals("unused_method");
         }
 
         @Override
