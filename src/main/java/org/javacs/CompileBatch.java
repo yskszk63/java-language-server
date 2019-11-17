@@ -251,10 +251,9 @@ class CompileBatch implements AutoCloseable {
             severity = DiagnosticSeverity.Information;
         } else {
             code = "unused_other";
-            severity = DiagnosticSeverity.Hint;
+            severity = DiagnosticSeverity.Information;
         }
         return lspWarnUnused(severity, code, message, start, end, root.getLineMap());
-        // TODO create an additional warning with severity Hint that fades methods and classes
     }
 
     static org.javacs.lsp.Diagnostic lspWarnUnused(
