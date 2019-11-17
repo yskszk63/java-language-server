@@ -11,6 +11,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.javacs.Main;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -40,6 +41,14 @@ public class LanguageServerTest {
         writeServerToClient = new PipedOutputStream(serverToClient);
         main = new Thread(this::runServer, "runServer");
         main.start();
+    }
+
+    @After
+    public void cleanup() throws IOException {
+        writeClientToServer.close();
+        writeServerToClient.close();
+        clientToServer.close();
+        serverToClient.close();
     }
 
     private void runServer() {

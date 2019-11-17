@@ -9,6 +9,7 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.nio.charset.Charset;
 import java.util.Optional;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -31,6 +32,12 @@ public class LspTest {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @After
+    public void cleanup() throws IOException {
+        buffer.close();
+        writer.close();
     }
 
     @Test
