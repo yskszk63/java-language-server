@@ -3,7 +3,6 @@ package org.javacs;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.util.Objects;
-import java.util.logging.Logger;
 
 // Search for the smallest element that encompasses a range
 class FindRange extends TreePathScanner<Void, Void> {
@@ -18,13 +17,11 @@ class FindRange extends TreePathScanner<Void, Void> {
         this.start = start;
         this.end = end;
         this.root = root;
-        LOG.info("find " + start + " - " + end);
     }
 
     boolean containsRange(Tree tree) {
         Objects.requireNonNull(root, "root was never set");
         long start = pos.getStartPosition(root, tree), end = pos.getEndPosition(root, tree);
-        LOG.info(tree + " spans " + start + " - " + end);
         return start <= this.start && this.end <= end;
     }
 
@@ -46,6 +43,4 @@ class FindRange extends TreePathScanner<Void, Void> {
         }
         return null;
     }
-
-    private static final Logger LOG = Logger.getLogger("main");
 }
