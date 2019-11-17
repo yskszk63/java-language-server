@@ -1,5 +1,6 @@
 package org.javacs;
 
+import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreePath;
@@ -14,7 +15,7 @@ interface Refactor {
     CodeAction refactor(Parser parse, TreePath error);
 
     Refactor[] RULES = { // TODO this is used!
-        new ConvertToStatement(), new ConvertToBlock(), new RemoveDeclaration(),
+        new ConvertToStatement(), new ConvertToBlock(), new RemoveDeclaration(), new SuppressWarning(),
     };
 
     class ConvertToStatement implements Refactor {
@@ -123,6 +124,37 @@ interface Refactor {
             a.title = "Remove declaration";
             a.edit = new WorkspaceEdit();
             a.edit.changes = Map.of(file, List.of(delete));
+            return a;
+        }
+    }
+
+    class SuppressWarning implements Refactor {
+        @Override
+        public boolean canRefactor(Diagnostic d) {
+            return d.code.equals("compiler.warn.unchecked.call.mbr.of.raw.type");
+        }
+
+        @Override
+        public CodeAction refactor(Parser parse, TreePath error) {
+            while (!(error.getLeaf() instanceof MethodTree)) {
+                error = error.getParentPath();
+                if (error == null) return CodeAction.NONE;
+            }
+            var pos = parse.trees.getSourcePositions();
+            var startMethod = (int) pos.getStartPosition(error.getCompilationUnit(), error.getLeaf());
+            var lines = parse.root.getLineMap();
+            var line = lines.getLineNumber(startMethod);
+            var startLine = (int) lines.getStartPosition(line);
+            var indent = " ".repeat(startMethod - startLine);
+            var insertText = "@SuppressWarnings(\"unchecked\")\n" + indent;
+            var insertPoint = new Span(startMethod, startMethod).asRange(parse.root.getLineMap());
+            var insert = new TextEdit(insertPoint, insertText);
+            var file = error.getCompilationUnit().getSourceFile().toUri();
+            var a = new CodeAction();
+            a.kind = CodeActionKind.QuickFix;
+            a.title = "Suppress 'unchecked' warning";
+            a.edit = new WorkspaceEdit();
+            a.edit.changes = Map.of(file, List.of(insert));
             return a;
         }
     }

@@ -37,6 +37,11 @@ public class CodeActionTest {
         check("org/javacs/action/TestUnusedException.java");
     }
 
+    @Test
+    public void testSuppressWarning() {
+        check("org/javacs/action/TestSuppressWarning.java", "Suppress 'unchecked' warning");
+    }
+
     public void check(String testFile, String... expect) {
         var file = FindResource.path(testFile);
         server.lint(List.of(file));
