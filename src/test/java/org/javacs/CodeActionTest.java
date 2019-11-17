@@ -12,7 +12,8 @@ public class CodeActionTest {
     private static List<Diagnostic> errors = new ArrayList<>();
     protected static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer(errors::add);
     private static final String[][] cases = {
-        {"org/javacs/action/TestRemoveVar.java", "Remove variable"},
+        {"org/javacs/action/TestCantConvertToStatement.java"},
+        {"org/javacs/action/TestConvertToStatement.java", "Convert to statement"},
         {"org/javacs/action/TestPrefixParam.java", "Prefix with underscore"},
     };
 
@@ -27,9 +28,11 @@ public class CodeActionTest {
             params.context.diagnostics = errors;
             var actions = server.codeAction(params);
             var titles = titles(actions);
+            var expect = new String[c.length - 1];
             for (int i = 1; i < c.length; i++) {
-                assertThat(titles, hasItem(c[i]));
+                expect[i - 1] = c[i];
             }
+            assertThat(titles, hasItems(expect));
         }
     }
 

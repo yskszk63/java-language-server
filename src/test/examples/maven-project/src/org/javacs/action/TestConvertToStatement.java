@@ -1,6 +1,6 @@
 package org.javacs.docs.action;
 
-class TestRemoveVar {
+class TestConvertToStatement {
     void test() {
         int unusedLocal = makeInt();
     }
