@@ -12,7 +12,11 @@ class Refactor {
         this.compiler = compiler;
     }
 
-    CodeAction prependUnderscore(URI file, Range range) {
+    static boolean canPrependUnderscore(Diagnostic d) {
+        return d.code.equals("unused") && d.severity == DiagnosticSeverity.Information;
+    }
+
+    static CodeAction prependUnderscore(URI file, Range range) {
         var edit = new TextEdit(new Range(range.start, range.start), "_");
         var a = new CodeAction();
         a.kind = CodeActionKind.QuickFix;

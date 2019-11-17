@@ -1023,9 +1023,8 @@ class JavaLanguageServer extends LanguageServer {
     public List<CodeAction> codeAction(CodeActionParams params) {
         var actions = new ArrayList<CodeAction>();
         for (var d : params.context.diagnostics) {
-            if (d.code.equals("unused")
-                    && d.severity == DiagnosticSeverity.Information) { // TODO why isn't this italic and blue?
-                actions.add(new Refactor(compiler()).prependUnderscore(params.textDocument.uri, d.range));
+            if (Refactor.canPrependUnderscore(d)) {
+                actions.add(Refactor.prependUnderscore(params.textDocument.uri, d.range));
             }
         }
         return actions;
