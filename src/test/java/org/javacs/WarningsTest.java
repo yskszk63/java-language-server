@@ -101,6 +101,12 @@ public class WarningsTest {
     }
 
     @Test
+    public void interfaceConst() {
+        server.lint(List.of(FindResource.path("org/javacs/warn/InterfaceConst.java")));
+        assertThat(errors, empty());
+    }
+
+    @Test
     public void referencePackagePrivateClassInFileWithDifferentName() {
         server.lint(List.of(FindResource.path("org/javacs/example/ReferenceGotoPackagePrivate.java")));
         assertThat(errors, empty());

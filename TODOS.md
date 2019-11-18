@@ -24,10 +24,10 @@
 - Quick fixes
     - Remove parameter
     - Fix imports
-    - Create method
+    - Create missing method
     - Implement abstract methods
+    - public is redundant in interface methods
     - static, final are redundant in interfaces inners
-    - Add exception
 - Selection
     - Extract constant
     - Extract variable
