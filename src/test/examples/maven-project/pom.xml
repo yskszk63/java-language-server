@@ -8,6 +8,15 @@
     <packaging>jar</packaging>
     <version>0.1-SNAPSHOT</version>
 
+    <dependencies>
+        <!-- JSON support -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.8.5</version>
+        </dependency>
+    </dependencies>
+    
     <build>
         <plugins>
             <!-- Set source 1.8 -->

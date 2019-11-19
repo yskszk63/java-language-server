@@ -406,7 +406,7 @@ class Parser {
         return doc;
     }
 
-    static Range range(JavacTask task, String contents, TreePath path) {
+    static Range range(JavacTask task, CharSequence contents, TreePath path) {
         // Find start position
         var trees = Trees.instance(task);
         var pos = trees.getSourcePositions();
@@ -495,7 +495,7 @@ class Parser {
         return range;
     }
 
-    private static int indexOf(String contents, String name, int start) {
+    private static int indexOf(CharSequence contents, String name, int start) {
         var matcher = Pattern.compile("\\b" + name + "\\b").matcher(contents);
         if (matcher.find(start)) {
             return matcher.start();

@@ -662,7 +662,7 @@ class JavaLanguageServer extends LanguageServer {
             if (toEl.get().asType().getKind() == TypeKind.ERROR) {
                 return gotoErrorDefinition(batch, toEl.get());
             }
-            var toFile = Parser.declaringFile(toEl.get());
+            var toFile = findElement(toEl.get());
             if (toFile.isEmpty()) {
                 LOG.info(String.format("...no file for %s", toEl.get()));
                 return Optional.empty();
@@ -672,10 +672,23 @@ class JavaLanguageServer extends LanguageServer {
         }
     }
 
-    private Optional<List<Location>> resolveGotoDefinition(Path fromFile, int fromLine, int fromColumn, Path toFile) {
-        var sources = new HashSet<SourceFileObject>();
+    private Optional<JavaFileObject> findElement(Element toEl) {
+        var fromSourcePath = Parser.declaringFile(toEl);
+        if (fromSourcePath.isPresent()) {
+            return Optional.of(new SourceFileObject(fromSourcePath.get()));
+        }
+        var fromDocPath = compiler().docs.find(new Ptr(toEl));
+        if (fromDocPath.isPresent()) {
+            return fromDocPath;
+        }
+        return Optional.empty();
+    }
+
+    private Optional<List<Location>> resolveGotoDefinition(
+            Path fromFile, int fromLine, int fromColumn, JavaFileObject toFile) {
+        var sources = new HashSet<JavaFileObject>();
         sources.add(new SourceFileObject(fromFile));
-        sources.add(new SourceFileObject(toFile));
+        sources.add(toFile);
         try (var batch = compiler().compileBatch(sources)) {
             var fromTree = batch.tree(fromFile, fromLine, fromColumn);
             var toEl = batch.element(fromTree).get();

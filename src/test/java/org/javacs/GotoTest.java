@@ -3,6 +3,8 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
+import java.net.URI;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -182,6 +184,12 @@ public class GotoTest {
         assertThat(suggestions, hasItem("ContainsGotoPackagePrivate.java:4"));
     }
 
+    @Test
+    public void gsonSourceJar() {
+        var file = "/org/javacs/example/GotoGuava.java";
+        assertThat(doGoto(file, 7, 15, false), hasItem("Gson.java:105"));
+    }
+
     private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
 
     private List<String> doGoto(String file, int row, int column) {
@@ -206,7 +214,7 @@ public class GotoTest {
         var locations = server.gotoDefinition(p).orElse(List.of());
         var strings = new ArrayList<String>();
         for (var l : locations) {
-            var fileName = Paths.get(l.uri).getFileName();
+            var fileName = path(l.uri).getFileName();
             var start = l.range.start;
             if (includeColumn) {
                 strings.add(String.format("%s:%d,%d", fileName, start.line + 1, start.character + 1));
@@ -215,5 +223,16 @@ public class GotoTest {
             }
         }
         return strings;
+    }
+
+    private Path path(URI uri) {
+        switch (uri.getScheme()) {
+            case "file":
+                return Paths.get(uri);
+            case "jar":
+                return Paths.get(uri.getSchemeSpecificPart().substring("file://".length()));
+            default:
+                throw new RuntimeException("Don't know what to do with " + uri.getScheme());
+        }
     }
 }

@@ -61,7 +61,7 @@ class CompileBatch implements AutoCloseable {
         var addFiles = new HashSet<Path>();
         for (var err : parent.diags) {
             if (!err.getCode().equals("compiler.err.cant.resolve.location")) continue;
-            if (!isValid(err)) continue;
+            if (!isValidFileRange(err)) continue;
             var className = errorText(err);
             var packageName = packageName(err);
             var location = findPackagePrivateClass(packageName, className);
@@ -153,7 +153,7 @@ class CompileBatch implements AutoCloseable {
             if (source == null) continue;
             var path = Paths.get(source.toUri());
             if (!file.equals(path)) continue;
-            if (!isValid(d)) continue;
+            if (!isValidFileRange(d)) continue;
             diags.add(lspDiagnostic(d, root.getLineMap()));
         }
         // Check for unused privates
@@ -169,8 +169,8 @@ class CompileBatch implements AutoCloseable {
         return diags;
     }
 
-    private boolean isValid(javax.tools.Diagnostic<? extends JavaFileObject> d) {
-        return d.getStartPosition() >= 0 && d.getEndPosition() >= 0;
+    private boolean isValidFileRange(javax.tools.Diagnostic<? extends JavaFileObject> d) {
+        return d.getSource().toUri().getScheme().equals("file") && d.getStartPosition() >= 0 && d.getEndPosition() >= 0;
     }
 
     /**
@@ -309,9 +309,12 @@ class CompileBatch implements AutoCloseable {
     }
 
     Range range(TreePath path) {
-        var file = Paths.get(path.getCompilationUnit().getSourceFile().toUri());
-        var contents = FileStore.contents(file);
-        return Parser.range(borrow.task, contents, path);
+        try {
+            var contents = path.getCompilationUnit().getSourceFile().getCharContent(true);
+            return Parser.range(borrow.task, contents, path);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     SourcePositions sourcePositions() {

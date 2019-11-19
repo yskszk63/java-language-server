@@ -3,10 +3,11 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as Path from "path";
 import * as FS from "fs";
-import {window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, debug, DebugConfiguration, Range, Position, TextDocument} from 'vscode';
+import {window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, debug, DebugConfiguration, Range, Position, TextDocument, TextDocumentContentProvider, CancellationToken, ProviderResult} from 'vscode';
 import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType} from "vscode-languageclient";
 import {activateTreeSitter} from './treeSitter';
 import {decoration} from './textMate';
+import * as AdmZip from 'adm-zip';
 
 // If we want to profile using VisualVM, we have to run the language server using regular java, not jlink
 const visualVm = false;
@@ -14,6 +15,9 @@ const visualVm = false;
 /** Called when extension is activated */
 export function activate(context: ExtensionContext) {
     console.log('Activating Java');
+
+    // Teach VSCode to open JAR files
+    workspace.registerTextDocumentContentProvider('jar', new JarFileSystemProvider());
     
     // Options to control the language client
     let clientOptions: LanguageClientOptions = {
@@ -107,6 +111,32 @@ export function activate(context: ExtensionContext) {
     });
 	
 	activateTreeSitter(context);
+}
+
+// Allows VSCode to open files like jar:file:///path/to/dep.jar!/com/foo/Thing.java
+class JarFileSystemProvider implements TextDocumentContentProvider {
+    private cache = new Map<string, AdmZip>();
+    provideTextDocumentContent(uri: Uri, _token: CancellationToken): ProviderResult<string> {
+        const {zip, file} = this.splitZipUri(uri);
+        return this.readZip(zip, file);
+    }
+    private splitZipUri(uri: Uri): {zip: string, file: string} {
+        const path = uri.fsPath.substring("file://".length);
+        const [zip, file] = path.split('!/');
+        return {zip, file};
+    }
+    private readZip(zip: string, file: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            try {
+                if (!this.cache.has(zip)) {
+                    this.cache.set(zip, new AdmZip(zip));
+                }
+                this.cache.get(zip).readAsTextAsync(file, resolve);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
 }
 
 // this method is called when your extension is deactivated
