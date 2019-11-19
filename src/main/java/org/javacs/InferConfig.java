@@ -102,8 +102,7 @@ class InferConfig {
 
         // Bazel
         if (Files.exists(workspaceRoot.resolve("WORKSPACE"))) {
-            return bazelDeps("srcjar");
-            // TODO proto source jars
+            return bazelSourcepath();
         }
 
         return Collections.emptySet();
@@ -239,52 +238,80 @@ class InferConfig {
     }
 
     private Set<Path> bazelClasspath() {
+        var absolute = new HashSet<Path>();
+        for (var relative : bazelAQuery("Javac", "--classpath")) {
+            absolute.add(workspaceRoot.resolve(relative));
+        }
+        return absolute;
+    }
+
+    private Set<Path> bazelSourcepath() {
+        var absolute = new HashSet<Path>();
+        var outputBase = bazelOutputBase();
+        for (var relative : bazelAQuery("JavaSourceJar", "--sources")) {
+            absolute.add(outputBase.resolve(relative));
+        }
+        return absolute;
+    }
+
+    private Path bazelOutputBase() {
+        // Run bazel as a subprocess
+        String[] command = {
+            "bazel", "info", "output_base",
+        };
+        var output = fork(command);
+        if (output == NOT_FOUND) {
+            return NOT_FOUND;
+        }
+        // Read output
         try {
-            // Run bazel as a subprocess
-            String[] command = {
-                "bazel",
-                "aquery",
-                "--output=proto",
-                "mnemonic(Javac, kind(java_library, ...) union kind(java_test, ...) union kind(java_binary, ...))"
-            };
-            var output = Files.createTempFile("java-language-server-bazel-output", ".txt");
-            LOG.info("Running " + String.join(" ", command) + " ...");
-            var process =
-                    new ProcessBuilder()
-                            .command(command)
-                            .directory(workspaceRoot.toFile())
-                            .redirectError(ProcessBuilder.Redirect.INHERIT)
-                            .redirectOutput(output.toFile())
-                            .start();
-            // Wait for process to exit
-            var result = process.waitFor();
-            if (result != 0) {
-                LOG.severe("`" + String.join(" ", command) + "` returned " + result);
-                return Set.of();
-            }
-            // Read output
+            var out = Files.readString(output).trim();
+            return Paths.get(out);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private Set<String> bazelAQuery(String filterMnemonic, String filterArgument) {
+        String[] command = {
+            "bazel",
+            "aquery",
+            "--output=proto",
+            "mnemonic("
+                    + filterMnemonic
+                    + ", kind(java_library, ...) union kind(java_test, ...) union kind(java_binary, ...))"
+        };
+        var output = fork(command);
+        if (output == NOT_FOUND) {
+            return Set.of();
+        }
+        return readActionGraph(output, filterArgument);
+    }
+
+    private Set<String> readActionGraph(Path output, String filterArgument) {
+        try {
             var container = AnalysisProtos.ActionGraphContainer.parseFrom(Files.newInputStream(output));
             var argumentPaths = new HashSet<String>();
             var outputIds = new HashSet<String>();
             for (var action : container.getActionsList()) {
-                var isClasspath = false;
+                var isFilterArgument = false;
                 for (var argument : action.getArgumentsList()) {
-                    if (isClasspath && argument.startsWith("-")) {
-                        isClasspath = false;
+                    if (isFilterArgument && argument.startsWith("-")) {
+                        isFilterArgument = false;
                         continue;
                     }
-                    if (!isClasspath) {
-                        isClasspath = argument.equals("--classpath");
+                    if (!isFilterArgument) {
+                        isFilterArgument = argument.equals(filterArgument);
                         continue;
                     }
                     argumentPaths.add(argument);
                 }
                 outputIds.addAll(action.getOutputIdsList());
             }
-            var classpath = new HashSet<Path>();
+            var artifactPaths = new HashSet<String>();
             for (var artifact : container.getArtifactsList()) {
                 if (!argumentPaths.contains(artifact.getExecPath())) {
-                    // artifact is not on the classpath
+                    // artifact was not specified by --filterArgument
                     continue;
                 }
                 if (outputIds.contains(artifact.getId())) {
@@ -292,23 +319,19 @@ class InferConfig {
                     continue;
                 }
                 var relative = artifact.getExecPath();
-                var absolute = workspaceRoot.resolve(relative);
                 LOG.info("...found bazel dependency " + relative);
-                classpath.add(absolute);
+                artifactPaths.add(relative);
             }
-            return classpath;
-        } catch (InterruptedException | IOException e) {
+            return artifactPaths;
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private Set<Path> bazelDeps(String labelsFilter) {
+    private Path fork(String[] command) {
         try {
-            // Run bazel as a subprocess
-            var query = "labels(" + labelsFilter + ", deps(...))";
-            String[] command = {"bazel", "query", query, "--output", "location"};
-            var output = Files.createTempFile("java-language-server-bazel-output", ".txt");
             LOG.info("Running " + String.join(" ", command) + " ...");
+            var output = Files.createTempFile("java-language-server-bazel-output", ".proto");
             var process =
                     new ProcessBuilder()
                             .command(command)
@@ -320,40 +343,13 @@ class InferConfig {
             var result = process.waitFor();
             if (result != 0) {
                 LOG.severe("`" + String.join(" ", command) + "` returned " + result);
-                return Set.of();
+                return NOT_FOUND;
             }
-            // Read output
-            var dependencies = new HashSet<Path>();
-            for (var line : Files.readAllLines(output)) {
-                var jar = findBazelJar(line);
-                if (jar != NOT_FOUND) {
-                    dependencies.add(jar);
-                }
-            }
-            return dependencies;
+            return output;
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    // Example:
-    // /private/var/tmp/_bazel_georgefraser/33b8fb8944a241143eca3ae505600d73/external/com_fasterxml_jackson_datatype_jackson_datatype_jdk8/jar/BUILD:6:12: source file @com_fasterxml_jackson_datatype_jackson_datatype_jdk8//jar:jackson-datatype-jdk8-2.9.8.jar
-    private static final Pattern LOCATION = Pattern.compile("(.*):\\d+:\\d+: source file @(.*)//jar:(.*\\.jar)");
     private static final Path NOT_FOUND = Paths.get("");
-
-    private Path findBazelJar(String line) {
-        var matcher = LOCATION.matcher(line);
-        if (!matcher.matches()) {
-            LOG.warning(line + " does not look like a jar dependency");
-            return NOT_FOUND;
-        }
-        var build = matcher.group(1);
-        var jar = matcher.group(3);
-        var path = Paths.get(build).getParent().resolve(jar);
-        if (!Files.exists(path)) {
-            LOG.warning(path + " does not exist");
-            return NOT_FOUND;
-        }
-        return path;
-    }
 }
