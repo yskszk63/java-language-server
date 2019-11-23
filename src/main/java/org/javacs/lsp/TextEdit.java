@@ -10,4 +10,9 @@ public class TextEdit {
         this.range = range;
         this.newText = newText;
     }
+
+    @Override
+    public String toString() {
+        return range + "/" + newText;
+    }
 }

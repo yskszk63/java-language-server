@@ -122,21 +122,21 @@ class JavaCompilerService implements CompilerProvider {
         return result;
     }
 
-    private static final Pattern PACKAGE_EXTRACTOR = Pattern.compile("^([a-z]\\.)*");
+    private static final Pattern PACKAGE_EXTRACTOR = Pattern.compile("^([a-z][_a-zA-Z0-9]*\\.)*[a-z][_a-zA-Z0-9]*");
 
     private String packageName(String className) {
         var m = PACKAGE_EXTRACTOR.matcher(className);
-        if (m.matches()) {
+        if (m.find()) {
             return m.group();
         }
         return "";
     }
 
-    private static final Pattern CLASS_EXTRACTOR = Pattern.compile("\\w+$");
+    private static final Pattern CLASS_EXTRACTOR = Pattern.compile("[A-Z][_a-zA-Z0-9]*$");
 
     private String className(String className) {
         var m = CLASS_EXTRACTOR.matcher(className);
-        if (m.matches()) {
+        if (m.find()) {
             return m.group();
         }
         return "";

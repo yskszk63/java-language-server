@@ -10,5 +10,10 @@ public class Range {
         this.end = end;
     }
 
+    @Override
+    public String toString() {
+        return start + "-" + end;
+    }
+
     public static final Range NONE = new Range(Position.NONE, Position.NONE);
 }

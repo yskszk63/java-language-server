@@ -11,5 +11,10 @@ public class Position {
         this.character = character;
     }
 
+    @Override
+    public String toString() {
+        return line + "," + character;
+    }
+
     public static final Position NONE = new Position(-1, -1);
 }

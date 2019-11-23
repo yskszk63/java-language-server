@@ -12,6 +12,8 @@
 - `Thing#close()` shows 0 references for `try (thing)`
 - Changing `class Foo {}` to `static class Foo {}` doesn't fix "non-static variables this" in `static void test() { new Foo() }`
 - Fields don't show up in debugger
+- Debugger doesn't print arrays nicely
+- instanceof doesn't autocomplete
 
 ## Optimizations
 - Compilation is very slow in the presence of lots of errors
@@ -21,6 +23,7 @@
 # Features
 - Autocomplete new method name based on "no such method" errors.
 - Search for methods in source and deps based on return type, parameters
+- "Find implementations" code lens on interfaces
 
 ## Refactorings
 - Quick fixes

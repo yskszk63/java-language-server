@@ -3,7 +3,6 @@ package org.javacs.rewrite;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.Trees;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 import org.javacs.lsp.TextEdit;
@@ -35,7 +34,7 @@ class RenameVariable implements Rewrite {
                 return CANCELLED;
             }
             var rename = trees.getPath(root, found);
-            var edits = new RenameHelper(compile.task).rename(List.of(root), rename, newName);
+            var edits = new RenameHelper(compile.task).renameVariable(root, rename, newName);
             return Map.of(file, edits);
         }
     }
