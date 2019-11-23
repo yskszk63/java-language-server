@@ -1,17 +1,18 @@
 package org.javacs.rewrite;
 
-import com.sun.source.util.JavacTask;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public interface CompilerProvider {
-    Path findClass(String className);
+    Path findTypeDeclaration(String className);
 
-    Path[] findReferences(String className);
+    Path[] findTypeReferences(String className);
 
-    JavacTask parse(Path file);
+    Path[] findMemberReferences(String className, String memberName);
 
-    JavacTask compile(Path[] files);
+    ParseTask parse(Path file);
+
+    CompileTask compile(Path... files);
 
     Path NOT_FOUND = Paths.get("");
 }

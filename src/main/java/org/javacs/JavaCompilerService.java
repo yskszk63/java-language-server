@@ -4,11 +4,13 @@ import java.io.File;
 import java.nio.file.*;
 import java.util.*;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.tools.*;
 import org.javacs.lsp.SymbolInformation;
+import org.javacs.rewrite.*;
 
-class JavaCompilerService {
+class JavaCompilerService implements CompilerProvider {
     // Not modifiable! If you want to edit these, you need to create a new instance
     final Set<Path> classPath, docPath;
     final Set<String> addExports;
@@ -118,6 +120,115 @@ class JavaCompilerService {
         LOG.info(String.format("Found %d matches in %d/%d/%d files", result.size(), checked, parsed, files.size()));
 
         return result;
+    }
+
+    private static final Pattern PACKAGE_EXTRACTOR = Pattern.compile("^([a-z]\\.)*");
+
+    private String packageName(String className) {
+        var m = PACKAGE_EXTRACTOR.matcher(className);
+        if (m.matches()) {
+            return m.group();
+        }
+        return "";
+    }
+
+    private static final Pattern CLASS_EXTRACTOR = Pattern.compile("\\w+$");
+
+    private String className(String className) {
+        var m = CLASS_EXTRACTOR.matcher(className);
+        if (m.matches()) {
+            return m.group();
+        }
+        return "";
+    }
+
+    private static final Cache<String, Boolean> cacheContainsWord = new Cache<>();
+
+    private boolean containsWord(Path file, String word) {
+        if (cacheContainsWord.needs(file, word)) {
+            cacheContainsWord.load(file, word, StringSearch.containsWord(file, word));
+        }
+        return cacheContainsWord.get(file, word);
+    }
+
+    private static final Cache<Void, List<String>> cacheContainsType = new Cache<>();
+
+    private boolean containsType(Path file, String simpleName) {
+        if (cacheContainsType.needs(file, null)) {
+            var root = parse(file).root;
+            var types = new ArrayList<String>();
+            new FindTypeDeclarations().scan(root, types);
+            cacheContainsType.load(file, null, types);
+        }
+        return cacheContainsType.get(file, null).contains(simpleName);
+    }
+
+    private static final Cache<Void, List<String>> cacheContainsImport = new Cache<>();
+
+    private boolean containsImport(Path file, String className) {
+        if (cacheContainsImport.needs(file, null)) {
+            var root = parse(file).root;
+            var types = new ArrayList<String>();
+            new FindImports().scan(root, types);
+            cacheContainsImport.load(file, null, types);
+        }
+        var star = packageName(className) + ".*";
+        for (var i : cacheContainsImport.get(file, null)) {
+            if (i.equals(className) || i.equals(star)) return true;
+        }
+        return false;
+    }
+
+    @Override
+    public Path findTypeDeclaration(String className) {
+        var packageName = packageName(className);
+        var simpleName = className(className);
+        for (var f : FileStore.list(packageName)) {
+            if (containsWord(f, simpleName) && containsType(f, simpleName)) {
+                return f;
+            }
+        }
+        return NOT_FOUND;
+    }
+
+    @Override
+    public Path[] findTypeReferences(String className) {
+        var packageName = packageName(className);
+        var candidates = new ArrayList<Path>();
+        for (var f : FileStore.all()) {
+            if (containsWord(f, packageName) && containsImport(f, className)) {
+                candidates.add(f);
+            }
+        }
+        return candidates.toArray(new Path[candidates.size()]);
+    }
+
+    @Override
+    public Path[] findMemberReferences(String className, String memberName) {
+        var packageName = packageName(className);
+        var candidates = new ArrayList<Path>();
+        for (var f : FileStore.all()) {
+            if (containsWord(f, packageName) && containsImport(f, className) && containsWord(f, memberName)) {
+                candidates.add(f);
+            }
+        }
+        return candidates.toArray(new Path[candidates.size()]);
+    }
+
+    @Override
+    public ParseTask parse(Path file) {
+        var parser = Parser.parseFile(file);
+        return new ParseTask(parser.task, parser.root);
+    }
+
+    @Override
+    public CompileTask compile(Path... files) {
+        var sources = new ArrayList<JavaFileObject>();
+        for (var f : files) {
+            sources.add(new SourceFileObject(f));
+        }
+        var compile = compileBatch(sources);
+        return new CompileTask(compile.task, compile.roots, compile::close);
     }
 
     private static final Logger LOG = Logger.getLogger("main");

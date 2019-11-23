@@ -20,6 +20,7 @@
 
 # Features
 - Autocomplete new method name based on "no such method" errors.
+- Search for methods in source and deps based on return type, parameters
 
 ## Refactorings
 - Quick fixes

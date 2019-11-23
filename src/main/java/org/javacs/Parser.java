@@ -26,7 +26,7 @@ class Parser {
     }
 
     final String contents;
-    private final JavacTask task;
+    final JavacTask task;
     final CompilationUnitTree root;
     final Trees trees;
 
