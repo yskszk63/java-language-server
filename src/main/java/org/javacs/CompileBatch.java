@@ -5,6 +5,7 @@ import com.sun.source.doctree.DocTree;
 import com.sun.source.doctree.ParamTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -13,6 +14,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
@@ -109,8 +111,42 @@ class CompileBatch implements AutoCloseable {
     private static ReusableCompiler.Borrow batchTask(
             JavaCompilerService parent, Collection<? extends JavaFileObject> sources) {
         parent.diags.clear();
-        var options = JavaCompilerService.options(parent.classPath, parent.addExports);
+        var options = options(parent.classPath, parent.addExports);
         return parent.compiler.getTask(null, parent.fileManager, parent.diags::add, options, List.of(), sources);
+    }
+
+    /** Combine source path or class path entries using the system separator, for example ':' in unix */
+    private static String joinPath(Collection<Path> classOrSourcePath) {
+        return classOrSourcePath.stream().map(p -> p.toString()).collect(Collectors.joining(File.pathSeparator));
+    }
+
+    private static List<String> options(Set<Path> classPath, Set<String> addExports) {
+        var list = new ArrayList<String>();
+
+        Collections.addAll(list, "-classpath", joinPath(classPath));
+        Collections.addAll(list, "--add-modules", "ALL-MODULE-PATH");
+        // Collections.addAll(list, "-verbose");
+        Collections.addAll(list, "-proc:none");
+        Collections.addAll(list, "-g");
+        // You would think we could do -Xlint:all,
+        // but some lints trigger fatal errors in the presence of parse errors
+        Collections.addAll(
+                list,
+                "-Xlint:cast",
+                "-Xlint:deprecation",
+                "-Xlint:empty",
+                "-Xlint:fallthrough",
+                "-Xlint:finally",
+                "-Xlint:path",
+                "-Xlint:unchecked",
+                "-Xlint:varargs",
+                "-Xlint:static");
+        for (var export : addExports) {
+            list.add("--add-exports");
+            list.add(export + "=ALL-UNNAMED");
+        }
+
+        return list;
     }
 
     CompilationUnitTree root(Path file) {
@@ -559,7 +595,7 @@ class CompileBatch implements AutoCloseable {
     private boolean addSignatureDocs(ExecutableElement e, SignatureInformation sig) {
         // Find the file that contains e
         var ptr = new Ptr(e);
-        var file = parent.docs().find(ptr);
+        var file = parent.docs.find(ptr);
         if (!file.isPresent()) return false;
         var parse = Parser.parseJavaFileObject(file.get());
         // Find the tree

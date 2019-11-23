@@ -462,7 +462,7 @@ class JavaLanguageServer extends LanguageServer {
         LOG.info(String.format("Find docs for `%s`...", ptr));
 
         // Find el in the doc path
-        var file = compiler().docs().find(ptr);
+        var file = compiler().docs.find(ptr);
         if (!file.isPresent()) return Optional.empty();
         // Parse file and find el
         var parse = Parser.parseJavaFileObject(file.get());
@@ -479,7 +479,7 @@ class JavaLanguageServer extends LanguageServer {
 
         // TODO find and parse happens twice
         // Find method in the doc path
-        var file = compiler().docs().find(ptr);
+        var file = compiler().docs.find(ptr);
         if (!file.isPresent()) return Optional.empty();
         // Parse file and find method
         var parse = Parser.parseJavaFileObject(file.get());
@@ -580,7 +580,7 @@ class JavaLanguageServer extends LanguageServer {
 
     private String hoverDocs(Element e) {
         var ptr = new Ptr(e);
-        var file = compiler().docs().find(ptr);
+        var file = compiler().docs.find(ptr);
         if (!file.isPresent()) return "";
         var parse = Parser.parseJavaFileObject(file.get());
         var path = parse.fuzzyFind(ptr);
@@ -1032,6 +1032,7 @@ class JavaLanguageServer extends LanguageServer {
             case LOCAL_VARIABLE:
                 return true;
             default:
+                // TODO rename other types
                 return false;
         }
     }
