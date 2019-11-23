@@ -26,12 +26,23 @@ public class RewriteTest {
     }
 
     @Test
-    public void renameMethod() {
-        var file = file("TestRenameMethod.java");
-        var edits =
-                new RenameMethod("org.javacs.rewrite.TestRenameMethod", "foo", new String[] {}, "bar")
-                        .rewrite(compiler);
+    public void renameField() {
+        var className = "org.javacs.rewrite.TestRenameField";
+        var fieldName = "foo";
+        var renamer = new RenameField(className, fieldName, "bar");
+        var edits = renamer.rewrite(compiler);
         assertThat(edits.keySet(), hasSize(1));
-        assertThat(edits, hasKey(file));
+        assertThat(edits, hasKey(file("TestRenameField.java")));
+    }
+
+    @Test
+    public void renameMethod() {
+        var className = "org.javacs.rewrite.TestRenameMethod";
+        var methodName = "foo";
+        String[] erasedParameterTypes = {};
+        var renamer = new RenameMethod(className, methodName, erasedParameterTypes, "bar");
+        var edits = renamer.rewrite(compiler);
+        assertThat(edits.keySet(), hasSize(1));
+        assertThat(edits, hasKey(file("TestRenameMethod.java")));
     }
 }

@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.util.Types;
 import org.javacs.lsp.Position;
 import org.javacs.lsp.Range;
@@ -55,6 +56,19 @@ class RenameHelper {
         return allEdits;
     }
 
+    Map<Path, TextEdit[]> renameField(
+            List<CompilationUnitTree> roots, String className, String fieldName, String newName) {
+        var allEdits = new HashMap<Path, TextEdit[]>();
+        for (var root : roots) {
+            var file = Paths.get(root.getSourceFile().toUri());
+            var references = findFieldReferences(root, className, fieldName);
+            if (references.isEmpty()) continue;
+            var fileEdits = replaceAll(references, newName);
+            allEdits.put(file, fileEdits);
+        }
+        return allEdits;
+    }
+
     private List<TreePath> findVariableReferences(CompilationUnitTree root, Element target) {
         var found = new ArrayList<TreePath>();
         Consumer<TreePath> forEach =
@@ -66,6 +80,29 @@ class RenameHelper {
                 };
         new FindReferences().scan(root, forEach);
         return found;
+    }
+
+    private List<TreePath> findFieldReferences(CompilationUnitTree root, String className, String fieldName) {
+        var found = new ArrayList<TreePath>();
+        Consumer<TreePath> forEach =
+                path -> {
+                    if (isFieldReference(path, className, fieldName)) {
+                        found.add(path);
+                    }
+                };
+        new FindFieldReferences().scan(root, forEach);
+        return found;
+    }
+
+    private boolean isFieldReference(TreePath path, String className, String fieldName) {
+        var candidate = trees.getElement(path);
+        if (!(candidate instanceof VariableElement)) return false;
+        var variable = (VariableElement) candidate;
+        if (!variable.getSimpleName().contentEquals(fieldName)) return false;
+        if (!(variable.getEnclosingElement() instanceof TypeElement)) return false;
+        var parent = (TypeElement) variable.getEnclosingElement();
+        if (!parent.getQualifiedName().contentEquals(className)) return false;
+        return true;
     }
 
     private List<TreePath> findMethodReferences(
