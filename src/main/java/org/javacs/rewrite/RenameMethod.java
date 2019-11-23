@@ -5,12 +5,12 @@ import java.util.Map;
 import java.util.logging.Logger;
 import org.javacs.lsp.TextEdit;
 
-class RenameMethod implements Rewrite {
+public class RenameMethod implements Rewrite {
     final String className, methodName;
     final String[] erasedParameterTypes;
     final String newName;
 
-    RenameMethod(String className, String methodName, String[] erasedParameterTypes, String newName) {
+    public RenameMethod(String className, String methodName, String[] erasedParameterTypes, String newName) {
         this.className = className;
         this.methodName = methodName;
         this.erasedParameterTypes = erasedParameterTypes;

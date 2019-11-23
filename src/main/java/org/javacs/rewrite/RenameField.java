@@ -5,10 +5,10 @@ import java.util.Map;
 import java.util.logging.Logger;
 import org.javacs.lsp.TextEdit;
 
-class RenameField implements Rewrite {
+public class RenameField implements Rewrite {
     final String className, fieldName, newName;
 
-    RenameField(String className, String fieldName, String newName) {
+    public RenameField(String className, String fieldName, String newName) {
         this.className = className;
         this.fieldName = fieldName;
         this.newName = newName;

@@ -7,12 +7,12 @@ import java.util.Map;
 import java.util.function.Predicate;
 import org.javacs.lsp.TextEdit;
 
-class RenameVariable implements Rewrite {
+public class RenameVariable implements Rewrite {
     final Path file;
     final int position;
     final String newName;
 
-    RenameVariable(Path file, int position, String newName) {
+    public RenameVariable(Path file, int position, String newName) {
         this.file = file;
         this.position = position;
         this.newName = newName;

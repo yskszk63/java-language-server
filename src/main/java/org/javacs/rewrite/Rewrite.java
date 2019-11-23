@@ -9,4 +9,6 @@ public interface Rewrite {
     Map<Path, TextEdit[]> rewrite(CompilerProvider compiler);
     /** CANCELLED signals that the rewrite couldn't be completed. */
     Map<Path, TextEdit[]> CANCELLED = Map.of();
+
+    Rewrite NOT_SUPPORTED = new RewriteNotSupported();
 }

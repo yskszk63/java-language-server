@@ -12,6 +12,7 @@ import javax.lang.model.element.*;
 import javax.lang.model.type.TypeKind;
 import javax.tools.JavaFileObject;
 import org.javacs.lsp.*;
+import org.javacs.rewrite.*;
 
 class JavaLanguageServer extends LanguageServer {
     // TODO allow multiple workspace roots
@@ -179,6 +180,9 @@ class JavaLanguageServer extends LanguageServer {
         c.add("codeLensProvider", codeLensOptions);
         c.addProperty("foldingRangeProvider", true);
         c.addProperty("codeActionProvider", true);
+        var renameOptions = new JsonObject();
+        renameOptions.addProperty("prepareProvider", true);
+        c.add("renameProvider", renameOptions);
 
         return new InitializeResult(c);
     }
@@ -992,13 +996,101 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     @Override
-    public Optional<RenameResponse> prepareRename(TextDocumentPositionParams _params) {
-        throw new RuntimeException("TODO");
+    public Optional<RenameResponse> prepareRename(TextDocumentPositionParams params) {
+        if (!FileStore.isJavaFile(params.textDocument.uri)) return Optional.empty();
+        LOG.info("Try to rename...");
+        var file = Paths.get(params.textDocument.uri);
+        try (var compile = compiler().compileBatch(List.of(new SourceFileObject(file)))) {
+            var lines = compile.root(file).getLineMap();
+            var position = lines.getPosition(params.position.line + 1, params.position.character + 1);
+            var path = compile.findPath(file, position);
+            var el = compile.element(path);
+            if (el.isEmpty()) {
+                LOG.info("...no element under cursor");
+                return Optional.empty();
+            }
+            if (!canRename(el.get())) {
+                LOG.info("...can't rename " + el.get());
+                return Optional.empty();
+            }
+            var toFile = findElement(el.get());
+            if (toFile.isEmpty()) {
+                LOG.info("...can't find source for " + el.get());
+                return Optional.empty();
+            }
+            var response = new RenameResponse();
+            response.range = compile.range(path);
+            response.placeholder = el.get().getSimpleName().toString();
+            return Optional.of(response);
+        }
+    }
+
+    private boolean canRename(Element rename) {
+        switch (rename.getKind()) {
+            case METHOD:
+            case FIELD:
+            case LOCAL_VARIABLE:
+                return true;
+            default:
+                return false;
+        }
     }
 
     @Override
-    public WorkspaceEdit rename(RenameParams _params) {
-        throw new RuntimeException("TODO");
+    public WorkspaceEdit rename(RenameParams params) {
+        var rw = createRewrite(params);
+        var response = new WorkspaceEdit();
+        var map = rw.rewrite(compiler());
+        for (var editedFile : map.keySet()) {
+            response.changes.put(editedFile.toUri(), List.of(map.get(editedFile)));
+        }
+        return response;
+    }
+
+    private Rewrite createRewrite(RenameParams params) {
+        var file = Paths.get(params.textDocument.uri);
+        try (var compile = compiler().compileBatch(List.of(new SourceFileObject(file)))) {
+            var lines = compile.root(file).getLineMap();
+            var position = lines.getPosition(params.position.line + 1, params.position.character + 1);
+            var path = compile.findPath(file, position);
+            var el = compile.element(path).get();
+            switch (el.getKind()) {
+                case METHOD:
+                    return renameMethod(compile, (ExecutableElement) el, params.newName);
+                case FIELD:
+                    return renameField(compile, (VariableElement) el, params.newName);
+                case LOCAL_VARIABLE:
+                    return renameVariable(compile, (VariableElement) el, params.newName);
+                default:
+                    return Rewrite.NOT_SUPPORTED;
+            }
+        }
+    }
+
+    private RenameMethod renameMethod(CompileBatch compile, ExecutableElement method, String newName) {
+        var parent = (TypeElement) method.getEnclosingElement();
+        var className = parent.getQualifiedName().toString();
+        var methodName = method.getSimpleName().toString();
+        var erasedParameterTypes = new String[method.getParameters().size()];
+        for (var i = 0; i < erasedParameterTypes.length; i++) {
+            var type = method.getParameters().get(i).asType();
+            erasedParameterTypes[i] = compile.types.erasure(type).toString();
+        }
+        return new RenameMethod(className, methodName, erasedParameterTypes, newName);
+    }
+
+    private RenameField renameField(CompileBatch compile, VariableElement field, String newName) {
+        var parent = (TypeElement) field.getEnclosingElement();
+        var className = parent.getQualifiedName().toString();
+        var fieldName = field.getSimpleName().toString();
+        return new RenameField(className, fieldName, newName);
+    }
+
+    private RenameVariable renameVariable(CompileBatch compile, VariableElement variable, String newName) {
+        var path = compile.trees.getPath(variable);
+        var file = Paths.get(path.getCompilationUnit().getSourceFile().toUri());
+        var position = compile.sourcePositions().getStartPosition(path.getCompilationUnit(), path.getLeaf());
+        return new RenameVariable(file, (int) position, newName);
     }
 
     private boolean uncheckedChanges = false;

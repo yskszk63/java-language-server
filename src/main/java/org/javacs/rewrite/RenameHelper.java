@@ -1,6 +1,8 @@
 package org.javacs.rewrite;
 
 import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.tree.MemberReferenceTree;
+import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.JavacTask;
@@ -155,11 +157,24 @@ class RenameHelper {
                 startPos = findName(root, startPos, method.getName());
                 endPos = startPos + method.getName().length();
             }
+            if (f.getLeaf() instanceof MemberReferenceTree) {
+                var select = (MemberReferenceTree) f.getLeaf();
+                startPos = pos.getEndPosition(root, select.getQualifierExpression());
+                startPos = findName(root, startPos, select.getName());
+                endPos = startPos + select.getName().length();
+            }
+            if (f.getLeaf() instanceof MemberSelectTree) {
+                var select = (MemberSelectTree) f.getLeaf();
+                startPos = pos.getEndPosition(root, select.getExpression());
+                startPos = findName(root, startPos, select.getIdentifier());
+                endPos = startPos + select.getIdentifier().length();
+            }
             var startLine = (int) lines.getLineNumber(startPos);
             var startColumn = (int) lines.getColumnNumber(startPos);
             var endLine = (int) lines.getLineNumber(endPos);
             var endColumn = (int) lines.getColumnNumber(endPos);
-            var range = new Range(new Position(startLine, startColumn), new Position(endLine, endColumn));
+            var range =
+                    new Range(new Position(startLine - 1, startColumn - 1), new Position(endLine - 1, endColumn - 1));
             edits[i++] = new TextEdit(range, newName);
         }
         return edits;
