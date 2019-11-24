@@ -907,64 +907,19 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public List<TextEdit> formatting(DocumentFormattingParams params) {
+        var edits = new ArrayList<TextEdit>();
         var file = Paths.get(params.textDocument.uri);
+        var fixImports = new AutoFixImports(file).rewrite(compiler()).get(file);
+        for (var e : fixImports) {
+            edits.add(e);
+        }
         var sources = Set.of(new SourceFileObject(file));
         try (var compile = compiler().compileBatch(sources)) {
-            var edits = new ArrayList<TextEdit>();
-            edits.addAll(fixImports(compile, file));
             edits.addAll(addOverrides(compile, file));
             // TODO replace var with type name when vars are copy-pasted into fields
             // TODO replace ThisClass.staticMethod() with staticMethod() when ThisClass is useless
             return edits;
         }
-    }
-
-    private List<TextEdit> fixImports(CompileBatch compile, Path file) {
-        // TODO if imports already match fixed-imports, return empty list
-        // TODO preserve comments and other details of existing imports
-        var imports = compile.fixImports(file);
-        var pos = compile.sourcePositions();
-        var lines = compile.lineMap(file);
-        var edits = new ArrayList<TextEdit>();
-        // Delete all existing imports
-        for (var i : compile.imports(file)) {
-            if (!i.isStatic()) {
-                var offset = pos.getStartPosition(compile.root(file), i);
-                var line = (int) lines.getLineNumber(offset) - 1;
-                var delete = new TextEdit(new Range(new Position(line, 0), new Position(line + 1, 0)), "");
-                edits.add(delete);
-            }
-        }
-        if (imports.isEmpty()) return edits;
-        // Find a place to insert the new imports
-        long insertLine = -1;
-        var insertText = new StringBuilder();
-        // If there are imports, use the start of the first import as the insert position
-        for (var i : compile.imports(file)) {
-            if (!i.isStatic() && insertLine == -1) {
-                long offset = pos.getStartPosition(compile.root(file), i);
-                insertLine = lines.getLineNumber(offset) - 1;
-            }
-        }
-        // If there are no imports, insert after the package declaration
-        if (insertLine == -1 && compile.root(file).getPackageName() != null) {
-            long offset = pos.getEndPosition(compile.root(file), compile.root(file).getPackageName());
-            insertLine = lines.getLineNumber(offset);
-            insertText.append("\n");
-        }
-        // If there are no imports and no package, insert at the top of the file
-        if (insertLine == -1) {
-            insertLine = 0;
-        }
-        // Insert each import
-        for (var i : imports) {
-            insertText.append("import ").append(i).append(";\n");
-        }
-        var insertPosition = new Position((int) insertLine, 0);
-        var insert = new TextEdit(new Range(insertPosition, insertPosition), insertText.toString());
-        edits.add(insert);
-
-        return edits;
     }
 
     private List<TextEdit> addOverrides(CompileBatch compile, Path file) {

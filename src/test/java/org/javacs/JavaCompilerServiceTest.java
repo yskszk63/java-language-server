@@ -53,27 +53,6 @@ public class JavaCompilerServiceTest {
     }
 
     @Test
-    public void fixImports() {
-        var file = resourceFile("MissingImport.java");
-        var qualifiedNames = compiler.compileBatch(Set.of(new SourceFileObject(file))).fixImports(file);
-        assertThat(qualifiedNames, hasItem("java.util.List"));
-    }
-
-    @Test
-    public void ignoreStaticImport() {
-        var file = resourceFile("StaticImport.java");
-        var qualifiedNames = compiler.compileBatch(Set.of(new SourceFileObject(file))).fixImports(file);
-        assertThat(qualifiedNames, not(hasItem("java.util.Arrays.asList")));
-    }
-
-    @Test
-    public void dontImportEnum() {
-        var file = resourceFile("DontImportEnum.java");
-        var qualifiedNames = compiler.compileBatch(Set.of(new SourceFileObject(file))).fixImports(file);
-        assertThat(qualifiedNames, contains("java.nio.file.AccessMode", "java.util.ArrayList"));
-    }
-
-    @Test
     public void matchesPartialName() {
         assertTrue(StringSearch.matchesPartialName("foobar", "foo"));
         assertFalse(StringSearch.matchesPartialName("foo", "foobar"));

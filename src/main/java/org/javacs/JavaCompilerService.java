@@ -1,5 +1,6 @@
 package org.javacs;
 
+import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 import java.util.logging.Logger;
@@ -123,24 +124,72 @@ class JavaCompilerService implements CompilerProvider {
         return cacheContainsType.get(file, null).contains(simpleName);
     }
 
-    private static final Cache<Void, List<String>> cacheContainsImport = new Cache<>();
+    private Cache<Void, List<String>> cacheFileImports = new Cache<>();
+
+    private List<String> readImports(Path file) {
+        if (cacheFileImports.needs(file, null)) {
+            loadImports(file);
+        }
+        return cacheFileImports.get(file, null);
+    }
+
+    private void loadImports(Path file) {
+        var list = new ArrayList<String>();
+        var importClass = Pattern.compile("^import +([\\w\\.]+\\.\\w+);");
+        var importStar = Pattern.compile("^import +([\\w\\.]+\\.\\*);");
+        try (var lines = FileStore.lines(file)) {
+            for (var line = lines.readLine(); line != null; line = lines.readLine()) {
+                // If we reach a class declaration, stop looking for imports
+                // TODO This could be a little more specific
+                if (line.contains("class")) break;
+                // import foo.bar.Doh;
+                var matchesClass = importClass.matcher(line);
+                if (matchesClass.matches()) {
+                    list.add(matchesClass.group(1));
+                }
+                // import foo.bar.*
+                var matchesStar = importStar.matcher(line);
+                if (matchesStar.matches()) {
+                    list.add(matchesStar.group(1));
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        cacheFileImports.load(file, null, list);
+    }
+
+    @Override
+    public Set<String> imports() {
+        var all = new HashSet<String>();
+        for (var f : FileStore.all()) {
+            all.addAll(readImports(f));
+        }
+        return all;
+    }
+
+    @Override
+    public Set<String> publicTopLevelTypes() {
+        return Set.of("TODO");
+    }
+
+    @Override
+    public Set<String> packagePrivateTopLevelTypes(String packageName) {
+        return Set.of("TODO");
+    }
 
     private boolean containsImport(Path file, String className) {
-        if (cacheContainsImport.needs(file, null)) {
-            var root = parse(file).root;
-            var types = new ArrayList<String>();
-            new FindImports().scan(root, types);
-            cacheContainsImport.load(file, null, types);
-        }
-        var star = packageName(className) + ".*";
-        for (var i : cacheContainsImport.get(file, null)) {
+        var packageName = packageName(className);
+        if (FileStore.packageName(file).equals(packageName)) return true;
+        var star = packageName + ".*";
+        for (var i : readImports(file)) {
             if (i.equals(className) || i.equals(star)) return true;
         }
         return false;
     }
 
     @Override
-    public Path findTypeDeclaration(String className) {
+    public Path findTopLevelDeclaration(String className) {
         var packageName = packageName(className);
         var simpleName = className(className);
         for (var f : FileStore.list(packageName)) {
@@ -188,7 +237,7 @@ class JavaCompilerService implements CompilerProvider {
             sources.add(new SourceFileObject(f));
         }
         var compile = compileBatch(sources);
-        return new CompileTask(compile.task, compile.roots, compile::close);
+        return new CompileTask(compile.task, compile.roots, diags, compile::close);
     }
 
     private static final Logger LOG = Logger.getLogger("main");

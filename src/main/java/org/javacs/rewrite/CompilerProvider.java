@@ -2,9 +2,16 @@ package org.javacs.rewrite;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Set;
 
 public interface CompilerProvider {
-    Path findTypeDeclaration(String className);
+    Set<String> imports();
+
+    Set<String> publicTopLevelTypes();
+
+    Set<String> packagePrivateTopLevelTypes(String packageName);
+
+    Path findTopLevelDeclaration(String className);
 
     Path[] findTypeReferences(String className);
 

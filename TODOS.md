@@ -14,6 +14,7 @@
 - Fields don't show up in debugger
 - Debugger doesn't print arrays nicely
 - instanceof doesn't autocomplete
+- Rename method doesn't rename implementations
 
 ## Optimizations
 - Compilation is very slow in the presence of lots of errors

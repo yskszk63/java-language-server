@@ -378,7 +378,7 @@ public class CompletionsTest extends CompletionsBase {
         assertThat(suggestions, hasItems("selfMethod", "super1Method", "super2Method"));
     }
 
-    @Ignore // We are now managing imports with FixImports
+    @Ignore // We are now managing imports with AutoFixImports
     @Test
     public void addImport() {
         var file = "/org/javacs/example/AutocompleteOther.java";
@@ -398,7 +398,7 @@ public class CompletionsTest extends CompletionsBase {
         fail("No ArrayList in " + items);
     }
 
-    @Ignore // We are now managing imports with FixImports
+    @Ignore // We are now managing imports with AutoFixImports
     @Test
     public void dontImportSamePackage() {
         var file = "/org/javacs/example/AutocompleteOther.java";
@@ -417,7 +417,7 @@ public class CompletionsTest extends CompletionsBase {
         fail("No AutocompleteMember in " + items);
     }
 
-    @Ignore // We are now managing imports with FixImports
+    @Ignore // We are now managing imports with AutoFixImports
     @Test
     public void dontImportJavaLang() {
         var file = "/org/javacs/example/AutocompleteOther.java";
@@ -436,7 +436,7 @@ public class CompletionsTest extends CompletionsBase {
         fail("No ArrayIndexOutOfBoundsException in " + items);
     }
 
-    @Ignore // We are now managing imports with FixImports
+    @Ignore // We are now managing imports with AutoFixImports
     @Test
     public void dontImportSelf() {
         var file = "/org/javacs/example/AutocompleteOther.java";
@@ -455,7 +455,7 @@ public class CompletionsTest extends CompletionsBase {
         fail("No AutocompleteOther in " + items);
     }
 
-    @Ignore // We are now managing imports with FixImports
+    @Ignore // We are now managing imports with AutoFixImports
     @Test
     public void dontImportAlreadyImported() {
         var file = "/org/javacs/example/AutocompleteOther.java";
@@ -474,7 +474,7 @@ public class CompletionsTest extends CompletionsBase {
         fail("No Arrays in " + items);
     }
 
-    @Ignore // We are now managing imports with FixImports
+    @Ignore // We are now managing imports with AutoFixImports
     @Test
     public void dontImportAlreadyImportedStar() {
         var file = "/org/javacs/example/AutocompleteOther.java";
@@ -592,7 +592,7 @@ public class CompletionsTest extends CompletionsBase {
         assertThat(suggestions, hasItem(startsWith("AutocompleteMember")));
     }
 
-    @Ignore // We are now managing imports with FixImports
+    @Ignore // We are now managing imports with AutoFixImports
     @Test
     public void autoImportConstructor() {
         var file = "/org/javacs/example/AutocompleteConstructor.java";
@@ -659,7 +659,7 @@ public class CompletionsTest extends CompletionsBase {
         assertThat(suggestions, hasItems("OtherPackagePublic"));
         assertThat(suggestions, not(hasItems("OtherPackagePrivate")));
 
-        // Imports are now being managed by FixImports
+        // Imports are now being managed by AutoFixImports
         // for (var item : items) {
         //     if (item.label.equals("OtherPackagePublic"))
         //         assertThat(

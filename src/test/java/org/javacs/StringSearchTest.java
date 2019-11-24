@@ -3,11 +3,7 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.stream.Collectors;
 import org.javacs.lsp.DidChangeTextDocumentParams;
 import org.javacs.lsp.DidCloseTextDocumentParams;
 import org.javacs.lsp.DidOpenTextDocumentParams;
@@ -134,28 +130,5 @@ public class StringSearchTest {
         var rel = Paths.get("src", "org", "javacs", "example", "AutocompleteBetweenLines.java");
         var file = LanguageServerFixture.DEFAULT_WORKSPACE_ROOT.resolve(rel);
         assertTrue(StringSearch.containsWordMatching(file, "ABetweenLines"));
-    }
-
-    @Test
-    public void findExistingImports() {
-        var rel = Paths.get("src", "org", "javacs", "doimport");
-        var dir = LanguageServerFixture.DEFAULT_WORKSPACE_ROOT.resolve(rel);
-        FileStore.setWorkspaceRoots(Collections.singleton(dir));
-        var existing = StringSearch.existingImports(FileStore.all());
-        assertThat(existing.classes, hasItems("java.util.List"));
-        assertThat(existing.packages, hasItems("java.util", "java.io"));
-    }
-
-    @Test
-    public void findExistingImportsInBatch() throws IOException {
-        var allJavaFiles =
-                Files.walk(JavaCompilerServiceTest.simpleProjectSrc())
-                        .filter(f -> f.getFileName().toString().endsWith(".java"))
-                        .collect(Collectors.toSet());
-        assertThat(allJavaFiles, not(empty()));
-
-        var find = StringSearch.existingImports(allJavaFiles);
-        assertThat(find.classes, hasItem("java.util.List"));
-        assertThat(find.packages, hasItem("java.util"));
     }
 }

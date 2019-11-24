@@ -1,3 +1,5 @@
+package org.javacs.rewrite;
+
 import static java.util.Arrays.asList;
 
 class MissingImport {

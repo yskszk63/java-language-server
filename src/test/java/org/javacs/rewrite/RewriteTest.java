@@ -8,7 +8,7 @@ import org.javacs.LanguageServerFixture;
 import org.junit.Test;
 
 public class RewriteTest {
-    final CompilerProvider compiler = LanguageServerFixture.getCompilerProvider();
+    static final CompilerProvider compiler = LanguageServerFixture.getCompilerProvider();
 
     private Path file(String name) {
         return LanguageServerFixture.DEFAULT_WORKSPACE_ROOT
@@ -44,5 +44,42 @@ public class RewriteTest {
         var edits = renamer.rewrite(compiler);
         assertThat(edits.keySet(), hasSize(1));
         assertThat(edits, hasKey(file("TestRenameMethod.java")));
+    }
+
+    @Test
+    public void fixImports() {
+        var file = file("TestFixImports.java");
+        var edits = new AutoFixImports(file).rewrite(compiler);
+        assertThat(edits, hasKey(file));
+        for (var edit : edits.get(file)) {
+            if (edit.newText.contains("java.util.List")) {
+                return;
+            }
+        }
+        fail();
+    }
+
+    @Test
+    public void ignoreStaticImport() {
+        var file = file("StaticImport.java");
+        var edits = new AutoFixImports(file).rewrite(compiler);
+        assertThat(edits, hasKey(file));
+        for (var edit : edits.get(file)) {
+            if (edit.newText.contains("java.util.Arrays.asList")) {
+                fail();
+            }
+        }
+    }
+
+    @Test
+    public void dontImportEnum() {
+        var file = file("DontImportEnum.java");
+        var edits = new AutoFixImports(file).rewrite(compiler);
+        assertThat(edits, hasKey(file));
+        for (var edit : edits.get(file)) {
+            if (edit.newText.contains("READ")) {
+                fail();
+            }
+        }
     }
 }

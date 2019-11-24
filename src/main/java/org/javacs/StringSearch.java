@@ -9,7 +9,6 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import javax.lang.model.element.TypeElement;
 
 // Translated from https://golang.org/src/strings/search.go
@@ -379,107 +378,6 @@ class StringSearch {
         return false;
     }
 
-    /** Find all already-imported symbols in all .java files in workspace */
-    static ExistingImports existingImports(Collection<Path> allJavaFiles) {
-        var classes = new HashSet<String>();
-        var packages = new HashSet<String>();
-        var importClass = Pattern.compile("^import +(([\\w\\.]+)\\.\\w+);");
-        var importStar = Pattern.compile("^import +([\\w\\.]+)\\.\\*;");
-        var importSimple = Pattern.compile("^import +(\\w+);");
-        for (var path : allJavaFiles) {
-            try (var lines = FileStore.lines(path)) {
-                for (var line = lines.readLine(); line != null; line = lines.readLine()) {
-                    // If we reach a class declaration, stop looking for imports
-                    // TODO This could be a little more specific
-                    if (line.contains("class")) break;
-                    // import foo.bar.Doh;
-                    var matchesClass = importClass.matcher(line);
-                    if (matchesClass.matches()) {
-                        String className = matchesClass.group(1), packageName = matchesClass.group(2);
-                        packages.add(packageName);
-                        classes.add(className);
-                    }
-                    // import foo.bar.*
-                    var matchesStar = importStar.matcher(line);
-                    if (matchesStar.matches()) {
-                        var packageName = matchesStar.group(1);
-                        packages.add(packageName);
-                    }
-                    // import Doh
-                    var matchesSimple = importSimple.matcher(line);
-                    if (matchesSimple.matches()) {
-                        var className = matchesSimple.group(1);
-                        classes.add(className);
-                    }
-                }
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        return new ExistingImports(classes, packages);
-    }
-
-    private static Optional<String> resolveSymbol(String unresolved, ExistingImports imports, Set<String> classPath) {
-        // Try to disambiguate by looking for exact matches
-        // For example, Foo is exactly matched by `import com.bar.Foo`
-        // Foo is *not* exactly matched by `import com.bar.*`
-        var candidates = imports.classes.stream().filter(c -> c.endsWith("." + unresolved)).collect(Collectors.toSet());
-        if (candidates.size() > 1) {
-            LOG.warning(
-                    String.format("%s is ambiguous between previously imported candidates %s", unresolved, candidates));
-            return Optional.empty();
-        } else if (candidates.size() == 1) {
-            return Optional.of(candidates.iterator().next());
-        }
-
-        // Try to disambiguate by looking at package names
-        // Both normal imports like `import com.bar.Foo`, and star-imports like `import com.bar.*`,
-        // are used to generate package names
-        candidates =
-                classPath
-                        .stream()
-                        .filter(c -> lastName(c).equals(unresolved))
-                        .filter(c -> imports.packages.contains(mostName(c)))
-                        .collect(Collectors.toSet());
-        if (candidates.size() > 1) {
-            LOG.warning(String.format("%s is ambiguous between package-based candidates %s", unresolved, candidates));
-            return Optional.empty();
-        } else if (candidates.size() == 1) {
-            return Optional.of(candidates.iterator().next());
-        }
-
-        // If there is only one class on the classpath with this name, use it
-        candidates = classPath.stream().filter(c -> lastName(c).equals(unresolved)).collect(Collectors.toSet());
-
-        if (candidates.size() > 1) {
-            LOG.warning(String.format("%s is ambiguous between classpath candidates %s", unresolved, candidates));
-        } else if (candidates.size() == 1) {
-            return Optional.of(candidates.iterator().next());
-        } else {
-            LOG.warning(unresolved + " does not appear on the classpath");
-        }
-
-        // Try to import from java stdlib
-        Comparator<String> order =
-                Comparator.comparing(
-                        c -> {
-                            if (c.startsWith("java.lang")) return 1;
-                            else if (c.startsWith("java.util")) return 2;
-                            else if (c.startsWith("java.io")) return 3;
-                            else return 4;
-                        });
-        return candidates.stream().filter(c -> c.startsWith("java.")).sorted(order).findFirst();
-    }
-
-    static Map<String, String> resolveSymbols(
-            Set<String> unresolvedSymbols, ExistingImports imports, Set<String> classPath) {
-        var result = new HashMap<String, String>();
-        for (var s : unresolvedSymbols) {
-            resolveSymbol(s, imports, classPath).ifPresent(resolved -> result.put(s, resolved));
-        }
-        return result;
-    }
-
     // TODO this doesn't work for inner classes, eliminate
     static String mostName(String name) {
         var lastDot = name.lastIndexOf('.');
@@ -527,16 +425,4 @@ class StringSearch {
     }
 
     private static final Logger LOG = Logger.getLogger("main");
-}
-
-class ExistingImports {
-    /** Fully-qualified names of classes that have been imported on the source path */
-    final Set<String> classes;
-    /** Package names from star-imports like `import java.util.*` */
-    final Set<String> packages;
-
-    ExistingImports(Set<String> classes, Set<String> packages) {
-        this.classes = classes;
-        this.packages = packages;
-    }
 }
