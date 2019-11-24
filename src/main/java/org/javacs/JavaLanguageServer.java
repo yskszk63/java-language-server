@@ -1127,6 +1127,10 @@ class JavaLanguageServer extends LanguageServer {
                     }
                 }
                 return allImports;
+            case "compiler.err.var.not.initialized.in.default.constructor":
+                var needsConstructor = findClass(file, d.range);
+                var generateConstructor = new GenerateRecordConstructor(needsConstructor);
+                return createQuickFix("Generate constructor", generateConstructor);
             default:
                 return List.of();
         }
@@ -1136,6 +1140,12 @@ class JavaLanguageServer extends LanguageServer {
         var parse = Parser.parseFile(file);
         var lines = parse.root.getLineMap();
         return (int) lines.getPosition(position.line + 1, position.character + 1);
+    }
+
+    private String findClass(Path file, Range range) {
+        var parse = compiler().parse(file);
+        var position = parse.root.getLineMap().getPosition(range.start.line + 1, range.start.character + 1);
+        return new FindClassDeclarationAt(parse.task).scan(parse.root, position);
     }
 
     private MethodPtr findMethod(Path file, Range range) {

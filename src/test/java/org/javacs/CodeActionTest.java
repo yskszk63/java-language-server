@@ -66,6 +66,11 @@ public class CodeActionTest {
         assertThat(titles("org/javacs/action/TestRemoveNotThrown.java"), contains("Remove 'IOException'"));
     }
 
+    @Test
+    public void testGenerateConstructor() {
+        assertThat(titles("org/javacs/action/TestGenerateConstructor.java"), contains("Generate constructor"));
+    }
+
     private List<String> titles(String testFile, String... expect) {
         var file = FindResource.path(testFile);
         server.lint(List.of(file));
