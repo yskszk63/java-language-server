@@ -20,40 +20,45 @@ public class CodeActionTest {
 
     @Test
     public void testCantConvertToStatement() {
-        check("org/javacs/action/TestCantConvertToStatement.java");
+        assertThat(titles("org/javacs/action/TestCantConvertToStatement.java"), empty());
     }
 
     @Test
     public void testConvertToStatement() {
-        check("org/javacs/action/TestConvertToStatement.java", "Convert to statement");
+        assertThat(titles("org/javacs/action/TestConvertToStatement.java"), contains("Convert to statement"));
     }
 
     @Test
     public void testConvertToBlock() {
-        check("org/javacs/action/TestConvertToBlock.java", "Convert to block");
+        assertThat(titles("org/javacs/action/TestConvertToBlock.java"), contains("Convert to block"));
     }
 
     @Test
     public void testRemoveDeclaration() {
-        check("org/javacs/action/TestRemoveDeclaration.java", "Remove method");
+        assertThat(titles("org/javacs/action/TestRemoveDeclaration.java"), contains("Remove method"));
     }
 
     @Test
     public void testUnusedException() {
-        check("org/javacs/action/TestUnusedException.java");
+        assertThat(titles("org/javacs/action/TestUnusedException.java"), empty());
     }
 
     @Test
     public void testSuppressWarning() {
-        check("org/javacs/action/TestSuppressWarning.java", "Suppress 'unchecked' warning");
+        assertThat(titles("org/javacs/action/TestSuppressWarning.java"), contains("Suppress 'unchecked' warning"));
     }
 
     @Test
     public void testAddThrows() {
-        check("org/javacs/action/TestAddThrows.java", "Add 'throws'");
+        assertThat(titles("org/javacs/action/TestAddThrows.java"), contains("Add 'throws'"));
     }
 
-    public void check(String testFile, String... expect) {
+    @Test
+    public void testAddImport() {
+        assertThat(titles("org/javacs/action/TestAddImport.java"), hasItem("Import 'java.util.List'"));
+    }
+
+    private List<String> titles(String testFile, String... expect) {
         var file = FindResource.path(testFile);
         server.lint(List.of(file));
         var params = new CodeActionParams();
@@ -61,11 +66,10 @@ public class CodeActionTest {
         params.context = new CodeActionContext();
         params.context.diagnostics = errors;
         var actions = server.codeAction(params);
-        var titles = titles(actions);
-        assertThat(titles, containsInAnyOrder(expect));
+        return extractTitles(actions);
     }
 
-    private List<String> titles(List<CodeAction> actions) {
+    private List<String> extractTitles(List<CodeAction> actions) {
         var titles = new ArrayList<String>();
         for (var a : actions) {
             titles.add(a.title);

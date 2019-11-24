@@ -170,7 +170,20 @@ class JavaCompilerService implements CompilerProvider {
 
     @Override
     public Set<String> publicTopLevelTypes() {
-        return Set.of("TODO");
+        var all = new HashSet<String>();
+        for (var file : FileStore.all()) {
+            var fileName = file.getFileName().toString();
+            if (!fileName.endsWith(".java")) continue;
+            var className = fileName.substring(0, fileName.length() - ".java".length());
+            var packageName = FileStore.packageName(file);
+            if (!packageName.isEmpty()) {
+                className = packageName + "." + className;
+            }
+            all.add(className);
+        }
+        all.addAll(classPathClasses);
+        all.addAll(jdkClasses);
+        return all;
     }
 
     @Override

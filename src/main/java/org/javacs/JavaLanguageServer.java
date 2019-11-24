@@ -1065,12 +1065,13 @@ class JavaLanguageServer extends LanguageServer {
         var actions = new ArrayList<CodeAction>();
         for (var d : params.context.diagnostics) {
             var file = Paths.get(params.textDocument.uri);
-            codeActionForDiagnostic(file, d).ifPresent(actions::add);
+            var newActions = codeActionForDiagnostic(file, d);
+            actions.addAll(newActions);
         }
         return actions;
     }
 
-    private Optional<CodeAction> codeActionForDiagnostic(Path file, Diagnostic d) {
+    private List<CodeAction> codeActionForDiagnostic(Path file, Diagnostic d) {
         // TODO this should be done asynchronously using executeCommand
         switch (d.code) {
             case "unused_local":
@@ -1104,8 +1105,19 @@ class JavaLanguageServer extends LanguageServer {
                                 needsThrow.erasedParameterTypes,
                                 exceptionName);
                 return createQuickFix("Add 'throws'", addThrows);
+            case "compiler.err.cant.resolve.location":
+                var simpleName = extractRange(file, d.range);
+                var allImports = new ArrayList<CodeAction>();
+                for (var qualifiedName : compiler().publicTopLevelTypes()) {
+                    if (qualifiedName.endsWith("." + simpleName)) {
+                        var title = "Import '" + qualifiedName + "'";
+                        var addImport = new AddImport(file, qualifiedName);
+                        allImports.addAll(createQuickFix(title, addImport));
+                    }
+                }
+                return allImports;
             default:
-                return Optional.empty();
+                return List.of();
         }
     }
 
@@ -1154,10 +1166,18 @@ class JavaLanguageServer extends LanguageServer {
         return matcher.group(1);
     }
 
-    private Optional<CodeAction> createQuickFix(String title, Rewrite rewrite) {
+    private String extractRange(Path file, Range range) {
+        var parse = Parser.parseFile(file);
+        var contents = FileStore.contents(file);
+        var start = (int) parse.root.getLineMap().getPosition(range.start.line + 1, range.start.character + 1);
+        var end = (int) parse.root.getLineMap().getPosition(range.end.line + 1, range.end.character + 1);
+        return contents.substring(start, end);
+    }
+
+    private List<CodeAction> createQuickFix(String title, Rewrite rewrite) {
         var edits = rewrite.rewrite(compiler());
         if (edits == Rewrite.CANCELLED) {
-            return Optional.empty();
+            return List.of();
         }
         var a = new CodeAction();
         a.kind = CodeActionKind.QuickFix;
@@ -1166,7 +1186,7 @@ class JavaLanguageServer extends LanguageServer {
         for (var file : edits.keySet()) {
             a.edit.changes.put(file.toUri(), List.of(edits.get(file)));
         }
-        return Optional.of(a);
+        return List.of(a);
     }
 
     @Override
