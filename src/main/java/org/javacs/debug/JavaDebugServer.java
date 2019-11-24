@@ -676,7 +676,9 @@ public class JavaDebugServer implements DebugServer {
     }
 
     private String print(Value value, ThreadReference t) {
-        if (value instanceof ObjectReference) {
+        if (value == null) {
+            return "null";
+        } else if (value instanceof ObjectReference) {
             return printObject((ObjectReference) value, t);
         } else {
             return value.toString();
