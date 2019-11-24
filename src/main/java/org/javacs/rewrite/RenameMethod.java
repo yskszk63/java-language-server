@@ -27,7 +27,7 @@ public class RenameMethod implements Rewrite {
         }
         LOG.info("...check " + paths.length + " files for references");
         try (var compile = compiler.compile(paths)) {
-            var helper = new RenameHelper(compile.task);
+            var helper = new RenameHelper(compile);
             var edits = helper.renameMethod(compile.roots, className, methodName, erasedParameterTypes, newName);
             return edits;
         }

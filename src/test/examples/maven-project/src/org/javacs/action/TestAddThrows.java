@@ -1,4 +1,4 @@
-package org.javacs.docs.action;
+package org.javacs.action;
 
 import java.io.IOException;
 

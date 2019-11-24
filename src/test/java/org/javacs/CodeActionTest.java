@@ -35,7 +35,7 @@ public class CodeActionTest {
 
     @Test
     public void testRemoveDeclaration() {
-        check("org/javacs/action/TestRemoveDeclaration.java", "Remove declaration");
+        check("org/javacs/action/TestRemoveDeclaration.java", "Remove method");
     }
 
     @Test

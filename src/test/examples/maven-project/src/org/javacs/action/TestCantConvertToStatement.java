@@ -1,4 +1,4 @@
-package org.javacs.docs.action;
+package org.javacs.action;
 
 class TestCantConvertToStatement {
     void test() {

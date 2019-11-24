@@ -24,7 +24,7 @@ public class RenameField implements Rewrite {
         }
         LOG.info("...check " + paths.length + " files for references");
         try (var compile = compiler.compile(paths)) {
-            var helper = new RenameHelper(compile.task);
+            var helper = new RenameHelper(compile);
             var edits = helper.renameField(compile.roots, className, fieldName, newName);
             return edits;
         }

@@ -5,7 +5,6 @@ import com.sun.source.tree.MemberReferenceTree;
 import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.VariableTree;
-import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 import java.io.IOException;
@@ -18,24 +17,21 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.util.Types;
 import org.javacs.lsp.Position;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;
 
-class RenameHelper {
-    final Trees trees;
-    final Types types;
+public class RenameHelper {
+    final CompileTask task;
 
-    RenameHelper(JavacTask task) {
-        this.trees = Trees.instance(task);
-        this.types = task.getTypes();
+    RenameHelper(CompileTask task) {
+        this.task = task;
     }
 
     TextEdit[] renameVariable(CompilationUnitTree root, TreePath rename, String newName) {
+        var trees = Trees.instance(task.task);
         var target = trees.getElement(rename);
         var found = findVariableReferences(root, target);
         return replaceAll(found, newName);
@@ -72,6 +68,7 @@ class RenameHelper {
     }
 
     private List<TreePath> findVariableReferences(CompilationUnitTree root, Element target) {
+        var trees = Trees.instance(task.task);
         var found = new ArrayList<TreePath>();
         Consumer<TreePath> forEach =
                 path -> {
@@ -97,6 +94,7 @@ class RenameHelper {
     }
 
     private boolean isFieldReference(TreePath path, String className, String fieldName) {
+        var trees = Trees.instance(task.task);
         var candidate = trees.getElement(path);
         if (!(candidate instanceof VariableElement)) return false;
         var variable = (VariableElement) candidate;
@@ -110,9 +108,10 @@ class RenameHelper {
     private List<TreePath> findMethodReferences(
             CompilationUnitTree root, String className, String methodName, String[] erasedParameterTypes) {
         var found = new ArrayList<TreePath>();
+        var finder = new FindHelper(task);
         Consumer<TreePath> forEach =
                 path -> {
-                    if (isMethodReference(path, className, methodName, erasedParameterTypes)) {
+                    if (finder.isSameMethod(path, className, methodName, erasedParameterTypes)) {
                         found.add(path);
                     }
                 };
@@ -120,24 +119,8 @@ class RenameHelper {
         return found;
     }
 
-    private boolean isMethodReference(
-            TreePath path, String className, String methodName, String[] erasedParameterTypes) {
-        var candidate = trees.getElement(path);
-        if (!(candidate instanceof ExecutableElement)) return false;
-        var method = (ExecutableElement) candidate;
-        var parent = (TypeElement) method.getEnclosingElement();
-        if (!parent.getQualifiedName().contentEquals(className)) return false;
-        if (!method.getSimpleName().contentEquals(methodName)) return false;
-        if (method.getParameters().size() != erasedParameterTypes.length) return false;
-        for (var i = 0; i < erasedParameterTypes.length; i++) {
-            var erasure = types.erasure(method.getParameters().get(i).asType());
-            var same = erasure.toString().equals(erasedParameterTypes[i]);
-            if (!same) return false;
-        }
-        return true;
-    }
-
     private TextEdit[] replaceAll(List<TreePath> found, String newName) {
+        var trees = Trees.instance(task.task);
         var pos = trees.getSourcePositions();
         var edits = new TextEdit[found.size()];
         var i = 0;

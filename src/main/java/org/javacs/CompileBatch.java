@@ -163,14 +163,6 @@ class CompileBatch implements AutoCloseable {
         throw new RuntimeException("File " + file + " isn't in batch " + names);
     }
 
-    private String contents(CompilationUnitTree root) {
-        try {
-            return root.getSourceFile().getCharContent(true).toString();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     TreePath tree(Path file, int line, int character) {
         var root = root(file);
         var cursor = root.getLineMap().getPosition(line, character);

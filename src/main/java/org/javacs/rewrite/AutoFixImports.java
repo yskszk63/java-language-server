@@ -94,8 +94,8 @@ public class AutoFixImports implements Rewrite {
         for (var i : root.getImports()) {
             if (i.isStatic()) continue;
             var start = pos.getStartPosition(root, i);
-            var line = (int) root.getLineMap().getLineNumber(start) - 1;
-            var delete = new TextEdit(new Range(new Position(line, 0), new Position(line + 1, 0)), "");
+            var line = (int) root.getLineMap().getLineNumber(start);
+            var delete = new TextEdit(new Range(new Position(line - 1, 0), new Position(line, 0)), "");
             edits.add(delete);
         }
         return edits;

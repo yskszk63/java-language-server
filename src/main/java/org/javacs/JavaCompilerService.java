@@ -114,14 +114,14 @@ class JavaCompilerService implements CompilerProvider {
 
     private static final Cache<Void, List<String>> cacheContainsType = new Cache<>();
 
-    private boolean containsType(Path file, String simpleName) {
+    private boolean containsType(Path file, String className) {
         if (cacheContainsType.needs(file, null)) {
             var root = parse(file).root;
             var types = new ArrayList<String>();
             new FindTypeDeclarations().scan(root, types);
             cacheContainsType.load(file, null, types);
         }
-        return cacheContainsType.get(file, null).contains(simpleName);
+        return cacheContainsType.get(file, null).contains(className);
     }
 
     private Cache<Void, List<String>> cacheFileImports = new Cache<>();
@@ -193,7 +193,7 @@ class JavaCompilerService implements CompilerProvider {
         var packageName = packageName(className);
         var simpleName = className(className);
         for (var f : FileStore.list(packageName)) {
-            if (containsWord(f, simpleName) && containsType(f, simpleName)) {
+            if (containsWord(f, simpleName) && containsType(f, className)) {
                 return f;
             }
         }

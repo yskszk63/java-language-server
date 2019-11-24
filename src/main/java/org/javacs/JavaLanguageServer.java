@@ -2,12 +2,14 @@ package org.javacs;
 
 import com.google.gson.*;
 import com.sun.source.tree.*;
+import com.sun.source.util.Trees;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeKind;
 import javax.tools.JavaFileObject;
@@ -1062,16 +1064,109 @@ class JavaLanguageServer extends LanguageServer {
     public List<CodeAction> codeAction(CodeActionParams params) {
         var actions = new ArrayList<CodeAction>();
         for (var d : params.context.diagnostics) {
-            for (var rule : Refactor.RULES) {
-                if (!rule.canRefactor(d)) continue;
-                var parse = Parser.parseFile(Paths.get(params.textDocument.uri));
-                var error = parse.findPath(d.range);
-                var action = rule.refactor(parse, error, d.message);
-                if (action == CodeAction.NONE) continue;
-                actions.add(action);
-            }
+            var file = Paths.get(params.textDocument.uri);
+            codeActionForDiagnostic(file, d).ifPresent(actions::add);
         }
         return actions;
+    }
+
+    private Optional<CodeAction> codeActionForDiagnostic(Path file, Diagnostic d) {
+        // TODO this should be done asynchronously using executeCommand
+        switch (d.code) {
+            case "unused_local":
+                var toStatement = new ConvertVariableToStatement(file, findPosition(file, d.range.start));
+                return createQuickFix("Convert to statement", toStatement);
+            case "unused_field":
+                var toBlock = new ConvertFieldToBlock(file, findPosition(file, d.range.start));
+                return createQuickFix("Convert to block", toBlock);
+            case "unused_class":
+                var removeClass = new RemoveClass(file, findPosition(file, d.range.start));
+                return createQuickFix("Remove class", removeClass);
+            case "unused_method":
+                var unusedMethod = findMethod(file, d.range);
+                var removeMethod =
+                        new RemoveMethod(
+                                unusedMethod.className, unusedMethod.methodName, unusedMethod.erasedParameterTypes);
+                return createQuickFix("Remove method", removeMethod);
+            case "compiler.warn.unchecked.call.mbr.of.raw.type":
+                var warnedMethod = findMethod(file, d.range);
+                var suppressWarning =
+                        new AddSuppressWarningAnnotation(
+                                warnedMethod.className, warnedMethod.methodName, warnedMethod.erasedParameterTypes);
+                return createQuickFix("Suppress 'unchecked' warning", suppressWarning);
+            case "compiler.err.unreported.exception.need.to.catch.or.throw":
+                var needsThrow = findMethod(file, d.range);
+                var exceptionName = extractExceptionName(d.message);
+                var addThrows =
+                        new AddException(
+                                needsThrow.className,
+                                needsThrow.methodName,
+                                needsThrow.erasedParameterTypes,
+                                exceptionName);
+                return createQuickFix("Add 'throws'", addThrows);
+            default:
+                return Optional.empty();
+        }
+    }
+
+    private int findPosition(Path file, Position position) {
+        var parse = Parser.parseFile(file);
+        var lines = parse.root.getLineMap();
+        return (int) lines.getPosition(position.line + 1, position.character + 1);
+    }
+
+    private MethodPtr findMethod(Path file, Range range) {
+        try (var task = compiler().compile(file)) {
+            var trees = Trees.instance(task.task);
+            var types = task.task.getTypes();
+            var position = task.root().getLineMap().getPosition(range.start.line + 1, range.start.character + 1);
+            var tree = new FindMethodDeclarationAt(task.task).scan(task.root(), position);
+            var path = trees.getPath(task.root(), tree);
+            var method = (ExecutableElement) trees.getElement(path);
+            var parent = (TypeElement) method.getEnclosingElement();
+            var p = new MethodPtr();
+            p.className = parent.getQualifiedName().toString();
+            p.methodName = method.getSimpleName().toString();
+            p.erasedParameterTypes = new String[method.getParameters().size()];
+            for (var i = 0; i < p.erasedParameterTypes.length; i++) {
+                var param = method.getParameters().get(i);
+                var type = param.asType();
+                var erased = types.erasure(type);
+                p.erasedParameterTypes[i] = erased.toString();
+            }
+            return p;
+        }
+    }
+
+    class MethodPtr {
+        String className, methodName;
+        String[] erasedParameterTypes;
+    }
+
+    private static final Pattern UNREPORTED_EXCEPTION = Pattern.compile("unreported exception ((\\w+\\.)*\\w+)");
+
+    private String extractExceptionName(String message) {
+        var matcher = UNREPORTED_EXCEPTION.matcher(message);
+        if (!matcher.find()) {
+            LOG.warning(String.format("`%s` doesn't match `%s`", message, UNREPORTED_EXCEPTION));
+            return "";
+        }
+        return matcher.group(1);
+    }
+
+    private Optional<CodeAction> createQuickFix(String title, Rewrite rewrite) {
+        var edits = rewrite.rewrite(compiler());
+        if (edits == Rewrite.CANCELLED) {
+            return Optional.empty();
+        }
+        var a = new CodeAction();
+        a.kind = CodeActionKind.QuickFix;
+        a.title = title;
+        a.edit = new WorkspaceEdit();
+        for (var file : edits.keySet()) {
+            a.edit.changes.put(file.toUri(), List.of(edits.get(file)));
+        }
+        return Optional.of(a);
     }
 
     @Override

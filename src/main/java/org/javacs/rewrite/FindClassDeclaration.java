@@ -4,17 +4,17 @@ import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.util.function.Predicate;
 
-class FindVariable extends TreeScanner<VariableTree, Predicate<VariableTree>> {
+class FindClassDeclaration extends TreeScanner<ClassTree, Predicate<ClassTree>> {
     @Override
-    public VariableTree visitVariable(VariableTree t, Predicate<VariableTree> test) {
+    public ClassTree visitClass(ClassTree t, Predicate<ClassTree> test) {
         if (test.test(t)) {
             return t;
         }
-        return super.visitVariable(t, test);
+        return super.visitClass(t, test);
     }
 
     @Override
-    public VariableTree reduce(VariableTree r1, VariableTree r2) {
+    public ClassTree reduce(ClassTree r1, ClassTree r2) {
         if (r1 != null) return r1;
         return r2;
     }
