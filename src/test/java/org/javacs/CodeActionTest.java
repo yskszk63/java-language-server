@@ -55,7 +55,9 @@ public class CodeActionTest {
 
     @Test
     public void testAddImport() {
-        assertThat(titles("org/javacs/action/TestAddImport.java"), hasItem("Import 'java.util.List'"));
+        assertThat(
+                titles("org/javacs/action/TestAddImport.java"),
+                hasItems("Import 'java.util.List'", "Import 'com.google.gson.Gson'"));
     }
 
     private List<String> titles(String testFile, String... expect) {
