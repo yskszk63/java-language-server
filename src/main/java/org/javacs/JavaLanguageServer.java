@@ -913,31 +913,9 @@ class JavaLanguageServer extends LanguageServer {
         for (var e : fixImports) {
             edits.add(e);
         }
-        var sources = Set.of(new SourceFileObject(file));
-        try (var compile = compiler().compileBatch(sources)) {
-            edits.addAll(addOverrides(compile, file));
-            // TODO replace var with type name when vars are copy-pasted into fields
-            // TODO replace ThisClass.staticMethod() with staticMethod() when ThisClass is useless
-            return edits;
-        }
-    }
-
-    private List<TextEdit> addOverrides(CompileBatch compile, Path file) {
-        var edits = new ArrayList<TextEdit>();
-        var methods = compile.needsOverrideAnnotation(file);
-        var pos = compile.sourcePositions();
-        var lines = compile.lineMap(file);
-        for (var t : methods) {
-            var methodStart = pos.getStartPosition(t.getCompilationUnit(), t.getLeaf());
-            var insertLine = lines.getLineNumber(methodStart);
-            var indent = methodStart - lines.getPosition(insertLine, 0);
-            var insertText = new StringBuilder();
-            for (var i = 0; i < indent; i++) insertText.append(' ');
-            insertText.append("@Override");
-            insertText.append('\n');
-            var insertPosition = new Position((int) insertLine - 1, 0);
-            var insert = new TextEdit(new Range(insertPosition, insertPosition), insertText.toString());
-            edits.add(insert);
+        var addOverrides = new AutoAddOverrides(file).rewrite(compiler()).get(file);
+        for (var e : addOverrides) {
+            edits.add(e);
         }
         return edits;
     }

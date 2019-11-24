@@ -232,6 +232,10 @@ class JavaCompilerService implements CompilerProvider {
 
     @Override
     public CompileTask compile(Path... files) {
+        // TODO since the java compiler is a singleton, instead of making CompileTask closeable,
+        // we could simply maintain a reference to the active CompileTask and close it when someone requests a new one.
+        // This would also allow us to re-use the previous CompileTask when the files are the same and they haven't been
+        // modified.
         var sources = new ArrayList<JavaFileObject>();
         for (var f : files) {
             sources.add(new SourceFileObject(f));

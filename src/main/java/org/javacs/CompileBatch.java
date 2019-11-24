@@ -367,15 +367,6 @@ class CompileBatch implements AutoCloseable {
         return root(file).getImports();
     }
 
-    /** Find methods that override a method from a superclass but don't have an @Override annotation. */
-    List<TreePath> needsOverrideAnnotation(Path file) {
-        LOG.info(String.format("Looking for methods that need an @Override annotation in %s ...", file));
-        var root = root(file);
-        var finder = new FindMissingOverride(borrow.task);
-        finder.scan(root, null);
-        return finder.results;
-    }
-
     /** Find all overloads for the smallest method call that includes the cursor */
     Optional<SignatureHelp> signatureHelp(Path file, int cursor) {
         var path = findPath(file, cursor);

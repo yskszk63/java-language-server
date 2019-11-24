@@ -82,4 +82,11 @@ public class RewriteTest {
             }
         }
     }
+
+    @Test
+    public void addOverride() {
+        var file = file("TestAddOverride.java");
+        var edits = new AutoAddOverrides(file).rewrite(compiler);
+        assertThat(edits, hasKey(file));
+    }
 }

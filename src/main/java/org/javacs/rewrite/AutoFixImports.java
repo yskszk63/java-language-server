@@ -129,9 +129,6 @@ public class AutoFixImports implements Rewrite {
     private TextEdit insertImports(CompileTask task, List<String> qualifiedNames) {
         var pos = insertPosition(task);
         var text = new StringBuilder();
-        if (pos.line < 2) {
-            text.append("\n");
-        }
         for (var i : qualifiedNames) {
             text.append("import ").append(i).append(";\n");
         }

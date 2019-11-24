@@ -1,18 +1,16 @@
-package org.javacs;
+package org.javacs.rewrite;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.logging.Logger;
 import javax.lang.model.element.*;
 import javax.lang.model.util.*;
 
-class FindMissingOverride extends TreePathScanner<Void, Void> {
+class FindMissingOverride extends TreePathScanner<Void, List<TreePath>> {
     private final Trees trees;
     private final Elements elements;
     private final Types types;
-    final List<TreePath> results = new ArrayList<>();
 
     FindMissingOverride(JavacTask task) {
         this.trees = Trees.instance(task);
@@ -21,7 +19,7 @@ class FindMissingOverride extends TreePathScanner<Void, Void> {
     }
 
     @Override
-    public Void visitMethod(MethodTree t, Void __) {
+    public Void visitMethod(MethodTree t, List<TreePath> missing) {
         var method = (ExecutableElement) trees.getElement(getCurrentPath());
         var supers = overrides(method);
         if (!supers.isEmpty() && !hasOverrideAnnotation(method)) {
@@ -31,7 +29,7 @@ class FindMissingOverride extends TreePathScanner<Void, Void> {
                     String.format(
                             "...`%s` has no @Override annotation but overrides `%s.%s`",
                             method, overridesClass, overridesMethod));
-            results.add(getCurrentPath());
+            missing.add(getCurrentPath());
         }
         return super.visitMethod(t, null);
     }
@@ -49,7 +47,7 @@ class FindMissingOverride extends TreePathScanner<Void, Void> {
     }
 
     private List<Element> overrides(ExecutableElement method) {
-        var results = new ArrayList<Element>();
+        var missing = new ArrayList<Element>();
         var enclosingClass = (TypeElement) method.getEnclosingElement();
         var enclosingType = enclosingClass.asType();
         for (var superClass : types.directSupertypes(enclosingType)) {
@@ -57,11 +55,11 @@ class FindMissingOverride extends TreePathScanner<Void, Void> {
             for (var other : e.getEnclosedElements()) {
                 if (!(other instanceof ExecutableElement)) continue;
                 if (elements.overrides(method, (ExecutableElement) other, enclosingClass)) {
-                    results.add(other);
+                    missing.add(other);
                 }
             }
         }
-        return results;
+        return missing;
     }
 
     private static final Logger LOG = Logger.getLogger("main");
