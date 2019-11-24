@@ -16,7 +16,9 @@ class FindUsedImports extends TreePathScanner<Void, Set<String>> {
 
     @Override
     public Void visitImport(ImportTree t, Set<String> references) {
-        imports.add(Objects.toString(t.getQualifiedIdentifier(), ""));
+        if (!t.isStatic()) {
+            imports.add(Objects.toString(t.getQualifiedIdentifier(), ""));
+        }
         return super.visitImport(t, references);
     }
 
@@ -26,15 +28,22 @@ class FindUsedImports extends TreePathScanner<Void, Set<String>> {
         if (e instanceof TypeElement) {
             var type = (TypeElement) e;
             var qualifiedName = type.getQualifiedName().toString();
-            if (!imports.contains(qualifiedName)) ;
-            var lastDot = qualifiedName.lastIndexOf('.');
-            var packageName = lastDot == -1 ? "" : qualifiedName.substring(0, lastDot);
-            var thisPackage = Objects.toString(getCurrentPath().getCompilationUnit().getPackageName(), "");
-            // java.lang.* and current package are imported by default
-            if (!packageName.equals("java.lang") && !packageName.equals(thisPackage) && !packageName.equals("")) {
+            var packageName = packageName(qualifiedName);
+            var starImport = packageName + ".*";
+            if (imports.contains(qualifiedName)) {
                 references.add(qualifiedName);
+            } else if (imports.contains(starImport)) {
+                references.add(starImport);
             }
         }
         return null;
+    }
+
+    private String packageName(String qualifiedName) {
+        var lastDot = qualifiedName.lastIndexOf('.');
+        if (lastDot != -1) {
+            return qualifiedName.substring(0, lastDot);
+        }
+        return "";
     }
 }

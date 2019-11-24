@@ -26,7 +26,6 @@
 - Search for methods in source and deps based on return type, parameters
 - "Find implementations" code lens on interfaces
 - Rename other types (see JavaLanguageServer#canRename)
-- Auto-remove unused * imports
 
 ## Refactorings
 - Quick fixes

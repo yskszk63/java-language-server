@@ -1,6 +1,5 @@
 package org.javacs.rewrite;
 
-import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.util.Trees;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -27,12 +26,10 @@ public class AutoFixImports implements Rewrite {
         LOG.info("Fix imports in " + file + "...");
         try (var task = compiler.compile(file)) {
             var used = usedImports(task);
-            var stars = usedStarImports(task.root(), used);
             var unresolved = unresolvedNames(task);
             var resolved = resolveNames(compiler, unresolved);
             var all = new ArrayList<String>();
             all.addAll(used);
-            all.addAll(stars);
             all.addAll(resolved.values());
             all.sort(String::compareTo); // TODO this is not always a good order
             var edits = new ArrayList<TextEdit>();
@@ -46,28 +43,6 @@ public class AutoFixImports implements Rewrite {
         var used = new HashSet<String>();
         new FindUsedImports(task.task).scan(task.root(), used);
         return used;
-    }
-
-    private List<String> usedStarImports(CompilationUnitTree root, Set<String> used) {
-        var stars = new ArrayList<String>();
-        for (var i : root.getImports()) {
-            var name = i.getQualifiedIdentifier().toString();
-            if (isUsedStarImport(name, used)) {
-                stars.add(name);
-            }
-        }
-        return stars;
-    }
-
-    private boolean isUsedStarImport(String name, Set<String> used) {
-        if (!name.endsWith(".*")) return false;
-        var packageName = name.substring(0, name.lastIndexOf('.'));
-        for (var qualifiedName : used) {
-            if (qualifiedName.startsWith(packageName)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private Set<String> unresolvedNames(CompileTask task) {
