@@ -35,19 +35,19 @@ public class ConvertFieldToBlock implements Rewrite {
         var end = pos.getStartPosition(task.root, expression);
         var startLine = (int) lines.getLineNumber(start);
         var startColumn = (int) lines.getColumnNumber(start);
-        var startPos = new Position(startLine, startColumn);
+        var startPos = new Position(startLine - 1, startColumn - 1);
         var endLine = (int) lines.getLineNumber(end);
         var endColumn = (int) lines.getColumnNumber(end);
-        var endPos = new Position(endLine, endColumn);
+        var endPos = new Position(endLine - 1, endColumn - 1);
         var deleteLhs = new Range(startPos, endPos);
         var fixLhs = new TextEdit(deleteLhs, "{ ");
         if (variable.getModifiers().getFlags().contains(Modifier.STATIC)) {
-            fixLhs.newText = "static {";
+            fixLhs.newText = "static { ";
         }
         var right = pos.getEndPosition(task.root, variable);
         var rightLine = (int) lines.getLineNumber(right);
         var rightColumn = (int) lines.getColumnNumber(right);
-        var rightPos = new Position(rightLine, rightColumn);
+        var rightPos = new Position(rightLine - 1, rightColumn - 1);
         var insertRight = new Range(rightPos, rightPos);
         var fixRhs = new TextEdit(insertRight, " }");
         TextEdit[] edits = {fixLhs, fixRhs};

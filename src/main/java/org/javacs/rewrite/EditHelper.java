@@ -22,10 +22,10 @@ class EditHelper {
         var end = pos.getEndPosition(root, remove);
         var startLine = (int) lines.getLineNumber(start);
         var startColumn = (int) lines.getColumnNumber(start);
-        var startPos = new Position(startLine, startColumn);
+        var startPos = new Position(startLine - 1, startColumn - 1);
         var endLine = (int) lines.getLineNumber(end);
         var endColumn = (int) lines.getColumnNumber(end);
-        var endPos = new Position(endLine, endColumn);
+        var endPos = new Position(endLine - 1, endColumn - 1);
         var range = new Range(startPos, endPos);
         return new TextEdit(range, "");
     }

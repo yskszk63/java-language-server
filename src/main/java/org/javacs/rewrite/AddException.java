@@ -36,7 +36,7 @@ public class AddException implements Rewrite {
             var startBody = pos.getStartPosition(task.root(), method.getBody());
             var line = (int) lines.getLineNumber(startBody);
             var column = (int) lines.getColumnNumber(startBody);
-            var insertPos = new Position(line, column);
+            var insertPos = new Position(line - 1, column - 1);
             var packageName = "";
             var simpleName = exceptionType;
             var lastDot = simpleName.lastIndexOf('.');
