@@ -190,11 +190,15 @@ class CompileBatch implements AutoCloseable {
         var warnUnused = new WarnUnused(borrow.task);
         warnUnused.scan(root, null);
         for (var unusedEl : warnUnused.notUsed()) {
-            var warn = warnUnused(unusedEl);
-            diags.add(warn);
+            diags.add(warnUnused(unusedEl));
+        }
+        // Check for unused exceptions
+        var notThrown = new HashMap<String, TreePath>();
+        new WarnNotThrown(borrow.task).scan(root, notThrown);
+        for (var name : notThrown.keySet()) {
+            diags.add(warnNotThrown(name, notThrown.get(name)));
         }
         // TODO hint fields that could be final
-        // TODO hint unused exception
 
         return diags;
     }
@@ -234,6 +238,27 @@ class CompileBatch implements AutoCloseable {
             default:
                 return DiagnosticSeverity.Hint;
         }
+    }
+
+    private org.javacs.lsp.Diagnostic warnNotThrown(String name, TreePath path) {
+        var pos = trees.getSourcePositions();
+        var root = path.getCompilationUnit();
+        var lines = root.getLineMap();
+        var start = pos.getStartPosition(root, path.getLeaf());
+        var startLine = (int) lines.getLineNumber(start);
+        var startColumn = (int) lines.getColumnNumber(start);
+        var startPos = new Position(startLine - 1, startColumn - 1);
+        var end = pos.getEndPosition(root, path.getLeaf());
+        var endLine = (int) lines.getLineNumber(end);
+        var endColumn = (int) lines.getColumnNumber(end);
+        var endPos = new Position(endLine - 1, endColumn - 1);
+        var d = new org.javacs.lsp.Diagnostic();
+        d.message = String.format("'%s' is not thrown in the body of the method", name);
+        d.range = new Range(startPos, endPos);
+        d.code = "unused_throws";
+        d.severity = DiagnosticSeverity.Information;
+        d.tags = List.of(DiagnosticTag.Unnecessary);
+        return d;
     }
 
     private org.javacs.lsp.Diagnostic warnUnused(Element unusedEl) {

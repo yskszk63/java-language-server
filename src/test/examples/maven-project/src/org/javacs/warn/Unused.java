@@ -42,4 +42,6 @@ class Unused {
     void referenceUsedByUnusedVar() {
         var x = usedByUnusedVar();
     }
+
+    void notActuallyThrown() throws Exception { }
 }

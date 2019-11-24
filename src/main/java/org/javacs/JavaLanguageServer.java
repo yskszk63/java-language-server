@@ -1089,6 +1089,17 @@ class JavaLanguageServer extends LanguageServer {
                         new RemoveMethod(
                                 unusedMethod.className, unusedMethod.methodName, unusedMethod.erasedParameterTypes);
                 return createQuickFix("Remove method", removeMethod);
+            case "unused_throws":
+                var shortExceptionName = extractRange(file, d.range);
+                var notThrown = extractNotThrownExceptionName(d.message);
+                var methodWithExtraThrow = findMethod(file, d.range);
+                var removeThrow =
+                        new RemoveException(
+                                methodWithExtraThrow.className,
+                                methodWithExtraThrow.methodName,
+                                methodWithExtraThrow.erasedParameterTypes,
+                                notThrown);
+                return createQuickFix("Remove '" + shortExceptionName + "'", removeThrow);
             case "compiler.warn.unchecked.call.mbr.of.raw.type":
                 var warnedMethod = findMethod(file, d.range);
                 var suppressWarning =
@@ -1153,6 +1164,17 @@ class JavaLanguageServer extends LanguageServer {
     class MethodPtr {
         String className, methodName;
         String[] erasedParameterTypes;
+    }
+
+    private static final Pattern NOT_THROWN_EXCEPTION = Pattern.compile("^'((\\w+\\.)*\\w+)' is not thrown");
+
+    private String extractNotThrownExceptionName(String message) {
+        var matcher = NOT_THROWN_EXCEPTION.matcher(message);
+        if (!matcher.find()) {
+            LOG.warning(String.format("`%s` doesn't match `%s`", message, NOT_THROWN_EXCEPTION));
+            return "";
+        }
+        return matcher.group(1);
     }
 
     private static final Pattern UNREPORTED_EXCEPTION = Pattern.compile("unreported exception ((\\w+\\.)*\\w+)");

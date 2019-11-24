@@ -15,4 +15,6 @@ public class TextEdit {
     public String toString() {
         return range + "/" + newText;
     }
+
+    public static final TextEdit NONE = new TextEdit(Range.NONE, "");
 }

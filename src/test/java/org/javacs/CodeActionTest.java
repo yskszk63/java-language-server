@@ -60,6 +60,11 @@ public class CodeActionTest {
                 hasItems("Import 'java.util.List'", "Import 'com.google.gson.Gson'"));
     }
 
+    @Test
+    public void testRemoveNotThrown() {
+        assertThat(titles("org/javacs/action/TestRemoveNotThrown.java"), contains("Remove 'IOException'"));
+    }
+
     private List<String> titles(String testFile, String... expect) {
         var file = FindResource.path(testFile);
         server.lint(List.of(file));
