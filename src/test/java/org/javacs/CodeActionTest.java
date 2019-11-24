@@ -71,6 +71,11 @@ public class CodeActionTest {
         assertThat(titles("org/javacs/action/TestGenerateConstructor.java"), contains("Generate constructor"));
     }
 
+    @Test
+    public void testDontGenerateConstructor() {
+        assertThat(titles("org/javacs/action/TestDontGenerateConstructor.java"), not(hasItem("Generate constructor")));
+    }
+
     private List<String> titles(String testFile, String... expect) {
         var file = FindResource.path(testFile);
         server.lint(List.of(file));

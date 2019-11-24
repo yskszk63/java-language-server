@@ -1128,7 +1128,8 @@ class JavaLanguageServer extends LanguageServer {
                 }
                 return allImports;
             case "compiler.err.var.not.initialized.in.default.constructor":
-                var needsConstructor = findClass(file, d.range);
+                var needsConstructor = findClassNeedingConstructor(file, d.range);
+                if (needsConstructor == null) return List.of();
                 var generateConstructor = new GenerateRecordConstructor(needsConstructor);
                 return createQuickFix("Generate constructor", generateConstructor);
             default:
@@ -1142,10 +1143,35 @@ class JavaLanguageServer extends LanguageServer {
         return (int) lines.getPosition(position.line + 1, position.character + 1);
     }
 
-    private String findClass(Path file, Range range) {
+    private String findClassNeedingConstructor(Path file, Range range) {
         var parse = compiler().parse(file);
         var position = parse.root.getLineMap().getPosition(range.start.line + 1, range.start.character + 1);
-        return new FindClassDeclarationAt(parse.task).scan(parse.root, position);
+        var type = new FindClassDeclarationAt(parse.task).scan(parse.root, position);
+        if (type == null || hasConstructor(type)) return null;
+        var path = Trees.instance(parse.task).getPath(parse.root, type);
+        var qualifiedName = new StringJoiner(".");
+        if (parse.root.getPackageName() != null) {
+            qualifiedName.add(parse.root.getPackageName().toString());
+        }
+        for (var part : path) {
+            if (part instanceof ClassTree) {
+                var cast = (ClassTree) part;
+                qualifiedName.add(cast.getSimpleName());
+            }
+        }
+        return qualifiedName.toString();
+    }
+
+    private boolean hasConstructor(ClassTree type) {
+        for (var member : type.getMembers()) {
+            if (member instanceof MethodTree) {
+                var method = (MethodTree) member;
+                if (method.getName().contentEquals("<init>")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private MethodPtr findMethod(Path file, Range range) {
