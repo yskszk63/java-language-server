@@ -15,7 +15,6 @@
 - Debugger doesn't print arrays nicely
 - instanceof doesn't autocomplete
 - Rename method doesn't rename implementations
-- TreePathScanner appears in autcomplete but not add-import code action
 - Can't rename method parameters
 
 ## Optimizations
