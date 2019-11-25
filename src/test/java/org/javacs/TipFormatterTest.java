@@ -13,6 +13,9 @@ public class TipFormatterTest {
         assertThat(TipFormatter.asMarkdown("<pre>foo</pre>"), equalTo("`foo`"));
         assertThat(TipFormatter.asMarkdown("<code>foo</code>"), equalTo("`foo`"));
         assertThat(TipFormatter.asMarkdown("{@code foo}"), equalTo("`foo`"));
+        assertThat(
+                TipFormatter.asMarkdown("<a href=\"#bar\">foo</a>"),
+                equalTo("foo")); // TODO it would be nice if this converted to a link
     }
 
     @Test

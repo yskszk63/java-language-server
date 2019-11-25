@@ -37,7 +37,7 @@ class TipFormatter {
         while (nodes.getLength() > 0) {
             var node = nodes.item(0);
             var parent = node.getParentNode();
-            var text = replace.apply(node.getTextContent());
+            var text = replace.apply(node.getTextContent().trim());
             var replacement = doc.createTextNode(text);
             parent.replaceChild(replacement, node);
             nodes = doc.getElementsByTagName(tagName);
@@ -143,11 +143,12 @@ class TipFormatter {
         replaceNodes(doc, "b", contents -> String.format("**%s**", contents));
         replaceNodes(doc, "pre", contents -> String.format("`%s`", contents));
         replaceNodes(doc, "code", contents -> String.format("`%s`", contents));
+        replaceNodes(doc, "a", contents -> contents);
 
         return print(doc);
     }
 
-    private static final Pattern HTML_TAG = Pattern.compile("<(\\w+)>");
+    private static final Pattern HTML_TAG = Pattern.compile("<(\\w+)[^>]*>");
 
     private static boolean isHtml(String text) {
         var tags = HTML_TAG.matcher(text);
