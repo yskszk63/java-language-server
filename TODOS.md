@@ -14,7 +14,6 @@
 - Fields don't show up in debugger
 - Debugger doesn't print arrays nicely
 - Rename method doesn't rename implementations
-- Can't rename method parameters
 
 ## Optimizations
 - Compilation is very slow in the presence of lots of errors

@@ -965,6 +965,8 @@ class JavaLanguageServer extends LanguageServer {
             case METHOD:
             case FIELD:
             case LOCAL_VARIABLE:
+            case PARAMETER:
+            case EXCEPTION_PARAMETER:
                 return true;
             default:
                 // TODO rename other types
@@ -996,6 +998,8 @@ class JavaLanguageServer extends LanguageServer {
                 case FIELD:
                     return renameField(compile, (VariableElement) el, params.newName);
                 case LOCAL_VARIABLE:
+                case PARAMETER:
+                case EXCEPTION_PARAMETER:
                     return renameVariable(compile, (VariableElement) el, params.newName);
                 default:
                     return Rewrite.NOT_SUPPORTED;
