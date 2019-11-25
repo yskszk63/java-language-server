@@ -13,7 +13,6 @@
 - Changing `class Foo {}` to `static class Foo {}` doesn't fix "non-static variables this" in `static void test() { new Foo() }`
 - Fields don't show up in debugger
 - Debugger doesn't print arrays nicely
-- instanceof doesn't autocomplete
 - Rename method doesn't rename implementations
 - Can't rename method parameters
 
@@ -31,9 +30,7 @@
 ## Refactorings
 - Quick fixes
     - Remove parameter
-    - Fix imports
     - Create missing method
-    - Implement abstract methods
     - public is redundant in interface methods
     - static, final are redundant in interfaces inners
 - Selection
@@ -43,5 +40,6 @@
     - Change package
     - Add parameter
     - Inline
+    - Implement single abstract method
 - Code lens
     - Inherited methods

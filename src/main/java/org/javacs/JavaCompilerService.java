@@ -202,6 +202,15 @@ class JavaCompilerService implements CompilerProvider {
     }
 
     @Override
+    public Optional<JavaFileObject> findAnywhere(String className) {
+        var file = findTopLevelDeclaration(className);
+        if (file != NOT_FOUND) {
+            return Optional.of(new SourceFileObject(file));
+        }
+        return docs.find(Ptr.toClass(packageName(className), className(className)));
+    }
+
+    @Override
     public Path findTopLevelDeclaration(String className) {
         var packageName = packageName(className);
         var simpleName = className(className);
@@ -240,6 +249,12 @@ class JavaCompilerService implements CompilerProvider {
     @Override
     public ParseTask parse(Path file) {
         var parser = Parser.parseFile(file);
+        return new ParseTask(parser.task, parser.root);
+    }
+
+    @Override
+    public ParseTask parse(JavaFileObject file) {
+        var parser = Parser.parseJavaFileObject(file);
         return new ParseTask(parser.task, parser.root);
     }
 

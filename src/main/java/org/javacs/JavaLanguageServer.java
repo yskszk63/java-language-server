@@ -1132,6 +1132,10 @@ class JavaLanguageServer extends LanguageServer {
                 if (needsConstructor == null) return List.of();
                 var generateConstructor = new GenerateRecordConstructor(needsConstructor);
                 return createQuickFix("Generate constructor", generateConstructor);
+            case "compiler.err.does.not.override.abstract":
+                var missingAbstracts = findClass(file, d.range);
+                var implementAbstracts = new ImplementAbstractMethods(missingAbstracts);
+                return createQuickFix("Implement abstract methods", implementAbstracts);
             default:
                 return List.of();
         }
@@ -1145,9 +1149,24 @@ class JavaLanguageServer extends LanguageServer {
 
     private String findClassNeedingConstructor(Path file, Range range) {
         var parse = compiler().parse(file);
-        var position = parse.root.getLineMap().getPosition(range.start.line + 1, range.start.character + 1);
-        var type = new FindClassDeclarationAt(parse.task).scan(parse.root, position);
+        var type = findClassTree(parse, range);
         if (type == null || hasConstructor(type)) return null;
+        return qualifiedName(parse, type);
+    }
+
+    private String findClass(Path file, Range range) {
+        var parse = compiler().parse(file);
+        var type = findClassTree(parse, range);
+        if (type == null) return null;
+        return qualifiedName(parse, type);
+    }
+
+    private ClassTree findClassTree(ParseTask parse, Range range) {
+        var position = parse.root.getLineMap().getPosition(range.start.line + 1, range.start.character + 1);
+        return new FindClassDeclarationAt(parse.task).scan(parse.root, position);
+    }
+
+    private String qualifiedName(ParseTask parse, ClassTree type) {
         var path = Trees.instance(parse.task).getPath(parse.root, type);
         var qualifiedName = new StringJoiner(".");
         if (parse.root.getPackageName() != null) {

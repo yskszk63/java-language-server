@@ -35,7 +35,7 @@ public class GenerateRecordConstructor implements Rewrite {
         template = template.replace("$class", simpleName(className));
         template = template.replace("$parameters", parameters);
         template = template.replace("$initializers", initializers);
-        var indent = indent(task, leaf) + 4;
+        var indent = EditHelper.indent(task.task, task.root, leaf) + 4;
         template = template.replaceAll("\n", "\n" + " ".repeat(indent));
         template = template + "\n\n";
         var insert = insertPoint(task, leaf);
@@ -87,14 +87,6 @@ public class GenerateRecordConstructor implements Rewrite {
         }
     }
 
-    private int indent(ParseTask task, ClassTree leaf) {
-        var pos = Trees.instance(task.task).getSourcePositions();
-        var lines = task.root.getLineMap();
-        var startClass = pos.getStartPosition(task.root, leaf);
-        var startLine = lines.getStartPosition(lines.getLineNumber(startClass));
-        return (int) (startClass - startLine);
-    }
-
     private String simpleName(String className) {
         var dot = className.lastIndexOf('.');
         if (dot != -1) {
@@ -106,25 +98,9 @@ public class GenerateRecordConstructor implements Rewrite {
     private Position insertPoint(ParseTask task, ClassTree leaf) {
         for (var member : leaf.getMembers()) {
             if (!(member instanceof VariableTree)) {
-                return insertBefore(task, member);
+                return EditHelper.insertBefore(task.task, task.root, member);
             }
         }
-        return insertAtEndOfClass(task, leaf);
-    }
-
-    private Position insertBefore(ParseTask task, Tree member) {
-        var pos = Trees.instance(task.task).getSourcePositions();
-        var lines = task.root.getLineMap();
-        var start = pos.getStartPosition(task.root, member);
-        var line = (int) lines.getLineNumber(start);
-        return new Position(line - 1, 0);
-    }
-
-    private Position insertAtEndOfClass(ParseTask task, ClassTree leaf) {
-        var pos = Trees.instance(task.task).getSourcePositions();
-        var lines = task.root.getLineMap();
-        var end = pos.getEndPosition(task.root, leaf);
-        var line = (int) lines.getLineNumber(end);
-        return new Position(line - 1, 0);
+        return EditHelper.insertAtEndOfClass(task.task, task.root, leaf);
     }
 }

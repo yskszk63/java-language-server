@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+// TODO this might be replaced with Elements
 class FindClassDeclarationNamed extends TreeScanner<ClassTree, String> {
     private CompilationUnitTree root;
     private List<CharSequence> qualifiedName = new ArrayList<>();

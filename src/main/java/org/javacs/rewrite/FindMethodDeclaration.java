@@ -4,6 +4,7 @@ import com.sun.source.tree.MethodTree;
 import com.sun.source.util.*;
 import java.util.function.Predicate;
 
+// TODO this might be replaced with Elements
 class FindMethodDeclaration extends TreePathScanner<MethodTree, Predicate<TreePath>> {
     @Override
     public MethodTree visitMethod(MethodTree t, Predicate<TreePath> test) {

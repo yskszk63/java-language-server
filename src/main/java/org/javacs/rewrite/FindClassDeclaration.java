@@ -4,6 +4,7 @@ import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.util.function.Predicate;
 
+// TODO this might be replaced with Elements
 class FindClassDeclaration extends TreeScanner<ClassTree, Predicate<ClassTree>> {
     @Override
     public ClassTree visitClass(ClassTree t, Predicate<ClassTree> test) {

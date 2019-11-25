@@ -2,7 +2,9 @@ package org.javacs.rewrite;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Optional;
 import java.util.Set;
+import javax.tools.JavaFileObject;
 
 public interface CompilerProvider {
     Set<String> imports();
@@ -11,6 +13,8 @@ public interface CompilerProvider {
 
     Set<String> packagePrivateTopLevelTypes(String packageName);
 
+    Optional<JavaFileObject> findAnywhere(String className);
+
     Path findTopLevelDeclaration(String className);
 
     Path[] findTypeReferences(String className);
@@ -18,6 +22,8 @@ public interface CompilerProvider {
     Path[] findMemberReferences(String className, String memberName);
 
     ParseTask parse(Path file);
+
+    ParseTask parse(JavaFileObject file);
 
     CompileTask compile(Path... files);
 

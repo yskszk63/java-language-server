@@ -1,5 +1,6 @@
 package org.javacs.rewrite;
 
+import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.util.JavacTask;
@@ -28,5 +29,29 @@ class EditHelper {
         var endPos = new Position(endLine - 1, endColumn - 1);
         var range = new Range(startPos, endPos);
         return new TextEdit(range, "");
+    }
+
+    static int indent(JavacTask task, CompilationUnitTree root, ClassTree leaf) {
+        var pos = Trees.instance(task).getSourcePositions();
+        var lines = root.getLineMap();
+        var startClass = pos.getStartPosition(root, leaf);
+        var startLine = lines.getStartPosition(lines.getLineNumber(startClass));
+        return (int) (startClass - startLine);
+    }
+
+    static Position insertBefore(JavacTask task, CompilationUnitTree root, Tree member) {
+        var pos = Trees.instance(task).getSourcePositions();
+        var lines = root.getLineMap();
+        var start = pos.getStartPosition(root, member);
+        var line = (int) lines.getLineNumber(start);
+        return new Position(line - 1, 0);
+    }
+
+    static Position insertAtEndOfClass(JavacTask task, CompilationUnitTree root, ClassTree leaf) {
+        var pos = Trees.instance(task).getSourcePositions();
+        var lines = root.getLineMap();
+        var end = pos.getEndPosition(root, leaf);
+        var line = (int) lines.getLineNumber(end);
+        return new Position(line - 1, 0);
     }
 }
