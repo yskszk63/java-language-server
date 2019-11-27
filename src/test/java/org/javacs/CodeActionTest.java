@@ -82,6 +82,11 @@ public class CodeActionTest {
                 titles("org/javacs/action/TestImplementAbstractMethods.java"), hasItem("Implement abstract methods"));
     }
 
+    @Test
+    public void testCreateMissingMethod() {
+        assertThat(titles("org/javacs/action/TestCreateMissingMethod.java"), hasItem("Create missing method"));
+    }
+
     private List<String> titles(String testFile, String... expect) {
         var file = FindResource.path(testFile);
         server.lint(List.of(file));

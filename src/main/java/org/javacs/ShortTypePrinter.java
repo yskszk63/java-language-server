@@ -66,7 +66,7 @@ class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
 
     @Override
     public String visitError(ErrorType t, Void aVoid) {
-        return "???";
+        return "_";
     }
 
     @Override

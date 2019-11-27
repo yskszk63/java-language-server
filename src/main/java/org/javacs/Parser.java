@@ -610,7 +610,7 @@ class Parser {
             return v.getName().toString();
         } else {
             LOG.warning("Don't know how to create SymbolInformation from " + t);
-            return "???";
+            return "_";
         }
     }
 

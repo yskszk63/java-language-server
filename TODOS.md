@@ -3,8 +3,6 @@
 ## Bugs 
 - Deleting file doesn't clear it from javac
 - External delete causes find-references to crash because it's still in FileStore.javaSources()
-- `return json.get("name").` doesn't auto-complete
-- `return "foo"\n.` doesn't auto-complete
 - Restart debug test doesn't work
 - Show 'not used' warnings for non-@Override package-private methods of private classes, because they can only be accessed from same file
 - Package template of new package which is sibling of existing package shows sibling + leaf, not parent + leaf.
@@ -12,6 +10,7 @@
 - Changing `class Foo {}` to `static class Foo {}` doesn't fix "non-static variables this" in `static void test() { new Foo() }`
 - Fields don't show up in debugger
 - Debugger doesn't print arrays nicely
+- When you move a class to a different package, compiler still thinks it's in the old package
 
 ## Optimizations
 - Compilation is very slow in the presence of lots of errors

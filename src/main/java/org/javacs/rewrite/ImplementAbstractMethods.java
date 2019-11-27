@@ -9,9 +9,6 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.ArrayType;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeMirror;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;
 
@@ -56,29 +53,17 @@ public class ImplementAbstractMethods implements Rewrite {
         if (method.getModifiers().contains(Modifier.PROTECTED)) {
             buf.append("protected ");
         }
-        buf.append(printType(method.getReturnType())).append(" ");
+        buf.append(EditHelper.printType(method.getReturnType())).append(" ");
         buf.append(method.getSimpleName()).append("(");
         buf.append(printParameters(method, source));
         buf.append(") {\n    // TODO\n}");
         return buf.toString();
     }
 
-    private String printType(TypeMirror type) {
-        if (type instanceof DeclaredType) {
-            var declared = (DeclaredType) type;
-            return declared.asElement().getSimpleName().toString();
-        } else if (type instanceof ArrayType) {
-            var array = (ArrayType) type;
-            return printType(array.getComponentType()) + "[]";
-        } else {
-            return type.toString();
-        }
-    }
-
     private String printParameters(ExecutableElement method, MethodTree source) {
         var join = new StringJoiner(", ");
         for (var i = 0; i < method.getParameters().size(); i++) {
-            var type = printType(method.getParameters().get(i).asType());
+            var type = EditHelper.printType(method.getParameters().get(i).asType());
             var name = source.getParameters().get(i).getName();
             join.add(type + " " + name);
         }

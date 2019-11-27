@@ -5,6 +5,9 @@ import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.Trees;
+import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeMirror;
 import org.javacs.lsp.Position;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;
@@ -31,6 +34,18 @@ class EditHelper {
         return new TextEdit(range, "");
     }
 
+    static String printType(TypeMirror type) {
+        if (type instanceof DeclaredType) {
+            var declared = (DeclaredType) type;
+            return declared.asElement().getSimpleName().toString();
+        } else if (type instanceof ArrayType) {
+            var array = (ArrayType) type;
+            return printType(array.getComponentType()) + "[]";
+        } else {
+            return type.toString();
+        }
+    }
+
     static int indent(JavacTask task, CompilationUnitTree root, ClassTree leaf) {
         var pos = Trees.instance(task).getSourcePositions();
         var lines = root.getLineMap();
@@ -45,6 +60,14 @@ class EditHelper {
         var start = pos.getStartPosition(root, member);
         var line = (int) lines.getLineNumber(start);
         return new Position(line - 1, 0);
+    }
+
+    static Position insertAfter(JavacTask task, CompilationUnitTree root, Tree member) {
+        var pos = Trees.instance(task).getSourcePositions();
+        var lines = root.getLineMap();
+        var end = pos.getEndPosition(root, member);
+        var line = (int) lines.getLineNumber(end);
+        return new Position(line, 0);
     }
 
     static Position insertAtEndOfClass(JavacTask task, CompilationUnitTree root, ClassTree leaf) {

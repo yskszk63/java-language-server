@@ -540,7 +540,7 @@ class JavaLanguageServer extends LanguageServer {
                 break;
             default:
                 LOG.warning("Don't know what to call type element " + t);
-                result.append("???");
+                result.append("_");
         }
         result.append(" ").append(ShortTypePrinter.DEFAULT.print(t.asType()));
         var superType = ShortTypePrinter.DEFAULT.print(t.getSuperclass());
@@ -1140,6 +1140,9 @@ class JavaLanguageServer extends LanguageServer {
                 var missingAbstracts = findClass(file, d.range);
                 var implementAbstracts = new ImplementAbstractMethods(missingAbstracts);
                 return createQuickFix("Implement abstract methods", implementAbstracts);
+            case "compiler.err.cant.resolve.location.args":
+                var missingMethod = new CreateMissingMethod(file, findPosition(file, d.range.start));
+                return createQuickFix("Create missing method", missingMethod);
             default:
                 return List.of();
         }
