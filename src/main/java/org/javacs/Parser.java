@@ -25,14 +25,14 @@ class Parser {
                 COMPILER.getTask(null, FILE_MANAGER, Parser::ignoreError, List.of(), List.of(), List.of(file));
     }
 
+    final JavaFileObject file;
     final String contents;
     final JavacTask task;
     final CompilationUnitTree root;
     final Trees trees;
 
     private Parser(JavaFileObject file) {
-        Objects.requireNonNull(file);
-
+        this.file = file;
         try {
             this.contents = file.getCharContent(false).toString();
         } catch (IOException e) {
@@ -48,11 +48,29 @@ class Parser {
     }
 
     static Parser parseFile(Path file) {
-        return new Parser(new SourceFileObject(file));
+        return parseJavaFileObject(new SourceFileObject(file));
+    }
+
+    private static Parser cachedParse;
+    private static long cachedModified = -1;
+
+    private static boolean needsParse(JavaFileObject file) {
+        if (cachedParse == null) return true;
+        if (!cachedParse.file.equals(file)) return true;
+        if (file.getLastModified() > cachedModified) return true;
+        return false;
+    }
+
+    private static void loadParse(JavaFileObject file) {
+        cachedParse = new Parser(file);
+        cachedModified = file.getLastModified();
     }
 
     static Parser parseJavaFileObject(JavaFileObject file) {
-        return new Parser(file);
+        if (needsParse(file)) {
+            loadParse(file);
+        }
+        return cachedParse;
     }
 
     boolean isTestMethod(TreePath path) {
