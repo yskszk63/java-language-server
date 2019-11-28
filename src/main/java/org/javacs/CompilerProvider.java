@@ -1,4 +1,4 @@
-package org.javacs.rewrite;
+package org.javacs;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;

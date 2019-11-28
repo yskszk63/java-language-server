@@ -9,6 +9,7 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.ExecutableType;
+import org.javacs.CompilerProvider;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;
 

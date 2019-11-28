@@ -6,6 +6,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.javacs.CompileTask;
+import org.javacs.CompilerProvider;
 import org.javacs.lsp.Position;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;
@@ -18,7 +20,7 @@ public class AutoAddOverrides implements Rewrite {
     }
 
     @Override
-    public Map<Path, TextEdit[]> rewrite(org.javacs.rewrite.CompilerProvider compiler) {
+    public Map<Path, TextEdit[]> rewrite(CompilerProvider compiler) {
         try (var task = compiler.compile(file)) {
             var missing = new ArrayList<TreePath>();
             new FindMissingOverride(task.task).scan(task.root(), missing);

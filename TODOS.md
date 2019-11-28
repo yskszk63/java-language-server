@@ -13,6 +13,7 @@
 - When you move a class to a different package, compiler still thinks it's in the old package
 - Override inherited method / Implement abstract methods doesn't substitute type variables
 - Imports are disappearing when errors are present
+- Delete imports from my own package
 
 ## Optimizations
 - Compilation is very slow in the presence of lots of errors
@@ -32,6 +33,7 @@
     - Create missing method
     - public is redundant in interface methods
     - static, final are redundant in interfaces inners
+    - Fix all imports in package
 - Selection
     - Extract constant
     - Extract variable

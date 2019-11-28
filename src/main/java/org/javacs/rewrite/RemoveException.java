@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
+import org.javacs.CompilerProvider;
 import org.javacs.lsp.Position;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;

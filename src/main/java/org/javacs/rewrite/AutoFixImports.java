@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
+import org.javacs.CompileTask;
+import org.javacs.CompilerProvider;
 import org.javacs.lsp.Position;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;

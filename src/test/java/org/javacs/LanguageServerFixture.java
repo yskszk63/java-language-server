@@ -6,7 +6,6 @@ import java.nio.file.Paths;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 import org.javacs.lsp.*;
-import org.javacs.rewrite.CompilerProvider;
 
 public class LanguageServerFixture {
 

@@ -3,6 +3,7 @@ package org.javacs.rewrite;
 import com.sun.source.util.Trees;
 import java.nio.file.Path;
 import java.util.Map;
+import org.javacs.CompilerProvider;
 import org.javacs.lsp.TextEdit;
 
 public class RemoveMethod implements Rewrite {

@@ -4,6 +4,7 @@ import com.sun.source.util.JavacTask;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import org.javacs.CompileTask;
 
 class FindHelper {
     final JavacTask task;

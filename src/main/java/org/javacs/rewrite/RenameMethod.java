@@ -3,6 +3,7 @@ package org.javacs.rewrite;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.logging.Logger;
+import org.javacs.CompilerProvider;
 import org.javacs.lsp.TextEdit;
 
 public class RenameMethod implements Rewrite {

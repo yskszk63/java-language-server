@@ -15,6 +15,8 @@ import java.util.Map;
 import java.util.StringJoiner;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
+import org.javacs.CompileTask;
+import org.javacs.CompilerProvider;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;
 
