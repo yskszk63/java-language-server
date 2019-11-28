@@ -40,19 +40,59 @@ class JavaCompilerService implements CompilerProvider {
         this.fileManager = new SourceFileManager();
     }
 
-    CompileBatch compileBatch(Collection<? extends JavaFileObject> sources) {
+    private CompileBatch cachedCompile;
+    private Map<JavaFileObject, Long> cachedModified = new HashMap<>();
+
+    private boolean needsCompile(Collection<? extends JavaFileObject> sources) {
+        if (cachedModified.size() != sources.size()) {
+            return true;
+        }
+        for (var f : sources) {
+            if (!cachedModified.containsKey(f)) {
+                return true;
+            }
+            if (f.getLastModified() > cachedModified.get(f)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void loadCompile(Collection<? extends JavaFileObject> sources) {
+        if (cachedCompile != null) {
+            if (!cachedCompile.closed) {
+                throw new RuntimeException("Compiler is still in-use!");
+            }
+            cachedCompile.borrow.close();
+        }
+        cachedCompile = doCompile(sources);
+        cachedModified.clear();
+        for (var f : sources) {
+            cachedModified.put(f, f.getLastModified());
+        }
+    }
+
+    CompileBatch doCompile(Collection<? extends JavaFileObject> sources) {
         var firstAttempt = new CompileBatch(this, sources);
         var addFiles = firstAttempt.needsAdditionalSources();
         if (addFiles.isEmpty()) return firstAttempt;
         // If the compiler needs additional source files that contain package-private files
-        LOG.info("Need to recompile with " + addFiles);
+        LOG.info("...need to recompile with " + addFiles);
         firstAttempt.close();
+        firstAttempt.borrow.close();
         var moreSources = new ArrayList<JavaFileObject>();
         moreSources.addAll(sources);
         for (var add : addFiles) {
             moreSources.add(new SourceFileObject(add));
         }
         return new CompileBatch(this, moreSources);
+    }
+
+    CompileBatch compileBatch(Collection<? extends JavaFileObject> sources) {
+        if (needsCompile(sources)) {
+            loadCompile(sources);
+        }
+        return cachedCompile;
     }
 
     List<SymbolInformation> findSymbols(String query, int limit) {
@@ -260,10 +300,6 @@ class JavaCompilerService implements CompilerProvider {
 
     @Override
     public CompileTask compile(Path... files) {
-        // TODO since the java compiler is a singleton, instead of making CompileTask closeable,
-        // we could simply maintain a reference to the active CompileTask and close it when someone requests a new one.
-        // This would also allow us to re-use the previous CompileTask when the files are the same and they haven't been
-        // modified.
         var sources = new ArrayList<JavaFileObject>();
         for (var f : files) {
             sources.add(new SourceFileObject(f));

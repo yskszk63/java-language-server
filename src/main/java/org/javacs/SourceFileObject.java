@@ -35,6 +35,11 @@ class SourceFileObject implements JavaFileObject {
     }
 
     @Override
+    public int hashCode() {
+        return this.path.hashCode();
+    }
+
+    @Override
     public Kind getKind() {
         var name = path.getFileName().toString();
         return kindFromExtension(name);
@@ -120,5 +125,10 @@ class SourceFileObject implements JavaFileObject {
     @Override
     public boolean delete() {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String toString() {
+        return path.toString();
     }
 }

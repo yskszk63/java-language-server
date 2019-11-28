@@ -23,6 +23,7 @@
 - Search for methods in source and deps based on return type, parameters
 - "Find implementations" code lens on interfaces
 - Rename other types (see JavaLanguageServer#canRename)
+- set.contains(wrongType) should show some kind of warning (and probably other collections methods too)
 
 ## Refactorings
 - Quick fixes

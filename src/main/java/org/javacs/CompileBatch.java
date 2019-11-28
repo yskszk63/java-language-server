@@ -27,8 +27,11 @@ import org.javacs.lsp.*;
 class CompileBatch implements AutoCloseable {
     static final int MAX_COMPLETION_ITEMS = 50;
 
-    private final JavaCompilerService parent;
-    private final ReusableCompiler.Borrow borrow;
+    final JavaCompilerService parent;
+    final ReusableCompiler.Borrow borrow;
+    /** Indicates the task that requested the compilation is finished with it. */
+    boolean closed;
+
     final JavacTask task;
     final Trees trees;
     final Elements elements;
@@ -105,7 +108,7 @@ class CompileBatch implements AutoCloseable {
 
     @Override
     public void close() {
-        borrow.close();
+        closed = true;
     }
 
     private static ReusableCompiler.Borrow batchTask(

@@ -63,7 +63,7 @@ class JavaLanguageServer extends LanguageServer {
     private List<SourceFileObject> asSourceFiles(Collection<Path> files) {
         var sources = new ArrayList<SourceFileObject>();
         for (var f : files) {
-            sources.add(new SourceFileObject(f, FileStore.contents(f), FileStore.modified(f)));
+            sources.add(new SourceFileObject(f));
         }
         return sources;
     }
@@ -1079,16 +1079,15 @@ class JavaLanguageServer extends LanguageServer {
                 String.format(
                         "Find code actions at %s(%d)...",
                         params.textDocument.uri.getPath(), params.range.start.line + 1));
-        var tick = Instant.now();
+        var started = Instant.now();
         var file = Paths.get(params.textDocument.uri);
         // TODO this get-map / convert-to-CodeAction split is an ugly workaround of the fact that we need a new compile
         // task to generate the code actions
         // If we switch to resolving code actions asynchronously using Command, that will fix this problem.
         var rewrites = new HashMap<String, Rewrite>();
         try (var task = compiler().compile(file)) {
-            var elapsed = Duration.between(tick, Instant.now()).toMillis();
+            var elapsed = Duration.between(started, Instant.now()).toMillis();
             LOG.info(String.format("...compiled in %d ms", elapsed));
-            tick = Instant.now();
             var cursor =
                     task.root().getLineMap().getPosition(params.range.start.line + 1, params.range.start.character + 1);
             rewrites.putAll(overrideInheritedMethods(task, file, cursor));
@@ -1098,7 +1097,7 @@ class JavaLanguageServer extends LanguageServer {
             // TODO are these all quick fixes?
             actions.addAll(createQuickFix(title, rewrites.get(title)));
         }
-        var elapsed = Duration.between(tick, Instant.now()).toMillis();
+        var elapsed = Duration.between(started, Instant.now()).toMillis();
         LOG.info(String.format("...created %d actions in %d ms", actions.size(), elapsed));
         return actions;
     }

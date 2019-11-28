@@ -132,8 +132,8 @@ class ReusableCompiler {
     }
 
     class Borrow implements AutoCloseable {
-        public final JavacTask task;
-        private boolean closed;
+        final JavacTask task;
+        boolean closed;
 
         Borrow(JavacTask task, ReusableContext ctx) {
             this.task = task;

@@ -130,8 +130,8 @@ class FileStore {
 
     static Instant modified(Path file) {
         // If file is open, use last in-memory modification time
-        if (activeDocuments.containsKey(file.toUri())) {
-            return activeDocuments.get(file.toUri()).modified;
+        if (activeDocuments.containsKey(file)) {
+            return activeDocuments.get(file).modified;
         }
         // If we've never checked before, look up modified time on disk
         if (!javaSources.containsKey(file)) {
