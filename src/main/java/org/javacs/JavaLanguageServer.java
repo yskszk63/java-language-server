@@ -15,6 +15,8 @@ import javax.lang.model.element.*;
 import javax.lang.model.type.TypeKind;
 import javax.tools.JavaFileObject;
 import org.javacs.lsp.*;
+import org.javacs.markup.ColorProvider;
+import org.javacs.markup.ErrorProvider;
 import org.javacs.rewrite.*;
 
 class JavaLanguageServer extends LanguageServer {
@@ -47,38 +49,21 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     void lint(Collection<Path> files) {
-        if (files.isEmpty()) {
-            return;
-        }
+        if (files.isEmpty()) return;
         LOG.info("Lint " + files.size() + " files...");
         var started = Instant.now();
-        var sources = asSourceFiles(files);
-        try (var batch = compiler().compileBatch(sources)) {
-            LOG.info(String.format("...compiled in %d ms", elapsed(started)));
-            publishDiagnostics(files, batch);
+        try (var task = compiler().compile(files.toArray(Path[]::new))) {
+            var compiled = Instant.now();
+            LOG.info("...compiled in " + Duration.between(started, compiled).toMillis() + " ms");
+            for (var errs : new ErrorProvider(task).errors()) {
+                client.publishDiagnostics(errs);
+            }
+            for (var colors : new ColorProvider(task).colors()) {
+                client.customNotification("java/colors", GSON.toJsonTree(colors));
+            }
+            var published = Instant.now();
+            LOG.info("...published in " + Duration.between(started, published).toMillis() + " ms");
         }
-        LOG.info(String.format("...linted in %d ms", elapsed(started)));
-    }
-
-    private List<SourceFileObject> asSourceFiles(Collection<Path> files) {
-        var sources = new ArrayList<SourceFileObject>();
-        for (var f : files) {
-            sources.add(new SourceFileObject(f));
-        }
-        return sources;
-    }
-
-    private void publishDiagnostics(Collection<Path> files, CompileBatch batch) {
-        for (var f : files) {
-            var errors = batch.reportErrors(f);
-            var colors = batch.colors(f);
-            client.publishDiagnostics(new PublishDiagnosticsParams(f.toUri(), errors));
-            client.customNotification("java/colors", GSON.toJsonTree(colors));
-        }
-    }
-
-    private long elapsed(Instant since) {
-        return Duration.between(since, Instant.now()).toMillis();
     }
 
     static final Gson GSON = new GsonBuilder().registerTypeAdapter(Ptr.class, new PtrAdapter()).create();

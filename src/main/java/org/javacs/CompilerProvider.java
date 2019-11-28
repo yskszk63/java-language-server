@@ -2,6 +2,7 @@ package org.javacs;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
 import javax.tools.JavaFileObject;
@@ -26,6 +27,8 @@ public interface CompilerProvider {
     ParseTask parse(JavaFileObject file);
 
     CompileTask compile(Path... files);
+
+    CompileTask compile(Collection<? extends JavaFileObject> sources);
 
     Path NOT_FOUND = Paths.get("");
 }

@@ -13,7 +13,7 @@ import org.javacs.lsp.DidCloseTextDocumentParams;
 import org.javacs.lsp.DidOpenTextDocumentParams;
 import org.javacs.lsp.TextDocumentContentChangeEvent;
 
-class FileStore {
+public class FileStore {
 
     private static final Set<Path> workspaceRoots = new HashSet<>();
 
@@ -243,7 +243,7 @@ class FileStore {
         return activeDocuments.get(file).version;
     }
 
-    static String contents(Path file) {
+    public static String contents(Path file) {
         if (!isJavaFile(file)) {
             throw new RuntimeException(file + " is not a java file");
         }

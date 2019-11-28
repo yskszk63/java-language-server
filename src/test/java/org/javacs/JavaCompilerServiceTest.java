@@ -45,14 +45,6 @@ public class JavaCompilerServiceTest {
     }
 
     @Test
-    public void reportErrors() {
-        var file = resourceFile("HasError.java");
-        var files = Collections.singleton(new SourceFileObject(file));
-        var diags = compiler.compileBatch(files).reportErrors(file);
-        assertThat(diags, not(empty()));
-    }
-
-    @Test
     public void matchesPartialName() {
         assertTrue(StringSearch.matchesPartialName("foobar", "foo"));
         assertFalse(StringSearch.matchesPartialName("foo", "foobar"));

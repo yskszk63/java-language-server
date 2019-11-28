@@ -1,22 +1,19 @@
-package org.javacs;
+package org.javacs.markup;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
 import javax.lang.model.element.*;
+import org.javacs.FileStore;
 
-class Colorizer extends TreePathScanner<Void, Void> {
+class Colorizer extends TreePathScanner<Void, SemanticColors> {
     private final Trees trees;
-    final ColorsHolder colors = new ColorsHolder();
 
     Colorizer(JavacTask task) {
         trees = Trees.instance(task);
     }
 
-    private void check(Name name) {
+    private void check(Name name, SemanticColors colors) {
         if (name.contentEquals("this") || name.contentEquals("super") || name.contentEquals("class")) {
             return;
         }
@@ -50,50 +47,34 @@ class Colorizer extends TreePathScanner<Void, Void> {
             var region = contents.substring(start, end);
             start += region.indexOf(name.toString());
             end = start + name.length();
-            var span = new Span(start, end);
-            colors.fields.add(span);
+            var range = RangeHelper.range(root, start, end);
+            colors.fields.add(range);
             if (toEl.getModifiers().contains(Modifier.STATIC)) {
-                colors.statics.add(span);
+                colors.statics.add(range);
             }
         }
     }
 
     @Override
-    public Void visitIdentifier(IdentifierTree t, Void __) {
-        check(t.getName());
-        return super.visitIdentifier(t, null);
+    public Void visitIdentifier(IdentifierTree t, SemanticColors colors) {
+        check(t.getName(), colors);
+        return super.visitIdentifier(t, colors);
     }
 
     @Override
-    public Void visitMemberSelect(MemberSelectTree t, Void __) {
-        check(t.getIdentifier());
-        return super.visitMemberSelect(t, null);
+    public Void visitMemberSelect(MemberSelectTree t, SemanticColors colors) {
+        check(t.getIdentifier(), colors);
+        return super.visitMemberSelect(t, colors);
     }
 
     @Override
-    public Void visitVariable(VariableTree t, Void __) {
-        check(t.getName());
-        return super.visitVariable(t, null);
+    public Void visitVariable(VariableTree t, SemanticColors colors) {
+        check(t.getName(), colors);
+        return super.visitVariable(t, colors);
     }
 
     @Override
-    public Void visitCompilationUnit(CompilationUnitTree t, Void __) {
-        return super.visitCompilationUnit(t, null);
-    }
-}
-
-class ColorsHolder {
-    List<Span> statics = new ArrayList<>(), fields = new ArrayList<>();
-
-    SemanticColors lspSemanticColors(Path file, LineMap lines) {
-        var colors = new SemanticColors();
-        colors.uri = file.toUri();
-        for (var span : statics) {
-            colors.statics.add(span.asRange(lines));
-        }
-        for (var span : fields) {
-            colors.fields.add(span.asRange(lines));
-        }
-        return colors;
+    public Void visitCompilationUnit(CompilationUnitTree t, SemanticColors colors) {
+        return super.visitCompilationUnit(t, colors);
     }
 }

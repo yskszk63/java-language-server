@@ -1,4 +1,4 @@
-package org.javacs;
+package org.javacs.markup;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;

@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
 import java.nio.file.Path;
+import org.javacs.CompilerProvider;
 import org.javacs.LanguageServerFixture;
 import org.junit.Test;
 

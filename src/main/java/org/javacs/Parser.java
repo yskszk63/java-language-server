@@ -894,23 +894,6 @@ class Parser {
         return prune(root, pos, buffer, cursors, true);
     }
 
-    String prune(Span block) {
-        if (block == Span.EMPTY || block == Span.INVALID) return contents;
-        var pos = Trees.instance(task).getSourcePositions();
-        var buffer = new StringBuilder(contents);
-        /*
-        TODO: This will erase inner blocks like
-        void test() {
-            foo.|
-            {
-                innerBlock();
-            }
-        }
-        */
-        long[] cursors = {block.start + 1, block.until - 1};
-        return prune(root, pos, buffer, cursors, false);
-    }
-
     String eraseCase(long cursor) {
         var path = findPath(cursor);
         while (path != null && path.getLeaf().getKind() != Tree.Kind.CASE) {
@@ -946,27 +929,6 @@ class Parser {
         var buffer = new StringBuilder(contents);
         var pos = Trees.instance(task).getSourcePositions();
         return prune(root, pos, buffer, offsets, false);
-    }
-
-    Span enclosingMethod(int start, int end) {
-        var pos = Trees.instance(task).getSourcePositions();
-        class FindEnclosingMethod extends TreeScanner<Void, Void> {
-            Span found = Span.INVALID;
-
-            @Override
-            public Void visitMethod(MethodTree method, Void __) {
-                var body = method.getBody();
-                var startBody = (int) pos.getStartPosition(root, body);
-                var endBody = (int) pos.getEndPosition(root, body);
-                if (startBody < start && end < endBody) {
-                    found = new Span(startBody, endBody);
-                }
-                return super.visitMethod(method, null);
-            }
-        }
-        var find = new FindEnclosingMethod();
-        find.scan(root, null);
-        return find.found;
     }
 
     static Set<Path> potentialReferences(Path file, String name, boolean isType, Set<Modifier> flags) {

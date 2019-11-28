@@ -307,6 +307,11 @@ class JavaCompilerService implements CompilerProvider {
         for (var f : files) {
             sources.add(new SourceFileObject(f));
         }
+        return compile(sources);
+    }
+
+    @Override
+    public CompileTask compile(Collection<? extends JavaFileObject> sources) {
         var compile = compileBatch(sources);
         return new CompileTask(compile.task, compile.roots, diags, compile::close);
     }
