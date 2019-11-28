@@ -22,7 +22,7 @@ public class ImplementAbstractMethods implements Rewrite {
 
     @Override
     public Map<Path, TextEdit[]> rewrite(CompilerProvider compiler) {
-        var file = compiler.findTopLevelDeclaration(className);
+        var file = compiler.findTypeDeclaration(className);
         var insertText = new StringJoiner("\n");
         try (var task = compiler.compile(file)) {
             var elements = task.task.getElements();

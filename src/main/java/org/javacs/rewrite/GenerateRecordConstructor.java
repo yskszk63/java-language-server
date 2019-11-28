@@ -27,7 +27,7 @@ public class GenerateRecordConstructor implements Rewrite {
     @Override
     public Map<Path, TextEdit[]> rewrite(CompilerProvider compiler) {
         // TODO this needs to fall back on looking for inner classes and package-private classes
-        var file = compiler.findTopLevelDeclaration(className);
+        var file = compiler.findTypeDeclaration(className);
         try (var task = compiler.compile(file)) {
             var typeElement = task.task.getElements().getTypeElement(className);
             var typePath = Trees.instance(task.task).getPath(typeElement);

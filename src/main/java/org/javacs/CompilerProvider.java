@@ -15,7 +15,7 @@ public interface CompilerProvider {
 
     Optional<JavaFileObject> findAnywhere(String className);
 
-    Path findTopLevelDeclaration(String className);
+    Path findTypeDeclaration(String className);
 
     Path[] findTypeReferences(String className);
 

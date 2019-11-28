@@ -22,7 +22,7 @@ public class AddException implements Rewrite {
 
     @Override
     public Map<Path, TextEdit[]> rewrite(CompilerProvider compiler) {
-        var file = compiler.findTopLevelDeclaration(className);
+        var file = compiler.findTypeDeclaration(className);
         if (file == CompilerProvider.NOT_FOUND) {
             return CANCELLED;
         }

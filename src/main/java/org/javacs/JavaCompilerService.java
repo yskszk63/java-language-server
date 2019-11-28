@@ -7,7 +7,6 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import javax.tools.*;
 import org.javacs.lsp.SymbolInformation;
-import org.javacs.rewrite.*;
 
 class JavaCompilerService implements CompilerProvider {
     // Not modifiable! If you want to edit these, you need to create a new instance
@@ -135,10 +134,10 @@ class JavaCompilerService implements CompilerProvider {
         return "";
     }
 
-    private static final Pattern CLASS_EXTRACTOR = Pattern.compile("[A-Z][_a-zA-Z0-9]*$");
+    private static final Pattern SIMPLE_EXTRACTOR = Pattern.compile("[A-Z][_a-zA-Z0-9]*$");
 
-    private String className(String className) {
-        var m = CLASS_EXTRACTOR.matcher(className);
+    private String simpleName(String className) {
+        var m = SIMPLE_EXTRACTOR.matcher(className);
         if (m.find()) {
             return m.group();
         }
@@ -245,18 +244,20 @@ class JavaCompilerService implements CompilerProvider {
 
     @Override
     public Optional<JavaFileObject> findAnywhere(String className) {
-        var file = findTopLevelDeclaration(className);
+        var file = findTypeDeclaration(className);
         if (file != NOT_FOUND) {
             return Optional.of(new SourceFileObject(file));
         }
-        return docs.find(Ptr.toClass(packageName(className), className(className)));
+        return docs.find(Ptr.toClass(packageName(className), simpleName(className)));
     }
 
     @Override
-    public Path findTopLevelDeclaration(String className) {
+    public Path findTypeDeclaration(String className) {
         var packageName = packageName(className);
-        var simpleName = className(className);
+        var simpleName = simpleName(className);
         for (var f : FileStore.list(packageName)) {
+            // TODO we can be more efficient when we know we're only interested in public classes, for example in
+            // autocomplete
             if (containsWord(f, simpleName) && containsType(f, className)) {
                 return f;
             }
