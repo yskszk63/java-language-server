@@ -2,6 +2,7 @@ package org.javacs;
 
 import com.google.gson.*;
 import com.sun.source.tree.*;
+import com.sun.source.util.JavacTask;
 import com.sun.source.util.Trees;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -251,7 +252,7 @@ class JavaLanguageServer extends LanguageServer {
             switch (name) {
                 case "BUILD":
                 case "pom.xml":
-                    LOG.info("Compiler needs to be re-created because " + file + "has changed");
+                    LOG.info("Compiler needs to be re-created because " + file + " has changed");
                     modifiedBuild = true;
             }
         }
@@ -1066,9 +1067,66 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public List<CodeAction> codeAction(CodeActionParams params) {
+        if (params.context.diagnostics.isEmpty()) {
+            return codeActionsForCursor(params);
+        } else {
+            return codeActionForDiagnostics(params);
+        }
+    }
+
+    private List<CodeAction> codeActionsForCursor(CodeActionParams params) {
+        var file = Paths.get(params.textDocument.uri);
+        // TODO this get-map / convert-to-CodeAction split is an ugly workaround of the fact that we need a new compile
+        // task to generate the code actions
+        // If we switch to resolving code actions asynchronously using Command, that will fix this problem.
+        var rewrites = new HashMap<String, Rewrite>();
+        try (var task = compiler().compile(file)) {
+            var cursor =
+                    task.root().getLineMap().getPosition(params.range.start.line + 1, params.range.start.character + 1);
+            rewrites.putAll(overrideInheritedMethods(task, file, cursor));
+        }
+        var actions = new ArrayList<CodeAction>();
+        for (var title : rewrites.keySet()) {
+            actions.addAll(createQuickFix(title, rewrites.get(title)));
+        }
+        return actions;
+    }
+
+    private Map<String, Rewrite> overrideInheritedMethods(CompileTask task, Path file, long cursor) {
+        // TODO: It would be better to get the TreePath to the cursor *once* and then use it repeatedly
+        var methodTree = new FindMethodDeclarationAt(task.task).scan(task.root(), cursor);
+        if (methodTree != null) {
+            return Map.of();
+        }
+        var classTree = new FindClassDeclarationAt(task.task).scan(task.root(), cursor);
+        if (classTree == null) {
+            return Map.of();
+        }
+        var actions = new HashMap<String, Rewrite>();
+        var trees = Trees.instance(task.task);
+        var elements = task.task.getElements();
+        var classElement = (TypeElement) trees.getElement(trees.getPath(task.root(), classTree));
+        for (var member : elements.getAllMembers(classElement)) {
+            if (member.getModifiers().contains(Modifier.FINAL)) continue;
+            if (member.getKind() != ElementKind.METHOD) continue;
+            var method = (ExecutableElement) member;
+            var methodSource = (TypeElement) member.getEnclosingElement();
+            if (methodSource.getQualifiedName().contentEquals("java.lang.Object")) continue;
+            if (methodSource.equals(classElement)) continue;
+            var ptr = new MethodPtr(task.task, method);
+            var rewrite =
+                    new OverrideInheritedMethod(
+                            ptr.className, ptr.methodName, ptr.erasedParameterTypes, file, (int) cursor);
+            var title = "Override inherited method '" + method.getSimpleName() + "'";
+            actions.put(title, rewrite);
+        }
+        return actions;
+    }
+
+    private List<CodeAction> codeActionForDiagnostics(CodeActionParams params) {
+        var file = Paths.get(params.textDocument.uri);
         var actions = new ArrayList<CodeAction>();
         for (var d : params.context.diagnostics) {
-            var file = Paths.get(params.textDocument.uri);
             var newActions = codeActionForDiagnostic(file, d);
             actions.addAll(newActions);
         }
@@ -1203,29 +1261,31 @@ class JavaLanguageServer extends LanguageServer {
     private MethodPtr findMethod(Path file, Range range) {
         try (var task = compiler().compile(file)) {
             var trees = Trees.instance(task.task);
-            var types = task.task.getTypes();
             var position = task.root().getLineMap().getPosition(range.start.line + 1, range.start.character + 1);
             var tree = new FindMethodDeclarationAt(task.task).scan(task.root(), position);
             var path = trees.getPath(task.root(), tree);
             var method = (ExecutableElement) trees.getElement(path);
-            var parent = (TypeElement) method.getEnclosingElement();
-            var p = new MethodPtr();
-            p.className = parent.getQualifiedName().toString();
-            p.methodName = method.getSimpleName().toString();
-            p.erasedParameterTypes = new String[method.getParameters().size()];
-            for (var i = 0; i < p.erasedParameterTypes.length; i++) {
-                var param = method.getParameters().get(i);
-                var type = param.asType();
-                var erased = types.erasure(type);
-                p.erasedParameterTypes[i] = erased.toString();
-            }
-            return p;
+            return new MethodPtr(task.task, method);
         }
     }
 
     class MethodPtr {
         String className, methodName;
         String[] erasedParameterTypes;
+
+        MethodPtr(JavacTask task, ExecutableElement method) {
+            var types = task.getTypes();
+            var parent = (TypeElement) method.getEnclosingElement();
+            className = parent.getQualifiedName().toString();
+            methodName = method.getSimpleName().toString();
+            erasedParameterTypes = new String[method.getParameters().size()];
+            for (var i = 0; i < erasedParameterTypes.length; i++) {
+                var param = method.getParameters().get(i);
+                var type = param.asType();
+                var erased = types.erasure(type);
+                erasedParameterTypes[i] = erased.toString();
+            }
+        }
     }
 
     private static final Pattern NOT_THROWN_EXCEPTION = Pattern.compile("^'((\\w+\\.)*\\w+)' is not thrown");

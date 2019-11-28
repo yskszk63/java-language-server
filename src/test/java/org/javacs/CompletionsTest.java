@@ -885,14 +885,6 @@ public class CompletionsTest extends CompletionsBase {
     }
 
     @Test
-    public void overrideMethod() {
-        var file = "/org/javacs/example/AutocompleteOverride.java";
-        var suggestions = insertText(file, 8, 15);
-
-        assertThat(suggestions, hasItem(containsString("void superMethod() {")));
-    }
-
-    @Test
     public void stringBuilderLength() {
         var file = "/org/javacs/example/CompleteStringBuilderLength.java";
         var suggestions = filterText(file, 6, 12);

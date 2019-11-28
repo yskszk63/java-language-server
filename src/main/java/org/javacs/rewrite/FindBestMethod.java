@@ -32,7 +32,9 @@ class FindBestMethod extends TreeScanner<MethodTree, ExecutableElement> {
             return false;
         }
         for (var i = 0; i < candidate.getParameters().size(); i++) {
-            if (!typeMatches(candidate.getParameters().get(i), find.getParameters().get(i).asType())) ;
+            if (!typeMatches(candidate.getParameters().get(i), find.getParameters().get(i).asType())) {
+                return false;
+            }
         }
         return true;
     }
@@ -43,7 +45,7 @@ class FindBestMethod extends TreeScanner<MethodTree, ExecutableElement> {
         } else if (find instanceof DeclaredType) {
             var declared = (DeclaredType) find;
             var name = declared.asElement().getSimpleName();
-            var pattern = Pattern.compile("^(\\w\\.)+" + name);
+            var pattern = Pattern.compile("^(\\w\\.)*" + name);
             return pattern.matcher(candidate.toString()).find();
         } else if (find instanceof ArrayType) {
             if (!(candidate instanceof ArrayTypeTree)) {

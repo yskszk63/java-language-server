@@ -23,10 +23,14 @@ class FindHelper {
 
     boolean isSameMethod(TreePath path, String className, String methodName, String[] erasedParameterTypes) {
         var trees = Trees.instance(task);
-        var types = task.getTypes();
         var candidate = trees.getElement(path);
         if (!(candidate instanceof ExecutableElement)) return false;
         var method = (ExecutableElement) candidate;
+        return isSameMethod(method, className, methodName, erasedParameterTypes);
+    }
+
+    boolean isSameMethod(ExecutableElement method, String className, String methodName, String[] erasedParameterTypes) {
+        var types = task.getTypes();
         var parent = (TypeElement) method.getEnclosingElement();
         if (!parent.getQualifiedName().contentEquals(className)) return false;
         if (!method.getSimpleName().contentEquals(methodName)) return false;

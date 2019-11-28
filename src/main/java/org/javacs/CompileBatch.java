@@ -635,23 +635,6 @@ class CompileBatch implements AutoCloseable {
 
     List<CompletionItem> completeAnnotations(Path file, int cursor, String partialName) {
         var result = new ArrayList<CompletionItem>();
-        // Add @Override ... snippet
-        if ("Override".startsWith(partialName)) {
-            // TODO filter out already-implemented methods using thisMethods
-            var alreadyShown = new HashSet<String>();
-            for (var method : superMethods(file, cursor)) {
-                var mods = method.getModifiers();
-                if (mods.contains(Modifier.STATIC) || mods.contains(Modifier.PRIVATE)) continue;
-
-                var label = "@Override " + ShortTypePrinter.DEFAULT.printMethod(method);
-                var snippet = "Override\n" + new TemplatePrinter().printMethod(method) + " {\n    $0\n}";
-                var override = snippetCompletion(label, snippet);
-                if (!alreadyShown.contains(label)) {
-                    result.add(override);
-                    alreadyShown.add(label);
-                }
-            }
-        }
         // Add @Override, @Test, other simple class names
         var inScope = completeScopeIdentifiers(file, cursor, partialName, false, false);
         result.addAll(inScope);
@@ -943,49 +926,6 @@ class CompileBatch implements AutoCloseable {
         "float",
         "double",
     };
-
-    private List<ExecutableElement> virtualMethods(DeclaredType type) {
-        var result = new ArrayList<ExecutableElement>();
-        for (var member : type.asElement().getEnclosedElements()) {
-            if (member instanceof ExecutableElement) {
-                var method = (ExecutableElement) member;
-                if (!method.getSimpleName().contentEquals("<init>")
-                        && !method.getModifiers().contains(Modifier.STATIC)) {
-                    result.add(method);
-                }
-            }
-        }
-        return result;
-    }
-
-    private TypeMirror enclosingClass(Path file, int cursor) {
-        var path = findPath(file, cursor);
-        while (!(path.getLeaf() instanceof ClassTree)) {
-            path = path.getParentPath();
-        }
-        return trees.getElement(path).asType();
-    }
-
-    private void collectSuperMethods(TypeMirror thisType, List<ExecutableElement> result) {
-        var types = borrow.task.getTypes();
-
-        for (var superType : types.directSupertypes(thisType)) {
-            if (superType instanceof DeclaredType) {
-                var type = (DeclaredType) superType;
-                result.addAll(virtualMethods(type));
-                collectSuperMethods(type, result);
-            }
-        }
-    }
-
-    private List<ExecutableElement> superMethods(Path file, int cursor) {
-        var thisType = enclosingClass(file, cursor);
-        var result = new ArrayList<ExecutableElement>();
-
-        collectSuperMethods(thisType, result);
-
-        return result;
-    }
 
     private boolean isImported(Path file, String qualifiedName) {
         var root = root(file);

@@ -20,37 +20,37 @@ public class CodeActionTest {
 
     @Test
     public void testCantConvertToStatement() {
-        assertThat(titles("org/javacs/action/TestCantConvertToStatement.java"), empty());
+        assertThat(quickFix("org/javacs/action/TestCantConvertToStatement.java"), empty());
     }
 
     @Test
     public void testConvertToStatement() {
-        assertThat(titles("org/javacs/action/TestConvertToStatement.java"), contains("Convert to statement"));
+        assertThat(quickFix("org/javacs/action/TestConvertToStatement.java"), contains("Convert to statement"));
     }
 
     @Test
     public void testConvertToBlock() {
-        assertThat(titles("org/javacs/action/TestConvertToBlock.java"), contains("Convert to block"));
+        assertThat(quickFix("org/javacs/action/TestConvertToBlock.java"), contains("Convert to block"));
     }
 
     @Test
     public void testRemoveDeclaration() {
-        assertThat(titles("org/javacs/action/TestRemoveDeclaration.java"), contains("Remove method"));
+        assertThat(quickFix("org/javacs/action/TestRemoveDeclaration.java"), contains("Remove method"));
     }
 
     @Test
     public void testUnusedException() {
-        assertThat(titles("org/javacs/action/TestUnusedException.java"), empty());
+        assertThat(quickFix("org/javacs/action/TestUnusedException.java"), empty());
     }
 
     @Test
     public void testSuppressWarning() {
-        assertThat(titles("org/javacs/action/TestSuppressWarning.java"), contains("Suppress 'unchecked' warning"));
+        assertThat(quickFix("org/javacs/action/TestSuppressWarning.java"), contains("Suppress 'unchecked' warning"));
     }
 
     @Test
     public void testAddThrows() {
-        assertThat(titles("org/javacs/action/TestAddThrows.java"), contains("Add 'throws'"));
+        assertThat(quickFix("org/javacs/action/TestAddThrows.java"), contains("Add 'throws'"));
     }
 
     @Test
@@ -58,51 +58,69 @@ public class CodeActionTest {
         String[] expect = {
             "Import 'java.util.List'", "Import 'com.google.gson.Gson'", "Import 'com.sun.source.util.TreePathScanner'"
         };
-        assertThat(titles("org/javacs/action/TestAddImport.java"), hasItems(expect));
+        assertThat(quickFix("org/javacs/action/TestAddImport.java"), hasItems(expect));
     }
 
     @Test
     public void testRemoveNotThrown() {
-        assertThat(titles("org/javacs/action/TestRemoveNotThrown.java"), contains("Remove 'IOException'"));
+        assertThat(quickFix("org/javacs/action/TestRemoveNotThrown.java"), contains("Remove 'IOException'"));
     }
 
     @Test
     public void testGenerateConstructor() {
-        assertThat(titles("org/javacs/action/TestGenerateConstructor.java"), contains("Generate constructor"));
+        assertThat(quickFix("org/javacs/action/TestGenerateConstructor.java"), contains("Generate constructor"));
     }
 
     @Test
     public void testDontGenerateConstructor() {
-        assertThat(titles("org/javacs/action/TestDontGenerateConstructor.java"), not(hasItem("Generate constructor")));
+        assertThat(
+                quickFix("org/javacs/action/TestDontGenerateConstructor.java"), not(hasItem("Generate constructor")));
     }
 
     @Test
     public void testImplementAbstractMethods() {
         assertThat(
-                titles("org/javacs/action/TestImplementAbstractMethods.java"), hasItem("Implement abstract methods"));
+                quickFix("org/javacs/action/TestImplementAbstractMethods.java"), hasItem("Implement abstract methods"));
+    }
+
+    @Test
+    public void testOverrideInheritedMethod() {
+        assertThat(
+                forCursor("org/javacs/action/TestOverrideInheritedMethod.java", 6, 1),
+                hasItem("Override inherited method 'andThen'"));
     }
 
     @Test
     public void testCreateMissingMethod() {
-        assertThat(titles("org/javacs/action/TestCreateMissingMethod.java"), hasItem("Create missing method"));
+        assertThat(quickFix("org/javacs/action/TestCreateMissingMethod.java"), hasItem("Create missing method"));
     }
 
-    private List<String> titles(String testFile, String... expect) {
+    private List<String> quickFix(String testFile) {
         var file = FindResource.path(testFile);
         server.lint(List.of(file));
         var params = new CodeActionParams();
         params.textDocument = new TextDocumentIdentifier(file.toUri());
-        params.context = new CodeActionContext();
         params.context.diagnostics = errors;
         var actions = server.codeAction(params);
         return extractTitles(actions);
     }
 
+    private List<String> forCursor(String testFile, int line, int column) {
+        var file = FindResource.path(testFile);
+        var cursor = new Position(line - 1, column - 1);
+        server.lint(List.of(file));
+        var params = new CodeActionParams();
+        params.textDocument = new TextDocumentIdentifier(file.toUri());
+        params.range = new Range(cursor, cursor);
+        var actions = server.codeAction(params);
+        return extractTitles(actions);
+    }
+
     private List<String> extractTitles(List<CodeAction> actions) {
-        var titles = new ArrayList<String>();
+        var quickFix = new ArrayList<String>();
         for (var a : actions) {
-            titles.add(a.title);
+            quickFix.add(a.title);
         }
-        return titles;
+        return quickFix;
     }
 }

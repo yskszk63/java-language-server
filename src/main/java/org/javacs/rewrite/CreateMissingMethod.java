@@ -72,7 +72,7 @@ public class CreateMissingMethod implements Rewrite {
             returnType = "_";
         }
         var parameters = printParameters(task, call);
-        return returnType + " " + methodName + "(" + parameters + ")";
+        return "private " + returnType + " " + methodName + "(" + parameters + ")";
     }
 
     private String printParameters(CompileTask task, MethodInvocationTree call) {
@@ -130,7 +130,7 @@ public class CreateMissingMethod implements Rewrite {
         if (type instanceof DeclaredType) {
             var declared = (DeclaredType) type;
             var name = declared.asElement().getSimpleName();
-            return "" + Character.toUpperCase(name.charAt(0)) + name.subSequence(1, name.length());
+            return "" + Character.toLowerCase(name.charAt(0)) + name.subSequence(1, name.length());
         } else {
             return "";
         }

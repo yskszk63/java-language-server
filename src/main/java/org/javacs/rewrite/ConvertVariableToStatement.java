@@ -29,6 +29,9 @@ public class ConvertVariableToStatement implements Rewrite {
             return CANCELLED;
         }
         var expression = variable.getInitializer();
+        if (expression == null) {
+            return CANCELLED;
+        }
         if (!isExpressionStatement(expression)) {
             return CANCELLED;
         }
