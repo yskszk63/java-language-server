@@ -12,6 +12,7 @@
 - Debugger doesn't print arrays nicely
 - When you move a class to a different package, compiler still thinks it's in the old package
 - Override inherited method / Implement abstract methods doesn't substitute type variables
+- Imports are disappearing when errors are present
 
 ## Optimizations
 - Compilation is very slow in the presence of lots of errors

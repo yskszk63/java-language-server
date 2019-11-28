@@ -6,7 +6,6 @@ import com.sun.source.util.Trees;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
@@ -28,21 +27,17 @@ public class RemoveException implements Rewrite {
 
     @Override
     public Map<Path, TextEdit[]> rewrite(CompilerProvider compiler) {
-        LOG.info("Try to remove " + exceptionType + " from " + className + "#" + methodName + "...");
         var file = compiler.findTopLevelDeclaration(className);
         try (var task = compiler.compile(file)) {
-            var method = new FindHelper(task).findMethod(task.root(), className, methodName, erasedParameterTypes);
-            if (method.getThrows().isEmpty()) {
-                LOG.warning("...couldn't find method");
-                return CANCELLED;
-            }
-            if (method.getThrows().size() == 1) {
-                var delete = removeEntireThrows(task.task, task.root(), method);
+            var methodElement = new FindHelper(task).findMethod(className, methodName, erasedParameterTypes);
+            var methodTree = Trees.instance(task.task).getTree(methodElement);
+            if (methodTree.getThrows().size() == 1) {
+                var delete = removeEntireThrows(task.task, task.root(), methodTree);
                 if (delete == TextEdit.NONE) return CANCELLED;
                 TextEdit[] edits = {delete};
                 return Map.of(file, edits);
             }
-            TextEdit[] edits = {removeSingleException(task.task, task.root(), method)};
+            TextEdit[] edits = {removeSingleException(task.task, task.root(), methodTree)};
             return Map.of(file, edits);
         }
     }
@@ -61,7 +56,6 @@ public class RemoveException implements Rewrite {
         }
         var matcher = THROWS.matcher(contents);
         if (!matcher.find(startMethod)) {
-            LOG.warning("...couldn't find 'throws' before offset " + startMethod);
             return TextEdit.NONE;
         }
         var lines = root.getLineMap();
@@ -111,7 +105,6 @@ public class RemoveException implements Rewrite {
                 return i;
             }
         }
-        LOG.warning("...couldn't find " + exceptionType + " in throws list");
         return -1;
     }
 
@@ -146,6 +139,4 @@ public class RemoveException implements Rewrite {
             throw new RuntimeException(e);
         }
     }
-
-    private static final Logger LOG = Logger.getLogger("main");
 }

@@ -26,14 +26,12 @@ public class AddException implements Rewrite {
             return CANCELLED;
         }
         try (var task = compiler.compile(file)) {
-            var finder = new FindHelper(task);
-            var method = finder.findMethod(task.root(), className, methodName, erasedParameterTypes);
-            if (method == null) {
-                return CANCELLED;
-            }
-            var pos = Trees.instance(task.task).getSourcePositions();
+            var trees = Trees.instance(task.task);
+            var methodElement = new FindHelper(task).findMethod(className, methodName, erasedParameterTypes);
+            var methodTree = trees.getTree(methodElement);
+            var pos = trees.getSourcePositions();
             var lines = task.root().getLineMap();
-            var startBody = pos.getStartPosition(task.root(), method.getBody());
+            var startBody = pos.getStartPosition(task.root(), methodTree.getBody());
             var line = (int) lines.getLineNumber(startBody);
             var column = (int) lines.getColumnNumber(startBody);
             var insertPos = new Position(line - 1, column - 1);
@@ -45,7 +43,7 @@ public class AddException implements Rewrite {
                 simpleName = exceptionType.substring(lastDot + 1);
             }
             String insertText;
-            if (method.getThrows().isEmpty()) {
+            if (methodTree.getThrows().isEmpty()) {
                 insertText = "throws " + simpleName + " ";
             } else {
                 insertText = ", " + simpleName + " ";

@@ -1,5 +1,6 @@
 package org.javacs.rewrite;
 
+import com.sun.source.util.Trees;
 import java.nio.file.Path;
 import java.util.Map;
 import org.javacs.lsp.TextEdit;
@@ -21,12 +22,9 @@ public class RemoveMethod implements Rewrite {
             return CANCELLED;
         }
         try (var task = compiler.compile(file)) {
-            var finder = new FindHelper(task);
-            var method = finder.findMethod(task.root(), className, methodName, erasedParameterTypes);
-            if (method == null) {
-                return CANCELLED;
-            }
-            TextEdit[] edits = {new EditHelper(task.task).removeTree(task.root(), method)};
+            var methodElement = new FindHelper(task).findMethod(className, methodName, erasedParameterTypes);
+            var methodTree = Trees.instance(task.task).getTree(methodElement);
+            TextEdit[] edits = {new EditHelper(task.task).removeTree(task.root(), methodTree)};
             return Map.of(file, edits);
         }
     }

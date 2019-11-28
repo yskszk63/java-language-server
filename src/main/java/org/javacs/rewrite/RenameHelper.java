@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import org.javacs.lsp.Position;
@@ -44,9 +45,10 @@ public class RenameHelper {
             String[] erasedParameterTypes,
             String newName) {
         var allEdits = new HashMap<Path, TextEdit[]>();
+        var method = new FindHelper(task).findMethod(className, methodName, erasedParameterTypes);
         for (var root : roots) {
             var file = Paths.get(root.getSourceFile().toUri());
-            var references = findMethodReferences(root, className, methodName, erasedParameterTypes);
+            var references = findMethodReferences(root, method);
             if (references.isEmpty()) continue;
             var fileEdits = replaceAll(references, newName);
             allEdits.put(file, fileEdits);
@@ -105,13 +107,13 @@ public class RenameHelper {
         return true;
     }
 
-    private List<TreePath> findMethodReferences(
-            CompilationUnitTree root, String className, String methodName, String[] erasedParameterTypes) {
+    private List<TreePath> findMethodReferences(CompilationUnitTree root, ExecutableElement find) {
+        var trees = Trees.instance(task.task);
         var found = new ArrayList<TreePath>();
-        var finder = new FindHelper(task);
         Consumer<TreePath> forEach =
                 path -> {
-                    if (finder.isSameMethod(path, className, methodName, erasedParameterTypes)) {
+                    var candidate = trees.getElement(path);
+                    if (find.equals(candidate)) {
                         found.add(path);
                     }
                 };

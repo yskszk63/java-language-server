@@ -91,6 +91,8 @@ class JavaCompilerService implements CompilerProvider {
     CompileBatch compileBatch(Collection<? extends JavaFileObject> sources) {
         if (needsCompile(sources)) {
             loadCompile(sources);
+        } else {
+            LOG.info("...using cached compile");
         }
         return cachedCompile;
     }

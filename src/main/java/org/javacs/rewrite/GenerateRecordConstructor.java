@@ -26,26 +26,29 @@ public class GenerateRecordConstructor implements Rewrite {
     public Map<Path, TextEdit[]> rewrite(CompilerProvider compiler) {
         // TODO this needs to fall back on looking for inner classes and package-private classes
         var file = compiler.findTopLevelDeclaration(className);
-        var task = compiler.parse(file);
-        var leaf = new FindClassDeclarationNamed().scan(task.root, className);
-        var fields = fieldsNeedingInitialization(leaf);
-        var parameters = generateParameters(task, fields);
-        var initializers = generateInitializers(task, fields);
-        var template = TEMPLATE;
-        template = template.replace("$class", simpleName(className));
-        template = template.replace("$parameters", parameters);
-        template = template.replace("$initializers", initializers);
-        var indent = EditHelper.indent(task.task, task.root, leaf) + 4;
-        template = template.replaceAll("\n", "\n" + " ".repeat(indent));
-        template = template + "\n\n";
-        var insert = insertPoint(task, leaf);
-        TextEdit[] edits = {new TextEdit(new Range(insert, insert), template)};
-        return Map.of(file, edits);
+        try (var task = compiler.compile(file)) {
+            var typeElement = task.task.getElements().getTypeElement(className);
+            var typePath = Trees.instance(task.task).getPath(typeElement);
+            var typeTree = (ClassTree) typePath.getLeaf();
+            var fields = fieldsNeedingInitialization(typeTree);
+            var parameters = generateParameters(task, fields);
+            var initializers = generateInitializers(task, fields);
+            var template = TEMPLATE;
+            template = template.replace("$class", simpleName(className));
+            template = template.replace("$parameters", parameters);
+            template = template.replace("$initializers", initializers);
+            var indent = EditHelper.indent(task.task, task.root(), typeTree) + 4;
+            template = template.replaceAll("\n", "\n" + " ".repeat(indent));
+            template = template + "\n\n";
+            var insert = insertPoint(task, typeTree);
+            TextEdit[] edits = {new TextEdit(new Range(insert, insert), template)};
+            return Map.of(file, edits);
+        }
     }
 
-    private List<VariableTree> fieldsNeedingInitialization(ClassTree leaf) {
+    private List<VariableTree> fieldsNeedingInitialization(ClassTree typeTree) {
         var fields = new ArrayList<VariableTree>();
-        for (var member : leaf.getMembers()) {
+        for (var member : typeTree.getMembers()) {
             if (!(member instanceof VariableTree)) continue;
             var field = (VariableTree) member;
             if (field.getInitializer() != null) continue;
@@ -59,7 +62,7 @@ public class GenerateRecordConstructor implements Rewrite {
 
     private static final String TEMPLATE = "\n$class($parameters) {\n    $initializers\n}";
 
-    private String generateParameters(ParseTask task, List<VariableTree> fields) {
+    private String generateParameters(CompileTask task, List<VariableTree> fields) {
         var join = new StringJoiner(", ");
         for (var f : fields) {
             join.add(extract(task, f.getType()) + " " + f.getName());
@@ -67,7 +70,7 @@ public class GenerateRecordConstructor implements Rewrite {
         return join.toString();
     }
 
-    private String generateInitializers(ParseTask task, List<VariableTree> fields) {
+    private String generateInitializers(CompileTask task, List<VariableTree> fields) {
         var join = new StringJoiner("\n    ");
         for (var f : fields) {
             join.add("this." + f.getName() + " = " + f.getName() + ";");
@@ -75,12 +78,12 @@ public class GenerateRecordConstructor implements Rewrite {
         return join.toString();
     }
 
-    private CharSequence extract(ParseTask task, Tree leaf) {
+    private CharSequence extract(CompileTask task, Tree typeTree) {
         try {
-            var contents = task.root.getSourceFile().getCharContent(true);
+            var contents = task.root().getSourceFile().getCharContent(true);
             var pos = Trees.instance(task.task).getSourcePositions();
-            var start = (int) pos.getStartPosition(task.root, leaf);
-            var end = (int) pos.getEndPosition(task.root, leaf);
+            var start = (int) pos.getStartPosition(task.root(), typeTree);
+            var end = (int) pos.getEndPosition(task.root(), typeTree);
             return contents.subSequence(start, end);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -95,12 +98,12 @@ public class GenerateRecordConstructor implements Rewrite {
         return className;
     }
 
-    private Position insertPoint(ParseTask task, ClassTree leaf) {
-        for (var member : leaf.getMembers()) {
+    private Position insertPoint(CompileTask task, ClassTree typeTree) {
+        for (var member : typeTree.getMembers()) {
             if (!(member instanceof VariableTree)) {
-                return EditHelper.insertBefore(task.task, task.root, member);
+                return EditHelper.insertBefore(task.task, task.root(), member);
             }
         }
-        return EditHelper.insertAtEndOfClass(task.task, task.root, leaf);
+        return EditHelper.insertAtEndOfClass(task.task, task.root(), typeTree);
     }
 }

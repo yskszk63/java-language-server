@@ -69,6 +69,8 @@ class Parser {
     static Parser parseJavaFileObject(JavaFileObject file) {
         if (needsParse(file)) {
             loadParse(file);
+        } else {
+            LOG.info("...using cached parse");
         }
         return cachedParse;
     }

@@ -24,18 +24,11 @@ public class AddSuppressWarningAnnotation implements Rewrite {
             return CANCELLED;
         }
         try (var task = compiler.compile(file)) {
-            var finder = new FindHelper(task);
-            var method = finder.findMethod(task.root(), className, methodName, erasedParameterTypes);
-            if (method == null) {
-                return CANCELLED;
-            }
             var trees = Trees.instance(task.task);
-            var path = trees.getPath(task.root(), method);
-            if (path == null) {
-                return CANCELLED;
-            }
+            var methodElement = new FindHelper(task).findMethod(className, methodName, erasedParameterTypes);
+            var methodTree = trees.getTree(methodElement);
             var pos = trees.getSourcePositions();
-            var startMethod = (int) pos.getStartPosition(task.root(), method);
+            var startMethod = (int) pos.getStartPosition(task.root(), methodTree);
             var lines = task.root().getLineMap();
             var line = (int) lines.getLineNumber(startMethod);
             var column = (int) lines.getColumnNumber(startMethod);

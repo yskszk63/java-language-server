@@ -12,8 +12,7 @@ class Artifact {
     }
 
     static Artifact parse(String id) {
-        String[] parts = id.split(":");
-
+        var parts = id.split(":");
         if (parts.length == 3) return new Artifact(parts[0], parts[1], parts[2]);
         else if (parts.length == 5) return new Artifact(parts[0], parts[1], parts[3]);
         else throw new IllegalArgumentException(id + " is not properly formatted artifact");
