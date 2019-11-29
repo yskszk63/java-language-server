@@ -98,7 +98,7 @@ public class FileStore {
         return list;
     }
 
-    static Set<Path> sourceRoots() {
+    public static Set<Path> sourceRoots() {
         var roots = new HashSet<Path>();
         for (var file : javaSources.keySet()) {
             var root = sourceRoot(file);

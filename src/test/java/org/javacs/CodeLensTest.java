@@ -40,8 +40,8 @@ public class CodeLensTest {
         assertThat(lenses, not(empty()));
 
         var commands = commands(lenses);
-        assertThat(commands, hasItem(containsString("\"HasTest\",null")));
-        assertThat(commands, hasItem(containsString("\"HasTest\",\"testMethod\"")));
-        assertThat(commands, hasItem(containsString("\"HasTest\",\"otherTestMethod\"")));
+        assertThat(commands, hasItem(containsString("\"org.javacs.example.HasTest\",null")));
+        assertThat(commands, hasItem(containsString("\"org.javacs.example.HasTest\",\"testMethod\"")));
+        assertThat(commands, hasItem(containsString("\"org.javacs.example.HasTest\",\"otherTestMethod\"")));
     }
 }

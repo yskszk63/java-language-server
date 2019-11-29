@@ -87,7 +87,7 @@ public class CodeActionTest {
     public void testOverrideInheritedMethod() {
         assertThat(
                 forCursor("org/javacs/action/TestOverrideInheritedMethod.java", 6, 1),
-                hasItem("Override inherited method 'andThen'"));
+                hasItem("Override 'andThen' from java.util.function.Function"));
     }
 
     @Test

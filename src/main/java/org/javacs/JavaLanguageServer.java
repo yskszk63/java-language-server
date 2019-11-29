@@ -13,6 +13,7 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import javax.lang.model.element.*;
 import javax.tools.JavaFileObject;
+import org.javacs.lens.CodeLensProvider;
 import org.javacs.lsp.*;
 import org.javacs.markup.ColorProvider;
 import org.javacs.markup.ErrorProvider;
@@ -695,52 +696,10 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public List<CodeLens> codeLens(CodeLensParams params) {
-        var uri = params.textDocument.uri;
-        if (!FileStore.isJavaFile(uri)) return List.of();
-        var file = Paths.get(uri);
-        updateCachedParse(file);
-        var declarations = cacheParse.codeLensDeclarations();
-        var result = new ArrayList<CodeLens>();
-        for (var d : declarations) {
-            var range = cacheParse.range(d);
-            if (range == Range.NONE) continue;
-            var className = Parser.className(d);
-            var memberName = Parser.memberName(d);
-            // If test class or method, add "Run Test" code lens
-            if (cacheParse.isTestClass(d)) {
-                var arguments = new JsonArray();
-                arguments.add(uri.toString());
-                arguments.add(className);
-                arguments.add(JsonNull.INSTANCE);
-                var command = new Command("Run All Tests", "java.command.test.run", arguments);
-                var lens = new CodeLens(range, command, null);
-                result.add(lens);
-                // TODO run all tests in file
-                // TODO run all tests in package
-            }
-            if (cacheParse.isTestMethod(d)) {
-                var arguments = new JsonArray();
-                arguments.add(uri.toString());
-                arguments.add(className);
-                if (!memberName.isEmpty()) arguments.add(memberName);
-                else arguments.add(JsonNull.INSTANCE);
-                // 'Run Test' code lens
-                var command = new Command("Run Test", "java.command.test.run", arguments);
-                var lens = new CodeLens(range, command, null);
-                result.add(lens);
-                // 'Debug Test' code lens
-                // TODO this could be a CPU hot spot
-                var sourceRoots = new JsonArray();
-                for (var path : FileStore.sourceRoots()) {
-                    sourceRoots.add(path.toString());
-                }
-                arguments.add(sourceRoots);
-                command = new Command("Debug Test", "java.command.test.debug", arguments);
-                lens = new CodeLens(range, command, null);
-                result.add(lens);
-            }
-        }
-        return result;
+        if (!FileStore.isJavaFile(params.textDocument.uri)) return List.of();
+        var file = Paths.get(params.textDocument.uri);
+        var task = compiler().parse(file);
+        return CodeLensProvider.find(task);
     }
 
     @Override
@@ -924,7 +883,7 @@ class JavaLanguageServer extends LanguageServer {
         // TODO this get-map / convert-to-CodeAction split is an ugly workaround of the fact that we need a new compile
         // task to generate the code actions
         // If we switch to resolving code actions asynchronously using Command, that will fix this problem.
-        var rewrites = new HashMap<String, Rewrite>();
+        var rewrites = new TreeMap<String, Rewrite>();
         try (var task = compiler().compile(file)) {
             var elapsed = Duration.between(started, Instant.now()).toMillis();
             LOG.info(String.format("...compiled in %d ms", elapsed));
@@ -952,7 +911,7 @@ class JavaLanguageServer extends LanguageServer {
         if (classTree == null) {
             return Map.of();
         }
-        var actions = new HashMap<String, Rewrite>();
+        var actions = new TreeMap<String, Rewrite>();
         var trees = Trees.instance(task.task);
         var elements = task.task.getElements();
         var classElement = (TypeElement) trees.getElement(trees.getPath(task.root(), classTree));
@@ -967,7 +926,7 @@ class JavaLanguageServer extends LanguageServer {
             var rewrite =
                     new OverrideInheritedMethod(
                             ptr.className, ptr.methodName, ptr.erasedParameterTypes, file, (int) cursor);
-            var title = "Override inherited method '" + method.getSimpleName() + "'";
+            var title = "Override '" + method.getSimpleName() + "' from " + ptr.className;
             actions.put(title, rewrite);
         }
         return actions;
