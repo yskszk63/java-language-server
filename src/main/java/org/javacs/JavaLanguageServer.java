@@ -17,6 +17,7 @@ import javax.tools.JavaFileObject;
 import org.javacs.lsp.*;
 import org.javacs.markup.ColorProvider;
 import org.javacs.markup.ErrorProvider;
+import org.javacs.navigation.ReferenceProvider;
 import org.javacs.rewrite.*;
 
 class JavaLanguageServer extends LanguageServer {
@@ -749,72 +750,15 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public Optional<List<Location>> findReferences(ReferenceParams position) {
-        var toUri = position.textDocument.uri;
-        if (!FileStore.isJavaFile(toUri)) return Optional.empty();
-        var toFile = Paths.get(toUri);
-        var toLine = position.position.line + 1;
-        var toColumn = position.position.character + 1;
-
-        // TODO use parser to figure out batch to compile, avoiding compiling twice
-
-        // Compile from-file and identify element under cursor
-        LOG.warning(String.format("Looking for references to %s(%d,%d)...", toUri.getPath(), toLine, toColumn));
-        Element toEl;
-        var sources = Set.of(new SourceFileObject(toFile));
-        try (var batch = compiler().compileBatch(sources)) {
-            var maybe = batch.element(batch.tree(toFile, toLine, toColumn));
-            if (!maybe.isPresent()) {
-                LOG.warning("...no element under cursor");
-                return Optional.empty();
-            }
-            toEl = maybe.get();
+        if (!FileStore.isJavaFile(position.textDocument.uri)) return Optional.empty();
+        var file = Paths.get(position.textDocument.uri);
+        var line = position.position.line + 1;
+        var column = position.position.character + 1;
+        var found = new ReferenceProvider(compiler(), file, line, column).find();
+        if (found == ReferenceProvider.NOT_SUPPORTED) {
+            return Optional.empty();
         }
-
-        // Compile all files that *might* contain references to toEl
-        var name = Parser.simpleName(toEl);
-        var fromFiles = new HashSet<Path>();
-        var isLocal = toEl instanceof VariableElement && !(toEl.getEnclosingElement() instanceof TypeElement);
-        if (!isLocal) {
-            var isType = false;
-            switch (toEl.getKind()) {
-                case ANNOTATION_TYPE:
-                case CLASS:
-                case INTERFACE:
-                    isType = true;
-            }
-            var flags = toEl.getModifiers();
-            var possible = Parser.potentialReferences(toFile, name, isType, flags);
-            fromFiles.addAll(possible);
-        }
-        fromFiles.add(toFile);
-        var eraseCode = pruneWord(fromFiles, name);
-        try (var batch = compiler().compileBatch(eraseCode)) {
-            var fromTreePaths = batch.references(toFile, toLine, toColumn);
-            LOG.info(String.format("...found %d references", fromTreePaths.size()));
-            if (fromTreePaths == CompileBatch.CODE_NOT_FOUND) return Optional.empty();
-            var result = new ArrayList<Location>();
-            for (var path : fromTreePaths) {
-                var fromUri = path.getCompilationUnit().getSourceFile().toUri();
-                var fromRange = batch.range(path);
-                if (fromRange == Range.NONE) {
-                    LOG.warning(String.format("...couldn't locate `%s`", path.getLeaf()));
-                    continue;
-                }
-                var from = new Location(fromUri, fromRange);
-                result.add(from);
-            }
-            return Optional.of(result);
-        }
-    }
-
-    private List<JavaFileObject> pruneWord(Collection<Path> files, String name) {
-        LOG.info(String.format("...prune code that doesn't contain `%s`", name));
-        var sources = new ArrayList<JavaFileObject>();
-        for (var f : files) {
-            var pruned = Parser.parseFile(f).prune(name);
-            sources.add(new SourceFileObject(f, pruned, Instant.EPOCH));
-        }
-        return sources;
+        return Optional.of(found);
     }
 
     private Parser cacheParse;

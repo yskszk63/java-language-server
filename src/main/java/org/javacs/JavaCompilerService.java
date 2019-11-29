@@ -72,6 +72,7 @@ class JavaCompilerService implements CompilerProvider {
     }
 
     CompileBatch doCompile(Collection<? extends JavaFileObject> sources) {
+        if (sources.isEmpty()) throw new RuntimeException("empty sources");
         var firstAttempt = new CompileBatch(this, sources);
         var addFiles = firstAttempt.needsAdditionalSources();
         if (addFiles.isEmpty()) return firstAttempt;
@@ -268,25 +269,25 @@ class JavaCompilerService implements CompilerProvider {
     @Override
     public Path[] findTypeReferences(String className) {
         var packageName = packageName(className);
+        var simpleName = simpleName(className);
         var candidates = new ArrayList<Path>();
         for (var f : FileStore.all()) {
-            if (containsWord(f, packageName) && containsImport(f, className)) {
+            if (containsWord(f, packageName) && containsImport(f, className) && containsWord(f, simpleName)) {
                 candidates.add(f);
             }
         }
-        return candidates.toArray(new Path[candidates.size()]);
+        return candidates.toArray(Path[]::new);
     }
 
     @Override
     public Path[] findMemberReferences(String className, String memberName) {
-        var packageName = packageName(className);
         var candidates = new ArrayList<Path>();
         for (var f : FileStore.all()) {
-            if (containsWord(f, packageName) && containsImport(f, className) && containsWord(f, memberName)) {
+            if (containsWord(f, memberName)) {
                 candidates.add(f);
             }
         }
-        return candidates.toArray(new Path[candidates.size()]);
+        return candidates.toArray(Path[]::new);
     }
 
     @Override

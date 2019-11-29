@@ -14,11 +14,15 @@
 - Override inherited method / Implement abstract methods doesn't substitute type variables
 - Imports are disappearing when errors are present
 - Delete imports from my own package
+- 'Override inherited method ...' quick fixes are in a nonsense order
+- Return type of generated method is always wrong
+- Generated method doesn't have static modifier when appropriate
+- Generated constructor should have accessibility modifier of class
+- Cache logic is re-using pruned files from autocomplete for lint
 
 ## Optimizations
 - Compilation is very slow in the presence of lots of errors
 - Use package graph to limit search for find-usages/goto-def
-- Get classpath and docpath in a single bazel query
 
 # Features
 - Autocomplete new method name based on "no such method" errors.
@@ -26,6 +30,12 @@
 - "Find implementations" code lens on interfaces
 - Rename other types (see JavaLanguageServer#canRename)
 - set.contains(wrongType) should show some kind of warning (and probably other collections methods too)
+- Only show 'override inherited method' quick fixes when line is blank.
+- Go-to-definition should show references for class/method names
+- Show JDK sources in goto def
+- Show classpath and JDK sources in debugger
+- Warn for impossible null checks
+
 
 ## Refactorings
 - Quick fixes
@@ -42,5 +52,6 @@
     - Add parameter
     - Inline
     - Implement single abstract method
+    - Generate cases for enum
 - Code lens
     - Inherited methods

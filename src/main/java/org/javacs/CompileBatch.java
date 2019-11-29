@@ -180,31 +180,6 @@ class CompileBatch implements AutoCloseable {
         return d.getSource().toUri().getScheme().equals("file") && d.getStartPosition() >= 0 && d.getEndPosition() >= 0;
     }
 
-    public static final List<TreePath> CODE_NOT_FOUND = List.of();
-
-    List<TreePath> references(Path toFile, int toLine, int toColumn) {
-        var to = element(tree(toFile, toLine, toColumn));
-        if (to.isEmpty()) {
-            LOG.info(String.format("...no element at %s(%d, %d), giving up", toFile, toLine, toColumn));
-            return CODE_NOT_FOUND;
-        }
-        // If to is an error, we won't be able to find anything
-        if (to.get().asType().getKind() == TypeKind.ERROR) {
-            LOG.info(String.format("...`%s` is an error type, giving up", to.get().asType()));
-            return CODE_NOT_FOUND;
-        }
-        // Otherwise, scan roots for references
-        List<TreePath> list = new ArrayList<TreePath>();
-        var map = Map.of(to.get(), list);
-        var finder = new FindReferences(borrow.task);
-        for (var r : roots) {
-            // TODO jump to scan takes me to a specific method in this file, which is misleading. The actual
-            // implementation is in the super of FindReferences.
-            finder.scan(r, map);
-        }
-        return list;
-    }
-
     Location location(TreePath path) {
         var uri = path.getCompilationUnit().getSourceFile().toUri();
         var range = range(path);

@@ -714,47 +714,6 @@ class Parser {
         return result;
     }
 
-    boolean mightContainDefinition(Element to) {
-        var findName = simpleName(to);
-        class Found extends RuntimeException {}
-        class FindMethod extends TreePathScanner<Void, Void> {
-            private Name className;
-
-            @Override
-            public Void visitClass(ClassTree t, Void __) {
-                var prev = className;
-                className = t.getSimpleName();
-                super.visitClass(t, null);
-                className = prev;
-                return null;
-            }
-
-            @Override
-            public Void visitMethod(MethodTree t, Void __) {
-                var match =
-                        t.getName().contentEquals(findName)
-                                || t.getName().contentEquals("<init>") && className.contentEquals(findName);
-                if (match) {
-                    throw new Found();
-                }
-                return super.visitMethod(t, null);
-            }
-        }
-        try {
-            new FindMethod().scan(root, null);
-        } catch (Found __) {
-            return true;
-        }
-        return false;
-    }
-
-    static String simpleName(Element e) {
-        if (e.getSimpleName().contentEquals("<init>")) {
-            return e.getEnclosingElement().getSimpleName().toString();
-        }
-        return e.getSimpleName().toString();
-    }
-
     private static String prune(
             CompilationUnitTree root,
             SourcePositions pos,
@@ -931,42 +890,6 @@ class Parser {
         return prune(root, pos, buffer, offsets, false);
     }
 
-    static Set<Path> potentialReferences(Path file, String name, boolean isType, Set<Modifier> flags) {
-        LOG.info(String.format("...find potential references to `%s`...", name));
-        var pkg = FileStore.packageName(file);
-
-        // If `to` is private, any definitions must be in the same file
-        if (flags.contains(Modifier.PRIVATE)) {
-            LOG.info(String.format("...`%s` is private", name));
-            return Set.of(file);
-        }
-
-        LOG.info(String.format("...find identifiers named `%s`", name));
-        Collection<Path> allFiles;
-        var isPackagePrivate = !flags.contains(Modifier.PUBLIC) && !flags.contains(Modifier.PROTECTED);
-        if (isPackagePrivate) {
-            // If `to` is package-private, only look in my own package
-            allFiles = FileStore.list(pkg);
-            LOG.info(String.format("...check %d files in my own package %s", allFiles.size(), pkg));
-        } else {
-            // Otherwise search all files
-            allFiles = FileStore.all();
-            LOG.info(String.format("...check %d files", allFiles.size()));
-        }
-        // Check if the file contains the name of `to`
-        var hasWord = containsWord(allFiles, name);
-        // You can't reference a TypeElement without importing it
-        if (isType) {
-            hasWord = containsImport(hasWord, pkg, name);
-        }
-        // Convert Path to URI
-        var matches = new HashSet<Path>();
-        for (var f : hasWord) {
-            matches.add(f);
-        }
-        return matches;
-    }
-
     static Optional<Path> declaringFile(Element e) {
         // Find top-level type surrounding `to`
         LOG.info(String.format("...looking up declaring file of `%s`...", e));
@@ -994,63 +917,6 @@ class Parser {
             parent = parent.getEnclosingElement();
         }
         return Optional.ofNullable(result);
-    }
-
-    private static Cache<String, Boolean> cacheContainsWord = new Cache<>();
-
-    private static List<Path> containsWord(Collection<Path> allFiles, String name) {
-        // Figure out all files that need to be re-scanned
-        var outOfDate = new ArrayList<Path>();
-        for (var file : allFiles) {
-            // If we know file doesn't contain a prefix of word, we know it doesn't contain the word
-            var prefix = name.substring(0, name.length() - 1);
-            if (!prefix.isEmpty() && cacheContainsWord.has(file, prefix) && !cacheContainsWord.get(file, prefix)) {
-                cacheContainsWord.load(file, name, false);
-                continue;
-            }
-            // Otherwise, scan the file in the next loop
-            if (cacheContainsWord.needs(file, name)) {
-                outOfDate.add(file);
-            }
-        }
-
-        // Update those files in cacheContainsWord
-        LOG.info(String.format("...scanning %d out-of-date files for the word `%s`", outOfDate.size(), name));
-        for (var file : outOfDate) {
-            var found = StringSearch.containsWord(file, name);
-            cacheContainsWord.load(file, name, found);
-        }
-
-        // Assemble list of all files that contain name
-        var hasWord = new ArrayList<Path>();
-        for (var file : allFiles) {
-            if (cacheContainsWord.get(file, name)) {
-                hasWord.add(file);
-            }
-        }
-        LOG.info(String.format("...%d files contain the word `%s`", hasWord.size(), name));
-
-        return hasWord;
-    }
-
-    private static Cache<String, Boolean> cacheContainsImport = new Cache<>();
-
-    private static List<Path> containsImport(Collection<Path> allFiles, String toPackage, String toClass) {
-        // Figure out which files import `to`, explicitly or implicitly
-        var qName = toPackage.isEmpty() ? toClass : toPackage + "." + toClass;
-        var hasImport = new ArrayList<Path>();
-        for (var file : allFiles) {
-            if (cacheContainsImport.needs(file, qName)) {
-                var found = StringSearch.containsImport(file, toPackage, toClass);
-                cacheContainsImport.load(file, qName, found);
-            }
-            if (cacheContainsImport.get(file, qName)) {
-                hasImport.add(file);
-            }
-        }
-        LOG.info(String.format("...%d files import %s.%s", hasImport.size(), toPackage, toClass));
-
-        return hasImport;
     }
 
     static String className(TreePath t) {
