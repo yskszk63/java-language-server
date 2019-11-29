@@ -1,18 +1,15 @@
 package org.javacs.navigation;
 
+import static org.javacs.navigation.NavigationHelper.*;
+
 import com.sun.source.util.TreePath;
-import com.sun.source.util.Trees;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
 import org.javacs.lsp.Location;
-import org.javacs.lsp.Position;
-import org.javacs.lsp.Range;
 
 public class ReferenceProvider {
     private final CompilerProvider compiler;
@@ -30,7 +27,7 @@ public class ReferenceProvider {
 
     public List<Location> find() {
         try (var task = compiler.compile(file)) {
-            var element = findElement(task);
+            var element = findElement(task, file, line, column);
             if (element == null) return NOT_SUPPORTED;
             if (isLocal(element)) {
                 return findReferences(task);
@@ -55,59 +52,6 @@ public class ReferenceProvider {
         }
     }
 
-    private Element findElement(CompileTask task) {
-        for (var root : task.roots) {
-            if (root.getSourceFile().toUri().equals(file.toUri())) {
-                var trees = Trees.instance(task.task);
-                var cursor = (int) root.getLineMap().getPosition(line, column);
-                var tree = new FindElementAt(task.task).scan(root, cursor);
-                if (tree == null) return null;
-                var path = trees.getPath(root, tree);
-                return trees.getElement(path);
-            }
-        }
-        throw new RuntimeException("file not found");
-    }
-
-    private boolean isLocal(Element element) {
-        if (element.getModifiers().contains(Modifier.PRIVATE)) {
-            return true;
-        }
-        switch (element.getKind()) {
-            case EXCEPTION_PARAMETER:
-            case LOCAL_VARIABLE:
-            case PARAMETER:
-            case TYPE_PARAMETER:
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private boolean isMember(Element element) {
-        switch (element.getKind()) {
-            case ENUM_CONSTANT:
-            case FIELD:
-            case METHOD:
-            case CONSTRUCTOR:
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private boolean isType(Element element) {
-        switch (element.getKind()) {
-            case ANNOTATION_TYPE:
-            case CLASS:
-            case ENUM:
-            case INTERFACE:
-                return true;
-            default:
-                return false;
-        }
-    }
-
     private List<Location> findTypeReferences(String className) {
         var files = compiler.findTypeReferences(className);
         if (files.length == 0) return List.of();
@@ -125,7 +69,7 @@ public class ReferenceProvider {
     }
 
     private List<Location> findReferences(CompileTask task) {
-        var element = findElement(task);
+        var element = findElement(task, file, line, column);
         var paths = new ArrayList<TreePath>();
         for (var root : task.roots) {
             new FindReferences(task.task, element).scan(root, paths);
@@ -135,21 +79,5 @@ public class ReferenceProvider {
             locations.add(location(task, p));
         }
         return locations;
-    }
-
-    private Location location(CompileTask task, TreePath path) {
-        var lines = path.getCompilationUnit().getLineMap();
-        var pos = Trees.instance(task.task).getSourcePositions();
-        var start = pos.getStartPosition(path.getCompilationUnit(), path.getLeaf());
-        var end = pos.getEndPosition(path.getCompilationUnit(), path.getLeaf());
-        var startLine = (int) lines.getLineNumber(start);
-        var startColumn = (int) lines.getColumnNumber(start);
-        var startPos = new Position(startLine - 1, startColumn - 1);
-        var endLine = (int) lines.getLineNumber(end);
-        var endColumn = (int) lines.getColumnNumber(end);
-        var endPos = new Position(endLine - 1, endColumn - 1);
-        var range = new Range(startPos, endPos);
-        var uri = path.getCompilationUnit().getSourceFile().toUri();
-        return new Location(uri, range);
     }
 }

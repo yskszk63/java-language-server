@@ -108,8 +108,8 @@ public class GotoTest {
     @Test
     public void gotoEnum() {
         var file = "/org/javacs/example/GotoEnum.java";
-        assertThat(doGoto(file, 6, 31), not(empty()));
-        assertThat(doGoto(file, 6, 36), not(empty()));
+        assertThat(doGoto(file, 5, 30), hasItem("GotoEnum.java:8"));
+        assertThat(doGoto(file, 5, 35), hasItem("GotoEnum.java:9"));
     }
 
     @Test

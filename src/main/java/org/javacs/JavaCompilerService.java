@@ -50,7 +50,7 @@ class JavaCompilerService implements CompilerProvider {
             if (!cachedModified.containsKey(f)) {
                 return true;
             }
-            if (f.getLastModified() > cachedModified.get(f)) {
+            if (f.getLastModified() != cachedModified.get(f)) {
                 return true;
             }
         }

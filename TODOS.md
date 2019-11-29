@@ -19,6 +19,7 @@
 - Generated method doesn't have static modifier when appropriate
 - Generated constructor should have accessibility modifier of class
 - Cache logic is re-using pruned files from autocomplete for lint
+- Generated constructor is placed before class when class is empty
 
 ## Optimizations
 - Compilation is very slow in the presence of lots of errors

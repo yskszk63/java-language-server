@@ -2,8 +2,6 @@ package org.javacs.navigation;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
-import java.io.IOException;
-import java.util.regex.Pattern;
 
 class FindElementAt extends TreeScanner<Tree, Integer> {
     final JavacTask task;
@@ -98,24 +96,9 @@ class FindElementAt extends TreeScanner<Tree, Integer> {
         var start = (int) pos.getStartPosition(root, t);
         var end = (int) pos.getEndPosition(root, t);
         if (start == -1 || end == -1) return false;
-        start = findNameIn(name, start, end);
+        start = NavigationHelper.findNameIn(root, name, start, end);
         end = start + name.length();
         if (start == -1 || end == -1) return false;
         return start <= find && find < end;
-    }
-
-    private int findNameIn(CharSequence name, int start, int end) {
-        CharSequence contents;
-        try {
-            contents = root.getSourceFile().getCharContent(true);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        var matcher = Pattern.compile("\\b" + name + "\\b").matcher(contents);
-        matcher.region(start, end);
-        if (matcher.find()) {
-            return matcher.start();
-        }
-        return -1;
     }
 }

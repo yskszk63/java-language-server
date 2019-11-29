@@ -8,7 +8,7 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.NestingKind;
 import javax.tools.JavaFileObject;
 
-class SourceFileObject implements JavaFileObject {
+public class SourceFileObject implements JavaFileObject {
     /** path is the absolute path to this file on disk */
     final Path path;
     /** contents is the text in this file, or null if we should use the text in FileStore */
@@ -16,11 +16,11 @@ class SourceFileObject implements JavaFileObject {
     /** if contents is set, the modified time of contents */
     final Instant modified;
 
-    SourceFileObject(Path path) {
+    public SourceFileObject(Path path) {
         this(path, null, Instant.EPOCH);
     }
 
-    SourceFileObject(Path path, String contents, Instant modified) {
+    public SourceFileObject(Path path, String contents, Instant modified) {
         if (!FileStore.isJavaFile(path)) throw new RuntimeException(path + " is not a java source");
         this.path = path;
         this.contents = contents;
