@@ -37,8 +37,8 @@ public class CodeActionProvider {
         try (var task = compiler.compile(file)) {
             var elapsed = Duration.between(started, Instant.now()).toMillis();
             LOG.info(String.format("...compiled in %d ms", elapsed));
-            var cursor =
-                    task.root().getLineMap().getPosition(params.range.start.line + 1, params.range.start.character + 1);
+            var lines = task.root().getLineMap();
+            var cursor = lines.getPosition(params.range.start.line + 1, params.range.start.character + 1);
             rewrites.putAll(overrideInheritedMethods(task, file, cursor));
         }
         var actions = new ArrayList<CodeAction>();
@@ -59,8 +59,10 @@ public class CodeActionProvider {
         var actions = new TreeMap<String, Rewrite>();
         var trees = Trees.instance(task.task);
         var classTree = new FindClassDeclarationAt(task.task).scan(task.root(), cursor);
+        if (classTree == null) return Map.of();
+        var classPath = trees.getPath(task.root(), classTree);
         var elements = task.task.getElements();
-        var classElement = (TypeElement) trees.getElement(trees.getPath(task.root(), classTree));
+        var classElement = (TypeElement) trees.getElement(classPath);
         for (var member : elements.getAllMembers(classElement)) {
             if (member.getModifiers().contains(Modifier.FINAL)) continue;
             if (member.getKind() != ElementKind.METHOD) continue;
