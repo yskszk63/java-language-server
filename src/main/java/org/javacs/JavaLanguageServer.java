@@ -11,6 +11,7 @@ import java.util.logging.Logger;
 import javax.lang.model.element.*;
 import javax.tools.JavaFileObject;
 import org.javacs.action.CodeActionProvider;
+import org.javacs.fold.FoldProvider;
 import org.javacs.lens.CodeLensProvider;
 import org.javacs.lsp.*;
 import org.javacs.markup.ColorProvider;
@@ -724,8 +725,7 @@ class JavaLanguageServer extends LanguageServer {
     public List<FoldingRange> foldingRange(FoldingRangeParams params) {
         if (!FileStore.isJavaFile(params.textDocument.uri)) return List.of();
         var file = Paths.get(params.textDocument.uri);
-        updateCachedParse(file);
-        return cacheParse.foldingRanges();
+        return new FoldProvider(compiler()).foldingRanges(file);
     }
 
     @Override
