@@ -10,8 +10,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class CodeActionTest {
-    private static List<Diagnostic> errors = new ArrayList<>();
-    protected static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer(errors::add);
+    private static final List<Diagnostic> errors = new ArrayList<>();
+    private static final JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer(errors::add);
 
     @Before
     public void clearErrors() {

@@ -1,4 +1,4 @@
-package org.javacs;
+package org.javacs.action;
 
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.MethodTree;
