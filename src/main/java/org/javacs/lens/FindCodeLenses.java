@@ -119,6 +119,6 @@ class FindCodeLenses extends TreeScanner<Void, List<CodeLens>> {
         var startColumn = (int) lines.getColumnNumber(start);
         var endLine = (int) lines.getLineNumber(end);
         var endColumn = (int) lines.getColumnNumber(end);
-        return new Range(new Position(startLine, startColumn), new Position(endLine, endColumn));
+        return new Range(new Position(startLine - 1, startColumn - 1), new Position(endLine - 1, endColumn - 1));
     }
 }

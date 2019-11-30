@@ -12,6 +12,7 @@ import javax.lang.model.element.*;
 import javax.tools.JavaFileObject;
 import org.javacs.action.CodeActionProvider;
 import org.javacs.fold.FoldProvider;
+import org.javacs.index.SymbolProvider;
 import org.javacs.lens.CodeLensProvider;
 import org.javacs.lsp.*;
 import org.javacs.markup.ColorProvider;
@@ -206,7 +207,7 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public List<SymbolInformation> workspaceSymbols(WorkspaceSymbolParams params) {
-        return compiler().findSymbols(params.query, 50);
+        return new SymbolProvider(compiler()).findSymbols(params.query, 50);
     }
 
     @Override
@@ -685,12 +686,9 @@ class JavaLanguageServer extends LanguageServer {
 
     @Override
     public List<SymbolInformation> documentSymbol(DocumentSymbolParams params) {
-        var uri = params.textDocument.uri;
-        if (!FileStore.isJavaFile(uri)) return List.of();
-        var file = Paths.get(uri);
-        updateCachedParse(file);
-        var infos = cacheParse.documentSymbols();
-        return infos;
+        if (!FileStore.isJavaFile(params.textDocument.uri)) return List.of();
+        var file = Paths.get(params.textDocument.uri);
+        return new SymbolProvider(compiler()).documentSymbols(file);
     }
 
     @Override
@@ -702,7 +700,7 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     @Override
-    public CodeLens resolveCodeLens(CodeLens _unresolved) {
+    public CodeLens resolveCodeLens(CodeLens unresolved) {
         return null;
     }
 

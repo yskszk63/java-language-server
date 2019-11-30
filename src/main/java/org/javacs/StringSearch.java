@@ -18,7 +18,7 @@ import javax.lang.model.element.TypeElement;
 // https://en.wikipedia.org/wiki/Boyer-Moore_string_search_algorithm
 // https://www.cs.utexas.edu/~moore/publications/fstrpos.pdf (note: this aged
 // document uses 1-based indexing)
-class StringSearch {
+public class StringSearch {
     // pattern is the string that we are searching for in the text.
     private final byte[] pattern;
 
@@ -276,7 +276,7 @@ class StringSearch {
      * discontinuous if the letters of `find` match the first letters of words in `candidate` For example, fb matches
      * FooBar, but it doesn't match Foobar (exposed for testing)
      */
-    static boolean matchesTitleCase(CharSequence candidate, String find) {
+    public static boolean matchesTitleCase(CharSequence candidate, String find) {
         Objects.requireNonNull(candidate, "candidate is null");
         int i = 0;
 

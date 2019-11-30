@@ -3,10 +3,10 @@ package org.javacs;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import javax.tools.*;
-import org.javacs.lsp.SymbolInformation;
 
 class JavaCompilerService implements CompilerProvider {
     // Not modifiable! If you want to edit these, you need to create a new instance
@@ -95,34 +95,6 @@ class JavaCompilerService implements CompilerProvider {
             LOG.info("...using cached compile");
         }
         return cachedCompile;
-    }
-
-    List<SymbolInformation> findSymbols(String query, int limit) {
-        LOG.info(String.format("Searching for `%s`...", query));
-        var result = new ArrayList<SymbolInformation>();
-        var files = FileStore.all();
-        var checked = 0;
-        var parsed = 0;
-        for (var file : files) {
-            checked++;
-            // First do a fast check if the query matches anything in a file
-            if (!StringSearch.containsWordMatching(file, query)) continue;
-            // Parse the file and check class members for matches
-            LOG.info(String.format("...%s contains text matches", file.getFileName()));
-            var parse = Parser.parseFile(file);
-            var symbols = parse.findSymbolsMatching(query);
-            parsed++;
-            // If we confirm matches, add them to the results
-            if (symbols.size() > 0) {
-                LOG.info(String.format("...found %d occurrences", symbols.size()));
-            }
-            result.addAll(symbols);
-            // If results are full, stop
-            if (result.size() >= limit) break;
-        }
-        LOG.info(String.format("Found %d matches in %d/%d/%d files", result.size(), checked, parsed, files.size()));
-
-        return result;
     }
 
     private static final Pattern PACKAGE_EXTRACTOR = Pattern.compile("^([a-z][_a-zA-Z0-9]*\\.)*[a-z][_a-zA-Z0-9]*");
@@ -241,6 +213,12 @@ class JavaCompilerService implements CompilerProvider {
             if (i.equals(className) || i.equals(star)) return true;
         }
         return false;
+    }
+
+    @Override
+    public Iterable<Path> search(String query) {
+        Predicate<Path> test = f -> StringSearch.containsWordMatching(f, query);
+        return () -> FileStore.all().stream().filter(test).iterator();
     }
 
     @Override

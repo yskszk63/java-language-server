@@ -14,6 +14,8 @@ public interface CompilerProvider {
 
     Set<String> packagePrivateTopLevelTypes(String packageName);
 
+    Iterable<Path> search(String query);
+
     Optional<JavaFileObject> findAnywhere(String className);
 
     Path findTypeDeclaration(String className);
