@@ -11,7 +11,7 @@ class FindTypeDeclarations extends TreeScanner<Void, List<String>> {
 
     @Override
     public Void visitCompilationUnit(CompilationUnitTree root, List<String> found) {
-        var name = Objects.toString(root.getPackage().getPackageName(), "");
+        var name = Objects.toString(root.getPackageName(), "");
         qualifiedName.add(name);
         return super.visitCompilationUnit(root, found);
     }

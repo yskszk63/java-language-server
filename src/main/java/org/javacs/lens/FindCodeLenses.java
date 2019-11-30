@@ -24,7 +24,7 @@ class FindCodeLenses extends TreeScanner<Void, List<CodeLens>> {
 
     @Override
     public Void visitCompilationUnit(CompilationUnitTree t, List<CodeLens> list) {
-        var name = Objects.toString(t.getPackage().getPackageName(), "");
+        var name = Objects.toString(t.getPackageName(), "");
         qualifiedName.add(name);
         root = t;
         return super.visitCompilationUnit(t, list);
