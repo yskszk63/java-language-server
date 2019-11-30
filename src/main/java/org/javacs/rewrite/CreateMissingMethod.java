@@ -34,6 +34,7 @@ public class CreateMissingMethod implements Rewrite {
         try (var task = compiler.compile(file)) {
             var trees = Trees.instance(task.task);
             var call = new FindMethodCallAt(task.task).scan(task.root(), position);
+            if (call == null) return CANCELLED;
             var path = trees.getPath(task.root(), call);
             var insertText = "\n" + printMethodHeader(task, call) + " {\n    // TODO\n}";
             var surroundingClass = surroundingClass(path);
