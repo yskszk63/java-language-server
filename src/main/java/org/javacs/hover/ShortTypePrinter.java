@@ -1,4 +1,4 @@
-package org.javacs;
+package org.javacs.hover;
 
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
@@ -7,7 +7,8 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.type.*;
 import javax.lang.model.util.AbstractTypeVisitor8;
 
-class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
+// TODO this should be package-private once completions code is refactored
+public class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
     // TODO reduce usage of DEFAULT in favor of context-specific "suppress my own package" printer
     public static final ShortTypePrinter DEFAULT = new ShortTypePrinter("");
     public static final ShortTypePrinter NO_PACKAGE = new ShortTypePrinter("*");
@@ -18,7 +19,7 @@ class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
         this.packageContext = packageContext;
     }
 
-    String print(TypeMirror type) {
+    public String print(TypeMirror type) {
         return type.accept(new ShortTypePrinter(packageContext), null);
     }
 
@@ -101,7 +102,7 @@ class ShortTypePrinter extends AbstractTypeVisitor8<String, Void> {
         return t.toString();
     }
 
-    static boolean missingParamNames(ExecutableElement e) {
+    public static boolean missingParamNames(ExecutableElement e) {
         return e.getParameters().stream().allMatch(p -> p.getSimpleName().toString().matches("arg\\d+"));
     }
 

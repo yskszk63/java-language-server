@@ -12,7 +12,7 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import javax.lang.model.element.*;
 import org.javacs.*;
-import org.javacs.FindClassDeclarationAt;
+import org.javacs.FindTypeDeclarationAt;
 import org.javacs.lsp.*;
 import org.javacs.rewrite.*;
 
@@ -58,7 +58,7 @@ public class CodeActionProvider {
         if (methodTree != null) return Map.of();
         var actions = new TreeMap<String, Rewrite>();
         var trees = Trees.instance(task.task);
-        var classTree = new FindClassDeclarationAt(task.task).scan(task.root(), cursor);
+        var classTree = new FindTypeDeclarationAt(task.task).scan(task.root(), cursor);
         if (classTree == null) return Map.of();
         var classPath = trees.getPath(task.root(), classTree);
         var elements = task.task.getElements();
@@ -211,7 +211,7 @@ public class CodeActionProvider {
 
     private ClassTree findClassTree(CompileTask task, Range range) {
         var position = task.root().getLineMap().getPosition(range.start.line + 1, range.start.character + 1);
-        return new FindClassDeclarationAt(task.task).scan(task.root(), position);
+        return new FindTypeDeclarationAt(task.task).scan(task.root(), position);
     }
 
     private String qualifiedName(CompileTask task, ClassTree tree) {

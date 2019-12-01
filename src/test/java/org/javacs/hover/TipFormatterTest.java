@@ -1,4 +1,4 @@
-package org.javacs;
+package org.javacs.hover;
 
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;

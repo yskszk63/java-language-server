@@ -1,4 +1,4 @@
-package org.javacs;
+package org.javacs.hover;
 
 import java.io.IOException;
 import java.io.StringReader;

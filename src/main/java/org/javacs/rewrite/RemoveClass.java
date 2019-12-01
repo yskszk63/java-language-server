@@ -3,7 +3,7 @@ package org.javacs.rewrite;
 import java.nio.file.Path;
 import java.util.Map;
 import org.javacs.CompilerProvider;
-import org.javacs.FindClassDeclarationAt;
+import org.javacs.FindTypeDeclarationAt;
 import org.javacs.lsp.TextEdit;
 
 public class RemoveClass implements Rewrite {
@@ -18,7 +18,7 @@ public class RemoveClass implements Rewrite {
     @Override
     public Map<Path, TextEdit[]> rewrite(CompilerProvider compiler) {
         var task = compiler.parse(file);
-        var type = new FindClassDeclarationAt(task.task).scan(task.root, (long) position);
+        var type = new FindTypeDeclarationAt(task.task).scan(task.root, (long) position);
         TextEdit[] edits = {new EditHelper(task.task).removeTree(task.root, type)};
         return Map.of(file, edits);
     }

@@ -4,6 +4,7 @@ import com.sun.source.util.Trees;
 import java.nio.file.Path;
 import java.util.Map;
 import org.javacs.CompilerProvider;
+import org.javacs.FindHelper;
 import org.javacs.lsp.TextEdit;
 
 public class RemoveMethod implements Rewrite {
@@ -23,7 +24,7 @@ public class RemoveMethod implements Rewrite {
             return CANCELLED;
         }
         try (var task = compiler.compile(file)) {
-            var methodElement = new FindHelper(task).findMethod(className, methodName, erasedParameterTypes);
+            var methodElement = FindHelper.findMethod(task, className, methodName, erasedParameterTypes);
             var methodTree = Trees.instance(task.task).getTree(methodElement);
             TextEdit[] edits = {new EditHelper(task.task).removeTree(task.root(), methodTree)};
             return Map.of(file, edits);

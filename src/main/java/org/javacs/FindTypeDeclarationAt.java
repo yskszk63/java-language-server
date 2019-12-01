@@ -6,11 +6,11 @@ import com.sun.source.util.SourcePositions;
 import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
 
-public class FindClassDeclarationAt extends TreeScanner<ClassTree, Long> {
+public class FindTypeDeclarationAt extends TreeScanner<ClassTree, Long> {
     private final SourcePositions pos;
     private CompilationUnitTree root;
 
-    public FindClassDeclarationAt(JavacTask task) {
+    public FindTypeDeclarationAt(JavacTask task) {
         pos = Trees.instance(task).getSourcePositions();
     }
 
@@ -33,8 +33,8 @@ public class FindClassDeclarationAt extends TreeScanner<ClassTree, Long> {
     }
 
     @Override
-    public ClassTree reduce(ClassTree r1, ClassTree r2) {
-        if (r1 != null) return r1;
-        return r2;
+    public ClassTree reduce(ClassTree a, ClassTree b) {
+        if (a != null) return a;
+        return b;
     }
 }

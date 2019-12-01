@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import org.javacs.CompilerProvider;
+import org.javacs.FindHelper;
 import org.javacs.lsp.Position;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;
@@ -30,7 +31,7 @@ public class RemoveException implements Rewrite {
     public Map<Path, TextEdit[]> rewrite(CompilerProvider compiler) {
         var file = compiler.findTypeDeclaration(className);
         try (var task = compiler.compile(file)) {
-            var methodElement = new FindHelper(task).findMethod(className, methodName, erasedParameterTypes);
+            var methodElement = FindHelper.findMethod(task, className, methodName, erasedParameterTypes);
             var methodTree = Trees.instance(task.task).getTree(methodElement);
             if (methodTree.getThrows().size() == 1) {
                 var delete = removeEntireThrows(task.task, task.root(), methodTree);

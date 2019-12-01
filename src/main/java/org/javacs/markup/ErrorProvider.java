@@ -38,9 +38,9 @@ public class ErrorProvider {
     private List<org.javacs.lsp.Diagnostic> compilerErrors(CompilationUnitTree root) {
         var result = new ArrayList<org.javacs.lsp.Diagnostic>();
         for (var d : task.diagnostics) {
-            if (d.getSource().toUri().equals(root.getSourceFile().toUri())) {
-                result.add(lspDiagnostic(d, root.getLineMap()));
-            }
+            if (!d.getSource().toUri().equals(root.getSourceFile().toUri())) continue;
+            if (d.getStartPosition() == -1 || d.getEndPosition() == -1) continue;
+            result.add(lspDiagnostic(d, root.getLineMap()));
         }
         return result;
     }

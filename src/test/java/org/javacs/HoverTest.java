@@ -5,45 +5,9 @@ import static org.junit.Assert.*;
 
 import java.util.StringJoiner;
 import org.javacs.lsp.*;
-import org.junit.Ignore;
 import org.junit.Test;
 
-public class SymbolUnderCursorTest {
-
-    @Test
-    public void classDeclaration() {
-        assertThat(
-                symbolAt("/org/javacs/example/SymbolUnderCursor.java", 3, 22),
-                containsString("org.javacs.example.SymbolUnderCursor"));
-    }
-
-    @Test
-    public void fieldDeclaration() {
-        assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 4, 22), containsString("field"));
-    }
-
-    @Test
-    public void methodDeclaration() {
-        assertThat(
-                symbolAt("/org/javacs/example/SymbolUnderCursor.java", 6, 22),
-                containsString("method(String methodParameter)"));
-    }
-
-    @Test
-    public void methodParameterDeclaration() {
-        assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 6, 36), containsString("methodParameter"));
-    }
-
-    @Test
-    public void localVariableDeclaration() {
-        assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 7, 22), containsString("localVariable"));
-    }
-
-    @Test
-    public void constructorParameterDeclaration() {
-        assertThat(
-                symbolAt("/org/javacs/example/SymbolUnderCursor.java", 17, 46), containsString("constructorParameter"));
-    }
+public class HoverTest {
 
     @Test
     public void classIdentifier() {
@@ -71,7 +35,6 @@ public class SymbolUnderCursorTest {
                 containsString("method(String methodParameter)"));
     }
 
-    @Ignore // tree.sym is null
     @Test
     public void methodReference() {
         assertThat(symbolAt("/org/javacs/example/SymbolUnderCursor.java", 14, 65), containsString("method"));
@@ -98,6 +61,13 @@ public class SymbolUnderCursorTest {
     public void throwsList() {
         assertThat(
                 symbolAt("/org/javacs/example/HoverThrows.java", 11, 11), containsString("throws java.io.IOException"));
+    }
+
+    @Test
+    public void docString() {
+        assertThat(
+                symbolAt("/org/javacs/example/HoverDocs.java", 7, 15),
+                containsString("Returns an unmodifiable list containing zero elements."));
     }
 
     // Re-using the language server makes these tests go a lot faster, but it will potentially produce surprising output

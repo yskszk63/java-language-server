@@ -16,6 +16,7 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
 import org.javacs.CompilerProvider;
+import org.javacs.FindHelper;
 import org.javacs.lsp.Position;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;
@@ -74,8 +75,8 @@ class EditHelper {
         // TODO sometimes, the source will not be available
         var parent = (TypeElement) method.getEnclosingElement();
         var file = compiler.findAnywhere(parent.getQualifiedName().toString()).get();
-        var parse = compiler.parse(file);
-        return new FindBestMethod().scan(parse.root, method);
+        var task = compiler.parse(file);
+        return FindHelper.findMethod(task, method);
     }
 
     static String printType(TypeMirror type) {

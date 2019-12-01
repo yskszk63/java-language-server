@@ -12,6 +12,8 @@ import javax.lang.model.element.*;
 import javax.tools.JavaFileObject;
 import org.javacs.action.CodeActionProvider;
 import org.javacs.fold.FoldProvider;
+import org.javacs.hover.HoverProvider;
+import org.javacs.hover.MarkdownHelper;
 import org.javacs.index.SymbolProvider;
 import org.javacs.lens.CodeLensProvider;
 import org.javacs.lsp.*;
@@ -460,7 +462,7 @@ class JavaLanguageServer extends LanguageServer {
         if (!path.isPresent()) return Optional.empty();
         // Parse the doctree associated with el
         var docTree = parse.doc(path.get());
-        var string = Parser.asMarkupContent(docTree);
+        var string = MarkdownHelper.asMarkupContent(docTree);
         return Optional.of(string);
     }
 
@@ -511,75 +513,6 @@ class JavaLanguageServer extends LanguageServer {
         return unresolved;
     }
 
-    private String hoverTypeDeclaration(TypeElement t) {
-        var result = new StringBuilder();
-        switch (t.getKind()) {
-            case ANNOTATION_TYPE:
-                result.append("@interface");
-                break;
-            case INTERFACE:
-                result.append("interface");
-                break;
-            case CLASS:
-                result.append("class");
-                break;
-            case ENUM:
-                result.append("enum");
-                break;
-            default:
-                LOG.warning("Don't know what to call type element " + t);
-                result.append("_");
-        }
-        result.append(" ").append(ShortTypePrinter.DEFAULT.print(t.asType()));
-        var superType = ShortTypePrinter.DEFAULT.print(t.getSuperclass());
-        switch (superType) {
-            case "Object":
-            case "none":
-                break;
-            default:
-                result.append(" extends ").append(superType);
-        }
-        return result.toString();
-    }
-
-    private String hoverCode(Element e) {
-        if (e instanceof ExecutableElement) {
-            var m = (ExecutableElement) e;
-            return ShortTypePrinter.DEFAULT.printMethod(m);
-        } else if (e instanceof VariableElement) {
-            var v = (VariableElement) e;
-            return ShortTypePrinter.DEFAULT.print(v.asType()) + " " + v;
-        } else if (e instanceof TypeElement) {
-            var t = (TypeElement) e;
-            var lines = new StringJoiner("\n");
-            lines.add(hoverTypeDeclaration(t) + " {");
-            for (var member : t.getEnclosedElements()) {
-                // TODO check accessibility
-                if (member instanceof ExecutableElement || member instanceof VariableElement) {
-                    lines.add("  " + hoverCode(member) + ";");
-                } else if (member instanceof TypeElement) {
-                    lines.add("  " + hoverTypeDeclaration((TypeElement) member) + " { /* removed */ }");
-                }
-            }
-            lines.add("}");
-            return lines.toString();
-        } else {
-            return e.toString();
-        }
-    }
-
-    private String hoverDocs(Element e) {
-        var ptr = new Ptr(e);
-        var file = compiler().docs.find(ptr);
-        if (!file.isPresent()) return "";
-        var parse = Parser.parseJavaFileObject(file.get());
-        var path = parse.fuzzyFind(ptr);
-        if (!path.isPresent()) return "";
-        var doc = parse.doc(path.get());
-        var md = Parser.asMarkdown(doc);
-        return md;
-    }
-
     @Override
     public Optional<Hover> hover(TextDocumentPositionParams position) {
         var uri = position.textDocument.uri;
@@ -587,35 +520,12 @@ class JavaLanguageServer extends LanguageServer {
         var column = position.position.character + 1;
         if (!FileStore.isJavaFile(uri)) return Optional.empty();
         var file = Paths.get(uri);
-        // Log start time
-        LOG.info(String.format("Hover over %s(%d,%d) ...", uri.getPath(), line, column));
-        var started = Instant.now();
-        // Compile entire file
-        var sources = Set.of(new SourceFileObject(file));
-        try (var compile = compiler().compileBatch(sources)) {
-            // Find element under cursor
-            var el = compile.element(compile.tree(file, line, column));
-            if (!el.isPresent()) {
-                LOG.info("...no element under cursor");
-                return Optional.empty();
-            }
-            // Result is combination of docs and code
-            var result = new ArrayList<MarkedString>();
-            // Add docs hover message
-            var docs = hoverDocs(el.get());
-            if (!docs.isBlank()) {
-                result.add(new MarkedString(docs));
-            }
-
-            // Add code hover message
-            var code = hoverCode(el.get());
-            result.add(new MarkedString("java", code));
-            // Log duration
-            var elapsed = Duration.between(started, Instant.now());
-            LOG.info(String.format("...found hover in %d ms", elapsed.toMillis()));
-
-            return Optional.of(new Hover(result));
+        var list = new HoverProvider(compiler()).hover(file, line, column);
+        if (list == HoverProvider.NOT_SUPPORTED) {
+            return Optional.empty();
         }
+        // TODO add range
+        return Optional.of(new Hover(list));
     }
 
     @Override
@@ -671,17 +581,6 @@ class JavaLanguageServer extends LanguageServer {
             return Optional.empty();
         }
         return Optional.of(found);
-    }
-
-    private Parser cacheParse;
-    private Path cacheParseFile = Paths.get("/NONE");
-    private int cacheParseVersion = -1;
-
-    private void updateCachedParse(Path file) {
-        if (file.equals(cacheParseFile) && FileStore.version(file) == cacheParseVersion) return;
-        cacheParse = Parser.parseFile(file);
-        cacheParseFile = file;
-        cacheParseVersion = FileStore.version(file);
     }
 
     @Override
@@ -836,10 +735,7 @@ class JavaLanguageServer extends LanguageServer {
     public void didOpenTextDocument(DidOpenTextDocumentParams params) {
         FileStore.open(params);
         if (!FileStore.isJavaFile(params.textDocument.uri)) return;
-        // So that subsequent documentSymbol and codeLens requests will be faster
-        var file = Paths.get(params.textDocument.uri);
-        updateCachedParse(file);
-        lastEdited = file;
+        lastEdited = Paths.get(params.textDocument.uri);
         uncheckedChanges = true;
     }
 

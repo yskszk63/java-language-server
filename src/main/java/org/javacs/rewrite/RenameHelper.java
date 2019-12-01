@@ -21,6 +21,7 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import org.javacs.CompileTask;
+import org.javacs.FindHelper;
 import org.javacs.lsp.Position;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;
@@ -46,7 +47,7 @@ public class RenameHelper {
             String[] erasedParameterTypes,
             String newName) {
         var allEdits = new HashMap<Path, TextEdit[]>();
-        var method = new FindHelper(task).findMethod(className, methodName, erasedParameterTypes);
+        var method = FindHelper.findMethod(task, className, methodName, erasedParameterTypes);
         for (var root : roots) {
             var file = Paths.get(root.getSourceFile().toUri());
             var references = findMethodReferences(root, method);

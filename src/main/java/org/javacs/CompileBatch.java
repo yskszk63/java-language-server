@@ -21,6 +21,8 @@ import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.*;
 import javax.tools.*;
+import org.javacs.hover.MarkdownHelper;
+import org.javacs.hover.ShortTypePrinter;
 import org.javacs.lsp.*;
 
 class CompileBatch implements AutoCloseable {
@@ -374,13 +376,13 @@ class CompileBatch implements AutoCloseable {
         var method = (MethodTree) path.get().getLeaf();
         // Find the docstring on method, or empty doc if there is none
         var doc = parse.doc(path.get());
-        sig.documentation = Parser.asMarkupContent(doc);
+        sig.documentation = MarkdownHelper.asMarkupContent(doc);
         // Get param docs from @param tags
         var paramComments = new HashMap<String, String>();
         for (var tag : doc.getBlockTags()) {
             if (tag.getKind() == DocTree.Kind.PARAM) {
                 var param = (ParamTree) tag;
-                paramComments.put(param.getName().toString(), Parser.asMarkdown(param.getDescription()));
+                paramComments.put(param.getName().toString(), MarkdownHelper.asMarkdown(param.getDescription()));
             }
         }
         // Get param names from source

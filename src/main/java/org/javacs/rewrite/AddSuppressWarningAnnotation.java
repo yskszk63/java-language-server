@@ -4,6 +4,7 @@ import com.sun.source.util.Trees;
 import java.nio.file.Path;
 import java.util.Map;
 import org.javacs.CompilerProvider;
+import org.javacs.FindHelper;
 import org.javacs.lsp.Position;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;
@@ -26,7 +27,7 @@ public class AddSuppressWarningAnnotation implements Rewrite {
         }
         try (var task = compiler.compile(file)) {
             var trees = Trees.instance(task.task);
-            var methodElement = new FindHelper(task).findMethod(className, methodName, erasedParameterTypes);
+            var methodElement = FindHelper.findMethod(task, className, methodName, erasedParameterTypes);
             var methodTree = trees.getTree(methodElement);
             var pos = trees.getSourcePositions();
             var startMethod = (int) pos.getStartPosition(task.root(), methodTree);
