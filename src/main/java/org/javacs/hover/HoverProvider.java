@@ -10,6 +10,7 @@ import java.util.logging.Logger;
 import javax.lang.model.element.*;
 import org.javacs.CompilerProvider;
 import org.javacs.FindHelper;
+import org.javacs.MarkdownHelper;
 import org.javacs.ParseTask;
 import org.javacs.lsp.MarkedString;
 
@@ -69,6 +70,7 @@ public class HoverProvider {
     }
 
     // TODO this should parameterize the type
+    // TODO show more information about declarations---was this a parameter, a field? What were the modifiers?
     private String printType(Element e) {
         if (e instanceof ExecutableElement) {
             var m = (ExecutableElement) e;

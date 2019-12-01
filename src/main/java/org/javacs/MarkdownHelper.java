@@ -1,9 +1,13 @@
-package org.javacs.hover;
+package org.javacs;
 
+import com.sun.source.doctree.DocCommentTree;
+import com.sun.source.doctree.DocTree;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.CharBuffer;
+import java.util.List;
+import java.util.StringJoiner;
 import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -14,11 +18,33 @@ import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
+import org.javacs.lsp.MarkupContent;
+import org.javacs.lsp.MarkupKind;
 import org.w3c.dom.Document;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
-class TipFormatter {
+public class MarkdownHelper {
+
+    public static MarkupContent asMarkupContent(DocCommentTree comment) {
+        var markdown = asMarkdown(comment);
+        var content = new MarkupContent();
+        content.kind = MarkupKind.Markdown;
+        content.value = markdown;
+        return content;
+    }
+
+    public static String asMarkdown(DocCommentTree comment) {
+        var lines = comment.getFirstSentence();
+        return asMarkdown(lines);
+    }
+
+    public static String asMarkdown(List<? extends DocTree> lines) {
+        var join = new StringJoiner("\n");
+        for (var l : lines) join.add(l.toString());
+        var html = join.toString();
+        return asMarkdown(html);
+    }
 
     private static Document parse(String html) {
         try {

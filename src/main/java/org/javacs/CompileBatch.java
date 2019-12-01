@@ -21,7 +21,6 @@ import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.*;
 import javax.tools.*;
-import org.javacs.hover.MarkdownHelper;
 import org.javacs.hover.ShortTypePrinter;
 import org.javacs.lsp.*;
 

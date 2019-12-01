@@ -13,7 +13,6 @@ import javax.tools.JavaFileObject;
 import org.javacs.action.CodeActionProvider;
 import org.javacs.fold.FoldProvider;
 import org.javacs.hover.HoverProvider;
-import org.javacs.hover.MarkdownHelper;
 import org.javacs.index.SymbolProvider;
 import org.javacs.lens.CodeLensProvider;
 import org.javacs.lsp.*;
