@@ -1,7 +1,5 @@
 package org.javacs.navigation;
 
-import static org.javacs.navigation.NavigationHelper.*;
-
 import com.sun.source.util.Trees;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -12,6 +10,7 @@ import javax.lang.model.type.TypeKind;
 import javax.tools.JavaFileObject;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
+import org.javacs.FindHelper;
 import org.javacs.SourceFileObject;
 import org.javacs.lsp.Location;
 
@@ -38,7 +37,7 @@ public class DefinitionProvider {
                 return findError(element);
             }
             // TODO instead of checking isLocal, just try to resolve the location, fall back to searching
-            if (isLocal(element)) {
+            if (NavigationHelper.isLocal(element)) {
                 return findDefinitions(task, element);
             }
             var className = className(element);
@@ -81,7 +80,7 @@ public class DefinitionProvider {
                 if (!member.getSimpleName().contentEquals(memberName)) continue;
                 var path = trees.getPath(member);
                 if (path == null) continue;
-                var location = location(task, path, memberName);
+                var location = FindHelper.location(task, path, memberName);
                 locations.add(location);
             }
         }
@@ -101,7 +100,7 @@ public class DefinitionProvider {
 
     private List<Location> findRemoteDefinitions(JavaFileObject otherFile) {
         try (var task = compiler.compile(List.of(new SourceFileObject(file), otherFile))) {
-            var element = findElement(task, file, line, column);
+            var element = NavigationHelper.findElement(task, file, line, column);
             return findDefinitions(task, element);
         }
     }
@@ -114,6 +113,6 @@ public class DefinitionProvider {
         }
         var name = element.getSimpleName();
         if (name.contentEquals("<init>")) name = element.getEnclosingElement().getSimpleName();
-        return List.of(location(task, path, name));
+        return List.of(FindHelper.location(task, path, name));
     }
 }

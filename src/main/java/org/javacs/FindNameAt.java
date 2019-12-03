@@ -1,30 +1,30 @@
-package org.javacs.navigation;
+package org.javacs;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
 
-class FindElementAt extends TreeScanner<Tree, Integer> {
-    final JavacTask task;
+public class FindNameAt extends TreePathScanner<TreePath, Long> {
+    private final JavacTask task;
     private CompilationUnitTree root;
     private ClassTree surroundingClass;
 
-    FindElementAt(JavacTask task) {
-        this.task = task;
+    public FindNameAt(CompileTask task) {
+        this.task = task.task;
     }
 
     @Override
-    public Tree visitCompilationUnit(CompilationUnitTree t, Integer find) {
+    public TreePath visitCompilationUnit(CompilationUnitTree t, Long find) {
         root = t;
         return super.visitCompilationUnit(t, find);
     }
 
     @Override
-    public Tree visitClass(ClassTree t, Integer find) {
+    public TreePath visitClass(ClassTree t, Long find) {
         var push = surroundingClass;
         surroundingClass = t;
         if (contains(t, t.getSimpleName(), find)) {
             surroundingClass = push;
-            return t;
+            return getCurrentPath();
         }
         var result = super.visitClass(t, find);
         surroundingClass = push;
@@ -32,71 +32,71 @@ class FindElementAt extends TreeScanner<Tree, Integer> {
     }
 
     @Override
-    public Tree visitMethod(MethodTree t, Integer find) {
+    public TreePath visitMethod(MethodTree t, Long find) {
         var name = t.getName();
         if (name.contentEquals("<init>")) {
             name = surroundingClass.getSimpleName();
         }
         if (contains(t, name, find)) {
-            return t;
+            return getCurrentPath();
         }
         return super.visitMethod(t, find);
     }
 
     @Override
-    public Tree visitIdentifier(IdentifierTree t, Integer find) {
+    public TreePath visitIdentifier(IdentifierTree t, Long find) {
         if (contains(t, t.getName(), find)) {
-            return t;
+            return getCurrentPath();
         }
         return super.visitIdentifier(t, find);
     }
 
     @Override
-    public Tree visitMemberSelect(MemberSelectTree t, Integer find) {
+    public TreePath visitMemberSelect(MemberSelectTree t, Long find) {
         if (contains(t, t.getIdentifier(), find)) {
-            return t;
+            return getCurrentPath();
         }
         return super.visitMemberSelect(t, find);
     }
 
     @Override
-    public Tree visitMemberReference(MemberReferenceTree t, Integer find) {
+    public TreePath visitMemberReference(MemberReferenceTree t, Long find) {
         if (contains(t, t.getName(), find)) {
-            return t;
+            return getCurrentPath();
         }
         return super.visitMemberReference(t, find);
     }
 
     @Override
-    public Tree visitVariable(VariableTree t, Integer find) {
+    public TreePath visitVariable(VariableTree t, Long find) {
         if (contains(t, t.getName(), find)) {
-            return t;
+            return getCurrentPath();
         }
         return super.visitVariable(t, find);
     }
 
     @Override
-    public Tree visitNewClass(NewClassTree t, Integer find) {
+    public TreePath visitNewClass(NewClassTree t, Long find) {
         var start = Trees.instance(task).getSourcePositions().getStartPosition(root, t);
         var end = start + "new".length();
         if (start <= find && find < end) {
-            return t;
+            return getCurrentPath();
         }
         return super.visitNewClass(t, find);
     }
 
     @Override
-    public Tree reduce(Tree r1, Tree r2) {
+    public TreePath reduce(TreePath r1, TreePath r2) {
         if (r1 != null) return r1;
         return r2;
     }
 
-    private boolean contains(Tree t, CharSequence name, int find) {
+    private boolean contains(Tree t, CharSequence name, long find) {
         var pos = Trees.instance(task).getSourcePositions();
         var start = (int) pos.getStartPosition(root, t);
         var end = (int) pos.getEndPosition(root, t);
         if (start == -1 || end == -1) return false;
-        start = NavigationHelper.findNameIn(root, name, start, end);
+        start = FindHelper.findNameIn(root, name, start, end);
         end = start + name.length();
         if (start == -1 || end == -1) return false;
         return start <= find && find < end;

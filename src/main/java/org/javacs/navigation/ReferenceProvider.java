@@ -1,7 +1,5 @@
 package org.javacs.navigation;
 
-import static org.javacs.navigation.NavigationHelper.*;
-
 import com.sun.source.util.TreePath;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -9,6 +7,7 @@ import java.util.List;
 import javax.lang.model.element.TypeElement;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
+import org.javacs.FindHelper;
 import org.javacs.lsp.Location;
 
 public class ReferenceProvider {
@@ -27,18 +26,18 @@ public class ReferenceProvider {
 
     public List<Location> find() {
         try (var task = compiler.compile(file)) {
-            var element = findElement(task, file, line, column);
+            var element = NavigationHelper.findElement(task, file, line, column);
             if (element == null) return NOT_SUPPORTED;
-            if (isLocal(element)) {
+            if (NavigationHelper.isLocal(element)) {
                 return findReferences(task);
             }
-            if (isType(element)) {
+            if (NavigationHelper.isType(element)) {
                 var type = (TypeElement) element;
                 var className = type.getQualifiedName().toString();
                 task.close();
                 return findTypeReferences(className);
             }
-            if (isMember(element)) {
+            if (NavigationHelper.isMember(element)) {
                 var parentClass = (TypeElement) element.getEnclosingElement();
                 var className = parentClass.getQualifiedName().toString();
                 var memberName = element.getSimpleName().toString();
@@ -69,14 +68,14 @@ public class ReferenceProvider {
     }
 
     private List<Location> findReferences(CompileTask task) {
-        var element = findElement(task, file, line, column);
+        var element = NavigationHelper.findElement(task, file, line, column);
         var paths = new ArrayList<TreePath>();
         for (var root : task.roots) {
             new FindReferences(task.task, element).scan(root, paths);
         }
         var locations = new ArrayList<Location>();
         for (var p : paths) {
-            locations.add(location(task, p));
+            locations.add(FindHelper.location(task, p));
         }
         return locations;
     }

@@ -2,6 +2,7 @@ package org.javacs;
 
 import com.sun.source.tree.ArrayTypeTree;
 import com.sun.source.tree.ClassTree;
+import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.MethodTree;
@@ -9,9 +10,16 @@ import com.sun.source.tree.ParameterizedTypeTree;
 import com.sun.source.tree.PrimitiveTypeTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.VariableTree;
+import com.sun.source.util.TreePath;
+import com.sun.source.util.Trees;
+import java.io.IOException;
+import java.util.regex.Pattern;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import org.javacs.lsp.Location;
+import org.javacs.lsp.Position;
+import org.javacs.lsp.Range;
 
 public class FindHelper {
 
@@ -119,5 +127,44 @@ public class FindHelper {
             return typeMatches(array.getType(), erasedElement);
         }
         return true;
+    }
+
+    public static Location location(CompileTask task, TreePath path) {
+        return location(task, path, "");
+    }
+
+    public static Location location(CompileTask task, TreePath path, CharSequence name) {
+        var lines = path.getCompilationUnit().getLineMap();
+        var pos = Trees.instance(task.task).getSourcePositions();
+        var start = (int) pos.getStartPosition(path.getCompilationUnit(), path.getLeaf());
+        var end = (int) pos.getEndPosition(path.getCompilationUnit(), path.getLeaf());
+        if (name.length() > 0) {
+            start = FindHelper.findNameIn(path.getCompilationUnit(), name, start, end);
+            end = start + name.length();
+        }
+        var startLine = (int) lines.getLineNumber(start);
+        var startColumn = (int) lines.getColumnNumber(start);
+        var startPos = new Position(startLine - 1, startColumn - 1);
+        var endLine = (int) lines.getLineNumber(end);
+        var endColumn = (int) lines.getColumnNumber(end);
+        var endPos = new Position(endLine - 1, endColumn - 1);
+        var range = new Range(startPos, endPos);
+        var uri = path.getCompilationUnit().getSourceFile().toUri();
+        return new Location(uri, range);
+    }
+
+    public static int findNameIn(CompilationUnitTree root, CharSequence name, int start, int end) {
+        CharSequence contents;
+        try {
+            contents = root.getSourceFile().getCharContent(true);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        var matcher = Pattern.compile("\\b" + name + "\\b").matcher(contents);
+        matcher.region(start, end);
+        if (matcher.find()) {
+            return matcher.start();
+        }
+        return -1;
     }
 }

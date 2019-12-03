@@ -3,6 +3,7 @@ package org.javacs;
 import static org.javacs.JsonHelper.GSON;
 
 import com.google.gson.*;
+import com.sun.source.util.Trees;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -357,13 +358,9 @@ class JavaLanguageServer extends LanguageServer {
         var edits = new ArrayList<TextEdit>();
         var file = Paths.get(params.textDocument.uri);
         var fixImports = new AutoFixImports(file).rewrite(compiler()).get(file);
-        for (var e : fixImports) {
-            edits.add(e);
-        }
+        Collections.addAll(edits, fixImports);
         var addOverrides = new AutoAddOverrides(file).rewrite(compiler()).get(file);
-        for (var e : addOverrides) {
-            edits.add(e);
-        }
+        Collections.addAll(edits, addOverrides);
         return edits;
     }
 
@@ -379,27 +376,30 @@ class JavaLanguageServer extends LanguageServer {
         if (!FileStore.isJavaFile(params.textDocument.uri)) return Optional.empty();
         LOG.info("Try to rename...");
         var file = Paths.get(params.textDocument.uri);
-        try (var compile = compiler().compileBatch(List.of(new SourceFileObject(file)))) {
-            var lines = compile.root(file).getLineMap();
-            var position = lines.getPosition(params.position.line + 1, params.position.character + 1);
-            var path = compile.findPath(file, position);
-            var el = compile.element(path);
-            if (el.isEmpty()) {
+        try (var task = compiler().compile(file)) {
+            var lines = task.root().getLineMap();
+            var cursor = lines.getPosition(params.position.line + 1, params.position.character + 1);
+            var path = new FindNameAt(task).scan(task.root(), cursor);
+            if (path == null) {
                 LOG.info("...no element under cursor");
                 return Optional.empty();
             }
-            if (!canRename(el.get())) {
-                LOG.info("...can't rename " + el.get());
+            var el = Trees.instance(task.task).getElement(path);
+            if (el == null) {
+                LOG.info("...couldn't resolve element");
                 return Optional.empty();
             }
-            var toFile = findElement(el.get());
-            if (toFile.isEmpty()) {
-                LOG.info("...can't find source for " + el.get());
+            if (!canRename(el)) {
+                LOG.info("...can't rename " + el);
+                return Optional.empty();
+            }
+            if (!canFindSource(el)) {
+                LOG.info("...can't find source for " + el);
                 return Optional.empty();
             }
             var response = new RenameResponse();
-            response.range = compile.range(path);
-            response.placeholder = el.get().getSimpleName().toString();
+            response.range = FindHelper.location(task, path).range;
+            response.placeholder = el.getSimpleName().toString();
             return Optional.of(response);
         }
     }
@@ -416,6 +416,16 @@ class JavaLanguageServer extends LanguageServer {
                 // TODO rename other types
                 return false;
         }
+    }
+
+    private boolean canFindSource(Element rename) {
+        if (rename == null) return false;
+        if (rename instanceof TypeElement) {
+            var type = (TypeElement) rename;
+            var name = type.getQualifiedName().toString();
+            return compiler().findTypeDeclaration(name) != CompilerProvider.NOT_FOUND;
+        }
+        return canFindSource(rename.getEnclosingElement());
     }
 
     @Override

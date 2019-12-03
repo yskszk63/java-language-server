@@ -26,7 +26,7 @@ import org.javacs.lsp.Position;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;
 
-public class RenameHelper {
+class RenameHelper {
     final CompileTask task;
 
     RenameHelper(CompileTask task) {
