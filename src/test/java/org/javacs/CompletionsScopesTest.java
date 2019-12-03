@@ -4,12 +4,11 @@ import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 
-import java.io.IOException;
 import org.junit.Test;
 
 public class CompletionsScopesTest extends CompletionsBase {
     @Test
-    public void staticSub() throws IOException {
+    public void staticSub() {
         var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // Static method
@@ -33,7 +32,7 @@ public class CompletionsScopesTest extends CompletionsBase {
     }
 
     @Test
-    public void staticSubThisSuper() throws IOException {
+    public void staticSubThisSuper() {
         var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // StaticSub.this, StaticSub.super
@@ -45,7 +44,7 @@ public class CompletionsScopesTest extends CompletionsBase {
     }
 
     @Test
-    public void staticSubInner() throws IOException {
+    public void staticSubInner() {
         var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // Static method
@@ -69,7 +68,7 @@ public class CompletionsScopesTest extends CompletionsBase {
     }
 
     @Test
-    public void staticSubInnerThisSuper() throws IOException {
+    public void staticSubInnerThisSuper() {
         var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // StaticSub.this, StaticSub.super
@@ -81,7 +80,7 @@ public class CompletionsScopesTest extends CompletionsBase {
     }
 
     @Test
-    public void staticSubStaticMethod() throws IOException {
+    public void staticSubStaticMethod() {
         var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // Static method
@@ -105,7 +104,7 @@ public class CompletionsScopesTest extends CompletionsBase {
     }
 
     @Test
-    public void staticSubStaticMethodThisSuper() throws IOException {
+    public void staticSubStaticMethodThisSuper() {
         var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // StaticSub.this, StaticSub.super
@@ -117,7 +116,7 @@ public class CompletionsScopesTest extends CompletionsBase {
     }
 
     @Test
-    public void staticSubStaticMethodInner() throws IOException {
+    public void staticSubStaticMethodInner() {
         var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // Static method
@@ -141,7 +140,7 @@ public class CompletionsScopesTest extends CompletionsBase {
     }
 
     @Test
-    public void staticSubStaticMethodInnerThisSuper() throws IOException {
+    public void staticSubStaticMethodInnerThisSuper() {
         var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // StaticSub.this, StaticSub.super
@@ -153,7 +152,7 @@ public class CompletionsScopesTest extends CompletionsBase {
     }
 
     @Test
-    public void sub() throws IOException {
+    public void sub() {
         var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // Static method
@@ -177,7 +176,7 @@ public class CompletionsScopesTest extends CompletionsBase {
     }
 
     @Test
-    public void subThisSuper() throws IOException {
+    public void subThisSuper() {
         var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // sub.this, sub.super
@@ -189,7 +188,7 @@ public class CompletionsScopesTest extends CompletionsBase {
     }
 
     @Test
-    public void subInner() throws IOException {
+    public void subInner() {
         var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // Static method
@@ -213,7 +212,7 @@ public class CompletionsScopesTest extends CompletionsBase {
     }
 
     @Test
-    public void subInnerThisSuper() throws IOException {
+    public void subInnerThisSuper() {
         var file = "/org/javacs/example/AutocompleteScopes.java";
 
         // sub.this, sub.super
@@ -225,7 +224,7 @@ public class CompletionsScopesTest extends CompletionsBase {
     }
 
     @Test
-    public void blockLocal() throws IOException {
+    public void blockLocal() {
         var file = "/org/javacs/example/AutocompleteScopes.java";
         var suggestions = filterText(file, 196, 14);
         assertThat(suggestions, hasItems("testArg", "testMethodLocal", "testBlockLocal"));

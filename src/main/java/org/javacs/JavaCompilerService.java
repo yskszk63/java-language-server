@@ -183,8 +183,8 @@ class JavaCompilerService implements CompilerProvider {
     }
 
     @Override
-    public Set<String> publicTopLevelTypes() {
-        var all = new HashSet<String>();
+    public List<String> publicTopLevelTypes() {
+        var all = new ArrayList<String>();
         for (var file : FileStore.all()) {
             var fileName = file.getFileName().toString();
             if (!fileName.endsWith(".java")) continue;
@@ -201,8 +201,8 @@ class JavaCompilerService implements CompilerProvider {
     }
 
     @Override
-    public Set<String> packagePrivateTopLevelTypes(String packageName) {
-        return Set.of("TODO");
+    public List<String> packagePrivateTopLevelTypes(String packageName) {
+        return List.of("TODO");
     }
 
     private boolean containsImport(Path file, String className) {

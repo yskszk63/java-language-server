@@ -1,9 +1,12 @@
 package org.javacs;
 
-import com.sun.jdi.PrimitiveType;
 import com.sun.source.tree.ArrayTypeTree;
 import com.sun.source.tree.ClassTree;
+import com.sun.source.tree.IdentifierTree;
+import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.MethodTree;
+import com.sun.source.tree.ParameterizedTypeTree;
+import com.sun.source.tree.PrimitiveTypeTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.VariableTree;
 import java.util.regex.Pattern;
@@ -14,9 +17,38 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.ExecutableType;
+import javax.lang.model.type.PrimitiveType;
 import javax.lang.model.type.TypeMirror;
 
 public class FindHelper {
+
+    public static MethodTree findMethod(
+            ParseTask task, String className, String methodName, String[] erasedParameterTypes) {
+        var classTree = findType(task, className);
+        for (var member : classTree.getMembers()) {
+            if (member.getKind() != Tree.Kind.METHOD) continue;
+            var method = (MethodTree) member;
+            if (!method.getName().contentEquals(methodName)) continue;
+            if (!isSameMethodType(method, erasedParameterTypes)) continue;
+            return method;
+        }
+        throw new RuntimeException("no method");
+    }
+
+    public static VariableTree findField(ParseTask task, String className, String memberName) {
+        var classTree = findType(task, className);
+        for (var member : classTree.getMembers()) {
+            if (member.getKind() != Tree.Kind.VARIABLE) continue;
+            var variable = (VariableTree) member;
+            if (!variable.getName().contentEquals(memberName)) continue;
+            return variable;
+        }
+        throw new RuntimeException("no variable");
+    }
+
+    public static ClassTree findType(ParseTask task, String className) {
+        return new FindTypeDeclarationNamed().scan(task.root, className);
+    }
 
     public static ExecutableElement findMethod(
             CompileTask task, String className, String methodName, String[] erasedParameterTypes) {
@@ -116,5 +148,41 @@ public class FindHelper {
         } else {
             return true;
         }
+    }
+
+    private static boolean isSameMethodType(MethodTree candidate, String[] erasedParameterTypes) {
+        if (candidate.getParameters().size() != erasedParameterTypes.length) {
+            return false;
+        }
+        for (var i = 0; i < candidate.getParameters().size(); i++) {
+            if (!typeMatches(candidate.getParameters().get(i).getType(), erasedParameterTypes[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean typeMatches(Tree candidate, String erasedType) {
+        if (candidate instanceof ParameterizedTypeTree) {
+            var parameterized = (ParameterizedTypeTree) candidate;
+            return typeMatches(parameterized.getType(), erasedType);
+        }
+        if (candidate instanceof PrimitiveTypeTree) {
+            return candidate.toString().equals(erasedType);
+        }
+        if (candidate instanceof IdentifierTree) {
+            var simpleName = candidate.toString();
+            return erasedType.endsWith(simpleName);
+        }
+        if (candidate instanceof MemberSelectTree) {
+            return candidate.toString().equals(erasedType);
+        }
+        if (candidate instanceof ArrayTypeTree) {
+            var array = (ArrayTypeTree) candidate;
+            if (!erasedType.endsWith("[]")) return false;
+            var erasedElement = erasedType.substring(0, erasedType.length() - "[]".length());
+            return typeMatches(array.getType(), erasedElement);
+        }
+        return true;
     }
 }

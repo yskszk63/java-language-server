@@ -1,6 +1,7 @@
 package org.javacs;
 
-class CompletionData {
-    public Ptr ptr;
+public class CompletionData {
+    public String className, memberName;
+    public String[] erasedParameterTypes;
     public int plusOverloads;
 }

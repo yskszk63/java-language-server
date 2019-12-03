@@ -3,6 +3,7 @@ package org.javacs;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import javax.tools.JavaFileObject;
@@ -10,9 +11,9 @@ import javax.tools.JavaFileObject;
 public interface CompilerProvider {
     Set<String> imports();
 
-    Set<String> publicTopLevelTypes();
+    List<String> publicTopLevelTypes();
 
-    Set<String> packagePrivateTopLevelTypes(String packageName);
+    List<String> packagePrivateTopLevelTypes(String packageName);
 
     Iterable<Path> search(String query);
 

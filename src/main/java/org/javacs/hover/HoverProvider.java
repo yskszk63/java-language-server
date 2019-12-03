@@ -1,5 +1,6 @@
 package org.javacs.hover;
 
+import com.google.gson.JsonNull;
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import java.nio.file.Path;
@@ -9,9 +10,12 @@ import java.util.StringJoiner;
 import java.util.logging.Logger;
 import javax.lang.model.element.*;
 import org.javacs.CompilerProvider;
+import org.javacs.CompletionData;
 import org.javacs.FindHelper;
+import org.javacs.JsonHelper;
 import org.javacs.MarkdownHelper;
 import org.javacs.ParseTask;
+import org.javacs.lsp.CompletionItem;
 import org.javacs.lsp.MarkedString;
 
 public class HoverProvider {
@@ -37,6 +41,55 @@ public class HoverProvider {
             }
             return list;
         }
+    }
+
+    public void resolveCompletionItem(CompletionItem item) {
+        if (item.data == null || item.data == JsonNull.INSTANCE) return;
+        var data = JsonHelper.GSON.fromJson(item.data, CompletionData.class);
+        var source = compiler.findAnywhere(data.className);
+        if (source.isEmpty()) return;
+        var task = compiler.parse(source.get());
+        var tree = findItem(task, data);
+        resolveDetail(item, data, tree);
+        var path = Trees.instance(task.task).getPath(task.root, tree);
+        var docTree = DocTrees.instance(task.task).getDocCommentTree(path);
+        if (docTree == null) return;
+        item.documentation = MarkdownHelper.asMarkupContent(docTree);
+    }
+
+    // TODO consider showing actual source code instead of just types and names
+    private void resolveDetail(CompletionItem item, CompletionData data, Tree tree) {
+        if (tree instanceof MethodTree) {
+            var method = (MethodTree) tree;
+            var parameters = new StringJoiner(", ");
+            for (var p : method.getParameters()) {
+                parameters.add(p.getType() + " " + p.getName());
+            }
+            item.detail = method.getReturnType() + " " + method.getName() + "(" + parameters + ")";
+            if (!method.getThrows().isEmpty()) {
+                var exceptions = new StringJoiner(", ");
+                for (var e : method.getThrows()) {
+                    exceptions.add(e.toString());
+                }
+                item.detail += " throws " + exceptions;
+            }
+            if (data.plusOverloads != 0) {
+                item.detail += " (+" + data.plusOverloads + " overloads)";
+            }
+        }
+    }
+
+    private Tree findItem(ParseTask task, CompletionData data) {
+        if (data.erasedParameterTypes != null) {
+            return FindHelper.findMethod(task, data.className, data.memberName, data.erasedParameterTypes);
+        }
+        if (data.memberName != null) {
+            return FindHelper.findField(task, data.className, data.memberName);
+        }
+        if (data.className != null) {
+            return FindHelper.findType(task, data.className);
+        }
+        throw new RuntimeException("no className");
     }
 
     private String docs(Element element) {
@@ -69,6 +122,7 @@ public class HoverProvider {
         }
     }
 
+    // TODO this should be merged with logic in CompletionProvider
     // TODO this should parameterize the type
     // TODO show more information about declarations---was this a parameter, a field? What were the modifiers?
     private String printType(Element e) {

@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.javacs.lsp.*;
+import org.junit.Assert;
 
 public class CompletionsBase {
     protected static JavaLanguageServer server = LanguageServerFixture.getJavaLanguageServer();
@@ -12,10 +13,10 @@ public class CompletionsBase {
         server = LanguageServerFixture.getJavaLanguageServer();
     }
 
-    protected Set<String> insertTemplate(String file, int row, int column) {
+    protected List<String> insertTemplate(String file, int row, int column) {
         var items = items(file, row, column);
 
-        return items.stream().map(CompletionsBase::itemInsertTemplate).collect(Collectors.toSet());
+        return items.stream().map(CompletionsBase::itemInsertTemplate).collect(Collectors.toList());
     }
 
     static String itemInsertTemplate(CompletionItem i) {
@@ -38,27 +39,27 @@ public class CompletionsBase {
         return text;
     }
 
-    protected Set<String> label(String file, int row, int column) {
+    protected List<String> label(String file, int row, int column) {
         var items = items(file, row, column);
 
-        return items.stream().map(i -> i.label).collect(Collectors.toSet());
+        return items.stream().map(i -> i.label).collect(Collectors.toList());
     }
 
-    protected Set<String> insertText(String file, int row, int column) {
+    protected List<String> insertText(String file, int row, int column) {
         var items = items(file, row, column);
 
-        return items.stream().map(CompletionsBase::itemInsertText).collect(Collectors.toSet());
+        return items.stream().map(CompletionsBase::itemInsertText).collect(Collectors.toList());
     }
 
-    protected Set<String> filterText(String file, int row, int column) {
+    protected List<String> filterText(String file, int row, int column) {
         var items = items(file, row, column);
 
-        return items.stream().map(CompletionsBase::itemFilterText).collect(Collectors.toSet());
+        return items.stream().map(CompletionsBase::itemFilterText).collect(Collectors.toList());
     }
 
-    protected Set<String> detail(String file, int row, int column) {
+    protected List<String> detail(String file, int row, int column) {
         var items = items(file, row, column);
-        var result = new HashSet<String>();
+        var result = new ArrayList<String>();
         for (var i : items) {
             var resolved = resolve(i);
             result.add(resolved.detail);
@@ -90,7 +91,7 @@ public class CompletionsBase {
         return text;
     }
 
-    protected Set<String> documentation(String file, int row, int column) {
+    protected List<String> documentation(String file, int row, int column) {
         var items = items(file, row, column);
 
         return items.stream()
@@ -99,15 +100,18 @@ public class CompletionsBase {
                             if (i.documentation != null) return Stream.of(i.documentation.value.trim());
                             else return Stream.empty();
                         })
-                .collect(Collectors.toSet());
+                .collect(Collectors.toList());
     }
 
     protected List<? extends CompletionItem> items(String file, int row, int column) {
         var uri = FindResource.uri(file);
         var position =
                 new TextDocumentPositionParams(new TextDocumentIdentifier(uri), new Position(row - 1, column - 1));
-
-        return server.completion(position).get().items;
+        var maybe = server.completion(position);
+        if (!maybe.isPresent()) {
+            Assert.fail("no items");
+        }
+        return maybe.get().items;
     }
 
     protected CompletionItem resolve(CompletionItem item) {

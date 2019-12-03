@@ -150,7 +150,7 @@ public class FileStore {
         return javaSources.get(file).packageName;
     }
 
-    static String suggestedPackageName(Path file) {
+    public static String suggestedPackageName(Path file) {
         // Look in each parent directory of file
         for (var dir = file.getParent(); dir != null; dir = dir.getParent()) {
             // Try to find a sibling with a package declaration

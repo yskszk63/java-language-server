@@ -1277,9 +1277,7 @@ class CompileBatch implements AutoCloseable {
 
     private JsonElement data(Ptr ptr, int plusOverloads) {
         var data = new CompletionData();
-        data.ptr = ptr;
-        data.plusOverloads = plusOverloads;
-        return JavaLanguageServer.GSON.toJsonTree(data);
+        return JsonHelper.GSON.toJsonTree(data);
     }
 
     private static final Logger LOG = Logger.getLogger("main");
