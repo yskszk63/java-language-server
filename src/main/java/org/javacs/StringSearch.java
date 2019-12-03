@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.logging.Logger;
@@ -54,12 +54,8 @@ public class StringSearch {
     // goodSuffixSkip[3] == shift+len(suffix) == 6+5 == 11.
     private final int[] goodSuffixSkip;
 
-    StringSearch(String pattern) {
-        this(pattern.getBytes());
-    }
-
-    StringSearch(byte[] pattern) {
-        this.pattern = pattern;
+    StringSearch(String patternSting) {
+        this.pattern = patternSting.getBytes();
         this.goodSuffixSkip = new int[pattern.length];
 
         // last is the index of the last character in the pattern.
@@ -67,9 +63,7 @@ public class StringSearch {
 
         // Build bad character table.
         // Bytes not in the pattern can skip one pattern's length.
-        for (var i = 0; i < badCharSkip.length; i++) {
-            badCharSkip[i] = pattern.length;
-        }
+        Arrays.fill(badCharSkip, pattern.length);
         // The loop condition is < instead of <= so that the last byte does not
         // have a zero distance to itself. Finding this byte out of place implies
         // that it is not in the last position.
@@ -100,15 +94,15 @@ public class StringSearch {
         return next(text.getBytes());
     }
 
-    int next(byte[] text) {
+    private int next(byte[] text) {
         return next(ByteBuffer.wrap(text));
     }
 
-    int next(ByteBuffer text) {
+    private int next(ByteBuffer text) {
         return next(text, 0);
     }
 
-    int next(ByteBuffer text, int startingAfter) {
+    private int next(ByteBuffer text, int startingAfter) {
         var i = startingAfter + pattern.length - 1;
         while (i < text.limit()) {
             // Compare backwards from the end until the first unmatching character.
@@ -125,22 +119,22 @@ public class StringSearch {
         return -1;
     }
 
-    boolean isWordChar(byte b) {
+    private boolean isWordChar(byte b) {
         char c = (char) (b + 128);
         return Character.isAlphabetic(c) || Character.isDigit(c) || c == '$' || c == '_';
     }
 
-    boolean startsWord(ByteBuffer text, int offset) {
+    private boolean startsWord(ByteBuffer text, int offset) {
         if (offset == 0) return true;
         return !isWordChar(text.get(offset - 1));
     }
 
-    boolean endsWord(ByteBuffer text, int offset) {
+    private boolean endsWord(ByteBuffer text, int offset) {
         if (offset + 1 >= text.limit()) return true;
         return !isWordChar(text.get(offset + 1));
     }
 
-    boolean isWord(ByteBuffer text, int offset) {
+    private boolean isWord(ByteBuffer text, int offset) {
         return startsWord(text, offset) && endsWord(text, offset + pattern.length - 1);
     }
 
@@ -148,11 +142,11 @@ public class StringSearch {
         return nextWord(text.getBytes());
     }
 
-    int nextWord(byte[] text) {
+    private int nextWord(byte[] text) {
         return nextWord(ByteBuffer.wrap(text));
     }
 
-    int nextWord(ByteBuffer text) {
+    private int nextWord(ByteBuffer text) {
         var i = 0;
         while (true) {
             i = next(text, i);
@@ -191,22 +185,22 @@ public class StringSearch {
             return target[from + i];
         }
 
-        public Slice(byte[] target, int from) {
+        Slice(byte[] target, int from) {
             this(target, from, target.length);
         }
 
-        public Slice(byte[] target, int from, int until) {
+        Slice(byte[] target, int from, int until) {
             this.target = target;
             this.from = from;
             this.until = until;
         }
     }
 
-    private static final ByteBuffer SEARCH_BUFFER = ByteBuffer.allocateDirect(1 * 1024 * 1024);
+    private static final ByteBuffer SEARCH_BUFFER = ByteBuffer.allocateDirect(1024 * 1024);
 
     // TODO cache the progress made by searching shorter queries
     static boolean containsWordMatching(Path java, String query) {
-        if (FileStore.activeDocuments().contains(java.toUri())) {
+        if (FileStore.activeDocuments().contains(java)) {
             var text = FileStore.contents(java);
             return matchesTitleCase(text, query);
         }
@@ -217,7 +211,7 @@ public class StringSearch {
             SEARCH_BUFFER.limit(limit);
             channel.read(SEARCH_BUFFER);
             SEARCH_BUFFER.position(0);
-            var chars = Charset.forName("UTF-8").decode(SEARCH_BUFFER);
+            var chars = StandardCharsets.UTF_8.decode(SEARCH_BUFFER);
             return matchesTitleCase(chars, query);
         } catch (NoSuchFileException e) {
             LOG.warning(e.getMessage());
@@ -229,7 +223,7 @@ public class StringSearch {
 
     static boolean containsWord(Path java, String query) {
         var search = new StringSearch(query);
-        if (FileStore.activeDocuments().contains(java.toUri())) {
+        if (FileStore.activeDocuments().contains(java)) {
             var text = FileStore.contents(java).getBytes();
             return search.nextWord(text) != -1;
         }
@@ -249,9 +243,9 @@ public class StringSearch {
         }
     }
 
-    static boolean containsString(Path java, String query) {
+    private static boolean containsString(Path java, String query) {
         var search = new StringSearch(query);
-        if (FileStore.activeDocuments().contains(java.toUri())) {
+        if (FileStore.activeDocuments().contains(java)) {
             var text = FileStore.contents(java).getBytes();
             return search.next(text) != -1;
         }
@@ -336,9 +330,9 @@ public class StringSearch {
         }
     }
 
-    static Cache<String, Boolean> cacheContainsClass = new Cache<>();
+    private static Cache<String, Boolean> cacheContainsClass = new Cache<>();
 
-    static boolean containsClass(Path file, String simpleName) {
+    private static boolean containsClass(Path file, String simpleName) {
         if (cacheContainsClass.needs(file, simpleName)) {
             cacheContainsClass.load(file, simpleName, containsString(file, "class " + simpleName));
             // TODO verify this by actually parsing the file
@@ -346,36 +340,14 @@ public class StringSearch {
         return cacheContainsClass.get(file, simpleName);
     }
 
-    static Cache<String, Boolean> cacheContainsInterface = new Cache<>();
+    private static Cache<String, Boolean> cacheContainsInterface = new Cache<>();
 
-    static boolean containsInterface(Path file, String simpleName) {
+    private static boolean containsInterface(Path file, String simpleName) {
         if (cacheContainsInterface.needs(file, simpleName)) {
             cacheContainsInterface.load(file, simpleName, containsString(file, "interface " + simpleName));
             // TODO verify this by actually parsing the file
         }
         return cacheContainsInterface.get(file, simpleName);
-    }
-
-    static boolean containsImport(Path file, String toPackage, String toClass) {
-        if (toPackage.isEmpty()) return true;
-        var samePackage = Pattern.compile("^package +" + toPackage + ";");
-        var importClass = Pattern.compile("^import +" + toPackage + "\\." + toClass + ";");
-        var importStar = Pattern.compile("^import +" + toPackage + "\\.\\*;");
-        var importStatic = Pattern.compile("^import +static +" + toPackage + "\\." + toClass);
-        var startOfClass = Pattern.compile("^[\\w ]*class +\\w+");
-        try (var lines = FileStore.lines(file)) {
-            for (var line = lines.readLine(); line != null; line = lines.readLine()) {
-                if (startOfClass.matcher(line).find()) return false;
-                if (samePackage.matcher(line).find()) return true;
-                if (importClass.matcher(line).find()) return true;
-                if (importStar.matcher(line).find()) return true;
-                if (importStatic.matcher(line).find()) return true;
-                if (importClass.matcher(line).find()) return true;
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return false;
     }
 
     // TODO this doesn't work for inner classes, eliminate

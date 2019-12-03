@@ -88,50 +88,6 @@ class Parser {
         return result;
     }
 
-    /** Find the smallest tree that includes the cursor */
-    TreePath findPath(long cursor) {
-        var finder = new FindSmallest(cursor, task, root);
-        finder.scan(root, null);
-        if (finder.found == null) {
-            return new TreePath(root);
-        }
-        return finder.found;
-    }
-
-    TreePath findPath(Range range) {
-        var start = root.getLineMap().getPosition(range.start.line + 1, range.start.character + 1);
-        var end = root.getLineMap().getPosition(range.end.line + 1, range.end.character + 1);
-        var finder = new FindRange(start, end, task, root);
-        finder.scan(root, null);
-        if (finder.found == null) {
-            return new TreePath(root);
-        }
-        return finder.found;
-    }
-
-    boolean isIdentifier(long cursor) {
-        var path = findPath(cursor);
-        return path.getLeaf() instanceof IdentifierTree;
-    }
-
-    static boolean inClass(TreePath path) {
-        for (var part : path) {
-            if (part instanceof ClassTree) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    static boolean inMethod(TreePath path) {
-        for (var part : path) {
-            if (part instanceof MethodTree) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /** Find and source code associated with a ptr */
     Optional<TreePath> fuzzyFind(Ptr ptr) {
         LOG.info(
@@ -495,53 +451,11 @@ class Parser {
         }
     }
 
-    String prune(int line, int character) {
-        var cursor = root.getLineMap().getPosition(line, character);
-        return prune(cursor);
-    }
-
     String prune(long cursor) {
         var pos = Trees.instance(task).getSourcePositions();
         var buffer = new StringBuilder(contents);
         long[] cursors = {cursor};
         return prune(root, pos, buffer, cursors, true);
-    }
-
-    String eraseCase(long cursor) {
-        var path = findPath(cursor);
-        while (path != null && path.getLeaf().getKind() != Tree.Kind.CASE) {
-            path = path.getParentPath();
-        }
-        if (path == null) {
-            LOG.warning("Found no case around " + path.getLeaf());
-            return contents;
-        }
-        var caseTree = (CaseTree) path.getLeaf();
-        var pos = Trees.instance(task).getSourcePositions();
-        var start = pos.getStartPosition(root, caseTree);
-        var buffer = new StringBuilder(contents);
-        erase(buffer, start, cursor);
-        return buffer.toString();
-    }
-
-    String prune(String name) {
-        // Find all occurrences of name in contents
-        var file = Paths.get(root.getSourceFile().toUri());
-        var contents = FileStore.contents(file);
-        var list = new ArrayList<Long>();
-        var pattern = Pattern.compile("\\b" + Pattern.quote(name) + "\\b");
-        var matcher = pattern.matcher(contents);
-        while (matcher.find()) {
-            list.add((long) matcher.start());
-        }
-        var offsets = new long[list.size()];
-        for (var i = 0; i < list.size(); i++) {
-            offsets[i] = list.get(i);
-        }
-        // Erase all blocks that don't contain name
-        var buffer = new StringBuilder(contents);
-        var pos = Trees.instance(task).getSourcePositions();
-        return prune(root, pos, buffer, offsets, false);
     }
 
     static Optional<Path> declaringFile(Element e) {
@@ -582,45 +496,6 @@ class Parser {
             t = t.getParentPath();
         }
         return "";
-    }
-
-    static String memberName(TreePath t) {
-        if (t.getLeaf() instanceof ClassTree) {
-            return "";
-        } else if (t.getLeaf() instanceof MethodTree) {
-            var method = (MethodTree) t.getLeaf();
-            var name = method.getName().toString();
-            if (name.equals("<init>")) {
-                return className(t);
-            }
-            return name;
-        } else if (t.getLeaf() instanceof VariableTree) {
-            var field = (VariableTree) t.getLeaf();
-            var name = field.getName().toString();
-            return name;
-        }
-        return "";
-    }
-
-    static String signature(TreePath t) {
-        var uri = t.getCompilationUnit().getSourceFile().toUri();
-        var packageName = FileStore.packageName(Paths.get(uri));
-        var className = className(t);
-        var qualifiedName = packageName.isEmpty() ? className : packageName + "." + className;
-        if (t.getLeaf() instanceof MethodTree) {
-            var memberName = memberName(t);
-            var method = (MethodTree) t.getLeaf();
-            var params = new StringJoiner(", ");
-            for (var param : method.getParameters()) {
-                params.add(param.getType().toString());
-            }
-            return qualifiedName + "#" + memberName + "(" + params + ")";
-        } else if (t.getLeaf() instanceof VariableTree) {
-            var field = (VariableTree) t.getLeaf();
-            return qualifiedName + "#" + field.getName();
-        } else {
-            return qualifiedName;
-        }
     }
 
     private static final Logger LOG = Logger.getLogger("main");

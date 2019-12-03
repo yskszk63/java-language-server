@@ -238,11 +238,6 @@ public class FileStore {
         return activeDocuments.keySet();
     }
 
-    static int version(Path file) {
-        if (!activeDocuments.containsKey(file)) return -1;
-        return activeDocuments.get(file).version;
-    }
-
     public static String contents(Path file) {
         if (!isJavaFile(file)) {
             throw new RuntimeException(file + " is not a java file");

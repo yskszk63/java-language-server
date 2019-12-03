@@ -118,17 +118,15 @@ public class StringSearchTest {
     }
 
     @Test
-    public void largeFilePossibleReference() {
-        var largeFile = Paths.get(FindResource.uri("/org/javacs/example/LargeFile.java"));
-        assertTrue(StringSearch.containsImport(largeFile, "java.util.logging", "Logger"));
-        assertTrue(StringSearch.containsWord(largeFile, "removeMethodBodies"));
-        assertFalse(StringSearch.containsWord(largeFile, "removeMethodBodiez"));
-    }
-
-    @Test
     public void findAutocompleteBetweenLines() {
         var rel = Paths.get("src", "org", "javacs", "example", "AutocompleteBetweenLines.java");
         var file = LanguageServerFixture.DEFAULT_WORKSPACE_ROOT.resolve(rel);
         assertTrue(StringSearch.containsWordMatching(file, "ABetweenLines"));
+    }
+
+    @Test
+    public void matchesPartialName() {
+        assertTrue(StringSearch.matchesPartialName("foobar", "foo"));
+        assertFalse(StringSearch.matchesPartialName("foo", "foobar"));
     }
 }

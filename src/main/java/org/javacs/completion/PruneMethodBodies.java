@@ -7,12 +7,12 @@ import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
 import java.io.IOException;
 
-class PruneMethodBodies extends TreeScanner<StringBuilder, Long> {
+public class PruneMethodBodies extends TreeScanner<StringBuilder, Long> {
     private final JavacTask task;
     private final StringBuilder buf = new StringBuilder();
     private CompilationUnitTree root;
 
-    PruneMethodBodies(JavacTask task) {
+    public PruneMethodBodies(JavacTask task) {
         this.task = task;
     }
 

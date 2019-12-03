@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+import org.javacs.completion.PruneMethodBodies;
 import org.openjdk.jmh.annotations.*;
 
 @Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
@@ -23,7 +24,8 @@ public class BenchmarkPruner {
         private SourceFileObject file(boolean prune) {
             var file = Paths.get("src/main/java/org/javacs/CompileBatch.java").normalize();
             if (prune) {
-                var contents = Parser.parseFile(file).prune(276, 9);
+                var task = compiler.parse(file);
+                var contents = new PruneMethodBodies(task.task).scan(task.root, 2500L).toString();
                 return new SourceFileObject(file, contents, Instant.now());
             } else {
                 return new SourceFileObject(file);
