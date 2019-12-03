@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.StringJoiner;
 import java.util.logging.Logger;
 import javax.lang.model.element.*;
+import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
 import org.javacs.CompletionData;
 import org.javacs.FindHelper;
@@ -35,7 +36,7 @@ public class HoverProvider {
             var list = new ArrayList<MarkedString>();
             var code = printType(element);
             list.add(new MarkedString("java", code));
-            var docs = docs(element);
+            var docs = docs(task, element);
             if (!docs.isEmpty()) {
                 list.add(new MarkedString(docs));
             }
@@ -92,34 +93,45 @@ public class HoverProvider {
         throw new RuntimeException("no className");
     }
 
-    private String docs(Element element) {
-        var className = className(element);
-        if (className.isEmpty()) return "";
-        var toFile = compiler.findAnywhere(className);
-        if (toFile.isEmpty()) return "";
-        var task = compiler.parse(toFile.get());
-        var tree = find(task, element);
-        if (tree == null) return "";
+    private String docs(CompileTask task, Element element) {
+        if (element instanceof TypeElement) {
+            var type = (TypeElement) element;
+            var className = type.getQualifiedName().toString();
+            var file = compiler.findTypeDeclaration(className);
+            if (file == CompilerProvider.NOT_FOUND) return "";
+            var parse = compiler.parse(file);
+            var tree = FindHelper.findType(parse, className);
+            return docs(parse, tree);
+        } else if (element.getKind() == ElementKind.FIELD) {
+            var field = (VariableElement) element;
+            var type = (TypeElement) field.getEnclosingElement();
+            var className = type.getQualifiedName().toString();
+            var file = compiler.findTypeDeclaration(className);
+            if (file == CompilerProvider.NOT_FOUND) return "";
+            var parse = compiler.parse(file);
+            var tree = FindHelper.findType(parse, className);
+            return docs(parse, tree);
+        } else if (element instanceof ExecutableElement) {
+            var method = (ExecutableElement) element;
+            var type = (TypeElement) method.getEnclosingElement();
+            var className = type.getQualifiedName().toString();
+            var methodName = method.getSimpleName().toString();
+            var erasedParameterTypes = FindHelper.erasedParameterTypes(task, method);
+            var file = compiler.findAnywhere(className);
+            if (file.isEmpty()) return "";
+            var parse = compiler.parse(file.get());
+            var tree = FindHelper.findMethod(parse, className, methodName, erasedParameterTypes);
+            return docs(parse, tree);
+        } else {
+            return "";
+        }
+    }
+
+    private String docs(ParseTask task, Tree tree) {
         var path = Trees.instance(task.task).getPath(task.root, tree);
         var docTree = DocTrees.instance(task.task).getDocCommentTree(path);
         if (docTree == null) return "";
         return MarkdownHelper.asMarkdown(docTree);
-    }
-
-    private Tree find(ParseTask task, Element element) {
-        switch (element.getKind()) {
-            case FIELD:
-                return FindHelper.findField(task, element);
-            case METHOD:
-            case CONSTRUCTOR:
-                return FindHelper.findMethod(task, (ExecutableElement) element);
-            case INTERFACE:
-            case CLASS:
-            case ENUM:
-                return FindHelper.findType(task, (TypeElement) element);
-            default:
-                return null;
-        }
     }
 
     // TODO this should be merged with logic in CompletionProvider

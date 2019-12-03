@@ -15,8 +15,6 @@ import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeMirror;
-import org.javacs.CompilerProvider;
-import org.javacs.FindHelper;
 import org.javacs.lsp.Position;
 import org.javacs.lsp.Range;
 import org.javacs.lsp.TextEdit;
@@ -43,8 +41,7 @@ class EditHelper {
         return new TextEdit(range, "");
     }
 
-    static String printMethod(CompilerProvider compiler, ExecutableElement method, ExecutableType parameterizedType) {
-        var source = findSource(compiler, method);
+    static String printMethod(ExecutableElement method, ExecutableType parameterizedType, MethodTree source) {
         var buf = new StringBuilder();
         // TODO leading \n is extra, but needed for indent replaceAll trick
         buf.append("\n@Override\n");
@@ -54,7 +51,7 @@ class EditHelper {
         if (method.getModifiers().contains(Modifier.PROTECTED)) {
             buf.append("protected ");
         }
-        buf.append(printType(parameterizedType.getReturnType())).append(" ");
+        buf.append(EditHelper.printType(parameterizedType.getReturnType())).append(" ");
         buf.append(method.getSimpleName()).append("(");
         buf.append(printParameters(parameterizedType, source));
         buf.append(") {\n    // TODO\n}");
@@ -64,19 +61,11 @@ class EditHelper {
     private static String printParameters(ExecutableType method, MethodTree source) {
         var join = new StringJoiner(", ");
         for (var i = 0; i < method.getParameterTypes().size(); i++) {
-            var type = printType(method.getParameterTypes().get(i));
+            var type = EditHelper.printType(method.getParameterTypes().get(i));
             var name = source.getParameters().get(i).getName();
             join.add(type + " " + name);
         }
         return join.toString();
-    }
-
-    private static MethodTree findSource(CompilerProvider compiler, ExecutableElement method) {
-        // TODO sometimes, the source will not be available
-        var parent = (TypeElement) method.getEnclosingElement();
-        var file = compiler.findAnywhere(parent.getQualifiedName().toString()).get();
-        var task = compiler.parse(file);
-        return FindHelper.findMethod(task, method);
     }
 
     static String printType(TypeMirror type) {
