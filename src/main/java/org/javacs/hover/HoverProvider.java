@@ -163,17 +163,6 @@ public class HoverProvider {
         }
     }
 
-    private String className(Element e) {
-        while (e != null) {
-            if (e instanceof TypeElement) {
-                var type = (TypeElement) e;
-                return type.getQualifiedName().toString();
-            }
-            e = e.getEnclosingElement();
-        }
-        return "";
-    }
-
     private String hoverTypeDeclaration(TypeElement t) {
         var result = new StringBuilder();
         switch (t.getKind()) {

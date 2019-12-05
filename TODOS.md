@@ -23,6 +23,7 @@
 - Add import code action doesn't appear in extends clause
 - Docs are not getting resolved for field completions.
 - Completion item order has been lost
+- Don't complete inside comments
 
 ## Optimizations
 - Compilation is very slow in the presence of lots of errors

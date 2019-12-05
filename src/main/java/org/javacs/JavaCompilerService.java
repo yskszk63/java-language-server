@@ -223,15 +223,19 @@ class JavaCompilerService implements CompilerProvider {
 
     @Override
     public Optional<JavaFileObject> findAnywhere(String className) {
-        var fromSource = findTypeDeclaration(className);
-        if (fromSource != NOT_FOUND) {
-            return Optional.of(new SourceFileObject(fromSource));
-        }
         var fromDocs = findPublicTypeDeclarationInDocPath(className);
         if (fromDocs.isPresent()) {
             return fromDocs;
         }
-        return findPublicTypeDeclarationInJdk(className);
+        var fromJdk = findPublicTypeDeclarationInJdk(className);
+        if (fromJdk.isPresent()) {
+            return fromJdk;
+        }
+        var fromSource = findTypeDeclaration(className);
+        if (fromSource != NOT_FOUND) {
+            return Optional.of(new SourceFileObject(fromSource));
+        }
+        return Optional.empty();
     }
 
     private Optional<JavaFileObject> findPublicTypeDeclarationInDocPath(String className) {
@@ -265,16 +269,34 @@ class JavaCompilerService implements CompilerProvider {
 
     @Override
     public Path findTypeDeclaration(String className) {
+        var fastFind = findPublicTypeDeclaration(className);
+        if (fastFind != NOT_FOUND) return fastFind;
+        // In principle, the slow path can be skipped in many cases.
+        // If we're spending a lot of time in findTypeDeclaration, this would be a good optimization.
         var packageName = packageName(className);
         var simpleName = simpleName(className);
         for (var f : FileStore.list(packageName)) {
-            // TODO we can be more efficient when we know we're only interested in public classes, for example in
-            // autocomplete
             if (containsWord(f, simpleName) && containsType(f, className)) {
                 return f;
             }
         }
         return NOT_FOUND;
+    }
+
+    private Path findPublicTypeDeclaration(String className) {
+        JavaFileObject source;
+        try {
+            source =
+                    fileManager.getJavaFileForInput(
+                            StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        if (source == null) return NOT_FOUND;
+        if (!source.toUri().getScheme().equals("file")) return NOT_FOUND;
+        var file = Paths.get(source.toUri());
+        if (!containsType(file, className)) return NOT_FOUND;
+        return file;
     }
 
     @Override
