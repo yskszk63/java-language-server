@@ -102,7 +102,7 @@ public class GenerateRecordConstructor implements Rewrite {
 
     private Position insertPoint(CompileTask task, ClassTree typeTree) {
         for (var member : typeTree.getMembers()) {
-            if (!(member instanceof VariableTree)) {
+            if (member.getKind() == Tree.Kind.METHOD) {
                 return EditHelper.insertBefore(task.task, task.root(), member);
             }
         }

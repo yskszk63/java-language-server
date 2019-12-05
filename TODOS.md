@@ -21,6 +21,8 @@
 - Cache logic is re-using pruned files from autocomplete for lint
 - Generated constructor is placed before class when class is empty
 - Add import code action doesn't appear in extends clause
+- Docs are not getting resolved for field completions.
+- Completion item order has been lost
 
 ## Optimizations
 - Compilation is very slow in the presence of lots of errors

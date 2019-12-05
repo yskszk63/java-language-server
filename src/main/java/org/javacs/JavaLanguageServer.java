@@ -11,9 +11,9 @@ import java.time.Instant;
 import java.util.*;
 import java.util.logging.Logger;
 import javax.lang.model.element.*;
-import javax.tools.JavaFileObject;
 import org.javacs.action.CodeActionProvider;
 import org.javacs.completion.CompletionProvider;
+import org.javacs.completion.SignatureProvider;
 import org.javacs.fold.FoldProvider;
 import org.javacs.hover.HoverProvider;
 import org.javacs.index.SymbolProvider;
@@ -279,20 +279,14 @@ class JavaLanguageServer extends LanguageServer {
     }
 
     @Override
-    public Optional<SignatureHelp> signatureHelp(TextDocumentPositionParams position) {
-        var uri = position.textDocument.uri;
-        if (!FileStore.isJavaFile(uri)) return Optional.empty();
-        var file = Paths.get(uri);
-        var line = position.position.line + 1;
-        var column = position.position.character + 1;
-        LOG.info(String.format("Find signature at at %s(%d,%d)...", file, line, column));
-        var contents = FileStore.contents(file);
-        var cursor = FileStore.offset(contents, line, column);
-        var parse = Parser.parseJavaFileObject(new SourceFileObject(file, contents, Instant.now()));
-        contents = parse.prune(cursor);
-        try (var compile = compiler().compileBatch(List.of(new SourceFileObject(file, contents, Instant.now())))) {
-            return compile.signatureHelp(file, cursor);
-        }
+    public Optional<SignatureHelp> signatureHelp(TextDocumentPositionParams params) {
+        if (!FileStore.isJavaFile(params.textDocument.uri)) return Optional.empty();
+        var file = Paths.get(params.textDocument.uri);
+        var line = params.position.line + 1;
+        var column = params.position.character + 1;
+        var help = new SignatureProvider(compiler()).signatureHelp(file, line, column);
+        if (help == SignatureProvider.NOT_SUPPORTED) return Optional.empty();
+        return Optional.of(help);
     }
 
     @Override
@@ -306,18 +300,6 @@ class JavaLanguageServer extends LanguageServer {
             return Optional.empty();
         }
         return Optional.of(found);
-    }
-
-    private Optional<JavaFileObject> findElement(Element toEl) {
-        var fromSourcePath = Parser.declaringFile(toEl);
-        if (fromSourcePath.isPresent()) {
-            return Optional.of(new SourceFileObject(fromSourcePath.get()));
-        }
-        var fromDocPath = compiler().docs.find(new Ptr(toEl));
-        if (fromDocPath.isPresent()) {
-            return fromDocPath;
-        }
-        return Optional.empty();
     }
 
     @Override

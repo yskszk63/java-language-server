@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -269,38 +270,15 @@ public class CompletionProvider {
     private List<CompletionItem> completeUsingScope(
             CompileTask task, TreePath path, String partial, boolean endsWithParen) {
         var trees = Trees.instance(task.task);
-        var elements = task.task.getElements();
-        var isStatic = false;
         var list = new ArrayList<CompletionItem>();
         var methods = new HashMap<String, List<ExecutableElement>>();
-        for (var scope : fastScopes(trees.getScope(path))) {
-            if (scope.getEnclosingMethod() != null) {
-                isStatic = isStatic || scope.getEnclosingMethod().getModifiers().contains(Modifier.STATIC);
-            }
-            for (var member : scope.getLocalElements()) {
-                if (!StringSearch.matchesPartialName(member.getSimpleName(), partial)) continue;
-                if (isStatic && member.getSimpleName().contentEquals("this")) continue;
-                if (isStatic && member.getSimpleName().contentEquals("super")) continue;
-                if (member.getKind() == ElementKind.METHOD) {
-                    putMethod((ExecutableElement) member, methods);
-                } else {
-                    list.add(item(task, member));
-                }
-            }
-            if (scope.getEnclosingClass() != null) {
-                var typeElement = scope.getEnclosingClass();
-                var typeType = (DeclaredType) typeElement.asType();
-                for (var member : elements.getAllMembers(typeElement)) {
-                    if (!StringSearch.matchesPartialName(member.getSimpleName(), partial)) continue;
-                    if (!trees.isAccessible(scope, member, typeType)) continue;
-                    if (isStatic && !member.getModifiers().contains(Modifier.STATIC)) continue;
-                    if (member.getKind() == ElementKind.METHOD) {
-                        putMethod((ExecutableElement) member, methods);
-                    } else {
-                        list.add(item(task, member));
-                    }
-                }
-                isStatic = isStatic || typeElement.getModifiers().contains(Modifier.STATIC);
+        var scope = trees.getScope(path);
+        Predicate<CharSequence> filter = name -> StringSearch.matchesPartialName(name, partial);
+        for (var member : ScopeHelper.scopeMembers(task, scope, filter)) {
+            if (member.getKind() == ElementKind.METHOD) {
+                putMethod((ExecutableElement) member, methods);
+            } else {
+                list.add(item(task, member));
             }
         }
         for (var overloads : methods.values()) {
@@ -368,26 +346,12 @@ public class CompletionProvider {
         }
     }
 
-    private List<Scope> fastScopes(Scope start) {
-        var scopes = new ArrayList<Scope>();
-        for (var s = start; s != null; s = s.getEnclosingScope()) {
-            scopes.add(s);
-        }
-        // Scopes may be contained in an enclosing scope.
-        // The outermost scope contains those elements available via "star import" declarations;
-        // the scope within that contains the top level elements of the compilation unit, including any named
-        // imports.
-        // https://parent.docs.oracle.com/en/java/javase/11/docs/api/jdk.compiler/com/sun/source/tree/Scope.html
-        return scopes.subList(0, scopes.size() - 2);
-    }
-
     private CompletionList completeMemberSelect(
             CompileTask task, TreePath path, String partial, boolean endsWithParen) {
         var trees = Trees.instance(task.task);
         var select = (MemberSelectTree) path.getLeaf();
         path = new TreePath(path, select.getExpression());
-        var element = trees.getElement(path);
-        var isStatic = element instanceof TypeElement;
+        var isStatic = trees.getElement(path) instanceof TypeElement;
         var scope = trees.getScope(path);
         var type = trees.getTypeMirror(path);
         if (type instanceof ArrayType) {
@@ -455,7 +419,7 @@ public class CompletionProvider {
     }
 
     private boolean isEnclosingClass(DeclaredType type, Scope start) {
-        for (var s : fastScopes(start)) {
+        for (var s : ScopeHelper.fastScopes(start)) {
             // If we reach a static method, stop looking
             var method = s.getEnclosingMethod();
             if (method != null && method.getModifiers().contains(Modifier.STATIC)) {
