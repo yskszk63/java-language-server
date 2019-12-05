@@ -97,18 +97,18 @@ public class HoverProvider {
         if (element instanceof TypeElement) {
             var type = (TypeElement) element;
             var className = type.getQualifiedName().toString();
-            var file = compiler.findTypeDeclaration(className);
-            if (file == CompilerProvider.NOT_FOUND) return "";
-            var parse = compiler.parse(file);
+            var file = compiler.findAnywhere(className);
+            if (file.isEmpty()) return "";
+            var parse = compiler.parse(file.get());
             var tree = FindHelper.findType(parse, className);
             return docs(parse, tree);
         } else if (element.getKind() == ElementKind.FIELD) {
             var field = (VariableElement) element;
             var type = (TypeElement) field.getEnclosingElement();
             var className = type.getQualifiedName().toString();
-            var file = compiler.findTypeDeclaration(className);
-            if (file == CompilerProvider.NOT_FOUND) return "";
-            var parse = compiler.parse(file);
+            var file = compiler.findAnywhere(className);
+            if (file.isEmpty()) return "";
+            var parse = compiler.parse(file.get());
             var tree = FindHelper.findType(parse, className);
             return docs(parse, tree);
         } else if (element instanceof ExecutableElement) {

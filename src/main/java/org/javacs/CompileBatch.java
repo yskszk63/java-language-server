@@ -7,12 +7,9 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import javax.lang.model.element.*;
 import javax.lang.model.util.*;
 import javax.tools.*;
-import org.javacs.lsp.*;
 
 class CompileBatch implements AutoCloseable {
     static final int MAX_COMPLETION_ITEMS = 50;
@@ -142,58 +139,7 @@ class CompileBatch implements AutoCloseable {
         return list;
     }
 
-    CompilationUnitTree root(Path file) {
-        for (var root : roots) {
-            if (root.getSourceFile().toUri().equals(file.toUri())) {
-                return root;
-            }
-        }
-        // Somehow, file was not in batch
-        var names = new StringJoiner(", ");
-        for (var r : roots) {
-            names.add(StringSearch.fileName(r.getSourceFile().toUri()));
-        }
-        throw new RuntimeException("File " + file + " isn't in batch " + names);
-    }
-
-    TreePath tree(Path file, int line, int character) {
-        var root = root(file);
-        var cursor = root.getLineMap().getPosition(line, character);
-        return findPath(file, cursor);
-    }
-
-    Optional<Element> element(TreePath tree) {
-        var el = trees.getElement(tree);
-        return Optional.ofNullable(el);
-    }
-
     private boolean isValidFileRange(javax.tools.Diagnostic<? extends JavaFileObject> d) {
         return d.getSource().toUri().getScheme().equals("file") && d.getStartPosition() >= 0 && d.getEndPosition() >= 0;
     }
-
-    Range range(TreePath path) {
-        try {
-            var contents = path.getCompilationUnit().getSourceFile().getCharContent(true);
-            return Parser.range(borrow.task, contents, path);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    SourcePositions sourcePositions() {
-        return trees.getSourcePositions();
-    }
-
-    /** Find the smallest tree that includes the cursor */
-    TreePath findPath(Path file, long cursor) {
-        var root = root(file);
-        var finder = new FindSmallest(cursor, borrow.task, root);
-        finder.scan(root, null);
-        if (finder.found == null) {
-            return new TreePath(root);
-        }
-        return finder.found;
-    }
-
-    private static final Logger LOG = Logger.getLogger("main");
 }

@@ -88,65 +88,6 @@ class Parser {
         return result;
     }
 
-    /** Find and source code associated with a ptr */
-    Optional<TreePath> fuzzyFind(Ptr ptr) {
-        LOG.info(
-                String.format(
-                        "...find fuzzy match of %s in %s ...",
-                        ptr, StringSearch.fileName(root.getSourceFile().toUri())));
-
-        class FindPtr extends TreePathScanner<Void, Void> {
-            int bestMatch = Ptr.NOT_MATCHED;
-            TreePath found;
-
-            void check() {
-                var path = getCurrentPath();
-                var mismatch = ptr.fuzzyMatch(path);
-                if (mismatch < bestMatch) {
-                    found = path;
-                    bestMatch = mismatch;
-                }
-            }
-
-            @Override
-            public Void visitClass(ClassTree node, Void aVoid) {
-                check();
-                return super.visitClass(node, aVoid);
-            }
-
-            @Override
-            public Void visitMethod(MethodTree node, Void aVoid) {
-                check();
-                // Ptr can't point inside a method
-                return null;
-            }
-
-            @Override
-            public Void visitVariable(VariableTree node, Void aVoid) {
-                check();
-                // Ptr can't point inside a field
-                return null;
-            }
-        }
-        var find = new FindPtr();
-        find.scan(root, null);
-        if (find.found != null)
-            LOG.info(
-                    String.format(
-                            "...`%s` with score %d is best match", describeTree(find.found.getLeaf()), find.bestMatch));
-        else LOG.info("...no match found");
-        return Optional.ofNullable(find.found);
-    }
-
-    DocCommentTree doc(TreePath path) {
-        // Find ptr in the file
-        // Find the documentation attached to el
-        var docs = DocTrees.instance(task);
-        var doc = docs.getDocCommentTree(path);
-        if (doc == null) return EMPTY_DOC;
-        return doc;
-    }
-
     static Range range(JavacTask task, CharSequence contents, TreePath path) {
         // Find start position
         var trees = Trees.instance(task);

@@ -22,10 +22,10 @@ public class BenchmarkPruner {
         public JavaCompilerService compiler = createCompiler();
 
         private SourceFileObject file(boolean prune) {
-            var file = Paths.get("src/main/java/org/javacs/CompileBatch.java").normalize();
+            var file = Paths.get("src/main/java/org/javacs/InferConfig.java").normalize();
             if (prune) {
                 var task = compiler.parse(file);
-                var contents = new PruneMethodBodies(task.task).scan(task.root, 2500L).toString();
+                var contents = new PruneMethodBodies(task.task).scan(task.root, 11222L).toString();
                 return new SourceFileObject(file, contents, Instant.now());
             } else {
                 return new SourceFileObject(file);
@@ -49,12 +49,12 @@ public class BenchmarkPruner {
 
     @Benchmark
     public void compilePruned(CompilerState state) {
-        state.compiler.compileBatch(List.of(state.pruned)).close();
+        state.compiler.compile(List.of(state.pruned)).close();
     }
 
     @Benchmark
     public void compilePlain(CompilerState state) {
-        state.compiler.compileBatch(List.of(state.file)).close();
+        state.compiler.compile(List.of(state.file)).close();
     }
 
     private static final Logger LOG = Logger.getLogger("main");

@@ -71,7 +71,7 @@ class JavaCompilerService implements CompilerProvider {
         }
     }
 
-    CompileBatch doCompile(Collection<? extends JavaFileObject> sources) {
+    private CompileBatch doCompile(Collection<? extends JavaFileObject> sources) {
         if (sources.isEmpty()) throw new RuntimeException("empty sources");
         var firstAttempt = new CompileBatch(this, sources);
         var addFiles = firstAttempt.needsAdditionalSources();
@@ -88,7 +88,7 @@ class JavaCompilerService implements CompilerProvider {
         return new CompileBatch(this, moreSources);
     }
 
-    CompileBatch compileBatch(Collection<? extends JavaFileObject> sources) {
+    private CompileBatch compileBatch(Collection<? extends JavaFileObject> sources) {
         if (needsCompile(sources)) {
             loadCompile(sources);
         } else {
@@ -223,11 +223,44 @@ class JavaCompilerService implements CompilerProvider {
 
     @Override
     public Optional<JavaFileObject> findAnywhere(String className) {
-        var file = findTypeDeclaration(className);
-        if (file != NOT_FOUND) {
-            return Optional.of(new SourceFileObject(file));
+        var fromSource = findTypeDeclaration(className);
+        if (fromSource != NOT_FOUND) {
+            return Optional.of(new SourceFileObject(fromSource));
         }
-        return docs.find(Ptr.toClass(packageName(className), simpleName(className)));
+        var fromDocs = findPublicTypeDeclarationInDocPath(className);
+        if (fromDocs.isPresent()) {
+            return fromDocs;
+        }
+        return findPublicTypeDeclarationInJdk(className);
+    }
+
+    private Optional<JavaFileObject> findPublicTypeDeclarationInDocPath(String className) {
+        try {
+            var found =
+                    docs.fileManager.getJavaFileForInput(
+                            StandardLocation.SOURCE_PATH, className, JavaFileObject.Kind.SOURCE);
+            return Optional.ofNullable(found);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private Optional<JavaFileObject> findPublicTypeDeclarationInJdk(String className) {
+        try {
+            for (var module : ScanClassPath.JDK_MODULES) {
+                var moduleLocation = docs.fileManager.getLocationForModule(StandardLocation.MODULE_SOURCE_PATH, module);
+                if (moduleLocation == null) continue;
+                var fromModuleSourcePath =
+                        docs.fileManager.getJavaFileForInput(moduleLocation, className, JavaFileObject.Kind.SOURCE);
+                if (fromModuleSourcePath != null) {
+                    LOG.info(String.format("...found %s in module %s of jdk", fromModuleSourcePath.toUri(), module));
+                    return Optional.of(fromModuleSourcePath);
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return Optional.empty();
     }
 
     @Override

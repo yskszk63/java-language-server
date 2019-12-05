@@ -423,49 +423,51 @@ class JavaLanguageServer extends LanguageServer {
 
     private Rewrite createRewrite(RenameParams params) {
         var file = Paths.get(params.textDocument.uri);
-        try (var compile = compiler().compileBatch(List.of(new SourceFileObject(file)))) {
-            var lines = compile.root(file).getLineMap();
+        try (var task = compiler().compile(file)) {
+            var lines = task.root().getLineMap();
             var position = lines.getPosition(params.position.line + 1, params.position.character + 1);
-            var path = compile.findPath(file, position);
-            var el = compile.element(path).get();
+            var path = new FindNameAt(task).scan(task.root(), position);
+            if (path == null) return Rewrite.NOT_SUPPORTED;
+            var el = Trees.instance(task.task).getElement(path);
             switch (el.getKind()) {
                 case METHOD:
-                    return renameMethod(compile, (ExecutableElement) el, params.newName);
+                    return renameMethod(task, (ExecutableElement) el, params.newName);
                 case FIELD:
-                    return renameField(compile, (VariableElement) el, params.newName);
+                    return renameField(task, (VariableElement) el, params.newName);
                 case LOCAL_VARIABLE:
                 case PARAMETER:
                 case EXCEPTION_PARAMETER:
-                    return renameVariable(compile, (VariableElement) el, params.newName);
+                    return renameVariable(task, (VariableElement) el, params.newName);
                 default:
                     return Rewrite.NOT_SUPPORTED;
             }
         }
     }
 
-    private RenameMethod renameMethod(CompileBatch compile, ExecutableElement method, String newName) {
+    private RenameMethod renameMethod(CompileTask task, ExecutableElement method, String newName) {
         var parent = (TypeElement) method.getEnclosingElement();
         var className = parent.getQualifiedName().toString();
         var methodName = method.getSimpleName().toString();
         var erasedParameterTypes = new String[method.getParameters().size()];
         for (var i = 0; i < erasedParameterTypes.length; i++) {
             var type = method.getParameters().get(i).asType();
-            erasedParameterTypes[i] = compile.types.erasure(type).toString();
+            erasedParameterTypes[i] = task.task.getTypes().erasure(type).toString();
         }
         return new RenameMethod(className, methodName, erasedParameterTypes, newName);
     }
 
-    private RenameField renameField(CompileBatch compile, VariableElement field, String newName) {
+    private RenameField renameField(CompileTask task, VariableElement field, String newName) {
         var parent = (TypeElement) field.getEnclosingElement();
         var className = parent.getQualifiedName().toString();
         var fieldName = field.getSimpleName().toString();
         return new RenameField(className, fieldName, newName);
     }
 
-    private RenameVariable renameVariable(CompileBatch compile, VariableElement variable, String newName) {
-        var path = compile.trees.getPath(variable);
+    private RenameVariable renameVariable(CompileTask task, VariableElement variable, String newName) {
+        var trees = Trees.instance(task.task);
+        var path = trees.getPath(variable);
         var file = Paths.get(path.getCompilationUnit().getSourceFile().toUri());
-        var position = compile.sourcePositions().getStartPosition(path.getCompilationUnit(), path.getLeaf());
+        var position = trees.getSourcePositions().getStartPosition(path.getCompilationUnit(), path.getLeaf());
         return new RenameVariable(file, (int) position, newName);
     }
 
