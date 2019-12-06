@@ -1,6 +1,7 @@
 package org.javacs.rewrite;
 
 import com.sun.source.tree.ClassTree;
+import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.Tree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.Trees;
@@ -10,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
+import java.util.logging.Logger;
 import javax.lang.model.element.Modifier;
 import org.javacs.CompileTask;
 import org.javacs.CompilerProvider;
@@ -26,24 +28,32 @@ public class GenerateRecordConstructor implements Rewrite {
 
     @Override
     public Map<Path, TextEdit[]> rewrite(CompilerProvider compiler) {
+        LOG.info("Generate default constructor for " + className + "...");
         // TODO this needs to fall back on looking for inner classes and package-private classes
         var file = compiler.findTypeDeclaration(className);
         try (var task = compiler.compile(file)) {
             var typeElement = task.task.getElements().getTypeElement(className);
-            var typePath = Trees.instance(task.task).getPath(typeElement);
-            var typeTree = (ClassTree) typePath.getLeaf();
+            var typeTree = Trees.instance(task.task).getTree(typeElement);
             var fields = fieldsNeedingInitialization(typeTree);
             var parameters = generateParameters(task, fields);
             var initializers = generateInitializers(task, fields);
-            var template = TEMPLATE;
-            template = template.replace("$class", simpleName(className));
-            template = template.replace("$parameters", parameters);
-            template = template.replace("$initializers", initializers);
+            var buf = new StringBuffer();
+            buf.append("\n");
+            if (typeTree.getModifiers().getFlags().contains(Modifier.PUBLIC)) {
+                buf.append("public ");
+            }
+            buf.append(simpleName(className))
+                    .append("(")
+                    .append(parameters)
+                    .append(") {\n    ")
+                    .append(initializers)
+                    .append("\n}");
+            var string = buf.toString();
             var indent = EditHelper.indent(task.task, task.root(), typeTree) + 4;
-            template = template.replaceAll("\n", "\n" + " ".repeat(indent));
-            template = template + "\n\n";
+            string = string.replaceAll("\n", "\n" + " ".repeat(indent));
+            string = string + "\n\n";
             var insert = insertPoint(task, typeTree);
-            TextEdit[] edits = {new TextEdit(new Range(insert, insert), template)};
+            TextEdit[] edits = {new TextEdit(new Range(insert, insert), string)};
             return Map.of(file, edits);
         }
     }
@@ -61,8 +71,6 @@ public class GenerateRecordConstructor implements Rewrite {
         }
         return fields;
     }
-
-    private static final String TEMPLATE = "\n$class($parameters) {\n    $initializers\n}";
 
     private String generateParameters(CompileTask task, List<VariableTree> fields) {
         var join = new StringJoiner(", ");
@@ -103,9 +111,15 @@ public class GenerateRecordConstructor implements Rewrite {
     private Position insertPoint(CompileTask task, ClassTree typeTree) {
         for (var member : typeTree.getMembers()) {
             if (member.getKind() == Tree.Kind.METHOD) {
-                return EditHelper.insertBefore(task.task, task.root(), member);
+                var method = (MethodTree) member;
+                if (method.getReturnType() == null) continue;
+                LOG.info("...insert constructor before " + method.getName());
+                return EditHelper.insertBefore(task.task, task.root(), method);
             }
         }
+        LOG.info("...insert constructor at end of class");
         return EditHelper.insertAtEndOfClass(task.task, task.root(), typeTree);
     }
+
+    private static final Logger LOG = Logger.getLogger("main");
 }

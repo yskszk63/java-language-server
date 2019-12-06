@@ -68,9 +68,8 @@ public class CreateMissingMethod implements Rewrite {
     }
 
     private String printMethodHeader(CompileTask task, MethodInvocationTree call) {
-        var trees = Trees.instance(task.task);
         var methodName = extractMethodName(call.getMethodSelect());
-        var returnType = EditHelper.printType(trees.getTypeMirror(trees.getPath(task.root(), call)));
+        var returnType = "void"; // TODO infer type
         if (returnType.equals(methodName)) {
             returnType = "_";
         }

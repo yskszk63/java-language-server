@@ -2,6 +2,7 @@
 
 ## Bugs 
 - Deleting file doesn't clear it from javac
+- When you move a class to a different package, compiler still thinks it's in the old package
 - External delete causes find-references to crash because it's still in FileStore.javaSources()
 - Restart debug test doesn't work
 - Show 'not used' warnings for non-@Override package-private methods of private classes, because they can only be accessed from same file
@@ -10,20 +11,12 @@
 - Changing `class Foo {}` to `static class Foo {}` doesn't fix "non-static variables this" in `static void test() { new Foo() }`
 - Fields don't show up in debugger
 - Debugger doesn't print arrays nicely
-- When you move a class to a different package, compiler still thinks it's in the old package
-- Override inherited method / Implement abstract methods doesn't substitute type variables
 - Imports are disappearing when errors are present
 - Delete imports from my own package
-- 'Override inherited method ...' quick fixes are in a nonsense order
-- Return type of generated method is always wrong
 - Generated method doesn't have static modifier when appropriate
-- Generated constructor should have accessibility modifier of class
-- Cache logic is re-using pruned files from autocomplete for lint
-- Generated constructor is placed before class when class is empty
 - Add import code action doesn't appear in extends clause
 - Docs are not getting resolved for field completions.
-- Completion item order has been lost
-- Don't complete inside comments
+- Create missing method always places the method in the current class, even if it belongs somewhere else.
 
 ## Optimizations
 - Compilation is very slow in the presence of lots of errors

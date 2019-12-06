@@ -144,10 +144,12 @@ public class CompletionProvider {
     }
 
     private CompletionList compileAndComplete(Path file, String contents, long cursor) {
+        var started = Instant.now();
         var source = new SourceFileObject(file, contents, Instant.now());
         var partial = partialIdentifier(contents, (int) cursor);
         var endsWithParen = endsWithParen(contents, (int) cursor);
         try (var task = compiler.compile(List.of(source))) {
+            LOG.info("...compiled in " + Duration.between(started, Instant.now()).toMillis() + "ms");
             var path = new FindCompletionsAt(task.task).scan(task.root(), cursor);
             switch (path.getLeaf().getKind()) {
                 case IDENTIFIER:
@@ -228,6 +230,7 @@ public class CompletionProvider {
     }
 
     private CompletionList completeIdentifier(CompileTask task, TreePath path, String partial, boolean endsWithParen) {
+        LOG.info("...complete identifiers");
         var list = new CompletionList();
         list.items = completeUsingScope(task, path, partial, endsWithParen);
         addStaticImports(task, path.getCompilationUnit(), partial, endsWithParen, list);
@@ -284,6 +287,7 @@ public class CompletionProvider {
         for (var overloads : methods.values()) {
             list.add(method(task, overloads, !endsWithParen));
         }
+        LOG.info("...found " + list.size() + " scope members");
         return list;
     }
 
@@ -291,6 +295,7 @@ public class CompletionProvider {
             CompileTask task, CompilationUnitTree root, String partial, boolean endsWithParen, CompletionList list) {
         var trees = Trees.instance(task.task);
         var methods = new HashMap<String, List<ExecutableElement>>();
+        var previousSize = list.items.size();
         outer:
         for (var i : root.getImports()) {
             if (!i.isStatic()) continue;
@@ -316,6 +321,7 @@ public class CompletionProvider {
         for (var overloads : methods.values()) {
             list.items.add(method(task, overloads, !endsWithParen));
         }
+        LOG.info("...found " + (list.items.size() - previousSize) + " static imports");
     }
 
     private boolean importMatchesPartial(Name staticImport, String partial) {
@@ -329,6 +335,7 @@ public class CompletionProvider {
     private void addClassNames(CompilationUnitTree root, String partial, CompletionList list) {
         var packageName = Objects.toString(root.getPackageName(), "");
         var uniques = new HashSet<String>();
+        var previousSize = list.items.size();
         for (var className : compiler.packagePrivateTopLevelTypes(packageName)) {
             if (!StringSearch.matchesPartialName(className, partial)) continue;
             list.items.add(classItem(className));
@@ -339,17 +346,19 @@ public class CompletionProvider {
             if (uniques.contains(className)) continue;
             if (list.items.size() > MAX_COMPLETION_ITEMS) {
                 list.isIncomplete = true;
-                return;
+                break;
             }
             list.items.add(classItem(className));
             uniques.add(className);
         }
+        LOG.info("...found " + (list.items.size() - previousSize) + " class names");
     }
 
     private CompletionList completeMemberSelect(
             CompileTask task, TreePath path, String partial, boolean endsWithParen) {
         var trees = Trees.instance(task.task);
         var select = (MemberSelectTree) path.getLeaf();
+        LOG.info("...complete members of " + select.getExpression());
         path = new TreePath(path, select.getExpression());
         var isStatic = trees.getElement(path) instanceof TypeElement;
         var scope = trees.getScope(path);
@@ -441,6 +450,7 @@ public class CompletionProvider {
     private CompletionList completeMemberReference(CompileTask task, TreePath path, String partial) {
         var trees = Trees.instance(task.task);
         var select = (MemberReferenceTree) path.getLeaf();
+        LOG.info("...complete methods of " + select.getQualifierExpression());
         path = new TreePath(path, select.getQualifierExpression());
         var element = trees.getElement(path);
         var isStatic = element instanceof TypeElement;
@@ -520,6 +530,7 @@ public class CompletionProvider {
         var switchTree = (SwitchTree) path.getLeaf();
         path = new TreePath(path, switchTree.getExpression());
         var type = Trees.instance(task.task).getTypeMirror(path);
+        LOG.info("...complete constants of type " + type);
         if (!(type instanceof DeclaredType)) {
             return NOT_SUPPORTED;
         }
@@ -535,6 +546,7 @@ public class CompletionProvider {
     }
 
     private CompletionList completeImport(String path) {
+        LOG.info("...complete import");
         var names = new HashSet<String>();
         var list = new CompletionList();
         for (var className : compiler.publicTopLevelTypes()) {
