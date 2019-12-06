@@ -96,14 +96,6 @@ class SourceFileManager extends ForwardingJavaFileManager<StandardJavaFileManage
         }
     }
 
-    Collection<? extends JavaFileObject> getJavaFileObjectsFromFiles(Iterable<? extends File> files) {
-        var result = new ArrayList<JavaFileObject>();
-        for (var f : files) {
-            result.add(new SourceFileObject(f.toPath()));
-        }
-        return result;
-    }
-
     void setLocation(Location location, Iterable<? extends File> files) throws IOException {
         fileManager.setLocation(location, files);
     }

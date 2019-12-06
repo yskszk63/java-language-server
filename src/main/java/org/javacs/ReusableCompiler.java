@@ -43,7 +43,6 @@ import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.DefinedBy;
 import com.sun.tools.javac.util.DefinedBy.Api;
 import com.sun.tools.javac.util.Log;
-import java.io.Writer;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
@@ -90,7 +89,6 @@ class ReusableCompiler {
      * task is only valid while the worker is running. The internal structures may be reused from some previous
      * compilation.
      *
-     * @param out a Writer for additional output from the compiler; use {@code System.err} if {@code null}
      * @param fileManager a file manager; if {@code null} use the compiler's standard filemanager
      * @param diagnosticListener a diagnostic listener; if {@code null} use the compiler's default method for reporting
      *     diagnostics
@@ -104,7 +102,6 @@ class ReusableCompiler {
      *     of other kind than {@linkplain JavaFileObject.Kind#SOURCE source}
      */
     Borrow getTask(
-            Writer out,
             JavaFileManager fileManager,
             DiagnosticListener<? super JavaFileObject> diagnosticListener,
             Iterable<String> options,
@@ -124,7 +121,7 @@ class ReusableCompiler {
         JavacTaskImpl task =
                 (JavacTaskImpl)
                         systemProvider.getTask(
-                                out, fileManager, diagnosticListener, opts, classes, compilationUnits, currentContext);
+                                null, fileManager, diagnosticListener, opts, classes, compilationUnits, currentContext);
 
         task.addTaskListener(currentContext);
 
@@ -263,7 +260,7 @@ class ReusableCompiler {
                 // this field is never updated when a new task is created, we cannot simply reset the field
                 // or keep old value. This is a hack to workaround the limitations in the current infrastructure.
                 diagListener =
-                        new DiagnosticListener<JavaFileObject>() {
+                        new DiagnosticListener<>() {
                             DiagnosticListener<JavaFileObject> cachedListener;
 
                             @Override

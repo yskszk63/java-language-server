@@ -32,7 +32,7 @@ class CompileBatch implements AutoCloseable {
         this.trees = Trees.instance(borrow.task);
         this.elements = borrow.task.getElements();
         this.types = borrow.task.getTypes();
-        this.roots = new ArrayList<CompilationUnitTree>();
+        this.roots = new ArrayList<>();
         // Compile all roots
         try {
             for (var t : borrow.task.parse()) {
@@ -102,12 +102,12 @@ class CompileBatch implements AutoCloseable {
             JavaCompilerService parent, Collection<? extends JavaFileObject> sources) {
         parent.diags.clear();
         var options = options(parent.classPath, parent.addExports);
-        return parent.compiler.getTask(null, parent.fileManager, parent.diags::add, options, List.of(), sources);
+        return parent.compiler.getTask(parent.fileManager, parent.diags::add, options, List.of(), sources);
     }
 
     /** Combine source path or class path entries using the system separator, for example ':' in unix */
     private static String joinPath(Collection<Path> classOrSourcePath) {
-        return classOrSourcePath.stream().map(p -> p.toString()).collect(Collectors.joining(File.pathSeparator));
+        return classOrSourcePath.stream().map(Path::toString).collect(Collectors.joining(File.pathSeparator));
     }
 
     private static List<String> options(Set<Path> classPath, Set<String> addExports) {

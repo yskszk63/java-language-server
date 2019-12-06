@@ -39,7 +39,7 @@ public class MarkdownHelper {
         return asMarkdown(lines);
     }
 
-    public static String asMarkdown(List<? extends DocTree> lines) {
+    private static String asMarkdown(List<? extends DocTree> lines) {
         var join = new StringJoiner("\n");
         for (var l : lines) join.add(l.toString());
         var html = join.toString();
