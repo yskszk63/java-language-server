@@ -70,11 +70,21 @@ class InferConfig {
         }
 
         // Bazel
-        if (Files.exists(workspaceRoot.resolve("WORKSPACE"))) {
-            return bazelClasspath();
+        var bazelWorkspaceRoot = bazelWorkspaceRoot();
+        if (Files.exists(bazelWorkspaceRoot.resolve("WORKSPACE"))) {
+            return bazelClasspath(bazelWorkspaceRoot);
         }
 
         return Collections.emptySet();
+    }
+
+    private Path bazelWorkspaceRoot() {
+        for (var current = workspaceRoot; current != null; current = current.getParent()) {
+            if (Files.exists(current.resolve("WORKSPACE"))) {
+                return current;
+            }
+        }
+        return workspaceRoot;
     }
 
     /** Find source .jar files in local maven repository. */
@@ -101,8 +111,9 @@ class InferConfig {
         }
 
         // Bazel
-        if (Files.exists(workspaceRoot.resolve("WORKSPACE"))) {
-            return bazelSourcepath();
+        var bazelWorkspaceRoot = bazelWorkspaceRoot();
+        if (Files.exists(bazelWorkspaceRoot.resolve("WORKSPACE"))) {
+            return bazelSourcepath(bazelWorkspaceRoot);
         }
 
         return Collections.emptySet();
@@ -237,29 +248,29 @@ class InferConfig {
         return null;
     }
 
-    private Set<Path> bazelClasspath() {
+    private Set<Path> bazelClasspath(Path bazelWorkspaceRoot) {
         var absolute = new HashSet<Path>();
-        for (var relative : bazelAQuery("Javac", "--classpath")) {
-            absolute.add(workspaceRoot.resolve(relative));
+        for (var relative : bazelAQuery(bazelWorkspaceRoot, "Javac", "--classpath")) {
+            absolute.add(bazelWorkspaceRoot.resolve(relative));
         }
         return absolute;
     }
 
-    private Set<Path> bazelSourcepath() {
+    private Set<Path> bazelSourcepath(Path bazelWorkspaceRoot) {
         var absolute = new HashSet<Path>();
-        var outputBase = bazelOutputBase();
-        for (var relative : bazelAQuery("JavaSourceJar", "--sources")) {
+        var outputBase = bazelOutputBase(bazelWorkspaceRoot);
+        for (var relative : bazelAQuery(bazelWorkspaceRoot, "JavaSourceJar", "--sources")) {
             absolute.add(outputBase.resolve(relative));
         }
         return absolute;
     }
 
-    private Path bazelOutputBase() {
+    private Path bazelOutputBase(Path bazelWorkspaceRoot) {
         // Run bazel as a subprocess
         String[] command = {
             "bazel", "info", "output_base",
         };
-        var output = fork(command);
+        var output = fork(bazelWorkspaceRoot, command);
         if (output == NOT_FOUND) {
             return NOT_FOUND;
         }
@@ -272,7 +283,7 @@ class InferConfig {
         }
     }
 
-    private Set<String> bazelAQuery(String filterMnemonic, String filterArgument) {
+    private Set<String> bazelAQuery(Path bazelWorkspaceRoot, String filterMnemonic, String filterArgument) {
         String[] command = {
             "bazel",
             "aquery",
@@ -281,7 +292,7 @@ class InferConfig {
                     + filterMnemonic
                     + ", kind(java_library, ...) union kind(java_test, ...) union kind(java_binary, ...))"
         };
-        var output = fork(command);
+        var output = fork(bazelWorkspaceRoot, command);
         if (output == NOT_FOUND) {
             return Set.of();
         }
@@ -328,7 +339,7 @@ class InferConfig {
         }
     }
 
-    private Path fork(String[] command) {
+    private static Path fork(Path workspaceRoot, String[] command) {
         try {
             LOG.info("Running " + String.join(" ", command) + " ...");
             var output = Files.createTempFile("java-language-server-bazel-output", ".proto");

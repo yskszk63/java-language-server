@@ -3,24 +3,31 @@ package org.javacs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
 
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
 import org.junit.Test;
 
 public class InferBazelConfigTest {
-
-    private Path bazelWorkspace = Paths.get("src/test/examples/bazel-project");
-    private InferConfig bazel =
-            new InferConfig(bazelWorkspace, Collections.emptySet(), Paths.get("nowhere"), Paths.get("nowhere"));
-
     @Test
     public void bazelClassPath() {
+        var bazel = new InferConfig(Paths.get("src/test/examples/bazel-project"));
+        assertThat(bazel.classPath(), contains(hasToString(endsWith("guava-18.0-ijar.jar"))));
+    }
+
+    @Test
+    public void bazelClassPathInSubdir() {
+        var bazel = new InferConfig(Paths.get("src/test/examples/bazel-project/hello"));
         assertThat(bazel.classPath(), contains(hasToString(endsWith("guava-18.0-ijar.jar"))));
     }
 
     @Test
     public void bazelDocPath() {
+        var bazel = new InferConfig(Paths.get("src/test/examples/bazel-project"));
+        assertThat(bazel.buildDocPath(), contains(hasToString(endsWith("guava-18.0-sources.jar"))));
+    }
+
+    @Test
+    public void bazelDocPathInSubdir() {
+        var bazel = new InferConfig(Paths.get("src/test/examples/bazel-project/hello"));
         assertThat(bazel.buildDocPath(), contains(hasToString(endsWith("guava-18.0-sources.jar"))));
     }
 }
