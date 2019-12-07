@@ -12,7 +12,6 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.javacs.guava.ClassPath;
 
@@ -131,7 +130,7 @@ class ScanClassPath {
                     }
                 }
             } catch (IOException e) {
-                LOG.log(Level.WARNING, "Failed indexing module " + m + "(" + e.getMessage() + ")");
+                // LOG.log(Level.WARNING, "Failed indexing module " + m + "(" + e.getMessage() + ")");
             }
         }
 

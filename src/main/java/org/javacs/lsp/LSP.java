@@ -41,6 +41,7 @@ public class LSP {
 
     static class EndOfStream extends RuntimeException {}
 
+    // TODO this seems like it's probably really inefficient. Read in bulk?
     private static char read(InputStream client) {
         try {
             var c = client.read();
