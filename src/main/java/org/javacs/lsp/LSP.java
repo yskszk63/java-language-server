@@ -50,7 +50,8 @@ public class LSP {
             }
             return (char) c;
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            LOG.log(Level.SEVERE, e.getMessage(), e);
+            throw new EndOfStream();
         }
     }
 
