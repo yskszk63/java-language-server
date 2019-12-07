@@ -54,5 +54,8 @@ jobs:
             bazel version
         
       - run: mvn test
+      
+      - store_test_results:
+          path: target/surefire-reports
 
 
