@@ -13,11 +13,12 @@ A Java [language server](https://github.com/Microsoft/vscode-languageserver-prot
 ### Vim (with vim-lsc)
 
 - Checkout this repository
-- Run `./scripts/link_mac.sh`
+- Run `./scripts/link_{linux|mac|windows}.sh`
+- Run `mvn package -DskipTests`
 - Add the vim plugin [natebosch/vim-lsc](https://github.com/natebosch/vim-lsc) to your vimrc
 - Add vim-lsc configuration:
   ```vimrc
-  let g:lsc_server_commands = {'java': '<path-to-java-language-server>/java-language-server/dist/mac/bin/launcher --quiet'}
+  let g:lsc_server_commands = {'java': '<path-to-java-language-server>/java-language-server/dist/lang_server_{linux|mac|windows}.sh'}
   ```
 - See the [vim-lsc README](https://github.com/natebosch/vim-lsc/blob/master/README.md) for other configuration options.
 
