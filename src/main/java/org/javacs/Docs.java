@@ -50,17 +50,12 @@ public class Docs {
     }
 
     private static Path findSrcZip() {
-        // TODO try something else when JAVA_HOME isn't defined
-        var javaHome = System.getenv("JAVA_HOME");
-        if (javaHome == null) {
-            LOG.warning("Couldn't find src.zip because JAVA_HOME is not defined");
-            return NOT_FOUND;
-        }
+        var javaHome = JavaHomeHelper.javaHome();
         String[] locations = {
             "lib/src.zip", "src.zip",
         };
         for (var rel : locations) {
-            var abs = Paths.get(javaHome).resolve(rel);
+            var abs = javaHome.resolve(rel);
             if (Files.exists(abs)) {
                 LOG.info("Found " + abs);
                 return abs;

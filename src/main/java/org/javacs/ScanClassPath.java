@@ -11,12 +11,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.logging.Logger;
 import org.javacs.guava.ClassPath;
 
 class ScanClassPath {
 
+    // TODO delete this and implement findPublicTypeDeclarationInJdk some other way
     /** All exported modules that are present in JDK 10 or 11 */
     static String[] JDK_MODULES = {
         "java.activation",
@@ -142,15 +142,7 @@ class ScanClassPath {
     static Set<String> classPathTopLevelClasses(Set<Path> classPath) {
         LOG.info(String.format("Searching for top-level classes in %d classpath locations", classPath.size()));
 
-        Function<Path, URL> toUrl =
-                p -> {
-                    try {
-                        return p.toUri().toURL();
-                    } catch (MalformedURLException e) {
-                        throw new RuntimeException(e);
-                    }
-                };
-        var urls = classPath.stream().map(toUrl).toArray(URL[]::new);
+        var urls = classPath.stream().map(ScanClassPath::toUrl).toArray(URL[]::new);
         var classLoader = new URLClassLoader(urls, null);
         ClassPath scanner;
         try {
@@ -166,6 +158,14 @@ class ScanClassPath {
         LOG.info(String.format("Found %d classes in classpath", classes.size()));
 
         return classes;
+    }
+
+    private static URL toUrl(Path p) {
+        try {
+            return p.toUri().toURL();
+        } catch (MalformedURLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static final Logger LOG = Logger.getLogger("main");
