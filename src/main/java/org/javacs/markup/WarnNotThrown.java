@@ -78,9 +78,12 @@ class WarnNotThrown extends TreePathScanner<Void, Map<TreePath, String>> {
     @Override
     public Void visitMethodInvocation(MethodInvocationTree t, Map<TreePath, String> notThrown) {
         var trees = Trees.instance(task);
-        var method = (ExecutableElement) trees.getElement(getCurrentPath());
-        for (var type : method.getThrownTypes()) {
-            addThrown(type);
+        var target = trees.getElement(getCurrentPath());
+        if (target instanceof ExecutableElement) {
+            var method = (ExecutableElement) target;
+            for (var type : method.getThrownTypes()) {
+                addThrown(type);
+            }
         }
         return super.visitMethodInvocation(t, notThrown);
     }
