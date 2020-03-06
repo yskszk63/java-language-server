@@ -113,6 +113,13 @@ public class WarningsTest {
         assertThat(errors, empty());
     }
 
+    @Test
+    public void notThrown() {
+        server.lint(List.of(FindResource.path("org/javacs/warn/NotThrown.java")));
+        assertThat(errors, hasItem("unused_throws(6)"));
+        assertThat(errors, not(hasItem("unused_throws(8)")));
+    }
+
     // TODO warn on type.equals(otherType)
     // TODO warn on map.get(wrongKeyType)
 }

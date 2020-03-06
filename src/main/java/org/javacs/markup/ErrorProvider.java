@@ -57,10 +57,10 @@ public class ErrorProvider {
 
     private List<org.javacs.lsp.Diagnostic> notThrownWarnings(CompilationUnitTree root) {
         var result = new ArrayList<org.javacs.lsp.Diagnostic>();
-        var notThrown = new HashMap<String, TreePath>();
+        var notThrown = new HashMap<TreePath, String>();
         new WarnNotThrown(task.task).scan(root, notThrown);
-        for (var name : notThrown.keySet()) {
-            result.add(warnNotThrown(name, notThrown.get(name)));
+        for (var location : notThrown.keySet()) {
+            result.add(warnNotThrown(notThrown.get(location), location));
         }
         return result;
     }

@@ -1,6 +1,7 @@
 package org.javacs.markup;
 
 import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.tree.MethodInvocationTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.ThrowTree;
 import com.sun.source.util.JavacTask;
@@ -11,10 +12,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeMirror;
 
-class WarnNotThrown extends TreePathScanner<Void, Map<String, TreePath>> {
+class WarnNotThrown extends TreePathScanner<Void, Map<TreePath, String>> {
     private final JavacTask task;
     private CompilationUnitTree root;
     private Map<String, TreePath> declaredExceptions = new HashMap<>();
@@ -25,13 +28,13 @@ class WarnNotThrown extends TreePathScanner<Void, Map<String, TreePath>> {
     }
 
     @Override
-    public Void visitCompilationUnit(CompilationUnitTree t, Map<String, TreePath> notThrown) {
+    public Void visitCompilationUnit(CompilationUnitTree t, Map<TreePath, String> notThrown) {
         root = t;
         return super.visitCompilationUnit(t, notThrown);
     }
 
     @Override
-    public Void visitMethod(MethodTree t, Map<String, TreePath> notThrown) {
+    public Void visitMethod(MethodTree t, Map<TreePath, String> notThrown) {
         // Create a new method scope
         var pushDeclared = declaredExceptions;
         var pushObserved = observedExceptions;
@@ -40,9 +43,9 @@ class WarnNotThrown extends TreePathScanner<Void, Map<String, TreePath>> {
         // Recursively scan for 'throw' and method calls
         super.visitMethod(t, notThrown);
         // Check for exceptions that were never thrown
-        for (var declared : declaredExceptions.keySet()) {
-            if (!observedExceptions.contains(declared)) {
-                notThrown.put(declared, declaredExceptions.get(declared));
+        for (var exception : declaredExceptions.keySet()) {
+            if (!observedExceptions.contains(exception)) {
+                notThrown.put(declaredExceptions.get(exception), exception);
             }
         }
         declaredExceptions = pushDeclared;
@@ -65,15 +68,29 @@ class WarnNotThrown extends TreePathScanner<Void, Map<String, TreePath>> {
     }
 
     @Override
-    public Void visitThrow(ThrowTree t, Map<String, TreePath> notThrown) {
+    public Void visitThrow(ThrowTree t, Map<TreePath, String> notThrown) {
         var path = new TreePath(getCurrentPath(), t.getExpression());
         var type = Trees.instance(task).getTypeMirror(path);
+        addThrown(type);
+        return super.visitThrow(t, notThrown);
+    }
+
+    @Override
+    public Void visitMethodInvocation(MethodInvocationTree t, Map<TreePath, String> notThrown) {
+        var trees = Trees.instance(task);
+        var method = (ExecutableElement) trees.getElement(getCurrentPath());
+        for (var type : method.getThrownTypes()) {
+            addThrown(type);
+        }
+        return super.visitMethodInvocation(t, notThrown);
+    }
+
+    private void addThrown(TypeMirror type) {
         if (type instanceof DeclaredType) {
             var declared = (DeclaredType) type;
             var el = (TypeElement) declared.asElement();
             var name = el.getQualifiedName().toString();
             observedExceptions.add(name);
         }
-        return super.visitThrow(t, notThrown);
     }
 }
