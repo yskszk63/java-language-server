@@ -4,6 +4,6 @@ java_binary(
     main_class = "Hello",
     visibility = ["//visibility:public"],
     deps = [
-        "@com_google_guava_guava//jar",
+        "@maven//:com_google_guava_guava",
     ],
 )

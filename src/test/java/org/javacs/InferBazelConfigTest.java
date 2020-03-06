@@ -10,13 +10,13 @@ public class InferBazelConfigTest {
     @Test
     public void bazelClassPath() {
         var bazel = new InferConfig(Paths.get("src/test/examples/bazel-project"));
-        assertThat(bazel.classPath(), contains(hasToString(endsWith("guava-18.0-ijar.jar"))));
+        assertThat(bazel.classPath(), contains(hasToString(endsWith("guava-18.0.jar"))));
     }
 
     @Test
     public void bazelClassPathInSubdir() {
         var bazel = new InferConfig(Paths.get("src/test/examples/bazel-project/hello"));
-        assertThat(bazel.classPath(), contains(hasToString(endsWith("guava-18.0-ijar.jar"))));
+        assertThat(bazel.classPath(), contains(hasToString(endsWith("guava-18.0.jar"))));
     }
 
     @Test
