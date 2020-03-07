@@ -48,7 +48,7 @@ public class LanguageServerFixture {
                 });
     }
 
-    private static JavaLanguageServer getJavaLanguageServer(Path workspaceRoot, LanguageClient client) {
+    static JavaLanguageServer getJavaLanguageServer(Path workspaceRoot, LanguageClient client) {
         var server = new JavaLanguageServer(client);
         var init = new InitializeParams();
 

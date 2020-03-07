@@ -121,6 +121,9 @@ public class ErrorProvider {
     private org.javacs.lsp.Diagnostic warnUnused(Element unusedEl) {
         var trees = Trees.instance(task.task);
         var path = trees.getPath(unusedEl);
+        if (path == null) {
+            throw new RuntimeException(unusedEl + " has no path");
+        }
         var root = path.getCompilationUnit();
         var leaf = path.getLeaf();
         var pos = trees.getSourcePositions();
