@@ -3,17 +3,16 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as Path from "path";
 import * as FS from "fs";
-import {window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, debug, DebugConfiguration, Range, Position, TextDocument, TextDocumentContentProvider, CancellationToken, ProviderResult} from 'vscode';
+import {window, workspace, ExtensionContext, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, languages, IndentAction, Progress, ProgressLocation, debug, DebugConfiguration, Range, Position, TextDocument, TextDocumentContentProvider, CancellationToken, ProviderResult, ConfigurationChangeEvent} from 'vscode';
 import {LanguageClient, LanguageClientOptions, ServerOptions, NotificationType} from "vscode-languageclient";
-import {activateTreeSitter} from './treeSitter';
-import {decoration} from './textMate';
+import {loadStyles, decoration} from './textMate';
 import * as AdmZip from 'adm-zip';
 
 // If we want to profile using VisualVM, we have to run the language server using regular java, not jlink
 const visualVm = false;
 
 /** Called when extension is activated */
-export function activate(context: ExtensionContext) {
+export async function activate(context: ExtensionContext) {
     console.log('Activating Java');
 
     // Teach VSCode to open JAR files
@@ -96,21 +95,38 @@ export function activate(context: ExtensionContext) {
                 console.warn('No semantic colors for ' + editor.document.uri)
                 continue;
             }
-            const field = decoration('variable');
-            editor.setDecorations(field, c.fields.map(asRange));
+            function decorate(scope: string, ranges: RangeLike[]) {
+                const d = decoration(scope);
+                if (d == null) {
+                    console.warn(scope + ' is not defined in the current theme');
+                    return;
+                }
+                editor.setDecorations(d, ranges.map(asRange));
+            }
+            decorate('variable', c.fields);
             editor.setDecorations(statics, c.statics.map(asRange));
         }
     }
     function forgetSemanticColors(doc: TextDocument) {
         colors.delete(doc.uri.toString());
     }
+	// Load active color theme
+	async function onChangeConfiguration(event: ConfigurationChangeEvent) {
+        let colorizationNeedsReload: boolean = event.affectsConfiguration('workbench.colorTheme')
+			|| event.affectsConfiguration('editor.tokenColorCustomizations')
+		if (colorizationNeedsReload) {
+			await loadStyles()
+			applySemanticColors()
+		}
+	}
     client.onReady().then(() => {
         client.onNotification(new NotificationType('java/colors'), cacheSemanticColors);
         context.subscriptions.push(window.onDidChangeVisibleTextEditors(applySemanticColors));
-        workspace.onDidCloseTextDocument(forgetSemanticColors);
+        context.subscriptions.push(workspace.onDidCloseTextDocument(forgetSemanticColors));
+        context.subscriptions.push(workspace.onDidChangeConfiguration(onChangeConfiguration))
     });
-	
-	activateTreeSitter(context);
+    await loadStyles();
+    applySemanticColors();
 }
 
 // Allows VSCode to open files like jar:file:///path/to/dep.jar!/com/foo/Thing.java
