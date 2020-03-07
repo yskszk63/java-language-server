@@ -30,15 +30,30 @@
 					},
 					"patterns": [
 						{
+							"include": "#keywords"
+						},
+						{
+							"include": "#comments"
+						},
+						{
+							"include": "#types"
+						},
+						{
 							"begin": "{",
 							"end": "(?=})",
 							"name": "meta.class-body",
 							"patterns": [
 								{
+									"include": "#class-declaration"
+								},
+								{
 									"include": "#field-initializer"
 								},
 								{
 									"include": "#method-declaration"
+								},
+								{
+									"include": "#type-parameters"
 								},
 								{
 									"include": "#block"
@@ -51,6 +66,9 @@
 								},
 								{
 									"include": "#comments"
+								},
+								{
+									"include": "#types"
 								}
 							]
 						}
@@ -98,10 +116,33 @@
 						},
 						{
 							"include": "#comments"
+						},
+						{
+							"include": "#types"
 						}
 					]
 				}
 			]
+		},
+		"type-parameters": {
+			"match": "<[^<>]+>",
+			"name": "meta.type-parameters",
+			"captures": {
+				"0": {
+					"patterns": [
+						{
+							"include": "#keywords"
+						},
+						{
+							"include": "#comments"
+						},
+						{
+							"match": "\\b([A-Z]\\w*)\\b",
+							"name": "entity.name.type"
+						}
+					]
+				}
+			}
 		},
 		"block": {
 			"begin": "{",
@@ -119,6 +160,9 @@
 				},
 				{
 					"include": "#constants"
+				},
+				{
+					"include": "#types"
 				}
 			]
 		},
@@ -287,6 +331,49 @@
 							"name": "constant.character.escape"
 						}
 					]
+				}
+			]
+		},
+		"types": {
+			"patterns": [
+				{
+					"match": "\\b([a-z]\\w*\\.)*([A-Z]\\w*) +(?=\\w)",
+					"captures": {
+						"2": {
+							"name": "entity.name.type"
+						}
+					}
+				},
+				{
+					"match": "\\b([a-z]\\w*\\.)*([A-Z]\\w*) *(\\[\\])+",
+					"captures": {
+						"2": {
+							"name": "entity.name.type"
+						}
+					}
+				},
+				{
+					"match": "\\b(\\w+) *(?<GROUP><([^<>]|\\g<GROUP>)*>)",
+					"captures": {
+						"1": {
+							"name": "entity.name.type"
+						},
+						"2": {
+							"name": "meta.type-parameters",
+							"patterns": [
+								{
+									"include": "#keywords"
+								},
+								{
+									"include": "#comments"
+								},
+								{
+									"match": "\\b([a-z]\\w*\\.)*([A-Z]\\w*)\\b",
+									"name": "entity.name.type"
+								}
+							]
+						}
+					}
 				}
 			]
 		}
