@@ -36,7 +36,12 @@
 							"include": "#comments"
 						},
 						{
-							"include": "#types"
+							"match": "\\b([a-z]\\w*\\.)*([A-Z]\\w*)\\b",
+							"captures": {
+								"2": {
+									"name": "entity.name.type"
+								}
+							}
 						},
 						{
 							"begin": "{",
@@ -53,7 +58,7 @@
 									"include": "#method-declaration"
 								},
 								{
-									"include": "#type-parameters"
+									"include": "#type-parameters-declaration"
 								},
 								{
 									"include": "#block"
@@ -84,13 +89,7 @@
 					"name": "meta.field-initializer",
 					"patterns": [
 						{
-							"include": "#keywords"
-						},
-						{
-							"include": "#comments"
-						},
-						{
-							"include": "#constants"
+							"include": "#expressions"
 						}
 					]
 				}
@@ -124,9 +123,9 @@
 				}
 			]
 		},
-		"type-parameters": {
+		"type-parameters-declaration": {
 			"match": "<[^<>]+>",
-			"name": "meta.type-parameters",
+			"name": "meta.type-parameters-declaration",
 			"captures": {
 				"0": {
 					"patterns": [
@@ -153,16 +152,10 @@
 					"include": "#block"
 				},
 				{
-					"include": "#keywords"
-				},
-				{
-					"include": "#comments"
-				},
-				{
-					"include": "#constants"
-				},
-				{
 					"include": "#types"
+				},
+				{
+					"include": "#expressions"
 				}
 			]
 		},
@@ -214,6 +207,37 @@
 				}
 			]
 		},
+		"expressions": {
+			"patterns": [
+				{
+					"include": "#keywords"
+				},
+				{
+					"include": "#comments"
+				},
+				{
+					"include": "#constants"
+				},
+				{
+					"include": "#type-arguments"
+				},
+				{
+					"include": "#parens"
+				},
+				{
+					"begin": "\\(",
+					"end": "\\)",
+					"patterns": [
+						{
+							"include": "#expressions"
+						}
+					]
+				},
+				{
+					"include": "#new"
+				}
+			]
+		},
 		"keywords":  {
 			"patterns": [
 				{
@@ -233,7 +257,7 @@
 					"name": "keyword.control"
 				},
 				{
-					"match": "\\b(new|instanceof)\\b",
+					"match": "\\b(instanceof)\\b",
 					"name": "keyword.control"
 				},
 				{
@@ -359,7 +383,7 @@
 							"name": "entity.name.type"
 						},
 						"2": {
-							"name": "meta.type-parameters",
+							"name": "meta.type-parameters-declaration",
 							"patterns": [
 								{
 									"include": "#keywords"
@@ -369,7 +393,96 @@
 								},
 								{
 									"match": "\\b([a-z]\\w*\\.)*([A-Z]\\w*)\\b",
-									"name": "entity.name.type"
+									"captures": {
+										"2": {
+											"name": "entity.name.type"
+										}
+									}
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		"new": {
+			"begin": "\\b(new)\\b",
+			"end": "(?=;|\\)|\\.|,|:|}|=)",
+			"name": "meta.new",
+			"captures": {
+				"1": {
+					"name": "keyword.control"
+				}
+			},
+			"patterns": [
+				{
+					"include": "#expressions"
+				},
+				{
+					"match": "\\b([a-z]\\w*\\.)*([A-Z]\\w*)\\b",
+					"captures": {
+						"2": {
+							"name": "entity.name.type"
+						}
+					}
+				},
+				{
+					"begin": "{",
+					"end": "}",
+					"name": "meta.anonymous-class",
+					"patterns": [
+						{
+							"include": "#class-declaration"
+						},
+						{
+							"include": "#field-initializer"
+						},
+						{
+							"include": "#method-declaration"
+						},
+						{
+							"include": "#type-parameters-declaration"
+						},
+						{
+							"include": "#block"
+						},
+						{
+							"include": "#annotations"
+						},
+						{
+							"include": "#keywords"
+						},
+						{
+							"include": "#comments"
+						},
+						{
+							"include": "#types"
+						}
+					]
+				}
+			]
+		},
+		"type-arguments": {
+			"patterns": [
+				{
+					"match": "\\.(?<GROUP><([^<>]|\\g<GROUP>)*>)",
+					"name": "meta.type-arguments",
+					"captures": {
+						"1": {
+							"patterns": [
+								{
+									"include": "#keywords"
+								},
+								{
+									"include": "#comments"
+								},
+								{
+									"match": "\\b([a-z]\\w*\\.)*([A-Z]\\w*)\\b",
+									"captures": {
+										"2": {
+											"name": "entity.name.type"
+										}
+									}
 								}
 							]
 						}
