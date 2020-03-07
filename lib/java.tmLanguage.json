@@ -4,6 +4,9 @@
 	"scopeName": "source.java",
 	"patterns": [
 		{
+			"include": "#class-declaration"
+		},
+		{
 			"include": "#annotations"
 		},
 		{
@@ -11,12 +14,114 @@
 		},
 		{
 			"include": "#comments"
-		},
-		{
-			"include": "#constants"
 		}
 	],
 	"repository": {
+		"class-declaration": {
+			"patterns": [
+				{
+					"begin": "\\b(class|interface|enum)\\b",
+					"end": "}",
+					"name": "meta.class-declaration",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.class"
+						}
+					},
+					"patterns": [
+						{
+							"begin": "{",
+							"end": "(?=})",
+							"name": "meta.class-body",
+							"patterns": [
+								{
+									"include": "#field-initializer"
+								},
+								{
+									"include": "#method-declaration"
+								},
+								{
+									"include": "#block"
+								},
+								{
+									"include": "#annotations"
+								},
+								{
+									"include": "#keywords"
+								},
+								{
+									"include": "#comments"
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		"field-initializer": {
+			"patterns": [
+				{
+					"begin": "\\=",
+					"end": ";",
+					"name": "meta.field-initializer",
+					"patterns": [
+						{
+							"include": "#keywords"
+						},
+						{
+							"include": "#comments"
+						},
+						{
+							"include": "#constants"
+						}
+					]
+				}
+			]
+		},
+		"method-declaration": {
+			"patterns": [
+				{
+					"begin": "(\\w+)\\(",
+					"end": "\\)",
+					"name": "meta.method-declaration",
+					"beginCaptures": {
+						"1": {
+							"name": "entity.name.function"
+						}
+					},
+					"patterns": [
+						{
+							"include": "#annotations"
+						},
+						{
+							"include": "#keywords"
+						},
+						{
+							"include": "#comments"
+						}
+					]
+				}
+			]
+		},
+		"block": {
+			"begin": "{",
+			"end": "}",
+			"name": "meta.block",
+			"patterns": [
+				{
+					"include": "#block"
+				},
+				{
+					"include": "#keywords"
+				},
+				{
+					"include": "#comments"
+				},
+				{
+					"include": "#constants"
+				}
+			]
+		},
 		"annotations": {
 			"patterns": [
 				{
@@ -78,10 +183,6 @@
 				{
 					"match": "\\b(package|import)\\b",
 					"name": "keyword.package"
-				},
-				{
-					"match": "\\b(class|interface|enum)\\b",
-					"name": "keyword.class"
 				},
 				{
 					"match": "\\b(try|catch|finally|throw|throws|return|break|continue|do|for|while|switch|case|if|else|goto|synchronize|assert)\\b",
