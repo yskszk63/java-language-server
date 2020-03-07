@@ -58,13 +58,11 @@ export async function activate(context: ExtensionContext) {
 
     // Create the language client and start the client.
     let client = new LanguageClient('java', 'Java Language Server', serverOptions, clientOptions);
-    if (false) {
     let disposable = client.start();
 
     // Push the disposable to the context's subscriptions so that the 
     // client can be deactivated on extension deactivation
     context.subscriptions.push(disposable);
-    }
 
     // Register test commands
     commands.registerCommand('java.command.test.run', runTest);
