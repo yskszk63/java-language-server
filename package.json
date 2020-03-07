@@ -174,7 +174,7 @@
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "vscode:build": "vsce package -o build.vsix",
-        "vscode:publish": "vsce publish --patch",
+        "vscode:publish": "vsce publish patch",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
         "test": "npm run compile && node ./node_modules/vscode/bin/test",
