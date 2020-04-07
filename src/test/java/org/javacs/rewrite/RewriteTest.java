@@ -73,6 +73,32 @@ public class RewriteTest {
     }
 
     @Test
+    public void importAnnotation() {
+        var file = file("ImportAnnotation.java");
+        var edits = new AutoFixImports(file).rewrite(compiler);
+        assertThat(edits, hasKey(file));
+        for (var edit : edits.get(file)) {
+            if (edit.newText.contains("java.lang.annotation.Native")) {
+                return;
+            }
+        }
+        fail("didn't re-create import java.lang.annotation.Native");
+    }
+
+    @Test
+    public void importNotFound() {
+        var file = file("ImportNotFound.java");
+        var edits = new AutoFixImports(file).rewrite(compiler);
+        assertThat(edits, hasKey(file));
+        for (var edit : edits.get(file)) {
+            if (edit.newText.contains("foo.bar.Doh")) {
+                return;
+            }
+        }
+        fail("didn't re-create import foo.bar.Doh");
+    }
+
+    @Test
     public void dontImportEnum() {
         var file = file("DontImportEnum.java");
         var edits = new AutoFixImports(file).rewrite(compiler);
