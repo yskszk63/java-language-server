@@ -46,6 +46,11 @@ jobs:
             chmod +x bazel-2.2.0-installer-linux-x86_64.sh
             ./bazel-2.2.0-installer-linux-x86_64.sh --user
             echo "export PATH=$PATH:$HOME/bin" >> $BASH_ENV
+
+      - run:
+          name: Add CircleCI python to PATH
+          command: |
+            echo "export PATH=$PATH:/opt/circleci/.pyenv/libexec" >> $BASH_ENV
       
       - run:
           name: Verify environment
