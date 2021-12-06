@@ -115,6 +115,7 @@ class CompileBatch implements AutoCloseable {
 
         Collections.addAll(list, "-classpath", joinPath(classPath));
         Collections.addAll(list, "--add-modules", "ALL-MODULE-PATH");
+        Collections.addAll(list, "--add-modules", "jdk.incubator.foreign");
         // Collections.addAll(list, "-verbose");
         Collections.addAll(list, "-proc:none");
         Collections.addAll(list, "-g");

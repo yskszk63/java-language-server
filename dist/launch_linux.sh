@@ -10,4 +10,6 @@ JLINK_VM_OPTIONS="\
 --add-opens jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED"
 DIR=`dirname $0`
 CLASSPATH_OPTIONS="-classpath $DIR/classpath/gson-2.8.5.jar:$DIR/classpath/protobuf-java-3.9.1.jar:$DIR/classpath/java-language-server.jar"
-$DIR/linux/bin/java $JLINK_VM_OPTIONS $CLASSPATH_OPTIONS $@
+java="$DIR/linux/bin/java"
+[[ ! -f "$JAVA_HOME/bin/java" ]] || java="$JAVA_HOME/bin/java"
+"$java" $JLINK_VM_OPTIONS $CLASSPATH_OPTIONS $@
